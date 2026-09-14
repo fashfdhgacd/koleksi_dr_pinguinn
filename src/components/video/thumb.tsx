@@ -16,15 +16,11 @@ export function VideoThumb({
 
   if (!src || failed) {
     return (
-      <div
-        className={cn(
-          "flex size-full items-center justify-center bg-surface-2 text-sm tracking-wide text-muted",
-          className,
-        )}
-        aria-hidden="true"
-      >
-        {alt.slice(0, 1).toUpperCase() || "L"}
-      </div>
+      <img
+        src="/logo.svg"
+        alt=""
+        className={cn("size-full object-cover bg-surface-2", className)}
+      />
     );
   }
 

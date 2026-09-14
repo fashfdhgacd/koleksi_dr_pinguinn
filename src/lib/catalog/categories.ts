@@ -6,14 +6,14 @@ export type CategoryDef = CategoryInfo & {
 
 export const CATEGORIES: CategoryDef[] = [
   { slug: "jilbab", label: "Jilbab", query: "jilbab" },
-  { slug: "tante", label: "Tante / Janda", query: "tante" },
+  { slug: "tante", label: "Tante", query: "tante" },
   { slug: "amatir", label: "Amatir", query: "amatir" },
   { slug: "viral", label: "Viral", query: "viral" },
   { slug: "percakapan", label: "Percakapan", query: "percakapan" },
-  { slug: "kosan", label: "Pacar / Kosan", query: "kosan" },
+  { slug: "kosan", label: "Kosan", query: "kosan" },
   { slug: "colmek", label: "Colmek", query: "colmek" },
   { slug: "abg", label: "ABG", query: "abg" },
-  { slug: "istri", label: "Istri / Selingkuh", query: "istri" },
+  { slug: "istri", label: "Istri", query: "istri" },
   { slug: "live", label: "Live", query: "live" },
   { slug: "doggy", label: "Doggy", query: "doggy" },
   { slug: "open-bo", label: "Open BO", query: "open-bo" },
