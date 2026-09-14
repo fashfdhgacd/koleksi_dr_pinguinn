@@ -6,7 +6,7 @@ import {
   listLatest,
   listRelated,
   listSearch,
-} from "./archive";
+} from "./local";
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./types";
 import type { CatalogError, CatalogResponse, CatalogType, VideoCard } from "./types";
 

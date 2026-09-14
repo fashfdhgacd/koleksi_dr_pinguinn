@@ -5,18 +5,22 @@ export type CategoryDef = CategoryInfo & {
 };
 
 export const CATEGORIES: CategoryDef[] = [
-  { slug: "feature", label: "Film panjang", query: "collection:(feature_films)" },
-  { slug: "animation", label: "Animasi", query: "collection:(animationandcartoons)" },
-  { slug: "comedy", label: "Komedi", query: "subject:(comedy)" },
-  { slug: "drama", label: "Drama", query: "subject:(drama)" },
-  { slug: "horror", label: "Horor", query: "subject:(horror)" },
-  { slug: "scifi", label: "Fiksi ilmiah", query: 'subject:("science fiction" OR sci-fi OR scifi)' },
-  { slug: "action", label: "Aksi", query: "subject:(action OR adventure)" },
-  { slug: "western", label: "Western", query: "subject:(western)" },
-  { slug: "silent", label: "Film bisu", query: "subject:(silent)" },
-  { slug: "documentary", label: "Dokumenter", query: "collection:(prelinger) OR subject:(documentary)" },
-  { slug: "music", label: "Musik", query: "subject:(musical OR concert OR opera)" },
-  { slug: "classic", label: "Klasik", query: "year:[1890 TO 1959]" },
+  { slug: "jilbab", label: "Jilbab", query: "jilbab" },
+  { slug: "tante", label: "Tante / Janda", query: "tante" },
+  { slug: "amatir", label: "Amatir", query: "amatir" },
+  { slug: "viral", label: "Viral", query: "viral" },
+  { slug: "percakapan", label: "Percakapan", query: "percakapan" },
+  { slug: "kosan", label: "Pacar / Kosan", query: "kosan" },
+  { slug: "colmek", label: "Colmek", query: "colmek" },
+  { slug: "abg", label: "ABG", query: "abg" },
+  { slug: "istri", label: "Istri / Selingkuh", query: "istri" },
+  { slug: "live", label: "Live", query: "live" },
+  { slug: "doggy", label: "Doggy", query: "doggy" },
+  { slug: "open-bo", label: "Open BO", query: "open-bo" },
+  { slug: "malaysia", label: "Malaysia", query: "malaysia" },
+  { slug: "chindo", label: "Chindo", query: "chindo" },
+  { slug: "gangbang", label: "Gangbang", query: "gangbang" },
+  { slug: "lainnya", label: "Lainnya", query: "lainnya" },
 ];
 
 export const CATEGORY_LIST: CategoryInfo[] = CATEGORIES.map(({ slug, label }) => ({
