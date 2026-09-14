@@ -1,10 +1,9 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
-import { Analytics } from "@vercel/analytics/react";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "LAYAR";
+const APP_NAME = "DR. PINGUIN";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -14,7 +13,7 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       {
         name: "description",
-        content: "Streaming arsip film publik. Puluhan ribu judul, dimuat per batch.",
+        content: "Dr. Pinguin Bokep, M.S.B. Konten 18+. Koleksi video — masuk hanya jika dewasa.",
       },
       { name: "theme-color", content: "#09090b" },
     ],
@@ -46,7 +45,6 @@ function RootComponent() {
           <Outlet />
         </AuthProvider>
         <Scripts />
-        <Analytics />
       </body>
     </html>
   );

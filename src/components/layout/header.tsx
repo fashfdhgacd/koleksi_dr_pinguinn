@@ -37,8 +37,14 @@ export function Header({
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background">
       <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-3 px-4 sm:px-6">
-        <Link to="/" search={{ q: undefined, category: undefined }} className="shrink-0">
-          <span className="font-display text-[1.65rem] leading-none tracking-tight text-foreground">LAYAR</span>
+        <Link to="/" search={{ q: undefined, category: undefined }} className="flex shrink-0 items-center gap-2">
+          <img src="/logo.svg" alt="" width={32} height={32} className="size-8 rounded-lg bg-white object-cover" />
+          <span className="font-display text-[1.35rem] leading-none tracking-tight text-foreground">
+            DR. PINGUIN
+          </span>
+          <span className="hidden rounded-full border border-border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted sm:inline">
+            18+
+          </span>
         </Link>
 
         <form
@@ -56,12 +62,12 @@ export function Header({
           <Input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Cari judul, sutradara, arsip…"
+            placeholder="Cari judul / kategori…"
             className="pl-10 pr-10"
             type="search"
             enterKeyHint="search"
             autoComplete="off"
-            aria-label="Cari film"
+            aria-label="Cari judul"
           />
           {draft ? (
             <button

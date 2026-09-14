@@ -35,7 +35,7 @@ function HomePage() {
     ? `Hasil untuk “${q}”`
     : cat
       ? cat.label
-      : "Terbaru di arsip";
+      : "Terbaru di koleksi";
   const subtitle = feed.total
     ? `${feed.total.toLocaleString("id-ID")} judul · 24 per muatan`
     : "Dimuat per 24 judul";
@@ -67,7 +67,7 @@ function HomePage() {
                 description={
                   q
                     ? "Tidak ada judul yang cocok. Coba kata kunci yang lebih pendek atau kategori."
-                    : "Tidak ada film pada saringan ini."
+                    : "Tidak ada judul pada saringan ini."
                 }
               />
             ) : (

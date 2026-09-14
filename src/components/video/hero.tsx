@@ -16,7 +16,7 @@ export function Hero({ video }: { video: VideoCardType }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/55 to-background/10" />
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-4 p-5 sm:p-8 lg:max-w-2xl lg:p-10">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Pilihan arsip</p>
+          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Pilihan koleksi</p>
           <h1 className="font-display text-4xl leading-[1.1] text-foreground sm:text-5xl">{video.title}</h1>
           <p className="line-clamp-3 max-w-xl text-sm leading-relaxed text-muted">{video.description}</p>
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
