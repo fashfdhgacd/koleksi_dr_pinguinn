@@ -5,6 +5,10 @@ import part0 from "./data-0.json";
 import part1 from "./data-1.json";
 import part2 from "./data-2.json";
 import part3 from "./data-3.json";
+import part4 from "./data-4.json";
+import part5 from "./data-5.json";
+import part6 from "./data-6.json";
+import part7 from "./data-7.json";
 
 type RawItem = {
   id: string;
@@ -14,7 +18,16 @@ type RawItem = {
   c: string;
 };
 
-const ITEMS = [...(part0 as RawItem[]), ...(part1 as RawItem[]), ...(part2 as RawItem[]), ...(part3 as RawItem[])];
+const ITEMS = [
+  ...(part0 as RawItem[]),
+  ...(part1 as RawItem[]),
+  ...(part2 as RawItem[]),
+  ...(part3 as RawItem[]),
+  ...(part4 as RawItem[]),
+  ...(part5 as RawItem[]),
+  ...(part6 as RawItem[]),
+  ...(part7 as RawItem[]),
+];
 
 function pageOf<T>(items: T[], page = 1, limit = DEFAULT_PAGE_SIZE) {
   const p = Math.max(1, page);
