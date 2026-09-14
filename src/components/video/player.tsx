@@ -1,55 +1,70 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, LoaderCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { VideoDetail, VideoQuality } from "@/lib/catalog/types";
+import { hostLabel, resolveSource, type ResolvedSource } from "@/lib/catalog/embed";
 import { VideoThumb } from "./thumb";
 import { cn } from "@/lib/utils";
 
+function sourcesFromItem(item: VideoDetail): ResolvedSource[] {
+  const raw = [
+    item.video_url,
+    ...item.qualities.map((q) => q.url),
+  ].filter((u): u is string => Boolean(u));
+  const seen = new Set<string>();
+  const out: ResolvedSource[] = [];
+  for (const url of raw) {
+    const resolved = resolveSource(url);
+    if (!resolved || seen.has(resolved.url)) continue;
+    seen.add(resolved.url);
+    out.push(resolved);
+  }
+  return out;
+}
+
 export function VideoPlayer({ item }: { item: VideoDetail }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const list = useMemo(() => sourcesFromItem(item), [item]);
+  const [active, setActive] = useState(0);
   const [started, setStarted] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [qualityUrl, setQualityUrl] = useState(item.video_url);
+  const [fallbackAt, setFallbackAt] = useState(0);
+
+  const current = list[active] ?? null;
+  const playUrl = current?.fallbacks[fallbackAt] ?? current?.url ?? null;
 
   useEffect(() => {
+    setActive(0);
     setStarted(false);
     setBuffering(false);
     setFailed(false);
-    setQualityUrl(item.video_url);
-  }, [item.id, item.video_url]);
+    setFallbackAt(0);
+  }, [item.id]);
 
-  const qualities = item.qualities;
-  const canPlay = Boolean(qualityUrl);
-
-  function startPlayback(url = qualityUrl) {
-    if (!url) {
+  function start() {
+    if (!current || !playUrl) {
       setFailed(true);
       return;
     }
     setFailed(false);
-    setQualityUrl(url);
     setStarted(true);
-    setBuffering(true);
+    setBuffering(current.mode === "video");
+  }
+
+  function pickSource(index: number) {
+    setActive(index);
+    setFallbackAt(0);
+    setFailed(false);
+    setStarted(true);
+    setBuffering(list[index]?.mode === "video");
   }
 
   function changeQuality(next: VideoQuality) {
-    const node = videoRef.current;
-    const time = node?.currentTime ?? 0;
-    const wasPaused = node?.paused ?? false;
-    setQualityUrl(next.url);
-    setFailed(false);
-    setStarted(true);
-    requestAnimationFrame(() => {
-      const el = videoRef.current;
-      if (!el) return;
-      const resume = () => {
-        el.currentTime = time;
-        if (!wasPaused) void el.play().catch(() => setFailed(true));
-        el.removeEventListener("loadedmetadata", resume);
-      };
-      el.addEventListener("loadedmetadata", resume);
-    });
+    const resolved = resolveSource(next.url);
+    if (!resolved) return;
+    const idx = list.findIndex((s) => s.url === resolved.url);
+    pickSource(idx >= 0 ? idx : 0);
   }
 
   return (
@@ -62,18 +77,28 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
             <button
               type="button"
               className="absolute inset-0 flex items-center justify-center"
-              onClick={() => startPlayback()}
-              disabled={!canPlay}
-              aria-label={canPlay ? `Putar ${item.title}` : "Video tidak tersedia"}
+              onClick={start}
+              disabled={!current}
+              aria-label={current ? `Putar ${item.title}` : "Video tidak tersedia"}
             >
               <span className="flex size-16 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform duration-150 active:scale-[0.96]">
                 <Play className="size-6 fill-current" style={{ marginLeft: 3 }} />
               </span>
             </button>
           </>
+        ) : current?.mode === "iframe" && playUrl ? (
+          <iframe
+            key={playUrl}
+            src={playUrl}
+            title={item.title}
+            className="size-full border-0 bg-background"
+            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
+            referrerPolicy="origin"
+            allowFullScreen
+          />
         ) : (
           <video
-            key={qualityUrl ?? item.id}
+            key={playUrl ?? item.id}
             ref={videoRef}
             className="size-full bg-background object-contain"
             poster={item.thumbnail}
@@ -81,7 +106,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
             playsInline
             preload="metadata"
             autoPlay
-            src={qualityUrl ?? undefined}
+            src={playUrl ?? undefined}
             onWaiting={() => setBuffering(true)}
             onPlaying={() => {
               setBuffering(false);
@@ -89,13 +114,18 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
             }}
             onCanPlay={() => setBuffering(false)}
             onError={() => {
+              const next = fallbackAt + 1;
+              if (current && next < current.fallbacks.length) {
+                setFallbackAt(next);
+                return;
+              }
               setBuffering(false);
               setFailed(true);
             }}
           />
         )}
 
-        {buffering && started ? (
+        {buffering && started && current?.mode === "video" ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/30">
             <LoaderCircle className="size-8 animate-spin text-foreground" />
           </div>
@@ -105,12 +135,13 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 px-6 text-center">
             <AlertTriangle className="size-7 text-destructive" />
             <p className="max-w-sm text-sm text-muted">
-              Sumber video gagal dimuat. Coba kualitas lain atau ulangi.
+              Sumber gagal dimuat. Coba host lain atau ulangi.
             </p>
             <Button
               onClick={() => {
                 setFailed(false);
-                startPlayback(qualityUrl);
+                setFallbackAt(0);
+                start();
               }}
             >
               Coba lagi
@@ -118,30 +149,51 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
           </div>
         ) : null}
 
-        {!canPlay && !started ? (
+        {!current && !started ? (
           <div className="absolute inset-x-0 bottom-0 p-4 text-center text-sm text-muted">
             File putar tidak tersedia untuk judul ini.
           </div>
         ) : null}
       </div>
 
-      {qualities.length > 1 ? (
+      {list.length > 1 ? (
+        <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
+          <span className="text-xs text-muted">Host</span>
+          {list.map((src, i) => (
+            <button
+              key={src.url}
+              type="button"
+              onClick={() => pickSource(i)}
+              className={cn(
+                "h-8 rounded-md px-2.5 text-xs font-medium transition-colors duration-150",
+                i === active ? "bg-primary text-primary-foreground" : "bg-secondary text-muted",
+              )}
+            >
+              {src.host}
+            </button>
+          ))}
+        </div>
+      ) : item.qualities.length > 1 ? (
         <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
           <span className="text-xs text-muted">Kualitas</span>
-          {qualities.map((q) => (
+          {item.qualities.map((q) => (
             <button
               key={q.url}
               type="button"
               onClick={() => changeQuality(q)}
               className={cn(
                 "h-8 rounded-md px-2.5 text-xs font-medium transition-colors duration-150",
-                q.url === qualityUrl ? "bg-primary text-primary-foreground" : "bg-secondary text-muted",
+                resolveSource(q.url)?.url === current?.url
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-muted",
               )}
             >
-              {q.label}
+              {q.label || hostLabel(q.url)}
             </button>
           ))}
         </div>
+      ) : current ? (
+        <div className="border-t border-border px-4 py-2 text-xs text-muted">Sumber: {current.host}</div>
       ) : null}
     </div>
   );
