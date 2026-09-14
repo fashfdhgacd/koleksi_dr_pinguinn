@@ -32,6 +32,8 @@ function videyCdns(id: string): string[] {
 export function hostLabel(url: string): string {
   const s = url.toLowerCase();
   if (/videy/.test(s)) return "Videy";
+  if (/indoav/.test(s)) return "IndoAV";
+  if (/userbokep/.test(s)) return "UserBokep";
   if (/streamtape|campur|lulu/.test(s)) return "Streamtape";
   if (/putarin|puterin/.test(s)) return "Puterin";
   if (/archive\.org/.test(s)) return "Arsip";
@@ -46,8 +48,8 @@ export function resolveSource(raw: string | null | undefined): ResolvedSource | 
   if (!raw) return null;
   const url = raw.replace("/d/", "/e/");
   const id = videyId(url);
-  if (id || /videy/i.test(url) || /\.mp4($|\?)/i.test(url)) {
-    const fallbacks = id ? videyCdns(id) : [url];
+  if ((id && /videy/i.test(url)) || /\.mp4($|\?)/i.test(url)) {
+    const fallbacks = id && /videy/i.test(url) ? videyCdns(id) : [url];
     return {
       mode: "video",
       url: fallbacks[0],
