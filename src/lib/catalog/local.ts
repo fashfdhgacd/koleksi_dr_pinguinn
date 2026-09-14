@@ -4,6 +4,10 @@ import { findCategory } from "./categories";
 import localCatalog from "./videos.json";
 
 const SITE_CATALOG = "https://www.koleksidrpinguin.site/data/videos.json";
+const POSTER_URLS = [
+  "https://www.koleksidrpinguin.site/data/posters.json",
+  "https://www.koleksidrpinguin.site/data/latest-posters.json",
+];
 const CACHE_MS = 10 * 60 * 1000;
 
 type RawItem = {
@@ -52,18 +56,21 @@ function cleanTitle(title: string): string {
   );
 }
 
+function embedId(embed: string): string {
+  const m =
+    embed.match(/[?&]id=([A-Za-z0-9_-]+)/i) ||
+    embed.match(/\/(?:e|v|d)\/([A-Za-z0-9_-]+)/i);
+  return m ? m[1] : "";
+}
+
 function embedKey(embed: string): string {
-  const m = embed.match(/\/[ed]\/([A-Za-z0-9_-]+)/i);
-  if (m) return m[1].toLowerCase();
-  const q = embed.match(/[?&]id=([A-Za-z0-9_-]+)/i);
-  if (q) return q[1].toLowerCase();
-  return embed.toLowerCase();
+  return embedId(embed).toLowerCase() || embed.toLowerCase();
 }
 
 function makeId(raw: Record<string, unknown>): string {
   if (raw.id != null && String(raw.id).trim()) return String(raw.id);
   const embed = String(raw.embed || raw.direct || "");
-  const key = embedKey(embed);
+  const key = embedId(embed);
   return key || `t${Math.abs(hash(String(raw.title || embed)))}`;
 }
 
@@ -105,11 +112,34 @@ function merge(lists: Array<unknown>): RawItem[] {
   return out;
 }
 
-let cache: { at: number; items: RawItem[] } | null = null;
+let cache: { at: number; items: RawItem[]; posters: Record<string, string> } | null = null;
 
-async function loadItems(): Promise<RawItem[]> {
+async function loadPosters(): Promise<Record<string, string>> {
+  const map: Record<string, string> = {};
+  await Promise.all(
+    POSTER_URLS.map(async (url) => {
+      try {
+        const res = await fetch(url, { headers: { accept: "application/json" } });
+        if (!res.ok) return;
+        const data = (await res.json()) as Record<string, unknown>;
+        if (!data || Array.isArray(data)) return;
+        for (const [key, value] of Object.entries(data)) {
+          const src = String(value || "").trim();
+          if (!key || !/^https?:\/\//i.test(src)) continue;
+          map[key] = src;
+          map[key.toLowerCase()] = src;
+        }
+      } catch {
+        /* ignore */
+      }
+    }),
+  );
+  return map;
+}
+
+async function loadItems(): Promise<{ items: RawItem[]; posters: Record<string, string> }> {
   const now = Date.now();
-  if (cache && now - cache.at < CACHE_MS) return cache.items;
+  if (cache && now - cache.at < CACHE_MS) return cache;
 
   let remote: unknown = [];
   try {
@@ -119,9 +149,9 @@ async function loadItems(): Promise<RawItem[]> {
     remote = [];
   }
 
-  const items = merge([remote, localCatalog]);
-  cache = { at: now, items };
-  return items;
+  const [items, posters] = await Promise.all([Promise.resolve(merge([remote, localCatalog])), loadPosters()]);
+  cache = { at: now, items, posters };
+  return cache;
 }
 
 function pageOf<T>(items: T[], page = 1, limit = DEFAULT_PAGE_SIZE) {
@@ -135,28 +165,22 @@ function pageOf<T>(items: T[], page = 1, limit = DEFAULT_PAGE_SIZE) {
   };
 }
 
-function thumbOf(item: RawItem): string {
-  const id = embedKey(item.embed);
-  const host = /indoav/i.test(item.embed)
-    ? "indoav"
-    : /userbokep/i.test(item.embed)
-      ? "userbokep"
-      : /videy/i.test(item.embed)
-        ? "videy"
-        : "";
-  if (id && host) {
-    return `https://www.koleksidrpinguin.site/api/thumb?h=${host}&id=${encodeURIComponent(id)}`;
+function thumbOf(item: RawItem, posters: Record<string, string>): string {
+  const id = embedId(item.embed);
+  if (id) {
+    const hit = posters[id] || posters[id.toLowerCase()];
+    if (hit) return hit;
   }
   return "/logo.svg";
 }
 
-function toCard(item: RawItem): VideoCard {
+function toCard(item: RawItem, posters: Record<string, string>): VideoCard {
   const slug = classify(item.title || "");
   const label = findCategory(slug)?.label ?? "Lainnya";
   return {
     id: item.id,
     title: cleanTitle(item.title || ""),
-    thumbnail: thumbOf(item),
+    thumbnail: thumbOf(item, posters),
     description: `${label} · ${item.source || "embed"}`,
     category: label,
     duration: null,
@@ -168,8 +192,8 @@ function toCard(item: RawItem): VideoCard {
   };
 }
 
-function toDetail(item: RawItem): VideoDetail {
-  const card = toCard(item);
+function toDetail(item: RawItem, posters: Record<string, string>): VideoDetail {
+  const card = toCard(item, posters);
   const qualities = [{ label: item.source || "Embed", url: item.embed, format: "embed" }];
   if (item.direct && item.direct !== item.embed) {
     qualities.push({ label: "Direct", url: item.direct, format: "direct" });
@@ -188,44 +212,49 @@ function slugOf(item: RawItem): string {
 }
 
 export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE): Promise<PagedVideos> {
-  const all = await loadItems();
-  const { slice, total, hasMore } = pageOf(all, page, limit);
-  return { page, limit, total, hasMore, items: slice.map(toCard) };
+  const { items, posters } = await loadItems();
+  const { slice, total, hasMore } = pageOf(items, page, limit);
+  return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
 
 export async function listFeatured(page = 1, limit = 8): Promise<PagedVideos> {
-  const all = await loadItems();
-  const featured = all.filter((x) => ["jilbab", "tante", "viral", "live"].includes(slugOf(x))).slice(0, 24);
-  const source = featured.length ? featured : all;
+  const { items, posters } = await loadItems();
+  const featured = items.filter((x) => ["jilbab", "tante", "viral", "live"].includes(slugOf(x))).slice(0, 24);
+  const source = featured.length ? featured : items;
   const { slice, total, hasMore } = pageOf(source, page, limit);
-  return { page, limit, total, hasMore, items: slice.map(toCard) };
+  return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
 
 export async function listCategory(slug: string, page = 1, limit = DEFAULT_PAGE_SIZE): Promise<PagedVideos> {
-  const all = (await loadItems()).filter((x) => slugOf(x) === slug);
-  const { slice, total, hasMore } = pageOf(all, page, limit);
-  return { page, limit, total, hasMore, items: slice.map(toCard) };
+  const { items, posters } = await loadItems();
+  const filtered = items.filter((x) => slugOf(x) === slug);
+  const { slice, total, hasMore } = pageOf(filtered, page, limit);
+  return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
 
 export async function listSearch(q: string, page = 1, limit = DEFAULT_PAGE_SIZE): Promise<PagedVideos> {
   const key = q.trim().toLowerCase();
-  const all = (await loadItems()).filter((x) => `${x.title} ${x.source ?? ""}`.toLowerCase().includes(key));
-  const { slice, total, hasMore } = pageOf(all, page, limit);
-  return { page, limit, total, hasMore, items: slice.map(toCard) };
+  const { items, posters } = await loadItems();
+  const filtered = items.filter((x) => `${x.title} ${x.source ?? ""}`.toLowerCase().includes(key));
+  const { slice, total, hasMore } = pageOf(filtered, page, limit);
+  return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
 
 export async function getDetail(id: string): Promise<VideoDetail> {
-  const item = (await loadItems()).find((x) => x.id === id);
+  const { items, posters } = await loadItems();
+  const item = items.find((x) => x.id === id);
   if (!item) {
     throw Object.assign(new Error("Video tidak ditemukan."), { code: "not_found" as const });
   }
-  return toDetail(item);
+  return toDetail(item, posters);
 }
 
 export async function listRelated(id: string, limit = 12): Promise<PagedVideos> {
-  const all = await loadItems();
-  const current = all.find((x) => x.id === id);
-  const pool = current ? all.filter((x) => x.id !== id && slugOf(x) === slugOf(current)) : all.filter((x) => x.id !== id);
-  const items = (pool.length ? pool : all.filter((x) => x.id !== id)).slice(0, limit).map(toCard);
-  return { page: 1, limit, total: items.length, hasMore: false, items };
+  const { items, posters } = await loadItems();
+  const current = items.find((x) => x.id === id);
+  const pool = current
+    ? items.filter((x) => x.id !== id && slugOf(x) === slugOf(current))
+    : items.filter((x) => x.id !== id);
+  const picked = (pool.length ? pool : items.filter((x) => x.id !== id)).slice(0, limit);
+  return { page: 1, limit, total: picked.length, hasMore: false, items: picked.map((x) => toCard(x, posters)) };
 }
