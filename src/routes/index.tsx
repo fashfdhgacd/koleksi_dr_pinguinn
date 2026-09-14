@@ -31,14 +31,8 @@ function HomePage() {
   const hero = !q && !category ? feed.featured[0] : undefined;
   const gridItems = hero ? feed.items.filter((item) => item.id !== hero.id) : feed.items;
 
-  const title = q
-    ? `Hasil untuk “${q}”`
-    : cat
-      ? cat.label
-      : "Terbaru di koleksi";
-  const subtitle = feed.total
-    ? `${feed.total.toLocaleString("id-ID")} judul · 24 per muatan`
-    : "Dimuat per 24 judul";
+  const title = q ? `Hasil untuk “${q}”` : cat ? cat.label : "Terbaru";
+  const subtitle = feed.total ? `${feed.total.toLocaleString("id-ID")} judul` : "Koleksi Dr. Pinguin";
 
   return (
     <Shell query={q} category={category}>
@@ -66,7 +60,7 @@ function HomePage() {
                 title={q ? "Tidak ada hasil" : "Katalog kosong"}
                 description={
                   q
-                    ? "Tidak ada judul yang cocok. Coba kata kunci yang lebih pendek atau kategori."
+                    ? "Tidak ada judul yang cocok. Coba kata kunci lain."
                     : "Tidak ada judul pada saringan ini."
                 }
               />
