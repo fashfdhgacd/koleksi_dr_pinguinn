@@ -44,19 +44,24 @@ export function hostLabel(url: string): string {
   }
 }
 
+function isFile(url: string): boolean {
+  return /\.(mp4|mov|webm)($|\?)/i.test(url);
+}
+
 export function resolveSource(raw: string | null | undefined): ResolvedSource | null {
   if (!raw) return null;
   const url = raw.replace("/d/", "/e/");
   const id = videyId(url);
   if (id && /videy/i.test(url)) {
+    const page = `https://videy.co/v/?id=${encodeURIComponent(id)}`;
     return {
       mode: "iframe",
-      url: `https://videy.co/v/?id=${encodeURIComponent(id)}`,
-      fallbacks: videyCdns(id),
+      url: page,
+      fallbacks: [page, ...videyCdns(id)],
       host: "Videy",
     };
   }
-  if (/\.mp4($|\?)/i.test(url) || /\.mov($|\?)/i.test(url)) {
+  if (isFile(url)) {
     return {
       mode: "video",
       url,
