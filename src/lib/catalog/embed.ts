@@ -48,12 +48,19 @@ export function resolveSource(raw: string | null | undefined): ResolvedSource | 
   if (!raw) return null;
   const url = raw.replace("/d/", "/e/");
   const id = videyId(url);
-  if ((id && /videy/i.test(url)) || /\.mp4($|\?)/i.test(url)) {
-    const fallbacks = id && /videy/i.test(url) ? videyCdns(id) : [url];
+  if (id && /videy/i.test(url)) {
+    return {
+      mode: "iframe",
+      url: `https://videy.co/v/?id=${encodeURIComponent(id)}`,
+      fallbacks: videyCdns(id),
+      host: "Videy",
+    };
+  }
+  if (/\.mp4($|\?)/i.test(url) || /\.mov($|\?)/i.test(url)) {
     return {
       mode: "video",
-      url: fallbacks[0],
-      fallbacks,
+      url,
+      fallbacks: [url],
       host: hostLabel(url),
     };
   }
