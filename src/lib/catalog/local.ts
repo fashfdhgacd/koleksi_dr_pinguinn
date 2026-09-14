@@ -1,33 +1,53 @@
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
 import { findCategory } from "./categories";
-import part0 from "./data-0.json";
-import part1 from "./data-1.json";
-import part2 from "./data-2.json";
-import part3 from "./data-3.json";
-import part4 from "./data-4.json";
-import part5 from "./data-5.json";
-import part6 from "./data-6.json";
-import part7 from "./data-7.json";
+import catalog from "./videos.json";
 
 type RawItem = {
-  id: string;
+  id: string | number;
   title: string;
   embed: string;
+  direct?: string;
   source?: string;
-  c: string;
+  category?: string;
 };
 
-const ITEMS = [
-  ...(part0 as RawItem[]),
-  ...(part1 as RawItem[]),
-  ...(part2 as RawItem[]),
-  ...(part3 as RawItem[]),
-  ...(part4 as RawItem[]),
-  ...(part5 as RawItem[]),
-  ...(part6 as RawItem[]),
-  ...(part7 as RawItem[]),
+const RULES: Array<[string, RegExp]> = [
+  ["jilbab", /jilbab|hijab|ukhty|ukhti|tudung|berhijab/i],
+  ["tante", /tante|janda|\bstw\b|milf|ibu ?tiri|\bemak\b/i],
+  ["live", /\blive\b/i],
+  ["chindo", /chindo/i],
+  ["malaysia", /malay|malaysia/i],
+  ["open-bo", /open ?bo|michat/i],
+  ["percakapan", /percakapan/i],
+  ["viral", /viral/i],
+  ["gangbang", /gangbang|gilir|rame rame|threesome|foursome|bertiga/i],
+  ["doggy", /doggy|nungging/i],
+  ["colmek", /colmek|omek|coliin|dildo/i],
+  ["kosan", /pacar|kosan|check ?in|hotel|\bkos\b|\bkost\b/i],
+  ["istri", /istri|suami|selingkuh|hamil/i],
+  ["amatir", /amatir|bokepindo|bokep indo|pasutri|pasangan/i],
+  ["abg", /\babg\b|\bsma\b|mahasiswi|mahasiswa|pelajar/i],
 ];
+
+function classify(title: string): string {
+  for (const [slug, re] of RULES) {
+    if (re.test(title)) return slug;
+  }
+  return "lainnya";
+}
+
+function cleanTitle(title: string): string {
+  return title
+    .replace(/^\u25b6\s*/, "")
+    .replace(/Collection Dr\.?\s*Anjing Bokep[^,]*[,.]?\s*S\.\s*M\.\s*Sc\.?/gi, "")
+    .replace(/koleksidrpinguin\.com/gi, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^[\-|]+|[\-|]+$/g, "") || "Video";
+}
+
+const ITEMS: RawItem[] = (catalog as RawItem[]).slice().sort((a, b) => Number(b.id) - Number(a.id));
 
 function pageOf<T>(items: T[], page = 1, limit = DEFAULT_PAGE_SIZE) {
   const p = Math.max(1, page);
@@ -46,22 +66,18 @@ function embedId(embed: string): string {
 }
 
 function thumbOf(item: RawItem): string {
-  const id = embedId(item.embed);
+  const id = embedId(item.embed || "");
   const host = /indoav/i.test(item.embed) ? "indoav" : /userbokep/i.test(item.embed) ? "userbokep" : "";
   if (id && host) return `https://www.koleksidrpinguin.site/api/thumb?h=${host}&id=${encodeURIComponent(id)}`;
   return "/logo.svg";
 }
 
-function directOf(embed: string): string {
-  return embed.replace("/e/", "/d/");
-}
-
 function toCard(item: RawItem): VideoCard {
-  const cat = findCategory(item.c);
-  const label = cat?.label ?? "Lainnya";
+  const slug = classify(item.title || "");
+  const label = findCategory(slug)?.label ?? "Lainnya";
   return {
-    id: item.id,
-    title: item.title,
+    id: String(item.id),
+    title: cleanTitle(item.title || ""),
     thumbnail: thumbOf(item),
     description: `${label} · ${item.source || "embed"}`,
     category: label,
@@ -77,8 +93,9 @@ function toCard(item: RawItem): VideoCard {
 function toDetail(item: RawItem): VideoDetail {
   const card = toCard(item);
   const qualities = [{ label: item.source || "Embed", url: item.embed, format: "embed" }];
-  const direct = directOf(item.embed);
-  if (direct !== item.embed) qualities.push({ label: "Direct", url: direct, format: "direct" });
+  if (item.direct && item.direct !== item.embed) {
+    qualities.push({ label: "Direct", url: item.direct, format: "direct" });
+  }
   return {
     ...card,
     video_url: item.embed,
@@ -88,33 +105,37 @@ function toDetail(item: RawItem): VideoDetail {
   };
 }
 
+function slugOf(item: RawItem): string {
+  return classify(item.title || "");
+}
+
 export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE): Promise<PagedVideos> {
   const { slice, total, hasMore } = pageOf(ITEMS, page, limit);
   return { page, limit, total, hasMore, items: slice.map(toCard) };
 }
 
 export async function listFeatured(page = 1, limit = 8): Promise<PagedVideos> {
-  const featured = ITEMS.filter((x) => ["jilbab", "tante", "viral", "live"].includes(x.c)).slice(0, 24);
+  const featured = ITEMS.filter((x) => ["jilbab", "tante", "viral", "live"].includes(slugOf(x))).slice(0, 24);
   const source = featured.length ? featured : ITEMS;
   const { slice, total, hasMore } = pageOf(source, page, limit);
   return { page, limit, total, hasMore, items: slice.map(toCard) };
 }
 
 export async function listCategory(slug: string, page = 1, limit = DEFAULT_PAGE_SIZE): Promise<PagedVideos> {
-  const items = ITEMS.filter((x) => x.c === slug);
+  const items = ITEMS.filter((x) => slugOf(x) === slug);
   const { slice, total, hasMore } = pageOf(items, page, limit);
   return { page, limit, total, hasMore, items: slice.map(toCard) };
 }
 
 export async function listSearch(q: string, page = 1, limit = DEFAULT_PAGE_SIZE): Promise<PagedVideos> {
   const key = q.trim().toLowerCase();
-  const items = ITEMS.filter((x) => `${x.title} ${x.c} ${x.source ?? ""}`.toLowerCase().includes(key));
+  const items = ITEMS.filter((x) => `${x.title} ${x.source ?? ""}`.toLowerCase().includes(key));
   const { slice, total, hasMore } = pageOf(items, page, limit);
   return { page, limit, total, hasMore, items: slice.map(toCard) };
 }
 
 export async function getDetail(id: string): Promise<VideoDetail> {
-  const item = ITEMS.find((x) => x.id === id);
+  const item = ITEMS.find((x) => String(x.id) === id);
   if (!item) {
     throw Object.assign(new Error("Video tidak ditemukan."), { code: "not_found" as const });
   }
@@ -122,8 +143,10 @@ export async function getDetail(id: string): Promise<VideoDetail> {
 }
 
 export async function listRelated(id: string, limit = 12): Promise<PagedVideos> {
-  const current = ITEMS.find((x) => x.id === id);
-  const pool = current ? ITEMS.filter((x) => x.id !== id && x.c === current.c) : ITEMS.filter((x) => x.id !== id);
-  const items = (pool.length ? pool : ITEMS.filter((x) => x.id !== id)).slice(0, limit).map(toCard);
+  const current = ITEMS.find((x) => String(x.id) === id);
+  const pool = current
+    ? ITEMS.filter((x) => String(x.id) !== id && slugOf(x) === slugOf(current))
+    : ITEMS.filter((x) => String(x.id) !== id);
+  const items = (pool.length ? pool : ITEMS.filter((x) => String(x.id) !== id)).slice(0, limit).map(toCard);
   return { page: 1, limit, total: items.length, hasMore: false, items };
 }
