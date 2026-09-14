@@ -7,10 +7,7 @@ import { VideoThumb } from "./thumb";
 import { cn } from "@/lib/utils";
 
 function sourcesFromItem(item: VideoDetail): ResolvedSource[] {
-  const raw = [
-    item.video_url,
-    ...item.qualities.map((q) => q.url),
-  ].filter((u): u is string => Boolean(u));
+  const raw = [item.video_url, ...item.qualities.map((q) => q.url)].filter((u): u is string => Boolean(u));
   const seen = new Set<string>();
   const out: ResolvedSource[] = [];
   for (const url of raw) {
@@ -20,6 +17,10 @@ function sourcesFromItem(item: VideoDetail): ResolvedSource[] {
     out.push(resolved);
   }
   return out;
+}
+
+function isFileUrl(url: string | null): boolean {
+  return Boolean(url && /\.(mp4|mov|webm)($|\?)/i.test(url));
 }
 
 export function VideoPlayer({ item }: { item: VideoDetail }) {
@@ -33,6 +34,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
 
   const current = list[active] ?? null;
   const playUrl = current?.fallbacks[fallbackAt] ?? current?.url ?? null;
+  const useVideo = isFileUrl(playUrl);
 
   useEffect(() => {
     setActive(0);
@@ -49,7 +51,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     }
     setFailed(false);
     setStarted(true);
-    setBuffering(current.mode === "video");
+    setBuffering(useVideo);
   }
 
   function pickSource(index: number) {
@@ -57,7 +59,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     setFallbackAt(0);
     setFailed(false);
     setStarted(true);
-    setBuffering(list[index]?.mode === "video");
+    setBuffering(isFileUrl(list[index]?.url ?? null));
   }
 
   function changeQuality(next: VideoQuality) {
@@ -86,14 +88,14 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
               </span>
             </button>
           </>
-        ) : current?.mode === "iframe" && playUrl ? (
+        ) : !useVideo && playUrl ? (
           <iframe
             key={playUrl}
             src={playUrl}
             title={item.title}
             className="size-full border-0 bg-background"
             allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-            referrerPolicy="origin"
+            referrerPolicy="strict-origin-when-cross-origin"
             allowFullScreen
           />
         ) : (
@@ -106,6 +108,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
             playsInline
             preload="metadata"
             autoPlay
+            referrerPolicy="strict-origin-when-cross-origin"
             src={playUrl ?? undefined}
             onWaiting={() => setBuffering(true)}
             onPlaying={() => {
@@ -125,7 +128,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
           />
         )}
 
-        {buffering && started && current?.mode === "video" ? (
+        {buffering && started && useVideo ? (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/30">
             <LoaderCircle className="size-8 animate-spin text-foreground" />
           </div>
@@ -134,9 +137,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
         {failed ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 px-6 text-center">
             <AlertTriangle className="size-7 text-destructive" />
-            <p className="max-w-sm text-sm text-muted">
-              Sumber gagal dimuat. Coba host lain atau ulangi.
-            </p>
+            <p className="max-w-sm text-sm text-muted">Sumber gagal dimuat. Coba host lain atau ulangi.</p>
             <Button
               onClick={() => {
                 setFailed(false);
@@ -183,9 +184,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
               onClick={() => changeQuality(q)}
               className={cn(
                 "h-8 rounded-md px-2.5 text-xs font-medium transition-colors duration-150",
-                resolveSource(q.url)?.url === current?.url
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-muted",
+                resolveSource(q.url)?.url === current?.url ? "bg-primary text-primary-foreground" : "bg-secondary text-muted",
               )}
             >
               {q.label || hostLabel(q.url)}
