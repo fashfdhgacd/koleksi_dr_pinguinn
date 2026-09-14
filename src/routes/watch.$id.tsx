@@ -17,6 +17,10 @@ function shareUrl(id: string): string {
   return `${window.location.origin}/watch/${id}`;
 }
 
+function sourceUrl(item: VideoDetail): string {
+  return item.video_url || item.qualities[0]?.url || "";
+}
+
 async function shareVideo(title: string, id: string) {
   const url = shareUrl(id);
   try {
@@ -117,6 +121,16 @@ function WatchPage() {
               <Link to="/" search={{ q: undefined, category: undefined }} className="rounded-md bg-secondary px-3 py-2 text-sm text-foreground">
                 Kembali ke katalog
               </Link>
+              {sourceUrl(item) ? (
+                <a
+                  href={sourceUrl(item)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-md bg-secondary px-3 py-2 text-sm text-foreground"
+                >
+                  Buka sumber
+                </a>
+              ) : null}
             </div>
           </header>
 
