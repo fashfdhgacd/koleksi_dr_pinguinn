@@ -165,12 +165,22 @@ function pageOf<T>(items: T[], page = 1, limit = DEFAULT_PAGE_SIZE) {
   };
 }
 
+function videyFile(item: RawItem): string {
+  if (item.direct && /cdn\.videy\.co\//i.test(item.direct)) return item.direct;
+  const id = embedId(item.embed) || embedId(item.direct || "");
+  if (!id || !/videy/i.test(`${item.embed} ${item.direct || ""} ${item.source || ""}`)) return "";
+  const ext = id.length === 9 && id.endsWith("2") ? ".mov" : ".mp4";
+  return `https://cdn.videy.co/${id}${ext}`;
+}
+
 function thumbOf(item: RawItem, posters: Record<string, string>): string {
-  const id = embedId(item.embed);
+  const id = embedId(item.embed) || embedId(item.direct || "");
   if (id) {
     const hit = posters[id] || posters[id.toLowerCase()];
     if (hit) return hit;
   }
+  const videy = videyFile(item);
+  if (videy) return videy;
   return "/logo.svg";
 }
 
@@ -198,12 +208,16 @@ function toDetail(item: RawItem, posters: Record<string, string>): VideoDetail {
   if (item.direct && item.direct !== item.embed) {
     qualities.push({ label: "Direct", url: item.direct, format: "direct" });
   }
+  const videy = videyFile(item);
+  if (videy && !qualities.some((q) => q.url === videy)) {
+    qualities.unshift({ label: "Videy", url: videy, format: "mp4" });
+  }
   return {
     ...card,
-    video_url: item.embed,
+    video_url: videy || item.embed,
     qualities,
     subjects: [card.category],
-    playable: Boolean(item.embed),
+    playable: Boolean(videy || item.embed),
   };
 }
 
