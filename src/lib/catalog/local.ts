@@ -1,7 +1,10 @@
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
 import { findCategory } from "./categories";
-import catalog from "./data.json";
+import part0 from "./data-0.json";
+import part1 from "./data-1.json";
+import part2 from "./data-2.json";
+import part3 from "./data-3.json";
 
 type RawItem = {
   id: string;
@@ -11,7 +14,7 @@ type RawItem = {
   c: string;
 };
 
-const ITEMS = catalog as RawItem[];
+const ITEMS = [...(part0 as RawItem[]), ...(part1 as RawItem[]), ...(part2 as RawItem[]), ...(part3 as RawItem[])];
 
 function pageOf<T>(items: T[], page = 1, limit = DEFAULT_PAGE_SIZE) {
   const p = Math.max(1, page);
