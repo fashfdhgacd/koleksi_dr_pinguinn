@@ -12,6 +12,29 @@ export const Route = createFileRoute("/watch/$id")({
   component: WatchPage,
 });
 
+function shareUrl(id: string): string {
+  if (typeof window === "undefined") return `https://www.koleksidrpinguin.com/watch/${id}`;
+  return `${window.location.origin}/watch/${id}`;
+}
+
+async function shareVideo(title: string, id: string) {
+  const url = shareUrl(id);
+  try {
+    if (navigator.share) {
+      await navigator.share({ title, url });
+      return;
+    }
+  } catch {
+    /* user cancel */
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    alert("Link disalin.\n" + url);
+  } catch {
+    prompt("Salin link ini:", url);
+  }
+}
+
 function WatchPage() {
   const { id } = Route.useParams();
   const [item, setItem] = useState<VideoDetail | null>(null);
@@ -79,16 +102,22 @@ function WatchPage() {
             </p>
             <h1 className="font-display text-4xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>
             <div className="flex flex-wrap gap-3 text-sm text-muted">
-              <span>{item.durationLabel}</span>
               <span>{item.quality}</span>
               {item.creator ? <span>{item.creator}</span> : null}
             </div>
             <p className="text-sm leading-relaxed text-muted">{item.description}</p>
-            <p>
-              <Link to="/" search={{ q: undefined, category: undefined }} className="text-sm text-foreground underline-offset-4 hover:underline">
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
+                onClick={() => void shareVideo(item.title, item.id)}
+              >
+                Bagikan
+              </button>
+              <Link to="/" search={{ q: undefined, category: undefined }} className="rounded-md bg-secondary px-3 py-2 text-sm text-foreground">
                 Kembali ke katalog
               </Link>
-            </p>
+            </div>
           </header>
 
           {related.length ? (
