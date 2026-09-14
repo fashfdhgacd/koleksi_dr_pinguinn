@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { CATEGORY_LIST } from "@/lib/catalog/categories";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
+import { BRAND_LOGO_SRC } from "@/lib/brand-logo";
 
 export function Header({
   query,
@@ -38,7 +39,13 @@ export function Header({
     <header className="sticky top-0 z-40 border-b border-border bg-background">
       <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-3 px-4 sm:px-6">
         <Link to="/" search={{ q: undefined, category: undefined }} className="flex shrink-0 items-center gap-2">
-          <img src="/logo.svg" alt="" width={32} height={32} className="size-8 rounded-lg bg-white object-cover" />
+          <img
+            src={BRAND_LOGO_SRC}
+            alt="Dr. Pinguin"
+            width={40}
+            height={40}
+            className="size-10 rounded-lg bg-white object-cover object-[center_20%] ring-1 ring-border"
+          />
           <span className="font-display text-[1.35rem] leading-none tracking-tight text-foreground">
             DR. PINGUIN
           </span>
