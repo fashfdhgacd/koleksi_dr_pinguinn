@@ -11,12 +11,19 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: APP_NAME },
+      { title: "Bokep Indo Terbaru | DR. PINGUIN" },
       {
         name: "description",
-        content: "Dr. Pinguin Bokep, M.S.B. Konten 18+. Koleksi video — masuk hanya jika dewasa.",
+        content:
+          "Nonton bokep Indo terbaru di Dr. Pinguin. Koleksi amatir, jilbab, tante, viral, dan percakapan. Konten 18+.",
+      },
+      {
+        name: "keywords",
+        content: "bokep indo, bokep indo terbaru, bokep viral, bokep jilbab, bokep tante, dr pinguin",
       },
       { name: "theme-color", content: "#09090b" },
+      { name: "robots", content: "index,follow,max-image-preview:large" },
+      { name: "rating", content: "adult" },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
