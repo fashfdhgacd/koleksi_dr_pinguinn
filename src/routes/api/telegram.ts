@@ -131,25 +131,45 @@ async function handleShare(
     page = await listCategory(cat, 1, 400);
   } else if (/cari\s+(.+)/i.test(text)) {
     page = await listSearch(text.replace(/^.*cari\s+/i, ""), 1, 400);
+  } else if (source) {
+    // Ambil banyak item dulu biar filter sumber tidak kosong
+    page = await listLatest(1, 800);
   } else {
     page = await listLatest(1, 400);
   }
 
   let items = page.items.slice();
 
-  // Filter by source if button Streamtape / Putarin / Lulu
+  // Filter by source — VideoCard pakai creator/quality/description, bukan source/embed
   if (source) {
     items = items.filter((v) => {
-      const s = String((v as { source?: string }).source || "").toLowerCase();
-      const emb = String((v as { embed?: string }).embed || "").toLowerCase();
+      const blob = [
+        (v as { creator?: string | null }).creator,
+        (v as { quality?: string }).quality,
+        (v as { description?: string }).description,
+        (v as { title?: string }).title,
+        (v as { id?: string }).id,
+      ]
+        .map((x) => String(x || "").toLowerCase())
+        .join(" ");
       if (source === "streamtape")
-        return s.includes("stream") || emb.includes("streamtape");
-      if (source === "putarin")
-        return s.includes("putarin") || emb.includes("putarin");
-      if (source === "lulu")
-        return s.includes("lulu") || emb.includes("lulu");
+        return /streamtape|strcloud|\bstream\b/.test(blob);
+      if (source === "putarin") return /putarin/.test(blob);
+      if (source === "lulu") return /lulu/.test(blob);
       return true;
     });
+  }
+
+  // Kalau filter sumber masih kosong, coba search by keyword di katalog
+  if (source && !items.length) {
+    const q =
+      source === "streamtape"
+        ? "streamtape"
+        : source === "putarin"
+          ? "putarin"
+          : "lulu";
+    const searched = await listSearch(q, 1, 400);
+    items = searched.items.slice();
   }
 
   // Shuffle
@@ -291,7 +311,6 @@ async function handlePost(request: Request): Promise<Response> {
 
   const low = text.toLowerCase();
 
-  // /start atau Menu → tampilkan keyboard
   if (low.startsWith("/start") || low === "menu" || low === "/menu") {
     await tgSend(
       token,
@@ -307,7 +326,6 @@ async function handlePost(request: Request): Promise<Response> {
     return Response.json({ ok: true });
   }
 
-  // Upload jika ada link host
   const hasUploadLink =
     /streamtape\.com|putarin\.com|strcloud|lulustream|lulu\.st/i.test(text) &&
     /https?:\/\//i.test(text);
@@ -317,7 +335,6 @@ async function handlePost(request: Request): Promise<Response> {
     return Response.json({ ok: true });
   }
 
-  // Tombol menu / minta / kategori / sumber
   if (isMenuText(low)) {
     await handleShare(token, chatId, text);
     return Response.json({ ok: true });
