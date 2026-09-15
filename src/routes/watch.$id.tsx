@@ -336,7 +336,7 @@ function WatchPage() {
         <EmptyState title="Video tidak ditemukan" description="Judul ini tidak ada di katalog atau sudah dihapus." />
       ) : (
         <article className="space-y-8">
-          <div className="sticky top-16 z-30 -mx-4 bg-background/95 px-4 py-2 backdrop-blur sm:mx-0 sm:px-0">
+          <div className="z-30 -mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0 lg:sticky lg:top-16 lg:bg-background/95 lg:backdrop-blur">
             <VideoPlayer key={item.id} item={item} />
           </div>
 
