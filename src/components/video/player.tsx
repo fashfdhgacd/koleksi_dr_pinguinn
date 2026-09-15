@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ExternalLink, LoaderCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { VideoDetail, VideoQuality } from "@/lib/catalog/types";
-import { hostLabel, resolveSource, type ResolvedSource } from "@/lib/catalog/embed";
+import { hostLabel, hostPriority, isIndoAvUrl, resolveSource, type ResolvedSource } from "@/lib/catalog/embed";
 import { VideoThumb } from "./thumb";
 import { cn } from "@/lib/utils";
 
@@ -16,12 +16,8 @@ function sourcesFromItem(item: VideoDetail): ResolvedSource[] {
     seen.add(resolved.url);
     out.push(resolved);
   }
-  // Prefer direct file sources first (better UX than iframe ads)
-  out.sort((a, b) => {
-    const af = /\.(mp4|mov|webm)($|\?)/i.test(a.url) ? 0 : 1;
-    const bf = /\.(mp4|mov|webm)($|\?)/i.test(b.url) ? 0 : 1;
-    return af - bf;
-  });
+  // IndoAV first so viewer bonus can fire. Direct files are fallback only.
+  out.sort((a, b) => hostPriority(`${a.host} ${a.url}`) - hostPriority(`${b.host} ${b.url}`));
   return out;
 }
 
@@ -29,16 +25,13 @@ function isFileUrl(url: string | null): boolean {
   return Boolean(url && /\.(mp4|mov|webm)($|\?)/i.test(url));
 }
 
-/** Normalize embed URLs so players load more reliably */
 function normalizePlayUrl(url: string, host: string): string {
   try {
     const u = new URL(url);
-    // Streamtape: force /e/ embed path
     if (/streamtape|strcloud/i.test(host + u.hostname)) {
       u.pathname = u.pathname.replace(/\/(?:v|d)\//, "/e/");
       return u.toString();
     }
-    // IndoAV / UserBokep: prefer /e/ embed
     if (/indoav|userbokep/i.test(host + u.hostname)) {
       u.pathname = u.pathname.replace(/\/d\//, "/e/");
       return u.toString();
@@ -62,14 +55,18 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const rawPlay = current?.fallbacks[fallbackAt] ?? current?.url ?? null;
   const playUrl = rawPlay && current ? normalizePlayUrl(rawPlay, current.host) : rawPlay;
   const useVideo = isFileUrl(playUrl);
+  const indoFirst = Boolean(current && isIndoAvUrl(current.url));
 
   useEffect(() => {
     setActive(0);
-    setStarted(false);
-    setBuffering(false);
     setFailed(false);
     setFallbackAt(0);
-  }, [item.id]);
+    setBuffering(false);
+    // Auto-start IndoAV embed so the partner player can count a view.
+    const first = list[0];
+    const auto = Boolean(first && isIndoAvUrl(first.url));
+    setStarted(auto);
+  }, [item.id, list]);
 
   function start() {
     if (!current || !playUrl) {
@@ -154,7 +151,6 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
                 setFallbackAt(next);
                 return;
               }
-              // Try next host if available
               if (active + 1 < list.length) {
                 pickSource(active + 1);
                 return;
@@ -175,7 +171,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/85 px-6 text-center">
             <AlertTriangle className="size-7 text-destructive" />
             <p className="max-w-sm text-sm text-muted">
-              Sumber gagal dimuat. Coba host lain, buka sumber asli, atau ulangi.
+              Sumber gagal dimuat. Coba host lain atau ulangi.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-2">
               <Button
@@ -218,6 +214,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
               )}
             >
               {src.host}
+              {isIndoAvUrl(src.url) ? " · prioritas" : ""}
             </button>
           ))}
         </div>
@@ -242,18 +239,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
         </div>
       ) : current ? (
         <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2 text-xs text-muted">
-          <span>Sumber: {current.host}</span>
-          {playUrl ? (
-            <a
-              href={playUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-foreground hover:underline"
-            >
-              Buka di tab baru
-              <ExternalLink className="size-3" />
-            </a>
-          ) : null}
+          <span>Sumber: {current.host}{indoFirst ? " · prioritas bonus" : ""}</span>
         </div>
       ) : null}
     </div>
