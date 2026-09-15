@@ -6,6 +6,7 @@ import { InfiniteSentinel } from "@/components/video/infinite-sentinel";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { findCategory } from "@/lib/catalog/categories";
 import { useCatalogFeed } from "@/hooks/use-catalog";
+import { SITE_ORIGIN, homeSeo } from "@/lib/seo";
 
 type HomeSearch = {
   q?: string;
@@ -20,6 +21,29 @@ export const Route = createFileRoute("/")({
         ? search.category.trim()
         : undefined,
   }),
+  head: ({ match }) => {
+    const q = typeof match.search.q === "string" ? match.search.q : undefined;
+    const category = typeof match.search.category === "string" ? match.search.category : undefined;
+    const seo = homeSeo(q, category);
+    const url = q
+      ? `${SITE_ORIGIN}/?q=${encodeURIComponent(q)}`
+      : category
+        ? `${SITE_ORIGIN}/?category=${encodeURIComponent(category)}`
+        : SITE_ORIGIN;
+    return {
+      meta: [
+        { title: seo.title },
+        { name: "description", content: seo.description },
+        { name: "keywords", content: seo.keywords },
+        { property: "og:title", content: seo.title },
+        { property: "og:description", content: seo.description },
+        { property: "og:url", content: url },
+        { property: "og:type", content: "website" },
+        { name: "robots", content: "index,follow" },
+      ],
+      links: [{ rel: "canonical", href: url }],
+    };
+  },
   component: HomePage,
 });
 
@@ -34,7 +58,7 @@ function HomePage() {
     ? feed.items.filter((item) => !heroIds.has(item.id))
     : feed.items;
 
-  const title = q ? `Hasil untuk “${q}”` : cat ? cat.label : "Terbaru";
+  const title = q ? `Hasil untuk “${q}”` : cat ? `Bokep Indo ${cat.label}` : "Bokep Indo Terbaru";
   const subtitle = feed.total ? `${feed.total.toLocaleString("id-ID")} judul` : "Koleksi Dr. Pinguin";
 
   return (
@@ -53,7 +77,7 @@ function HomePage() {
           <section>
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h2 className="font-display text-3xl text-foreground">{title}</h2>
+                <h1 className="font-display text-3xl text-foreground">{title}</h1>
                 <p className="mt-1 text-sm text-muted">{subtitle}</p>
               </div>
             </div>
