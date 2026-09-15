@@ -5,6 +5,8 @@ export type CategoryDef = CategoryInfo & {
 };
 
 export const CATEGORIES: CategoryDef[] = [
+  { slug: "jav", label: "Jav", query: "jav" },
+  { slug: "ai-plus", label: "AI+", query: "ai-plus" },
   { slug: "jilbab", label: "Jilbab", query: "jilbab" },
   { slug: "tante", label: "Tante", query: "tante" },
   { slug: "amatir", label: "Amatir", query: "amatir" },
@@ -31,5 +33,14 @@ export const CATEGORY_LIST: CategoryInfo[] = CATEGORIES.map(({ slug, label }) =>
 export function findCategory(slug: string | null | undefined): CategoryDef | undefined {
   if (!slug) return undefined;
   const key = slug.trim().toLowerCase();
+  if (key === "ai" || key === "ai+") {
+    return CATEGORIES.find((c) => c.slug === "ai-plus");
+  }
+  if (key === "puterin" || key === "putarin") {
+    return CATEGORIES.find((c) => c.slug === "jav");
+  }
+  if (key === "streamtape" || key === "streampie") {
+    return CATEGORIES.find((c) => c.slug === "ai-plus");
+  }
   return CATEGORIES.find((c) => c.slug === key);
 }
