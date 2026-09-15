@@ -28,8 +28,11 @@ function HomePage() {
   const mode = q ? "search" : category ? "category" : "home";
   const feed = useCatalogFeed({ mode, q, category });
   const cat = findCategory(category);
-  const hero = !q && !category ? feed.featured[0] : undefined;
-  const gridItems = hero ? feed.items.filter((item) => item.id !== hero.id) : feed.items;
+  const heroVideos = !q && !category ? feed.featured : [];
+  const heroIds = new Set(heroVideos.map((v) => v.id));
+  const gridItems = heroIds.size
+    ? feed.items.filter((item) => !heroIds.has(item.id))
+    : feed.items;
 
   const title = q ? `Hasil untuk “${q}”` : cat ? cat.label : "Terbaru";
   const subtitle = feed.total ? `${feed.total.toLocaleString("id-ID")} judul` : "Koleksi Dr. Pinguin";
@@ -45,7 +48,7 @@ function HomePage() {
         <ErrorState message={feed.error ?? "Gagal memuat katalog."} onRetry={feed.retry} />
       ) : (
         <div className="space-y-10">
-          {hero ? <Hero video={hero} /> : null}
+          {heroVideos.length ? <Hero videos={heroVideos} /> : null}
 
           <section>
             <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
@@ -65,7 +68,7 @@ function HomePage() {
                 }
               />
             ) : (
-              <VideoGrid items={gridItems} eagerCount={hero ? 0 : 4} />
+              <VideoGrid items={gridItems} eagerCount={heroVideos.length ? 0 : 4} />
             )}
 
             {feed.error && feed.items.length ? (
