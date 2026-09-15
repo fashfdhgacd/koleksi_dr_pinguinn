@@ -7,6 +7,19 @@ import { fetchJsonFromGithub, pushJsonToGithub } from "@/lib/bot/github.js";
 
 const HOST = "https://www.koleksidrpinguin.com";
 
+/** Reply keyboard mirip bot lama + Streamtape */
+const MAIN_KEYBOARD = {
+  keyboard: [
+    [{ text: "Minta 10" }, { text: "Minta 25" }],
+    [{ text: "Semua" }, { text: "Amatir" }, { text: "Videy" }],
+    [{ text: "Streamtape" }, { text: "Putarin" }, { text: "Lulu" }],
+    [{ text: "Jilbab" }, { text: "ABG" }, { text: "AI" }],
+    [{ text: "Lagi" }, { text: "Menu" }],
+  ],
+  resize_keyboard: true,
+  is_persistent: true,
+};
+
 function envToken(): string {
   return String(
     process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || ""
@@ -31,11 +44,16 @@ function envBag(): NodeJS.ProcessEnv {
   return process.env;
 }
 
-async function tgSend(token: string, chatId: string | number, text: string) {
+async function tgSend(
+  token: string,
+  chatId: string | number,
+  text: string,
+  extra: Record<string, unknown> = {}
+) {
   await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text }),
+    body: JSON.stringify({ chat_id: chatId, text, ...extra }),
   });
 }
 
@@ -44,36 +62,57 @@ function parseCount(text: string): number {
   return m ? Number(m[1]) : 10;
 }
 
+/** Map tombol menu → kategori katalog */
 function parseCat(text: string): string {
-  const t = text.toLowerCase();
-  const cats = [
-    "jilbab",
-    "tante",
-    "amatir",
-    "viral",
-    "percakapan",
-    "kosan",
-    "colmek",
-    "abg",
-    "istri",
-    "live",
-    "doggy",
-    "open-bo",
-    "malaysia",
-    "chindo",
-    "gangbang",
-    "lainnya",
-    "videy",
-  ];
-  return cats.find((c) => t.includes(c)) || "";
+  const t = text.toLowerCase().trim();
+  const map: Record<string, string> = {
+    jilbab: "jilbab",
+    amatir: "amatir",
+    abg: "abg",
+    ai: "ai",
+    videy: "videy",
+    tante: "tante",
+    viral: "viral",
+    percakapan: "percakapan",
+    kosan: "kosan",
+    colmek: "colmek",
+    istri: "istri",
+    live: "live",
+    doggy: "doggy",
+    "open-bo": "open-bo",
+    malaysia: "malaysia",
+    chindo: "chindo",
+    gangbang: "gangbang",
+    lainnya: "lainnya",
+  };
+  if (map[t]) return map[t];
+  for (const [k, v] of Object.entries(map)) {
+    if (t.includes(k)) return v;
+  }
+  return "";
 }
 
-function isShare(text: string): boolean {
+/** Tombol sumber (bukan kategori) */
+function parseSource(text: string): string {
   const t = text.toLowerCase().trim();
-  if (/https?:\/\//.test(t) && !/^(minta|sebar|share)/.test(t)) return false;
+  if (/streamtape|strcloud|sterampie|stream/.test(t)) return "streamtape";
+  if (/putarin/.test(t)) return "putarin";
+  if (/lulu|lulustream/.test(t)) return "lulu";
+  return "";
+}
+
+function isMenuText(text: string): boolean {
+  const t = text.toLowerCase().trim();
   return (
-    /^(minta|sebar|share|lagi|10|25|menu|\/start|\/menu)/.test(t) ||
-    Boolean(parseCat(t))
+    t === "menu" ||
+    t === "/menu" ||
+    t === "/start" ||
+    t === "lagi" ||
+    t === "semua" ||
+    Boolean(parseCat(t)) ||
+    Boolean(parseSource(t)) ||
+    /^(minta|sebar|share)\b/.test(t) ||
+    /^\d+$/.test(t)
   );
 }
 
@@ -84,31 +123,56 @@ async function handleShare(
 ) {
   const n = parseCount(text);
   const cat = parseCat(text);
-  const page = cat
-    ? await listCategory(cat, 1, 400)
-    : /cari\s+(.+)/i.test(text)
-      ? await listSearch(text.replace(/^.*cari\s+/i, ""), 1, 400)
-      : await listLatest(1, 400);
-  const items = page.items.slice();
+  const source = parseSource(text);
+  const wantAll = /^(semua|lagi|menu)$/i.test(text.trim());
+
+  let page;
+  if (cat) {
+    page = await listCategory(cat, 1, 400);
+  } else if (/cari\s+(.+)/i.test(text)) {
+    page = await listSearch(text.replace(/^.*cari\s+/i, ""), 1, 400);
+  } else {
+    page = await listLatest(1, 400);
+  }
+
+  let items = page.items.slice();
+
+  // Filter by source if button Streamtape / Putarin / Lulu
+  if (source) {
+    items = items.filter((v) => {
+      const s = String((v as { source?: string }).source || "").toLowerCase();
+      const emb = String((v as { embed?: string }).embed || "").toLowerCase();
+      if (source === "streamtape")
+        return s.includes("stream") || emb.includes("streamtape");
+      if (source === "putarin")
+        return s.includes("putarin") || emb.includes("putarin");
+      if (source === "lulu")
+        return s.includes("lulu") || emb.includes("lulu");
+      return true;
+    });
+  }
+
+  // Shuffle
   for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     const tmp = items[i];
     items[i] = items[j];
     items[j] = tmp;
   }
+
   const take = items.slice(0, n);
   if (!take.length) {
-    await tgSend(
-      token,
-      chatId,
-      cat ? `Kategori ${cat} kosong.` : "Katalog kosong."
-    );
+    const label = cat || source || (wantAll ? "katalog" : "filter");
+    await tgSend(token, chatId, `Kosong: ${label}. Coba yang lain.`, {
+      reply_markup: MAIN_KEYBOARD,
+    });
     return;
   }
+
   const body = take
     .map((v) => `▶ ${v.title}\n${HOST}/v/${v.id}`)
     .join("\n\n");
-  await tgSend(token, chatId, body);
+  await tgSend(token, chatId, body, { reply_markup: MAIN_KEYBOARD });
 }
 
 async function resolveTitle(
@@ -138,7 +202,8 @@ async function handleUpload(
     await tgSend(
       token,
       chatId,
-      "❌ Tidak ada link Streamtape / Putarin yang valid.\n\nKirim link, atau ketik: Minta 10"
+      "❌ Tidak ada link Streamtape / Putarin yang valid.\n\nKirim link lengkap, atau pakai tombol menu.",
+      { reply_markup: MAIN_KEYBOARD }
     );
     return;
   }
@@ -152,7 +217,6 @@ async function handleUpload(
     const record = toRecord({ parsed: video, title, category });
     const fileName = video.file;
 
-    // Read current JSON from GitHub (serverless-safe)
     const fetched = await fetchJsonFromGithub(env, fileName);
     if (!fetched.ok && fetched.reason) {
       lines.push(`⚠️ Gagal baca GitHub (${fileName}): ${fetched.reason}`);
@@ -184,7 +248,12 @@ async function handleUpload(
     );
   }
 
-  await tgSend(token, chatId, lines.join("\n\n") || "Tidak ada yang diproses.");
+  await tgSend(
+    token,
+    chatId,
+    lines.join("\n\n") || "Tidak ada yang diproses.",
+    { reply_markup: MAIN_KEYBOARD }
+  );
 }
 
 async function handlePost(request: Request): Promise<Response> {
@@ -212,7 +281,6 @@ async function handlePost(request: Request): Promise<Response> {
   const fromId = String(msg.from?.id || "");
   if (!chatId) return Response.json({ ok: true });
 
-  // Auth: if AUTHORIZED_USER_IDS / TELEGRAM_USER_ID set, enforce it
   if (allowed.size > 0 && !allowed.has(fromId) && !allowed.has(String(chatId))) {
     await tgSend(token, chatId, "❌ Tidak diizinkan.");
     return Response.json({ ok: true });
@@ -223,28 +291,25 @@ async function handlePost(request: Request): Promise<Response> {
 
   const low = text.toLowerCase();
 
+  // /start atau Menu → tampilkan keyboard
   if (low.startsWith("/start") || low === "menu" || low === "/menu") {
     await tgSend(
       token,
       chatId,
       [
-        "Bot aktif (webhook).",
+        "Bot aktif.",
         "",
-        "📤 Upload:",
-        "Kirim link Streamtape / Putarin",
-        "Boleh + Judul: ... + Kategori: ...",
-        "",
-        "📥 Minta video:",
-        "Minta 10",
-        "Minta 10 jilbab",
-      ].join("\n")
+        "📤 Upload: kirim link Streamtape / Putarin",
+        "📥 Minta: tekan tombol di bawah",
+      ].join("\n"),
+      { reply_markup: MAIN_KEYBOARD }
     );
     return Response.json({ ok: true });
   }
 
-  // Prefer upload when there is a valid host link
+  // Upload jika ada link host
   const hasUploadLink =
-    /streamtape\.com|putarin\.com|strcloud/i.test(text) &&
+    /streamtape\.com|putarin\.com|strcloud|lulustream|lulu\.st/i.test(text) &&
     /https?:\/\//i.test(text);
 
   if (hasUploadLink) {
@@ -252,7 +317,8 @@ async function handlePost(request: Request): Promise<Response> {
     return Response.json({ ok: true });
   }
 
-  if (isShare(low)) {
+  // Tombol menu / minta / kategori / sumber
+  if (isMenuText(low)) {
     await handleShare(token, chatId, text);
     return Response.json({ ok: true });
   }
@@ -260,7 +326,8 @@ async function handlePost(request: Request): Promise<Response> {
   await tgSend(
     token,
     chatId,
-    "Kirim link Streamtape/Putarin untuk upload, atau ketik: Minta 10"
+    "Kirim link untuk upload, atau tekan tombol menu.",
+    { reply_markup: MAIN_KEYBOARD }
   );
   return Response.json({ ok: true });
 }
@@ -273,7 +340,7 @@ export const Route = createFileRoute("/api/telegram")({
           ok: true,
           service: "telegram-webhook",
           host: HOST,
-          modes: ["upload", "share"],
+          modes: ["upload", "share", "keyboard"],
           ready: Boolean(envToken()),
         }),
       POST: async ({ request }) => handlePost(request),
