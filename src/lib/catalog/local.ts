@@ -2,8 +2,13 @@ import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
 import { findCategory } from "./categories";
 import localCatalog from "./videos.json";
+import streamtapeBatch from "./streamtape.json";
 
-const SITE_CATALOG = "https://www.koleksidrpinguin.site/data/videos.json";
+const SITE_FEEDS = [
+  "https://www.koleksidrpinguin.site/data/videos.json",
+  "https://www.koleksidrpinguin.site/data/campur.json",
+  "https://www.koleksidrpinguin.site/data/putarin.json",
+];
 const POSTER_URLS = [
   "https://www.koleksidrpinguin.site/data/posters.json",
   "https://www.koleksidrpinguin.site/data/latest-posters.json",
@@ -50,6 +55,7 @@ function cleanTitle(title: string): string {
       .replace(/^\u25b6\s*/, "")
       .replace(/Collection Dr\.?\s*Anjing Bokep[^,]*[,.]?\s*S\.\s*M\.\s*Sc\.?/gi, "")
       .replace(/koleksidrpinguin\.(com|site)/gi, "")
+      .replace(/dibokepindo\.com/gi, "")
       .replace(/\s+/g, " ")
       .trim()
       .replace(/^[\-|]+|[\-|]+$/g, "") || "Video"
@@ -108,7 +114,6 @@ function merge(lists: Array<unknown>): RawItem[] {
       out.push(item);
     }
   }
-  out.sort((a, b) => Number(b.id) - Number(a.id) || b.id.localeCompare(a.id));
   return out;
 }
 
@@ -137,19 +142,27 @@ async function loadPosters(): Promise<Record<string, string>> {
   return map;
 }
 
+async function loadRemoteLists(): Promise<unknown[]> {
+  const packs = await Promise.all(
+    SITE_FEEDS.map(async (url) => {
+      try {
+        const res = await fetch(url, { headers: { accept: "application/json" } });
+        if (!res.ok) return [];
+        return await res.json();
+      } catch {
+        return [];
+      }
+    }),
+  );
+  return packs;
+}
+
 async function loadItems(): Promise<{ items: RawItem[]; posters: Record<string, string> }> {
   const now = Date.now();
   if (cache && now - cache.at < CACHE_MS) return cache;
 
-  let remote: unknown = [];
-  try {
-    const res = await fetch(SITE_CATALOG, { headers: { accept: "application/json" } });
-    if (res.ok) remote = await res.json();
-  } catch {
-    remote = [];
-  }
-
-  const [items, posters] = await Promise.all([Promise.resolve(merge([remote, localCatalog])), loadPosters()]);
+  const [remote, posters] = await Promise.all([loadRemoteLists(), loadPosters()]);
+  const items = merge([streamtapeBatch, ...remote, localCatalog]);
   cache = { at: now, items, posters };
   return cache;
 }
@@ -178,6 +191,9 @@ function thumbOf(item: RawItem, posters: Record<string, string>): string {
   if (id) {
     const hit = posters[id] || posters[id.toLowerCase()];
     if (hit) return hit;
+  }
+  if (id && /streamtape|strcloud/i.test(`${item.embed} ${item.direct || ""}`)) {
+    return `https://www.koleksidrpinguin.site/api/tape-thumb?id=${encodeURIComponent(id)}`;
   }
   const videy = videyFile(item);
   if (videy) return videy;
