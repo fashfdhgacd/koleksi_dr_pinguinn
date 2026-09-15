@@ -62,22 +62,129 @@ function sourceUrl(item: VideoDetail): string {
   return item.video_url || item.qualities[0]?.url || "";
 }
 
-async function shareVideo(title: string, id: string) {
+function xIntentUrl(title: string, url: string): string {
+  const text = `${title}\n\n${url}`;
+  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+}
+
+function ShareSheet({
+  open,
+  title,
+  id,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  id: string;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
   const url = shareUrl(id);
-  try {
-    if (navigator.share) {
-      await navigator.share({ title, url });
-      return;
+
+  useEffect(() => {
+    if (!open) setCopied(false);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      prompt("Salin link ini:", url);
     }
-  } catch {
-    /* user cancel */
   }
-  try {
-    await navigator.clipboard.writeText(url);
-    alert("Link disalin.\n" + url);
-  } catch {
-    prompt("Salin link ini:", url);
+
+  async function nativeShare() {
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, url, text: title });
+        onClose();
+      }
+    } catch {
+      /* user cancel */
+    }
   }
+
+  function shareToX() {
+    window.open(xIntentUrl(title, url), "_blank", "noopener,noreferrer");
+    onClose();
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Bagikan video"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/70"
+        onClick={onClose}
+        aria-label="Tutup"
+      />
+      <div className="relative z-10 w-full max-w-md rounded-t-2xl border border-border bg-background p-5 shadow-2xl sm:rounded-2xl">
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium uppercase tracking-wider text-muted">Bagikan</p>
+            <p className="mt-1 line-clamp-2 text-base font-medium text-foreground">{title}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-md px-2 py-1 text-sm text-muted hover:bg-secondary"
+          >
+            Tutup
+          </button>
+        </div>
+
+        <div className="grid gap-3">
+          <button
+            type="button"
+            onClick={shareToX}
+            className="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-[#1d9bf0] px-4 text-base font-semibold text-white active:scale-[0.98]"
+          >
+            <svg viewBox="0 0 24 24" className="size-5 fill-current" aria-hidden="true">
+              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+            </svg>
+            Bagikan ke X
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void copyLink()}
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-secondary px-4 text-base font-medium text-foreground active:scale-[0.98]"
+          >
+            {copied ? "✓ Link disalin" : "Salin link"}
+          </button>
+
+          {typeof navigator !== "undefined" && typeof navigator.share === "function" ? (
+            <button
+              type="button"
+              onClick={() => void nativeShare()}
+              className="flex h-14 w-full items-center justify-center rounded-xl border border-border px-4 text-base font-medium text-foreground active:scale-[0.98]"
+            >
+              Bagikan via sistem
+            </button>
+          ) : null}
+        </div>
+
+        <p className="mt-4 break-all text-center text-xs text-muted">{url}</p>
+      </div>
+    </div>
+  );
 }
 
 function WatchPage() {
@@ -101,8 +208,10 @@ function WatchPage() {
     loaderData && !loaderData.ok ? loaderData.error : null,
   );
   const [reload, setReload] = useState(0);
+  const [shareOpen, setShareOpen] = useState(false);
 
   const retry = useCallback(() => setReload((n) => n + 1), []);
+  const closeShare = useCallback(() => setShareOpen(false), []);
 
   useEffect(() => {
     // Jika loader sudah sukses dan belum ada reload manual, skip client fetch
@@ -173,12 +282,16 @@ function WatchPage() {
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
-                className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground"
-                onClick={() => void shareVideo(item.title, item.id)}
+                className="h-12 min-w-[140px] rounded-xl bg-primary px-5 text-base font-semibold text-primary-foreground active:scale-[0.98]"
+                onClick={() => setShareOpen(true)}
               >
                 Bagikan
               </button>
-              <Link to="/" search={{ q: undefined, category: undefined }} className="rounded-md bg-secondary px-3 py-2 text-sm text-foreground">
+              <Link
+                to="/"
+                search={{ q: undefined, category: undefined }}
+                className="flex h-12 items-center rounded-xl bg-secondary px-5 text-base text-foreground"
+              >
                 Kembali ke katalog
               </Link>
               {sourceUrl(item) ? (
@@ -186,7 +299,7 @@ function WatchPage() {
                   href={sourceUrl(item)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="rounded-md bg-secondary px-3 py-2 text-sm text-foreground"
+                  className="flex h-12 items-center rounded-xl bg-secondary px-5 text-base text-foreground"
                 >
                   Buka sumber
                 </a>
@@ -200,6 +313,8 @@ function WatchPage() {
               <VideoGrid items={related} />
             </section>
           ) : null}
+
+          <ShareSheet open={shareOpen} title={item.title} id={item.id} onClose={closeShare} />
         </article>
       )}
     </Shell>
