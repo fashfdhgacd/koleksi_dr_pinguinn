@@ -5,14 +5,8 @@ import localCatalog from "./videos.json";
 import streamtapeBatch from "./streamtape.json";
 import localPosters from "./posters.json";
 
-/**
- * Catalog is LOCAL-FIRST.
- * Remote feeds are opt-in only (set CATALOG_REMOTE=1) and never required.
- * Site keeps working fully offline / without koleksidrpinguin.site.
- */
 const CACHE_MS = 10 * 60 * 1000;
 
-/** Optional remote enrichment — disabled by default for independence. */
 const REMOTE_ENABLED =
   typeof process !== "undefined" &&
   (process.env.CATALOG_REMOTE === "1" || process.env.CATALOG_REMOTE === "true");
@@ -170,7 +164,7 @@ async function loadPosters(): Promise<Record<string, string>> {
           map[key.toLowerCase()] = src;
         }
       } catch {
-        /* ignore — remote posters optional */
+        /* ignore */
       }
     }),
   );
@@ -197,10 +191,8 @@ async function loadItems(): Promise<{ items: RawItem[]; posters: Record<string, 
   const now = Date.now();
   if (cache && now - cache.at < CACHE_MS) return cache;
 
-  // Local sources always present
   const localPacks: unknown[] = [streamtapeBatch, localCatalog];
 
-  // Posters always from bundled local map; remote posters only if enabled
   let remote: unknown[] = [];
   let posters: Record<string, string> = basePosters();
   try {
@@ -213,10 +205,17 @@ async function loadItems(): Promise<{ items: RawItem[]; posters: Record<string, 
     /* keep local posters */
   }
 
-  // Newest first: remote (if any) → streamtape → main local catalog
-  const items = merge([...remote, ...localPacks]);
+  const items = prioritizeIndoAv(merge([...remote, ...localPacks]));
   cache = { at: now, items, posters };
   return cache;
+}
+
+function isIndoAv(item: RawItem): boolean {
+  return /indoav/i.test(`${item.embed} ${item.direct || ""} ${item.source || ""}`);
+}
+
+function prioritizeIndoAv(items: RawItem[]): RawItem[] {
+  return [...items].sort((a, b) => Number(isIndoAv(b)) - Number(isIndoAv(a)));
 }
 
 function pageOf<T>(items: T[], page = 1, limit = DEFAULT_PAGE_SIZE) {
@@ -238,15 +237,6 @@ function videyFile(item: RawItem): string {
   return `https://cdn.videy.co/${id}${ext}`;
 }
 
-/**
- * Thumbnail resolution — fully self-contained, no .site dependency.
- *
- * Priority:
- * 1. Poster map (optional remote / future local)
- * 2. Videy CDN direct file (acts as poster via <video>)
- * 3. Streamtape public thumb host (best-effort patterns)
- * 4. IndoAV / UserBokep: no reliable public thumb → empty (UI shows nice placeholder)
- */
 function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const id = embedId(item.embed) || embedId(item.direct || "");
   const blob = `${item.embed} ${item.direct || ""} ${item.source || ""}`;
@@ -259,13 +249,10 @@ function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const videy = videyFile(item);
   if (videy) return videy;
 
-  // Streamtape — use self-hosted proxy (needs STREAMTAPE_LOGIN + STREAMTAPE_KEY on server)
-  // Works without any external .site domain.
   if (id && /streamtape|strcloud|tapecontent/i.test(blob)) {
     return `/api/tape-thumb?id=${encodeURIComponent(id)}`;
   }
 
-  // IndoAV / UserBokep: no stable public thumbnail URL without scraping
   return "";
 }
 
@@ -273,7 +260,6 @@ function normalizeCategorySlug(raw?: string): string | null {
   if (!raw) return null;
   const key = raw.trim().toLowerCase().replace(/\s+/g, "-").replace(/_/g, "-");
   if (findCategory(key)) return key;
-  // common aliases
   const aliases: Record<string, string> = {
     "open bo": "open-bo",
     openbo: "open-bo",
@@ -285,39 +271,49 @@ function normalizeCategorySlug(raw?: string): string | null {
   return null;
 }
 
+function seoBlurb(title: string, label: string): string {
+  const t = cleanTitle(title);
+  return `Nonton ${t} bokep Indo ${label} full di Dr. Pinguin. Streaming amatir, jilbab, tante, viral. Konten 18+.`};
+
 function toCard(item: RawItem, posters: Record<string, string>): VideoCard {
   const slug = normalizeCategorySlug(item.category) || classify(item.title || "");
   const label = findCategory(slug)?.label ?? "Lainnya";
+  const title = cleanTitle(item.title || "");
   return {
     id: item.id,
-    title: cleanTitle(item.title || ""),
+    title,
     thumbnail: thumbOf(item, posters),
-    description: `${label} · ${item.source || "embed"}`,
+    description: seoBlurb(title, label),
     category: label,
     duration: null,
     durationLabel: "—",
-    quality: item.source || "HD",
+    quality: isIndoAv(item) ? "IndoAV" : item.source || "HD",
     year: null,
-    creator: item.source || null,
+    creator: isIndoAv(item) ? "IndoAV" : item.source || null,
     views: null,
   };
 }
 
 function toDetail(item: RawItem, posters: Record<string, string>): VideoDetail {
   const card = toCard(item, posters);
-  const qualities = [{ label: item.source || "Embed", url: item.embed, format: "embed" }];
+  const qualities: VideoDetail["qualities"] = [];
+  if (isIndoAv(item)) {
+    qualities.push({ label: "IndoAV", url: item.embed, format: "embed" });
+  } else {
+    qualities.push({ label: item.source || "Embed", url: item.embed, format: "embed" });
+  }
   if (item.direct && item.direct !== item.embed) {
     qualities.push({ label: "Direct", url: item.direct, format: "direct" });
   }
   const videy = videyFile(item);
   if (videy && !qualities.some((q) => q.url === videy)) {
-    qualities.unshift({ label: "Videy", url: videy, format: "mp4" });
+    qualities.push({ label: "Videy", url: videy, format: "mp4" });
   }
   return {
     ...card,
-    video_url: videy || item.embed,
+    video_url: isIndoAv(item) ? item.embed : videy || item.embed,
     qualities,
-    subjects: [card.category],
+    subjects: [card.category, "bokep indo"],
     playable: Boolean(videy || item.embed),
   };
 }
@@ -334,9 +330,10 @@ export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: 
 
 export async function listFeatured(page = 1, limit = 8, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters } = await loadItems();
-  const featured = items.filter((x) => ["jilbab", "tante", "viral", "live"].includes(slugOf(x))).slice(0, 24);
-  const source = featured.length ? featured : items;
-  const { slice, total, hasMore } = pageOf(source, page, limit);
+  const indo = items.filter(isIndoAv);
+  const hot = items.filter((x) => ["jilbab", "tante", "viral", "live"].includes(slugOf(x)));
+  const source = indo.length ? indo : hot.length ? hot : items;
+  const { slice, total, hasMore } = pageOf(source.slice(0, 48), page, limit);
   return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
 
@@ -350,7 +347,7 @@ export async function listCategory(slug: string, page = 1, limit = DEFAULT_PAGE_
 export async function listSearch(q: string, page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
   const key = q.trim().toLowerCase();
   const { items, posters } = await loadItems();
-  const filtered = items.filter((x) => `${x.title} ${x.source ?? ""}`.toLowerCase().includes(key));
+  const filtered = items.filter((x) => `${x.title} ${x.source ?? ""} ${x.category ?? ""}`.toLowerCase().includes(key));
   const { slice, total, hasMore } = pageOf(filtered, page, limit);
   return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
@@ -367,9 +364,11 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
 export async function listRelated(id: string, limit = 12, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters } = await loadItems();
   const current = items.find((x) => x.id === id);
-  const pool = current
+  const sameCat = current
     ? items.filter((x) => x.id !== id && slugOf(x) === slugOf(current))
     : items.filter((x) => x.id !== id);
+  const indoSame = sameCat.filter(isIndoAv);
+  const pool = indoSame.length ? [...indoSame, ...sameCat.filter((x) => !isIndoAv(x))] : sameCat;
   const picked = (pool.length ? pool : items.filter((x) => x.id !== id)).slice(0, limit);
   return { page: 1, limit, total: picked.length, hasMore: false, items: picked.map((x) => toCard(x, posters)) };
 }
