@@ -11,6 +11,7 @@ const CACHE_MS = 5 * 60 * 1000;
 const BOT_FEEDS = [
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin-latest.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin.json",
+  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguin/main/data/putarin.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/videos-latest.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/campur-latest.json",
 ];
@@ -409,7 +410,9 @@ async function fetchStreamtapeName(fileId: string): Promise<string> {
 async function enrichItemMeta(items: RawItem[]): Promise<RawItem[]> {
   const out = items.slice();
   const jobs: Promise<void>[] = [];
+  const MAX_ENRICH = 8;
   for (let i = 0; i < out.length; i++) {
+    if (jobs.length >= MAX_ENRICH) break;
     const item = out[i];
     if (isPutarin(item) && needsTitleEnrich(item)) {
       jobs.push(
