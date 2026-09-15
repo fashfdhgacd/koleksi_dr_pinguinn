@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { listCategory, listLatest, listSearch } from "@/lib/catalog/local";
 import { parseMessage, detectCategory, cleanTitle } from "@/lib/bot/parse.js";
-import { toRecord, upsertInMemory } from "@/lib/bot/store.js";
+import { toRecord } from "@/lib/bot/store.js";
 import { fetchPutarinTitle, fetchStreamtapeTitle } from "@/lib/bot/providers.js";
-import { fetchJsonFromGithub, pushJsonToGithub } from "@/lib/bot/github.js";
+import { upsertVideoToGithub } from "@/lib/bot/github.js";
 
 const HOST = "https://www.koleksidrpinguin.com";
 
@@ -231,35 +231,30 @@ async function handleUpload(
     const record = toRecord({ parsed: video, title, category });
     const fileName = video.file;
 
-    const fetched = await fetchJsonFromGithub(env, fileName);
-    if (!fetched.ok && fetched.reason) {
-      lines.push(`⚠️ Gagal baca GitHub (${fileName}): ${fetched.reason}`);
-      continue;
-    }
-
-    const result = upsertInMemory(fetched.items, record);
-    const json = JSON.stringify(result.items, null, 2) + "\n";
-
     try {
-      await pushJsonToGithub(env, fileName, json, fetched.sha);
+      const result = await upsertVideoToGithub(env, fileName, record);
+      if (!result.ok) {
+        lines.push(`⚠️ Gagal upload: ${result.reason || "unknown"}`);
+        continue;
+      }
+      const mark = result.action === "created" ? "✅" : "♻️";
+      const label = result.action === "created" ? "BERHASIL diupload" : "DIUPDATE";
+      const extra = result.rotated ? `\nArsip penuh → data/${result.rotated}` : "";
+      lines.push(
+        [
+          `${mark} ${label}`,
+          `Judul: ${record.title}`,
+          `ID: ${record.id}`,
+          `Source: ${record.source}`,
+          `Kategori: ${record.category}`,
+          `JSON: data/${result.file}`,
+          `Total di chunk: ${result.total}`,
+        ].join("\n") + extra
+      );
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      lines.push(`⚠️ Gagal push GitHub (${fileName}): ${msg}`);
-      continue;
+      lines.push(`⚠️ Gagal push GitHub: ${msg}`);
     }
-
-    const mark = result.action === "created" ? "✅" : "♻️";
-    lines.push(
-      [
-        `${mark} ${result.action.toUpperCase()}`,
-        `Judul: ${record.title}`,
-        `ID: ${record.id}`,
-        `Source: ${record.source}`,
-        `Kategori: ${record.category}`,
-        `File: data/${fileName}`,
-        `Total: ${result.total}`,
-      ].join("\n")
-    );
   }
 
   await tgSend(
