@@ -3,6 +3,10 @@ import { AlertTriangle, ExternalLink, LoaderCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { VideoDetail, VideoQuality } from "@/lib/catalog/types";
 import { hostLabel, hostPriority, isIndoAvUrl, resolveSource, type ResolvedSource } from "@/lib/catalog/embed";
+
+function isEmbedHostUrl(url: string): boolean {
+  return /indoav|userbokep|puterin|putarin|streamtape|strcloud|lulu/i.test(url);
+}
 import { VideoThumb } from "./thumb";
 import { cn } from "@/lib/utils";
 
@@ -28,12 +32,9 @@ function isFileUrl(url: string | null): boolean {
 function normalizePlayUrl(url: string, host: string): string {
   try {
     const u = new URL(url);
-    if (/streamtape|strcloud/i.test(host + u.hostname)) {
-      u.pathname = u.pathname.replace(/\/(?:v|d)\//, "/e/");
-      return u.toString();
-    }
-    if (/indoav|userbokep/i.test(host + u.hostname)) {
-      u.pathname = u.pathname.replace(/\/d\//, "/e/");
+    const blob = `${host} ${u.hostname} ${u.pathname}`;
+    if (/streamtape|strcloud|puterin|putarin|indoav|userbokep|lulu/i.test(blob)) {
+      u.pathname = u.pathname.replace(/\/(?:v|d|watch)\//, "/e/");
       return u.toString();
     }
     return url;
@@ -62,9 +63,9 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     setFailed(false);
     setFallbackAt(0);
     setBuffering(false);
-    // Auto-start IndoAV embed so the partner player can count a view.
+    // Auto-start iframe embeds (IndoAV bonus + Puterin/Streamtape) — jangan stuck di poster.
     const first = list[0];
-    const auto = Boolean(first && isIndoAvUrl(first.url));
+    const auto = Boolean(first && !isFileUrl(first.url) && isEmbedHostUrl(first.url));
     setStarted(auto);
   }, [item.id, list]);
 
@@ -99,7 +100,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
 
   return (
     <div className="overflow-hidden rounded-2xl bg-surface">
-      <div className="relative aspect-video bg-background">
+      <div className="relative aspect-video max-h-[min(70vh,720px)] w-full bg-background sm:mx-auto">
         {!started ? (
           <>
             <VideoThumb src={item.thumbnail} alt={item.title} eager className="size-full object-cover" />
@@ -121,9 +122,9 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
             key={playUrl}
             src={playUrl}
             title={item.title}
-            className="size-full border-0 bg-background"
+            className="absolute inset-0 size-full border-0 bg-background"
             allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write"
-            referrerPolicy="no-referrer-when-downgrade"
+            referrerPolicy="origin-when-cross-origin"
             allowFullScreen
             loading="eager"
           />
