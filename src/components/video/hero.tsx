@@ -30,14 +30,24 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
 
   useEffect(() => {
     if (list.length <= 1) return;
-    const id = window.setInterval(() => {
-      setFade(false);
-      window.setTimeout(() => {
-        setIndex((i) => (i + 1) % list.length);
-        setFade(true);
-      }, 320);
-    }, intervalMs);
-    return () => window.clearInterval(id);
+    let timeoutId = 0;
+    let fadeId = 0;
+    const arm = () => {
+      const wait = Math.max(1500, intervalMs - (Date.now() % intervalMs) + 50);
+      timeoutId = window.setTimeout(() => {
+        setFade(false);
+        fadeId = window.setTimeout(() => {
+          setIndex((i) => (i + 1) % list.length);
+          setFade(true);
+          arm();
+        }, 320);
+      }, wait);
+    };
+    arm();
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.clearTimeout(fadeId);
+    };
   }, [list.length, intervalMs]);
 
   const current = list[index];
@@ -89,7 +99,6 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
         </div>
       </div>
 
-      {/* Dot indicator */}
       {list.length > 1 ? (
         <div className="pointer-events-none absolute bottom-3 right-4 flex gap-1.5 sm:bottom-5 sm:right-6">
           {list.slice(0, 8).map((v, i) => (
