@@ -13,6 +13,10 @@
  *   (this function cannot read `src/lib/og/site.json` or `public/og.jpg`).
  *   This must be a middleware transforming `next()`: h3 discards the `response`
  *   runtime hook's return value, and `render:html` does not exist in Nitro v3.
+ *
+ * IMPORTANT: /watch/* pages set their own dynamic Open Graph (title + video
+ * thumbnail) via the route head. Do NOT run the share-meta injector there or
+ * it will strip those tags and replace them with the static cinema og.jpg.
  */
 import installPageTemplate from "../../scripts/install-page.html?raw";
 import { grokOgIdentity } from "virtual:grok-og-identity";
@@ -60,6 +64,11 @@ function injectHeadStreaming(response: Response, host: string): Response {
   });
 }
 
+/** Watch pages own their OG tags (dynamic title + poster). Skip share injection. */
+function isWatchPath(pathname: string): boolean {
+  return pathname === "/watch" || pathname.startsWith("/watch/");
+}
+
 export default async function grokPwaMiddleware(
   event: GrokPwaEvent,
   next: () => unknown | Promise<unknown>,
@@ -99,6 +108,10 @@ export default async function grokPwaMiddleware(
   if (!isDocumentPath(path)) return next();
 
   const result = await next();
+
+  // Keep route-level dynamic OG (title + video thumbnail) intact on watch pages.
+  if (isWatchPath(path)) return result;
+
   if (
     result instanceof Response &&
     result.body &&
