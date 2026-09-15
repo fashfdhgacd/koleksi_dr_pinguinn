@@ -136,6 +136,22 @@ export function useCatalogFeed(params: BrowseParams) {
     return () => abortRef.current?.abort();
   }, [load, paramsKey]);
 
+  // Hero IndoAV: ganti tiap slot 5 menit menurut jam, meski tab ditutup lalu dibuka lagi.
+  useEffect(() => {
+    if (params.mode !== "home") return;
+    const SLOT = 5 * 60 * 1000;
+    let tid = 0;
+    const arm = () => {
+      const wait = Math.max(1500, SLOT - (Date.now() % SLOT) + 50);
+      tid = window.setTimeout(() => {
+        void load(1, "retry");
+        arm();
+      }, wait);
+    };
+    arm();
+    return () => window.clearTimeout(tid);
+  }, [load, params.mode]);
+
   const loadMore = useCallback(() => {
     if (inflightRef.current || !hasMoreRef.current) return;
     void load(pageRef.current + 1, "more");
