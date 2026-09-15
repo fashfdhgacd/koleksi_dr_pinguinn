@@ -308,6 +308,10 @@ function thumbOf(item: RawItem, posters: Record<string, string>): string {
     return `/api/tape-thumb?id=${encodeURIComponent(id)}`;
   }
 
+  if (id && /putarin|puterin/i.test(blob)) {
+    return `/api/puterin-thumb?id=${encodeURIComponent(id)}`;
+  }
+
   return "";
 }
 
