@@ -5,7 +5,7 @@ import localCatalog from "./videos.json";
 import streamtapeBatch from "./streamtape.json";
 
 const SITE_FEEDS = [
-  // Chunk upload baru (kecil, < 1MB) — diprioritaskan
+  // Upload baru (chunk kecil < 1MB)
   "https://www.koleksidrpinguin.site/data/videos-latest.json",
   "https://www.koleksidrpinguin.site/data/putarin-latest.json",
   "https://www.koleksidrpinguin.site/data/campur-latest.json",
@@ -36,7 +36,7 @@ const RULES: Array<[string, RegExp]> = [
   ["chindo", /chindo/i],
   ["malaysia", /malay|malaysia/i],
   ["open-bo", /open ?bo|michat/i],
-  ["percakapan", /percakapan|vcs|ngobrol|telpon/i],
+  ["percakapan", /percakapan/i],
   ["viral", /viral/i],
   ["gangbang", /gangbang|gilir|rame rame|threesome|foursome|bertiga/i],
   ["doggy", /doggy|nungging/i],
@@ -47,56 +47,79 @@ const RULES: Array<[string, RegExp]> = [
   ["abg", /\babg\b|\bsma\b|mahasiswi|mahasiswa|pelajar/i],
 ];
 
-function classify(title = "") {
-  const text = title.trim();
+function classify(title: string): string {
   for (const [slug, re] of RULES) {
-    if (re.test(text)) return slug;
+    if (re.test(title)) return slug;
   }
   return "lainnya";
 }
 
-function cleanTitle(raw = "") {
-  return String(raw)
-    .replace(/^\u25b6\s*/, "")
-    .replace(/koleksidrpinguin\.(com|site)/gi, "")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/^[\-|]+|[\-|]+$/g, "") || "Video";
+function cleanTitle(title: string): string {
+  return (
+    title
+      .replace(/^\u25b6\s*/, "")
+      .replace(/Collection Dr\.?\s*Anjing Bokep[^,]*[,.]?\s*S\.\s*M\.\s*Sc\.?/gi, "")
+      .replace(/koleksidrpinguin\.(com|site)/gi, "")
+      .replace(/dibokepindo\.com/gi, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .replace(/^[\-|]+|[\-|]+$/g, "") || "Video"
+  );
 }
 
-function embedId(url = "") {
-  const m = String(url).match(/\/(?:e|v|d)\/([A-Za-z0-9_-]+)/i);
+function embedId(embed: string): string {
+  const m =
+    embed.match(/[?&]id=([A-Za-z0-9_-]+)/i) ||
+    embed.match(/\/(?:e|v|d)\/([A-Za-z0-9_-]+)/i);
   return m ? m[1] : "";
 }
 
-function normalize(raw: unknown): RawItem | null {
-  if (!raw || typeof raw !== "object") return null;
-  const o = raw as Record<string, unknown>;
-  const id = String(o.id || embedId(String(o.embed || o.direct || "")) || "").trim();
-  const embed = String(o.embed || o.direct || "").trim();
-  if (!id || !embed) return null;
+function embedKey(embed: string): string {
+  return embedId(embed).toLowerCase() || embed.toLowerCase();
+}
+
+function makeId(raw: Record<string, unknown>): string {
+  if (raw.id != null && String(raw.id).trim()) return String(raw.id);
+  const embed = String(raw.embed || raw.direct || "");
+  const key = embedId(embed);
+  return key || `t${Math.abs(hash(String(raw.title || embed)))}`;
+}
+
+function hash(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return h;
+}
+
+function normalize(raw: Record<string, unknown>): RawItem | null {
+  const embed = String(raw.embed || raw.direct || "").trim();
+  if (!embed) return null;
   return {
-    id,
-    title: String(o.title || "Video"),
+    id: makeId(raw),
+    title: String(raw.title || "Video"),
     embed,
-    direct: o.direct ? String(o.direct) : undefined,
-    source: o.source ? String(o.source) : undefined,
-    category: o.category ? String(o.category) : undefined,
+    direct: raw.direct ? String(raw.direct) : undefined,
+    source: raw.source ? String(raw.source) : undefined,
+    category: raw.category ? String(raw.category) : undefined,
   };
 }
 
-function merge(packs: unknown[]): RawItem[] {
-  const map = new Map<string, RawItem>();
-  for (const pack of packs) {
-    const arr = Array.isArray(pack) ? pack : [];
-    for (const raw of arr) {
-      const item = normalize(raw);
+function merge(lists: Array<unknown>): RawItem[] {
+  const seen = new Set<string>();
+  const out: RawItem[] = [];
+  for (const list of lists) {
+    if (!Array.isArray(list)) continue;
+    for (const row of list) {
+      if (!row || typeof row !== "object") continue;
+      const item = normalize(row as Record<string, unknown>);
       if (!item) continue;
-      if (!map.has(item.id)) map.set(item.id, item);
+      const key = embedKey(item.embed);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(item);
     }
   }
-  return [...map.values()];
+  return out;
 }
 
 let cache: { at: number; items: RawItem[]; posters: Record<string, string> } | null = null;
@@ -108,9 +131,13 @@ async function loadPosters(): Promise<Record<string, string>> {
       try {
         const res = await fetch(url, { headers: { accept: "application/json" } });
         if (!res.ok) return;
-        const data = await res.json();
-        if (data && typeof data === "object" && !Array.isArray(data)) {
-          Object.assign(map, data as Record<string, string>);
+        const data = (await res.json()) as Record<string, unknown>;
+        if (!data || Array.isArray(data)) return;
+        for (const [key, value] of Object.entries(data)) {
+          const src = String(value || "").trim();
+          if (!key || !/^https?:\/\//i.test(src)) continue;
+          map[key] = src;
+          map[key.toLowerCase()] = src;
         }
       } catch {
         /* ignore */
@@ -219,13 +246,13 @@ function slugOf(item: RawItem): string {
   return classify(item.title || "");
 }
 
-export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE): Promise<PagedVideos> {
+export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters } = await loadItems();
   const { slice, total, hasMore } = pageOf(items, page, limit);
   return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
 
-export async function listFeatured(page = 1, limit = 8): Promise<PagedVideos> {
+export async function listFeatured(page = 1, limit = 8, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters } = await loadItems();
   const featured = items.filter((x) => ["jilbab", "tante", "viral", "live"].includes(slugOf(x))).slice(0, 24);
   const source = featured.length ? featured : items;
@@ -233,14 +260,14 @@ export async function listFeatured(page = 1, limit = 8): Promise<PagedVideos> {
   return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
 
-export async function listCategory(slug: string, page = 1, limit = DEFAULT_PAGE_SIZE): Promise<PagedVideos> {
+export async function listCategory(slug: string, page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters } = await loadItems();
   const filtered = items.filter((x) => slugOf(x) === slug);
   const { slice, total, hasMore } = pageOf(filtered, page, limit);
   return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
 
-export async function listSearch(q: string, page = 1, limit = DEFAULT_PAGE_SIZE): Promise<PagedVideos> {
+export async function listSearch(q: string, page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
   const key = q.trim().toLowerCase();
   const { items, posters } = await loadItems();
   const filtered = items.filter((x) => `${x.title} ${x.source ?? ""}`.toLowerCase().includes(key));
@@ -248,11 +275,21 @@ export async function listSearch(q: string, page = 1, limit = DEFAULT_PAGE_SIZE)
   return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
 
-export async function getDetail(id: string): Promise<VideoDetail> {
+export async function getDetail(id: string, _signal?: AbortSignal): Promise<VideoDetail> {
   const { items, posters } = await loadItems();
   const item = items.find((x) => x.id === id);
   if (!item) {
     throw Object.assign(new Error("Video tidak ditemukan."), { code: "not_found" as const });
   }
   return toDetail(item, posters);
+}
+
+export async function listRelated(id: string, limit = 12, _signal?: AbortSignal): Promise<PagedVideos> {
+  const { items, posters } = await loadItems();
+  const current = items.find((x) => x.id === id);
+  const pool = current
+    ? items.filter((x) => x.id !== id && slugOf(x) === slugOf(current))
+    : items.filter((x) => x.id !== id);
+  const picked = (pool.length ? pool : items.filter((x) => x.id !== id)).slice(0, limit);
+  return { page: 1, limit, total: picked.length, hasMore: false, items: picked.map((x) => toCard(x, posters)) };
 }
