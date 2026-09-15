@@ -239,8 +239,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
         </div>
       ) : current ? (
         <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2 text-xs text-muted">
-          <span>Sumber: {current.host}{indoFirst ? " · DR. PINGUIN
-18+" : ""}</span>
+          <span>Sumber: {current.host}{indoFirst ? " · DR. PINGUIN 18+" : ""}</span>
         </div>
       ) : null}
     </div>
