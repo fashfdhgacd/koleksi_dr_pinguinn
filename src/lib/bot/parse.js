@@ -1,5 +1,9 @@
-const STREAMTAPE_HOST = /(^|\.)streamtape\.com$/i;
-const PUTARIN_HOST = /(^|\.)putarin\.com$/i;
+const STREAMTAPE_HOST = /(^|\.)(streamtape\.com|strcloud[a-z0-9]*)$/i;
+const PUTARIN_HOST = /(^|\.)(putarin\.com|puterin\.[a-z]+)$/i;
+const LULU_HOST = /(^|\.)(luluvdo\.com|lulustream\.com|luluvid\.com|lulu\.st)$/i;
+const INDOAV_HOST = /indoav\./i;
+const USERBOKEP_HOST = /userbokep\./i;
+const VIDEY_HOST = /(^|\.)videy\.co$/i;
 
 const CATEGORY_RULES = [
   ["jilbab", /jilbab|hijab|ukhty|ukhti|tudung|berhijab/i],
@@ -42,11 +46,19 @@ export function extractUrls(text = "") {
   return found.map((u) => u.replace(/[),.;]+$/g, ""));
 }
 
-function hostOf(url) {
+export function isUploadHost(url) {
   try {
-    return new URL(url).hostname.replace(/^www\./i, "");
+    const host = new URL(url).hostname.replace(/^www\./i, "");
+    return (
+      STREAMTAPE_HOST.test(host) ||
+      PUTARIN_HOST.test(host) ||
+      LULU_HOST.test(host) ||
+      INDOAV_HOST.test(host) ||
+      USERBOKEP_HOST.test(host) ||
+      VIDEY_HOST.test(host)
+    );
   } catch {
-    return "";
+    return false;
   }
 }
 
@@ -60,6 +72,7 @@ export function parseVideoLink(url) {
 
   const host = parsed.hostname.replace(/^www\./i, "");
   const path = parsed.pathname || "";
+  const origin = parsed.origin;
 
   if (STREAMTAPE_HOST.test(host) || /strcloud/i.test(host)) {
     const m =
@@ -80,12 +93,13 @@ export function parseVideoLink(url) {
 
   if (PUTARIN_HOST.test(host)) {
     const m =
-      path.match(/\/(?:e|v|d|video)\/([A-Za-z0-9_-]+)/i) ||
+      path.match(/\/(?:e|v|d|watch|f|video)\/([A-Za-z0-9_-]+)/i) ||
       parsed.search.match(/[?&](?:code|id)=([A-Za-z0-9_-]+)/i);
     if (!m) return null;
     const id = m[1];
-    const embed = `https://panel.putarin.com/e/${id}`;
-    const watch = `https://panel.putarin.com/v/${id}`;
+    const base = /puterin\./i.test(host) ? origin : "https://panel.putarin.com";
+    const embed = `${base}/e/${id}`;
+    const watch = `${base}/v/${id}`;
     return {
       id,
       host: "putarin",
@@ -93,6 +107,53 @@ export function parseVideoLink(url) {
       embed,
       direct: watch,
       file: `putarin.json`,
+    };
+  }
+
+  if (LULU_HOST.test(host)) {
+    const m =
+      path.match(/\/(?:e|v|d)\/([A-Za-z0-9]+)/i) ||
+      [null, String(path.split("/").filter(Boolean).pop() || "").replace(/\.html$/i, "")];
+    const id = m && m[1];
+    if (!id) return null;
+    const embed = `https://luluvdo.com/e/${id}`;
+    return {
+      id,
+      host: "lulu",
+      source: "Lulustream",
+      embed,
+      direct: embed,
+      file: `campur.json`,
+    };
+  }
+
+  if (VIDEY_HOST.test(host)) {
+    const mm = parsed.search.match(/[?&]id=([A-Za-z0-9]+)/i);
+    const id = (mm && mm[1]) || "";
+    if (!id) return null;
+    const ext = id.length === 9 && id.endsWith("2") ? ".mov" : ".mp4";
+    return {
+      id,
+      host: "videy",
+      source: "Videy",
+      embed: `https://videy.co/v/?id=${id}`,
+      direct: `https://cdn.videy.co/${id}${ext}`,
+      file: `videos.json`,
+    };
+  }
+
+  if (INDOAV_HOST.test(host) || USERBOKEP_HOST.test(host)) {
+    const m = path.match(/\/(?:e|v|d|watch)\/([A-Za-z0-9_-]+)/i);
+    const id = (m && m[1]) || String(path.split("/").filter(Boolean).pop() || "");
+    if (!id) return null;
+    const embed = url.replace(/\/d\//i, "/e/");
+    return {
+      id,
+      host: INDOAV_HOST.test(host) ? "indoav" : "userbokep",
+      source: INDOAV_HOST.test(host) ? "IndoAV" : "Userbokep",
+      embed,
+      direct: embed,
+      file: `videos.json`,
     };
   }
 
