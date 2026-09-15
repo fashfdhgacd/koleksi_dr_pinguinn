@@ -62,7 +62,6 @@ function parseCount(text: string): number {
   return m ? Number(m[1]) : 10;
 }
 
-/** Map tombol menu → kategori katalog */
 function parseCat(text: string): string {
   const t = text.toLowerCase().trim();
   const map: Record<string, string> = {
@@ -92,7 +91,6 @@ function parseCat(text: string): string {
   return "";
 }
 
-/** Tombol sumber (bukan kategori) */
 function parseSource(text: string): string {
   const t = text.toLowerCase().trim();
   if (/streamtape|strcloud|sterampie|stream/.test(t)) return "streamtape";
@@ -132,7 +130,6 @@ async function handleShare(
   } else if (/cari\s+(.+)/i.test(text)) {
     page = await listSearch(text.replace(/^.*cari\s+/i, ""), 1, 400);
   } else if (source) {
-    // Ambil banyak item dulu biar filter sumber tidak kosong
     page = await listLatest(1, 800);
   } else {
     page = await listLatest(1, 400);
@@ -140,7 +137,6 @@ async function handleShare(
 
   let items = page.items.slice();
 
-  // Filter by source — VideoCard pakai creator/quality/description, bukan source/embed
   if (source) {
     items = items.filter((v) => {
       const blob = [
@@ -160,7 +156,6 @@ async function handleShare(
     });
   }
 
-  // Kalau filter sumber masih kosong, coba search by keyword di katalog
   if (source && !items.length) {
     const q =
       source === "streamtape"
@@ -172,7 +167,6 @@ async function handleShare(
     items = searched.items.slice();
   }
 
-  // Shuffle
   for (let i = items.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     const tmp = items[i];
@@ -352,14 +346,30 @@ async function handlePost(request: Request): Promise<Response> {
 export const Route = createFileRoute("/api/telegram")({
   server: {
     handlers: {
-      GET: async () =>
-        Response.json({
+      GET: async () => {
+        const env = process.env;
+        const has = (k: string) => Boolean(String(env[k] || "").trim());
+        const ghToken = has("GH_TOKEN") || has("GITHUB_TOKEN");
+        const ghOwner = String(env.GH_OWNER || env.GITHUB_OWNER || "").trim();
+        const ghRepo = String(env.GH_REPO || env.GITHUB_REPO || "").trim();
+        return Response.json({
           ok: true,
           service: "telegram-webhook",
           host: HOST,
           modes: ["upload", "share", "keyboard"],
           ready: Boolean(envToken()),
-        }),
+          upload: {
+            botToken: has("BOT_TOKEN") || has("TELEGRAM_BOT_TOKEN"),
+            adminId: has("AUTHORIZED_USER_IDS") || has("TELEGRAM_USER_ID") || has("TELEGRAM_ADMIN_ID"),
+            ghToken,
+            ghOwner: ghOwner || null,
+            ghRepo: ghRepo || null,
+            streamtape: has("STREAMTAPE_LOGIN") && has("STREAMTAPE_KEY"),
+            putarin: has("PUTARIN_API_KEY"),
+            canWriteJson: ghToken && Boolean(ghOwner) && Boolean(ghRepo),
+          },
+        });
+      },
       POST: async ({ request }) => handlePost(request),
     },
   },
