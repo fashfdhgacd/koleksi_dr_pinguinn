@@ -224,7 +224,12 @@ async function loadItems(): Promise<{ items: RawItem[]; posters: Record<string, 
   }
 
   // Bot feeds dulu (terbaru), lalu remote opsional, lalu bundle lokal.
-  const items = prioritizeMain(merge([...bot, ...remote, ...localPacks]));
+  let items = prioritizeMain(merge([...bot, ...remote, ...localPacks]));
+  try {
+    items = prioritizeMain(await enrichItemMeta(items));
+  } catch {
+    /* keep unenriched */
+  }
   cache = { at: now, items, posters };
   return cache;
 }
@@ -327,9 +332,102 @@ function normalizeCategorySlug(raw?: string): string | null {
   return null;
 }
 
-function seoBlurb(title: string, label: string): string {
-  const t = cleanTitle(title);
-  return `Nonton ${t} bokep Indo ${label} full di Dr. Pinguin. Streaming amatir, jilbab, tante, viral. Konten 18+.`;
+/** Deskripsi kartu dikosongkan — teks SEO palsu tidak ditampil di UI. Meta SEO tetap di route head. */
+function seoBlurb(_title: string, _label: string): string {
+  return "";
+}
+
+function needsTitleEnrich(item: RawItem): boolean {
+  const t = cleanTitle(item.title || "");
+  if (!t || t === "Video") return true;
+  if (/^campur\s+/i.test(t)) return true;
+  if (t === item.id) return true;
+  return false;
+}
+
+function decodeHtmlEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .trim();
+}
+
+async function scrapePutarinTitle(id: string): Promise<string> {
+  const urls = [
+    `https://puterin.biz/e/${encodeURIComponent(id)}`,
+    `https://panel.putarin.com/e/${encodeURIComponent(id)}`,
+  ];
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        headers: { accept: "text/html", "user-agent": "kdp-catalog" },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) continue;
+      const html = await res.text();
+      const m = html.match(/<title>([^<]+)<\/title>/i);
+      if (!m) continue;
+      let title = decodeHtmlEntities(m[1]);
+      title = title.replace(/\s*[·|].*putarin.*$/i, "").replace(/\s*[-–].*puterin.*$/i, "").trim();
+      if (!title || /tidak ditemukan|not found|^video$/i.test(title)) continue;
+      return cleanTitle(title);
+    } catch {
+      /* next */
+    }
+  }
+  return "";
+}
+
+async function fetchStreamtapeName(fileId: string): Promise<string> {
+  const login = typeof process !== "undefined" ? String(process.env.STREAMTAPE_LOGIN || "").trim() : "";
+  const key = typeof process !== "undefined" ? String(process.env.STREAMTAPE_KEY || "").trim() : "";
+  if (!login || !key || !fileId) return "";
+  try {
+    const url = `https://api.streamtape.com/file/info?file=${encodeURIComponent(fileId)}&login=${encodeURIComponent(login)}&key=${encodeURIComponent(key)}`;
+    const res = await fetch(url, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(8000) });
+    if (!res.ok) return "";
+    const data = (await res.json()) as { status?: number; result?: Record<string, { name?: string; title?: string }> };
+    if (data.status !== 200) return "";
+    const info = data.result?.[fileId] || (data.result as unknown as { name?: string; title?: string });
+    const name = String(info?.name || info?.title || "").replace(/\.[a-z0-9]+$/i, "").trim();
+    return name ? cleanTitle(name) : "";
+  } catch {
+    return "";
+  }
+}
+
+async function enrichItemMeta(items: RawItem[]): Promise<RawItem[]> {
+  const out = items.slice();
+  const jobs: Promise<void>[] = [];
+  for (let i = 0; i < out.length; i++) {
+    const item = out[i];
+    if (isPutarin(item) && needsTitleEnrich(item)) {
+      jobs.push(
+        (async () => {
+          const title = await scrapePutarinTitle(item.id);
+          if (title) out[i] = { ...out[i], title, category: out[i].category === "lainnya" || out[i].category === "umum" ? "jav" : out[i].category };
+        })(),
+      );
+    } else if (isStreamtape(item) && needsTitleEnrich(item)) {
+      jobs.push(
+        (async () => {
+          const title = await fetchStreamtapeName(item.id);
+          if (title) out[i] = { ...out[i], title };
+        })(),
+      );
+    }
+  }
+  if (jobs.length) await Promise.all(jobs);
+  return out;
+}
+
+function looksLikeFakeIndoAv(item: RawItem): boolean {
+  return /lazyprocrast|animations?\b|3d\s*render|ai\s*generated/i.test(item.title || "");
 }
 
 function toCard(item: RawItem, posters: Record<string, string>): VideoCard {
@@ -434,7 +532,7 @@ function shuffleSeeded<T>(items: T[], seed: number): T[] {
 /** Satu judul IndoAV acak per slot 5 menit — tidak campur Puterin/Streamtape. */
 export async function listFeatured(page = 1, limit = 1, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters } = await loadItems();
-  const indo = items.filter(isIndoAv);
+  const indo = items.filter((x) => isIndoAv(x) && !looksLikeFakeIndoAv(x));
   const slot = Math.floor(Date.now() / FEATURED_SLOT_MS);
   const shuffled = shuffleSeeded(indo, slot);
   const take = Math.max(1, limit);
