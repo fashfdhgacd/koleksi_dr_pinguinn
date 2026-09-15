@@ -12,8 +12,8 @@ const MAIN_KEYBOARD = {
   keyboard: [
     [{ text: "Minta 10" }, { text: "Minta 25" }],
     [{ text: "Semua" }, { text: "Amatir" }, { text: "Videy" }],
-    [{ text: "Streamtape" }, { text: "Putarin" }, { text: "Lulu" }],
-    [{ text: "Jilbab" }, { text: "ABG" }, { text: "AI" }],
+    [{ text: "Jav" }, { text: "AI+" }, { text: "Lulu" }],
+    [{ text: "Jilbab" }, { text: "ABG" }, { text: "Streamtape" }],
     [{ text: "Lagi" }, { text: "Menu" }],
   ],
   resize_keyboard: true,
@@ -68,7 +68,11 @@ function parseCat(text: string): string {
     jilbab: "jilbab",
     amatir: "amatir",
     abg: "abg",
-    ai: "ai",
+    ai: "ai-plus",
+    "ai+": "ai-plus",
+    jav: "jav",
+    puterin: "jav",
+    putarin: "jav",
     videy: "videy",
     tante: "tante",
     viral: "viral",
@@ -129,6 +133,10 @@ async function handleShare(
     page = await listCategory(cat, 1, 400);
   } else if (/cari\s+(.+)/i.test(text)) {
     page = await listSearch(text.replace(/^.*cari\s+/i, ""), 1, 400);
+  } else if (source === "putarin") {
+    page = await listCategory("jav", 1, 400);
+  } else if (source === "streamtape") {
+    page = await listCategory("ai-plus", 1, 400);
   } else if (source) {
     page = await listLatest(1, 800);
   } else {
@@ -227,7 +235,13 @@ async function handleUpload(
 
   for (const video of parsedMsg.videos) {
     const title = await resolveTitle(video, parsedMsg.title);
-    const category = parsedMsg.category || detectCategory(title);
+    const category =
+      parsedMsg.category ||
+      (video.host === "putarin"
+        ? "jav"
+        : video.host === "streamtape"
+          ? "ai-plus"
+          : detectCategory(title));
     const record = toRecord({ parsed: video, title, category });
     const fileName = video.file;
 
