@@ -5,7 +5,14 @@ import localCatalog from "./videos.json";
 import streamtapeBatch from "./streamtape.json";
 import localPosters from "./posters.json";
 
-const CACHE_MS = 10 * 60 * 1000;
+const CACHE_MS = 5 * 60 * 1000;
+
+/** Bot uploads di GitHub — selalu di-fetch server-side (bukan hanya kalau CATALOG_REMOTE). */
+const BOT_FEEDS = [
+  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin-latest.json",
+  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/videos-latest.json",
+  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/campur-latest.json",
+];
 
 const REMOTE_ENABLED =
   typeof process !== "undefined" &&
@@ -171,20 +178,25 @@ async function loadPosters(): Promise<Record<string, string>> {
   return map;
 }
 
+async function fetchJsonList(url: string): Promise<unknown> {
+  try {
+    const res = await fetch(url, {
+      headers: { accept: "application/json", "user-agent": "kdp-catalog" },
+    });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+async function loadBotFeeds(): Promise<unknown[]> {
+  return Promise.all(BOT_FEEDS.map((url) => fetchJsonList(url)));
+}
+
 async function loadRemoteLists(): Promise<unknown[]> {
   if (!SITE_FEEDS.length) return [];
-  const packs = await Promise.all(
-    SITE_FEEDS.map(async (url) => {
-      try {
-        const res = await fetch(url, { headers: { accept: "application/json" } });
-        if (!res.ok) return [];
-        return await res.json();
-      } catch {
-        return [];
-      }
-    }),
-  );
-  return packs;
+  return Promise.all(SITE_FEEDS.map((url) => fetchJsonList(url)));
 }
 
 async function loadItems(): Promise<{ items: RawItem[]; posters: Record<string, string> }> {
@@ -193,29 +205,67 @@ async function loadItems(): Promise<{ items: RawItem[]; posters: Record<string, 
 
   const localPacks: unknown[] = [streamtapeBatch, localCatalog];
 
+  let bot: unknown[] = [];
   let remote: unknown[] = [];
   let posters: Record<string, string> = basePosters();
   try {
+    const tasks: Promise<unknown>[] = [loadBotFeeds()];
     if (REMOTE_ENABLED) {
-      const [r, p] = await Promise.all([loadRemoteLists(), loadPosters()]);
-      remote = r;
-      posters = p;
+      tasks.push(loadRemoteLists(), loadPosters());
+    }
+    const settled = await Promise.all(tasks);
+    bot = settled[0] as unknown[];
+    if (REMOTE_ENABLED) {
+      remote = settled[1] as unknown[];
+      posters = settled[2] as Record<string, string>;
     }
   } catch {
-    /* keep local posters */
+    /* keep local */
   }
 
-  const items = prioritizeIndoAv(merge([...remote, ...localPacks]));
+  // Bot feeds dulu (terbaru), lalu remote opsional, lalu bundle lokal.
+  const items = prioritizeMain(merge([...bot, ...remote, ...localPacks]));
   cache = { at: now, items, posters };
   return cache;
 }
 
-function isIndoAv(item: RawItem): boolean {
-  return /indoav/i.test(`${item.embed} ${item.direct || ""} ${item.source || ""}`);
+function blobOf(item: RawItem): string {
+  return `${item.embed} ${item.direct || ""} ${item.source || ""} ${item.category || ""}`;
 }
 
-function prioritizeIndoAv(items: RawItem[]): RawItem[] {
-  return [...items].sort((a, b) => Number(isIndoAv(b)) - Number(isIndoAv(a)));
+function isIndoAv(item: RawItem): boolean {
+  return /indoav/i.test(blobOf(item));
+}
+
+function isUserBokep(item: RawItem): boolean {
+  return /userbokep/i.test(blobOf(item));
+}
+
+function isPutarin(item: RawItem): boolean {
+  return /putarin|puterin/i.test(blobOf(item));
+}
+
+function isStreamtape(item: RawItem): boolean {
+  return /streamtape|strcloud|tapecontent/i.test(blobOf(item));
+}
+
+/** Silo samping: tidak masuk Terbaru / hero / related IndoAV. */
+function isSideSilo(item: RawItem): boolean {
+  return isPutarin(item) || isStreamtape(item);
+}
+
+function mainRank(item: RawItem): number {
+  if (isIndoAv(item)) return 3;
+  if (isUserBokep(item)) return 2;
+  return 1;
+}
+
+function prioritizeMain(items: RawItem[]): RawItem[] {
+  return [...items].sort((a, b) => mainRank(b) - mainRank(a));
+}
+
+function mainCatalog(items: RawItem[]): RawItem[] {
+  return items.filter((x) => !isSideSilo(x));
 }
 
 function pageOf<T>(items: T[], page = 1, limit = DEFAULT_PAGE_SIZE) {
@@ -239,7 +289,7 @@ function videyFile(item: RawItem): string {
 
 function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const id = embedId(item.embed) || embedId(item.direct || "");
-  const blob = `${item.embed} ${item.direct || ""} ${item.source || ""}`;
+  const blob = blobOf(item);
 
   if (id) {
     const hit = posters[id] || posters[id.toLowerCase()];
@@ -259,12 +309,18 @@ function thumbOf(item: RawItem, posters: Record<string, string>): string {
 function normalizeCategorySlug(raw?: string): string | null {
   if (!raw) return null;
   const key = raw.trim().toLowerCase().replace(/\s+/g, "-").replace(/_/g, "-");
-  if (findCategory(key)) return key;
+  if (findCategory(key)) return findCategory(key)!.slug;
   const aliases: Record<string, string> = {
     "open bo": "open-bo",
     openbo: "open-bo",
     umum: "lainnya",
     other: "lainnya",
+    puterin: "jav",
+    putarin: "jav",
+    streamtape: "ai-plus",
+    streampie: "ai-plus",
+    ai: "ai-plus",
+    "ai+": "ai-plus",
   };
   const aliased = aliases[key] || aliases[raw.trim().toLowerCase()];
   if (aliased && findCategory(aliased)) return aliased;
@@ -277,9 +333,24 @@ function seoBlurb(title: string, label: string): string {
 }
 
 function toCard(item: RawItem, posters: Record<string, string>): VideoCard {
-  const slug = normalizeCategorySlug(item.category) || classify(item.title || "");
+  const slug = slugOf(item);
   const label = findCategory(slug)?.label ?? "Lainnya";
   const title = cleanTitle(item.title || "");
+  let quality = item.source || "HD";
+  let creator: string | null = item.source || null;
+  if (isIndoAv(item)) {
+    quality = "IndoAV";
+    creator = "IndoAV";
+  } else if (isUserBokep(item)) {
+    quality = "UserBokep";
+    creator = "UserBokep";
+  } else if (isPutarin(item)) {
+    quality = "Putarin";
+    creator = "Putarin";
+  } else if (isStreamtape(item)) {
+    quality = "Streamtape";
+    creator = "Streamtape";
+  }
   return {
     id: item.id,
     title,
@@ -288,9 +359,9 @@ function toCard(item: RawItem, posters: Record<string, string>): VideoCard {
     category: label,
     duration: null,
     durationLabel: "\u2014",
-    quality: isIndoAv(item) ? "IndoAV" : item.source || "HD",
+    quality,
     year: null,
-    creator: isIndoAv(item) ? "IndoAV" : item.source || null,
+    creator,
     views: null,
   };
 }
@@ -300,6 +371,10 @@ function toDetail(item: RawItem, posters: Record<string, string>): VideoDetail {
   const qualities: VideoDetail["qualities"] = [];
   if (isIndoAv(item)) {
     qualities.push({ label: "IndoAV", url: item.embed, format: "embed" });
+  } else if (isPutarin(item)) {
+    qualities.push({ label: "Putarin", url: item.embed, format: "embed" });
+  } else if (isStreamtape(item)) {
+    qualities.push({ label: "Streamtape", url: item.embed, format: "embed" });
   } else {
     qualities.push({ label: item.source || "Embed", url: item.embed, format: "embed" });
   }
@@ -312,7 +387,7 @@ function toDetail(item: RawItem, posters: Record<string, string>): VideoDetail {
   }
   return {
     ...card,
-    video_url: isIndoAv(item) ? item.embed : videy || item.embed,
+    video_url: isIndoAv(item) || isPutarin(item) || isStreamtape(item) ? item.embed : videy || item.embed,
     qualities,
     subjects: [card.category, "bokep indo"],
     playable: Boolean(videy || item.embed),
@@ -320,12 +395,15 @@ function toDetail(item: RawItem, posters: Record<string, string>): VideoDetail {
 }
 
 function slugOf(item: RawItem): string {
+  if (isPutarin(item)) return "jav";
+  if (isStreamtape(item)) return "ai-plus";
   return normalizeCategorySlug(item.category) || classify(item.title || "");
 }
 
 export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters } = await loadItems();
-  const { slice, total, hasMore } = pageOf(items, page, limit);
+  const main = mainCatalog(items);
+  const { slice, total, hasMore } = pageOf(main, page, limit);
   return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
 
@@ -353,7 +431,7 @@ function shuffleSeeded<T>(items: T[], seed: number): T[] {
   return copy;
 }
 
-/** Satu (atau limit) judul IndoAV acak per slot 5 menit, sama untuk semua pengunjung. */
+/** Satu judul IndoAV acak per slot 5 menit — tidak campur Puterin/Streamtape. */
 export async function listFeatured(page = 1, limit = 1, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters } = await loadItems();
   const indo = items.filter(isIndoAv);
@@ -372,7 +450,15 @@ export async function listFeatured(page = 1, limit = 1, _signal?: AbortSignal): 
 
 export async function listCategory(slug: string, page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters } = await loadItems();
-  const filtered = items.filter((x) => slugOf(x) === slug);
+  const key = (findCategory(slug)?.slug || slug).toLowerCase();
+  let filtered: RawItem[];
+  if (key === "jav") {
+    filtered = items.filter(isPutarin);
+  } else if (key === "ai-plus") {
+    filtered = items.filter(isStreamtape);
+  } else {
+    filtered = mainCatalog(items).filter((x) => slugOf(x) === key);
+  }
   const { slice, total, hasMore } = pageOf(filtered, page, limit);
   return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
@@ -380,7 +466,10 @@ export async function listCategory(slug: string, page = 1, limit = DEFAULT_PAGE_
 export async function listSearch(q: string, page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
   const key = q.trim().toLowerCase();
   const { items, posters } = await loadItems();
-  const filtered = items.filter((x) => `${x.title} ${x.source ?? ""} ${x.category ?? ""}`.toLowerCase().includes(key));
+  // Cari di semua silo; hasil tetap bisa dibuka. Related tetap silo sendiri.
+  const filtered = items.filter((x) =>
+    `${x.title} ${x.source ?? ""} ${x.category ?? ""} ${slugOf(x)}`.toLowerCase().includes(key),
+  );
   const { slice, total, hasMore } = pageOf(filtered, page, limit);
   return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
@@ -397,11 +486,41 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
 export async function listRelated(id: string, limit = 12, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters } = await loadItems();
   const current = items.find((x) => x.id === id);
-  const sameCat = current
-    ? items.filter((x) => x.id !== id && slugOf(x) === slugOf(current))
-    : items.filter((x) => x.id !== id);
-  const indoSame = sameCat.filter(isIndoAv);
-  const pool = indoSame.length ? [...indoSame, ...sameCat.filter((x) => !isIndoAv(x))] : sameCat;
-  const picked = (pool.length ? pool : items.filter((x) => x.id !== id)).slice(0, limit);
+  if (!current) {
+    return { page: 1, limit, total: 0, hasMore: false, items: [] };
+  }
+
+  let pool: RawItem[];
+  if (isPutarin(current)) {
+    pool = items.filter((x) => x.id !== id && isPutarin(x));
+  } else if (isStreamtape(current)) {
+    pool = items.filter((x) => x.id !== id && isStreamtape(x));
+  } else {
+    // Katalog utama: IndoAV dulu, UserBokep kedua; tidak campur silo samping.
+    const main = mainCatalog(items).filter((x) => x.id !== id);
+    const sameCat = main.filter((x) => slugOf(x) === slugOf(current));
+    const indoSame = sameCat.filter(isIndoAv);
+    const userSame = sameCat.filter(isUserBokep);
+    const restSame = sameCat.filter((x) => !isIndoAv(x) && !isUserBokep(x));
+    const indoAll = main.filter(isIndoAv);
+    const userAll = main.filter(isUserBokep);
+    pool = [
+      ...indoSame,
+      ...userSame,
+      ...restSame,
+      ...indoAll.filter((x) => !sameCat.includes(x)),
+      ...userAll.filter((x) => !sameCat.includes(x)),
+      ...main.filter((x) => !isIndoAv(x) && !isUserBokep(x) && !sameCat.includes(x)),
+    ];
+    // dedupe preserve order
+    const seen = new Set<string>();
+    pool = pool.filter((x) => {
+      if (seen.has(x.id)) return false;
+      seen.add(x.id);
+      return true;
+    });
+  }
+
+  const picked = pool.slice(0, limit);
   return { page: 1, limit, total: picked.length, hasMore: false, items: picked.map((x) => toCard(x, posters)) };
 }
