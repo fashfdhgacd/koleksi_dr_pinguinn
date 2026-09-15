@@ -16,7 +16,7 @@ import {
   videoSeoTitle,
 } from "@/lib/seo";
 
-const SHARE_CARD_VERSION = "4";
+const SHARE_CARD_VERSION = "5";
 
 export const Route = createFileRoute("/watch/$id")({
   loader: async ({ params }) => {
@@ -33,7 +33,14 @@ export const Route = createFileRoute("/watch/$id")({
         ? item.description.trim().slice(0, 160)
         : videoSeoDescription(item.title, item.category)
       : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
-    const image = item?.thumbnail?.startsWith("http") ? item.thumbnail : DEFAULT_OG;
+    const thumb = (item?.thumbnail || "").trim();
+    let image = DEFAULT_OG;
+    if (/^https?:\/\//i.test(thumb)) {
+      image = thumb;
+    } else if (thumb.startsWith("/")) {
+      // Absolute URL agar X/Twitter/OG crawler dapat poster asli (puterin-thumb / tape-thumb)
+      image = `${SITE_ORIGIN}${thumb}`;
+    }
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
     const jsonLd = item
       ? videoJsonLd({
