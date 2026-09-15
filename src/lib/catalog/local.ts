@@ -329,13 +329,45 @@ export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: 
   return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
 }
 
-export async function listFeatured(page = 1, limit = 8, _signal?: AbortSignal): Promise<PagedVideos> {
+const FEATURED_SLOT_MS = 5 * 60 * 1000;
+
+function mulberry32(seed: number) {
+  let a = seed | 0;
+  return function next() {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function shuffleSeeded<T>(items: T[], seed: number): T[] {
+  const copy = items.slice();
+  const rng = mulberry32(seed);
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const tmp = copy[i];
+    copy[i] = copy[j];
+    copy[j] = tmp;
+  }
+  return copy;
+}
+
+/** Satu (atau limit) judul IndoAV acak per slot 5 menit, sama untuk semua pengunjung. */
+export async function listFeatured(page = 1, limit = 1, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters } = await loadItems();
   const indo = items.filter(isIndoAv);
-  const hot = items.filter((x) => ["jilbab", "tante", "viral", "live"].includes(slugOf(x)));
-  const source = indo.length ? indo : hot.length ? hot : items;
-  const { slice, total, hasMore } = pageOf(source.slice(0, 48), page, limit);
-  return { page, limit, total, hasMore, items: slice.map((x) => toCard(x, posters)) };
+  const slot = Math.floor(Date.now() / FEATURED_SLOT_MS);
+  const shuffled = shuffleSeeded(indo, slot);
+  const take = Math.max(1, limit);
+  const picked = shuffled.slice(0, Math.min(take, shuffled.length));
+  return {
+    page,
+    limit: take,
+    total: indo.length,
+    hasMore: false,
+    items: picked.map((x) => toCard(x, posters)),
+  };
 }
 
 export async function listCategory(slug: string, page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
