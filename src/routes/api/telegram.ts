@@ -344,9 +344,40 @@ export const Route = createFileRoute("/api/telegram")({
       GET: async () => {
         const env = process.env;
         const has = (k: string) => Boolean(String(env[k] || "").trim());
-        const ghToken = has("GH_TOKEN") || has("GITHUB_TOKEN");
+        const token = String(env.GH_TOKEN || env.GITHUB_TOKEN || "").trim();
         const ghOwner = String(env.GH_OWNER || env.GITHUB_OWNER || "").trim();
         const ghRepo = String(env.GH_REPO || env.GITHUB_REPO || "").trim();
+        let ghAccess: string = "unknown";
+        let ghPrivate: boolean | null = null;
+        if (token && ghOwner && ghRepo) {
+          try {
+            const r = await fetch(
+              `https://api.github.com/repos/${ghOwner}/${ghRepo}`,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  Accept: "application/vnd.github+json",
+                  "User-Agent": "kdp-bot-diag",
+                },
+              }
+            );
+            if (r.status === 200) {
+              const body = (await r.json()) as { private?: boolean; permissions?: { push?: boolean } };
+              ghPrivate = Boolean(body.private);
+              ghAccess = body.permissions?.push ? "push_ok" : "read_only";
+            } else if (r.status === 401) {
+              ghAccess = "bad_token";
+            } else if (r.status === 404) {
+              ghAccess = "repo_not_found_or_no_access";
+            } else {
+              ghAccess = `http_${r.status}`;
+            }
+          } catch {
+            ghAccess = "network_error";
+          }
+        } else {
+          ghAccess = "missing_env";
+        }
         return Response.json({
           ok: true,
           service: "telegram-webhook",
@@ -356,12 +387,14 @@ export const Route = createFileRoute("/api/telegram")({
           upload: {
             botToken: has("BOT_TOKEN") || has("TELEGRAM_BOT_TOKEN"),
             adminId: has("AUTHORIZED_USER_IDS") || has("TELEGRAM_USER_ID") || has("TELEGRAM_ADMIN_ID"),
-            ghToken,
+            ghToken: Boolean(token),
             ghOwner: ghOwner || null,
             ghRepo: ghRepo || null,
+            ghAccess,
+            ghPrivate,
             streamtape: has("STREAMTAPE_LOGIN") && has("STREAMTAPE_KEY"),
             putarin: has("PUTARIN_API_KEY"),
-            canWriteJson: ghToken && Boolean(ghOwner) && Boolean(ghRepo),
+            canWriteJson: ghAccess === "push_ok",
           },
         });
       },
