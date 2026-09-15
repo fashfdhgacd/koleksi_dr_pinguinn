@@ -5,6 +5,11 @@ import localCatalog from "./videos.json";
 import streamtapeBatch from "./streamtape.json";
 
 const SITE_FEEDS = [
+  // Chunk upload baru (kecil, < 1MB) — diprioritaskan
+  "https://www.koleksidrpinguin.site/data/videos-latest.json",
+  "https://www.koleksidrpinguin.site/data/putarin-latest.json",
+  "https://www.koleksidrpinguin.site/data/campur-latest.json",
+  // Arsip lama
   "https://www.koleksidrpinguin.site/data/videos.json",
   "https://www.koleksidrpinguin.site/data/campur.json",
   "https://www.koleksidrpinguin.site/data/putarin.json",
@@ -31,7 +36,7 @@ const RULES: Array<[string, RegExp]> = [
   ["chindo", /chindo/i],
   ["malaysia", /malay|malaysia/i],
   ["open-bo", /open ?bo|michat/i],
-  ["percakapan", /percakapan/i],
+  ["percakapan", /percakapan|vcs|ngobrol|telpon/i],
   ["viral", /viral/i],
   ["gangbang", /gangbang|gilir|rame rame|threesome|foursome|bertiga/i],
   ["doggy", /doggy|nungging/i],
@@ -42,79 +47,56 @@ const RULES: Array<[string, RegExp]> = [
   ["abg", /\babg\b|\bsma\b|mahasiswi|mahasiswa|pelajar/i],
 ];
 
-function classify(title: string): string {
+function classify(title = "") {
+  const text = title.trim();
   for (const [slug, re] of RULES) {
-    if (re.test(title)) return slug;
+    if (re.test(text)) return slug;
   }
   return "lainnya";
 }
 
-function cleanTitle(title: string): string {
-  return (
-    title
-      .replace(/^\u25b6\s*/, "")
-      .replace(/Collection Dr\.?\s*Anjing Bokep[^,]*[,.]?\s*S\.\s*M\.\s*Sc\.?/gi, "")
-      .replace(/koleksidrpinguin\.(com|site)/gi, "")
-      .replace(/dibokepindo\.com/gi, "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .replace(/^[\-|]+|[\-|]+$/g, "") || "Video"
-  );
+function cleanTitle(raw = "") {
+  return String(raw)
+    .replace(/^\u25b6\s*/, "")
+    .replace(/koleksidrpinguin\.(com|site)/gi, "")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^[\-|]+|[\-|]+$/g, "") || "Video";
 }
 
-function embedId(embed: string): string {
-  const m =
-    embed.match(/[?&]id=([A-Za-z0-9_-]+)/i) ||
-    embed.match(/\/(?:e|v|d)\/([A-Za-z0-9_-]+)/i);
+function embedId(url = "") {
+  const m = String(url).match(/\/(?:e|v|d)\/([A-Za-z0-9_-]+)/i);
   return m ? m[1] : "";
 }
 
-function embedKey(embed: string): string {
-  return embedId(embed).toLowerCase() || embed.toLowerCase();
-}
-
-function makeId(raw: Record<string, unknown>): string {
-  if (raw.id != null && String(raw.id).trim()) return String(raw.id);
-  const embed = String(raw.embed || raw.direct || "");
-  const key = embedId(embed);
-  return key || `t${Math.abs(hash(String(raw.title || embed)))}`;
-}
-
-function hash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return h;
-}
-
-function normalize(raw: Record<string, unknown>): RawItem | null {
-  const embed = String(raw.embed || raw.direct || "").trim();
-  if (!embed) return null;
+function normalize(raw: unknown): RawItem | null {
+  if (!raw || typeof raw !== "object") return null;
+  const o = raw as Record<string, unknown>;
+  const id = String(o.id || embedId(String(o.embed || o.direct || "")) || "").trim();
+  const embed = String(o.embed || o.direct || "").trim();
+  if (!id || !embed) return null;
   return {
-    id: makeId(raw),
-    title: String(raw.title || "Video"),
+    id,
+    title: String(o.title || "Video"),
     embed,
-    direct: raw.direct ? String(raw.direct) : undefined,
-    source: raw.source ? String(raw.source) : undefined,
-    category: raw.category ? String(raw.category) : undefined,
+    direct: o.direct ? String(o.direct) : undefined,
+    source: o.source ? String(o.source) : undefined,
+    category: o.category ? String(o.category) : undefined,
   };
 }
 
-function merge(lists: Array<unknown>): RawItem[] {
-  const seen = new Set<string>();
-  const out: RawItem[] = [];
-  for (const list of lists) {
-    if (!Array.isArray(list)) continue;
-    for (const row of list) {
-      if (!row || typeof row !== "object") continue;
-      const item = normalize(row as Record<string, unknown>);
+function merge(packs: unknown[]): RawItem[] {
+  const map = new Map<string, RawItem>();
+  for (const pack of packs) {
+    const arr = Array.isArray(pack) ? pack : [];
+    for (const raw of arr) {
+      const item = normalize(raw);
       if (!item) continue;
-      const key = embedKey(item.embed);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      out.push(item);
+      if (!map.has(item.id)) map.set(item.id, item);
     }
   }
-  return out;
+  return [...map.values()];
 }
 
 let cache: { at: number; items: RawItem[]; posters: Record<string, string> } | null = null;
@@ -126,13 +108,9 @@ async function loadPosters(): Promise<Record<string, string>> {
       try {
         const res = await fetch(url, { headers: { accept: "application/json" } });
         if (!res.ok) return;
-        const data = (await res.json()) as Record<string, unknown>;
-        if (!data || Array.isArray(data)) return;
-        for (const [key, value] of Object.entries(data)) {
-          const src = String(value || "").trim();
-          if (!key || !/^https?:\/\//i.test(src)) continue;
-          map[key] = src;
-          map[key.toLowerCase()] = src;
+        const data = await res.json();
+        if (data && typeof data === "object" && !Array.isArray(data)) {
+          Object.assign(map, data as Record<string, string>);
         }
       } catch {
         /* ignore */
@@ -277,14 +255,4 @@ export async function getDetail(id: string): Promise<VideoDetail> {
     throw Object.assign(new Error("Video tidak ditemukan."), { code: "not_found" as const });
   }
   return toDetail(item, posters);
-}
-
-export async function listRelated(id: string, limit = 12): Promise<PagedVideos> {
-  const { items, posters } = await loadItems();
-  const current = items.find((x) => x.id === id);
-  const pool = current
-    ? items.filter((x) => x.id !== id && slugOf(x) === slugOf(current))
-    : items.filter((x) => x.id !== id);
-  const picked = (pool.length ? pool : items.filter((x) => x.id !== id)).slice(0, limit);
-  return { page: 1, limit, total: picked.length, hasMore: false, items: picked.map((x) => toCard(x, posters)) };
 }
