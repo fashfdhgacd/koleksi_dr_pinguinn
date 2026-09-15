@@ -12,15 +12,22 @@
 
 const MAX_CHUNK_BYTES = 850_000; // di bawah limit 1MB GitHub Contents API
 
+function clean(v) {
+  return String(v || "")
+    .trim()
+    .replace(/^GH_(?:TOKEN|OWNER|REPO|BRANCH)\s*=\s*/i, "")
+    .trim();
+}
+
 function cfg(env) {
-  const token = env.GITHUB_TOKEN || env.GH_TOKEN || "";
-  const owner = env.GITHUB_OWNER || env.GH_OWNER || "";
-  const repo = env.GITHUB_REPO || env.GH_REPO || "";
-  const branch = env.GITHUB_BRANCH || env.GH_BRANCH || "main";
-  const prefix = (env.GITHUB_DATA_PREFIX || env.GH_DATA_PREFIX || "data").replace(
+  const token = clean(env.GITHUB_TOKEN || env.GH_TOKEN || "");
+  const owner = clean(env.GITHUB_OWNER || env.GH_OWNER || "");
+  const repo = clean(env.GITHUB_REPO || env.GH_REPO || "");
+  const branch = clean(env.GITHUB_BRANCH || env.GH_BRANCH || "main") || "main";
+  const prefix = clean(env.GITHUB_DATA_PREFIX || env.GH_DATA_PREFIX || "data").replace(
     /\/$/,
     ""
-  );
+  ) || "data";
   return { token, owner, repo, branch, prefix };
 }
 
