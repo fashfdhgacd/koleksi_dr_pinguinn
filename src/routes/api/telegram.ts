@@ -5,7 +5,7 @@ import { toRecord } from "@/lib/bot/store.js";
 import { fetchPutarinTitle, fetchStreamtapeTitle } from "@/lib/bot/providers.js";
 import { upsertVideoToGithub } from "@/lib/bot/github.js";
 
-const HOST = "https://www.koleksidrpinguin.com";
+const HOST = "https://koleksidrpinguin.com";
 
 /** Reply keyboard mirip bot lama + Streamtape */
 const MAIN_KEYBOARD = {
