@@ -10,6 +10,7 @@ const CACHE_MS = 5 * 60 * 1000;
 /** Bot uploads di GitHub — selalu di-fetch server-side (bukan hanya kalau CATALOG_REMOTE). */
 const BOT_FEEDS = [
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin-latest.json",
+  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/videos-latest.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/campur-latest.json",
 ];
