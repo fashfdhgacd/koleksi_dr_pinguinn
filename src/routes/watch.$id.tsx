@@ -350,7 +350,9 @@ function WatchPage() {
             </p>
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>
             <p className="text-sm leading-relaxed text-muted">
-              {item.description || videoSeoDescription(item.title, item.category)}
+              {(item.description && !/nonton .+ bokep indo|streaming amatir, jilbab/i.test(item.description))
+                ? item.description
+                : null}
             </p>
             <div className="flex flex-wrap gap-3">
               <button
