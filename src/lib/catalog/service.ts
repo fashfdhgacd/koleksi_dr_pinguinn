@@ -69,7 +69,7 @@ export async function queryCatalog(query: CatalogQuery, signal?: AbortSignal): P
         return { ok: true, type, ...data };
       }
       case "featured": {
-        const data = await listFeatured(page, limit ?? 8, signal);
+        const data = await listFeatured(page, limit ?? 1, signal);
         return { ok: true, type, ...data };
       }
       case "category": {
@@ -102,7 +102,7 @@ export async function queryCatalog(query: CatalogQuery, signal?: AbortSignal): P
       }
       case "home": {
         const [featured, latest] = await Promise.all([
-          listFeatured(1, 8, signal),
+          listFeatured(1, 1, signal),
           listLatest(page ?? 1, limit ?? DEFAULT_PAGE_SIZE, signal),
         ]);
         return {
