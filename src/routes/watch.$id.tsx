@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
@@ -8,11 +8,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
 import { queryCatalog } from "@/lib/catalog/service";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
+import {
+  DEFAULT_OG,
+  SITE_ORIGIN,
+  videoJsonLd,
+  videoSeoDescription,
+  videoSeoTitle,
+} from "@/lib/seo";
 
-const SITE_ORIGIN = "https://koleksidrpinguin.com";
-const FALLBACK_OG = `${SITE_ORIGIN}/og.jpg`;
-/** Bump this when OG tags change so shared links force X to re-crawl. */
-const SHARE_CARD_VERSION = "3";
+const SHARE_CARD_VERSION = "4";
 
 export const Route = createFileRoute("/watch/$id")({
   loader: async ({ params }) => {
@@ -23,51 +27,63 @@ export const Route = createFileRoute("/watch/$id")({
   head: ({ loaderData }) => {
     const ok = loaderData && loaderData.ok === true && loaderData.type === "detail";
     const item = ok ? loaderData.item : null;
-    const title = item?.title ? `${item.title} | DR. PINGUIN` : "DR. PINGUIN";
-    const description =
-      item?.description?.trim() ||
-      item?.title ||
-      "Dr. Pinguin Bokep, M.S.B. Konten 18+. Koleksi video — masuk hanya jika dewasa.";
-    const image = item?.thumbnail?.startsWith("http") ? item.thumbnail : FALLBACK_OG;
+    const title = item ? videoSeoTitle(item.title, item.category) : "Dr. Pinguin — Bokep Indo";
+    const description = item
+      ? item.description?.trim()?.length > 40
+        ? item.description.trim().slice(0, 160)
+        : videoSeoDescription(item.title, item.category)
+      : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
+    const image = item?.thumbnail?.startsWith("http") ? item.thumbnail : DEFAULT_OG;
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
+    const jsonLd = item
+      ? videoJsonLd({
+          id: item.id,
+          title: item.title,
+          description,
+          thumbnail: item.thumbnail,
+          category: item.category,
+        })
+      : null;
 
     return {
       meta: [
         { title },
         { name: "description", content: description },
+        {
+          name: "keywords",
+          content: `bokep indo, ${item?.category || "viral"}, ${item?.title || "bokep terbaru"}, dr pinguin`,
+        },
         { property: "og:type", content: "video.other" },
         { property: "og:site_name", content: "DR. PINGUIN" },
-        { property: "og:title", content: item?.title || "DR. PINGUIN" },
+        { property: "og:title", content: title },
         { property: "og:description", content: description },
         { property: "og:url", content: url },
         { property: "og:image", content: image },
         { property: "og:image:width", content: "1200" },
         { property: "og:image:height", content: "630" },
         { name: "twitter:card", content: "summary_large_image" },
-        { name: "twitter:title", content: item?.title || "DR. PINGUIN" },
+        { name: "twitter:title", content: title },
         { name: "twitter:description", content: description },
         { name: "twitter:image", content: image },
         { name: "robots", content: "index,follow,max-video-preview:120" },
+        { name: "rating", content: "adult" },
       ],
       links: [{ rel: "canonical", href: url }],
+      scripts: jsonLd
+        ? [{ type: "application/ld+json", children: JSON.stringify(jsonLd) }]
+        : [],
     };
   },
   component: WatchPage,
 });
 
-/** Clean URL for display / canonical. */
 function cleanWatchUrl(id: string): string {
   if (typeof window === "undefined") return `${SITE_ORIGIN}/watch/${id}`;
   return `${window.location.origin}/watch/${id}`;
 }
 
-/** Share URL with cache-bust so X treats it as a new card and re-fetches OG. */
 function shareUrl(id: string): string {
   return `${cleanWatchUrl(id)}?v=${SHARE_CARD_VERSION}`;
-}
-
-function sourceUrl(item: VideoDetail): string {
-  return item.video_url || item.qualities[0]?.url || "";
 }
 
 function xIntentUrl(title: string, url: string): string {
@@ -137,39 +153,25 @@ function ShareSheet({
       aria-modal="true"
       aria-label="Bagikan video"
     >
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/70"
-        onClick={onClose}
-        aria-label="Tutup"
-      />
+      <button type="button" className="absolute inset-0 bg-black/70" onClick={onClose} aria-label="Tutup" />
       <div className="relative z-10 w-full max-w-md rounded-t-2xl border border-border bg-background p-5 shadow-2xl sm:rounded-2xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-wider text-muted">Bagikan</p>
             <p className="mt-1 line-clamp-2 text-base font-medium text-foreground">{title}</p>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="shrink-0 rounded-md px-2 py-1 text-sm text-muted hover:bg-secondary"
-          >
+          <button type="button" onClick={onClose} className="shrink-0 rounded-md px-2 py-1 text-sm text-muted hover:bg-secondary">
             Tutup
           </button>
         </div>
-
         <div className="grid gap-3">
           <button
             type="button"
             onClick={shareToX}
             className="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-[#1d9bf0] px-4 text-base font-semibold text-white active:scale-[0.98]"
           >
-            <svg viewBox="0 0 24 24" className="size-5 fill-current" aria-hidden="true">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-            </svg>
             Bagikan ke X
           </button>
-
           <button
             type="button"
             onClick={() => void copyLink()}
@@ -177,7 +179,6 @@ function ShareSheet({
           >
             {copied ? "✓ Link disalin" : "Salin link"}
           </button>
-
           {typeof navigator !== "undefined" && typeof navigator.share === "function" ? (
             <button
               type="button"
@@ -188,8 +189,54 @@ function ShareSheet({
             </button>
           ) : null}
         </div>
-
         <p className="mt-4 break-all text-center text-xs text-muted">{url}</p>
+      </div>
+    </div>
+  );
+}
+
+function NextUp({ next }: { next: VideoCard | null }) {
+  const navigate = useNavigate();
+  const [left, setLeft] = useState(25);
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    setLeft(25);
+    setArmed(false);
+    if (!next) return;
+    const arm = window.setTimeout(() => setArmed(true), 90_000);
+    return () => window.clearTimeout(arm);
+  }, [next?.id]);
+
+  useEffect(() => {
+    if (!armed || !next) return;
+    if (left <= 0) {
+      void navigate({ to: "/watch/$id", params: { id: next.id } });
+      return;
+    }
+    const t = window.setTimeout(() => setLeft((n) => n - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [armed, left, next, navigate]);
+
+  if (!next || !armed) return null;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-secondary/60 px-4 py-3">
+      <div className="min-w-0">
+        <p className="text-xs uppercase tracking-wider text-muted">Berikutnya dalam {left}d</p>
+        <p className="truncate text-sm font-medium text-foreground">{next.title}</p>
+      </div>
+      <div className="flex gap-2">
+        <button type="button" className="h-10 rounded-lg bg-secondary px-3 text-sm" onClick={() => setArmed(false)}>
+          Tetap di sini
+        </button>
+        <Link
+          to="/watch/$id"
+          params={{ id: next.id }}
+          className="flex h-10 items-center rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground"
+        >
+          Putar sekarang
+        </Link>
       </div>
     </div>
   );
@@ -223,10 +270,6 @@ function WatchPage() {
 
   useEffect(() => {
     setShareOpen(false);
-
-    // Client nav /watch/A → /watch/B keeps this component mounted.
-    // Must apply the new loader payload; previously we returned early and
-    // left the old video stuck on screen.
     if (reload === 0 && loaderData) {
       if (loaderData.ok && loaderData.type === "detail") {
         if (loaderData.item.id === id) {
@@ -292,19 +335,23 @@ function WatchPage() {
       ) : status === "empty" || !item ? (
         <EmptyState title="Video tidak ditemukan" description="Judul ini tidak ada di katalog atau sudah dihapus." />
       ) : (
-        <article className="space-y-10">
-          <VideoPlayer key={item.id} item={item} />
+        <article className="space-y-8">
+          <div className="sticky top-16 z-30 -mx-4 bg-background/95 px-4 py-2 backdrop-blur sm:mx-0 sm:px-0">
+            <VideoPlayer key={item.id} item={item} />
+          </div>
+
+          <NextUp next={related[0] ?? null} />
+
           <header className="max-w-3xl space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
               {item.category}
               {item.year ? ` · ${item.year}` : ""}
+              {item.creator ? ` · ${item.creator}` : ""}
             </p>
-            <h1 className="font-display text-4xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>
-            <div className="flex flex-wrap gap-3 text-sm text-muted">
-              <span>{item.quality}</span>
-              {item.creator ? <span>{item.creator}</span> : null}
-            </div>
-            <p className="text-sm leading-relaxed text-muted">{item.description}</p>
+            <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>
+            <p className="text-sm leading-relaxed text-muted">
+              {item.description || videoSeoDescription(item.title, item.category)}
+            </p>
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
@@ -320,23 +367,13 @@ function WatchPage() {
               >
                 Kembali ke katalog
               </Link>
-              {sourceUrl(item) ? (
-                <a
-                  href={sourceUrl(item)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex h-12 items-center rounded-xl bg-secondary px-5 text-base text-foreground"
-                >
-                  Buka sumber
-                </a>
-              ) : null}
             </div>
           </header>
 
           {related.length ? (
             <section>
-              <h2 className="mb-5 font-display text-3xl text-foreground">Judul terkait</h2>
-              <VideoGrid items={related} />
+              <h2 className="mb-5 font-display text-3xl text-foreground">Tonton juga</h2>
+              <VideoGrid items={related} eagerCount={4} />
             </section>
           ) : null}
 
