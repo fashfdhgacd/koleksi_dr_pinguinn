@@ -222,8 +222,27 @@ function WatchPage() {
   const closeShare = useCallback(() => setShareOpen(false), []);
 
   useEffect(() => {
-    if (reload === 0 && loaderData && loaderData.ok && loaderData.type === "detail") {
-      return;
+    setShareOpen(false);
+
+    // Client nav /watch/A → /watch/B keeps this component mounted.
+    // Must apply the new loader payload; previously we returned early and
+    // left the old video stuck on screen.
+    if (reload === 0 && loaderData) {
+      if (loaderData.ok && loaderData.type === "detail") {
+        if (loaderData.item.id === id) {
+          setItem(loaderData.item);
+          setRelated(loaderData.related.filter((v) => v.id !== loaderData.item.id));
+          setStatus("success");
+          setError(null);
+          return;
+        }
+      } else if (!loaderData.ok && loaderData.code === "not_found") {
+        setItem(null);
+        setRelated([]);
+        setStatus("empty");
+        setError(loaderData.error);
+        return;
+      }
     }
 
     const controller = new AbortController();
@@ -274,7 +293,7 @@ function WatchPage() {
         <EmptyState title="Video tidak ditemukan" description="Judul ini tidak ada di katalog atau sudah dihapus." />
       ) : (
         <article className="space-y-10">
-          <VideoPlayer item={item} />
+          <VideoPlayer key={item.id} item={item} />
           <header className="max-w-3xl space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
               {item.category}
