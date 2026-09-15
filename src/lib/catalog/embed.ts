@@ -49,10 +49,11 @@ export function hostPriority(urlOrHost: string): number {
   const s = urlOrHost.toLowerCase();
   if (/indoav/.test(s)) return 0;
   if (/userbokep/.test(s)) return 1;
-  if (/videy/.test(s)) return 2;
-  if (/streamtape|strcloud|tapecontent/.test(s)) return 3;
-  if (/\.(mp4|mov|webm)($|\?)/.test(s)) return 4;
-  return 5;
+  if (/puterin|putarin/.test(s)) return 2;
+  if (/videy/.test(s)) return 3;
+  if (/streamtape|strcloud|tapecontent/.test(s)) return 4;
+  if (/\.(mp4|mov|webm)($|\?)/.test(s)) return 5;
+  return 6;
 }
 
 export function isIndoAvUrl(url: string): boolean {
