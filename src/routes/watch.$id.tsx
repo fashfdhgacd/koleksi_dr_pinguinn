@@ -11,6 +11,8 @@ import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
 
 const SITE_ORIGIN = "https://koleksidrpinguin.com";
 const FALLBACK_OG = `${SITE_ORIGIN}/og.jpg`;
+/** Bump this when OG tags change so shared links force X to re-crawl. */
+const SHARE_CARD_VERSION = "3";
 
 export const Route = createFileRoute("/watch/$id")({
   loader: async ({ params }) => {
@@ -53,9 +55,15 @@ export const Route = createFileRoute("/watch/$id")({
   component: WatchPage,
 });
 
-function shareUrl(id: string): string {
+/** Clean URL for display / canonical. */
+function cleanWatchUrl(id: string): string {
   if (typeof window === "undefined") return `${SITE_ORIGIN}/watch/${id}`;
   return `${window.location.origin}/watch/${id}`;
+}
+
+/** Share URL with cache-bust so X treats it as a new card and re-fetches OG. */
+function shareUrl(id: string): string {
+  return `${cleanWatchUrl(id)}?v=${SHARE_CARD_VERSION}`;
 }
 
 function sourceUrl(item: VideoDetail): string {
@@ -214,7 +222,6 @@ function WatchPage() {
   const closeShare = useCallback(() => setShareOpen(false), []);
 
   useEffect(() => {
-    // Jika loader sudah sukses dan belum ada reload manual, skip client fetch
     if (reload === 0 && loaderData && loaderData.ok && loaderData.type === "detail") {
       return;
     }
