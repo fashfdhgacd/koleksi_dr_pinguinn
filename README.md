@@ -1,104 +1,74 @@
-# KDP Telegram Bot
+# DR. PINGUIN — Koleksi Mandiri
 
-Bot admin untuk [koleksidrpinguin.com](https://koleksidrpinguin.com/).
+Situs koleksi video **mandiri**. Tidak bergantung ke domain `koleksidrpinguin.site` untuk data atau thumbnail.
 
-Kirim link **Streamtape** atau **Putarin** ke bot. Bot menulis JSON dengan skema yang dibaca situs:
+## Mode data
 
-- `data/videos.json` → Streamtape
-- `data/putarin.json` → Putarin
+| Mode | Env | Perilaku |
+|------|-----|----------|
+| **Local-first (default)** | — | Baca `src/lib/catalog/videos.json` + `streamtape.json` saja |
+| Remote enrichment | `CATALOG_REMOTE=1` | Opsional merge data dari feed remote (boleh dimatiin total) |
 
-Situs live membaca file ini dari:
+## Thumbnail Streamtape
 
-- `https://www.koleksidrpinguin.site/data/videos.json`
-- `https://www.koleksidrpinguin.site/data/putarin.json`
+Route: `/api/tape-thumb?id={fileId}`
 
-Jadi setelah bot nulis file, file itu harus sampai ke folder `data/` di project `.site` (copy manual, atau biarkan bot push ke GitHub).
-
-## 1. Install
-
-```bash
-cd kdp-bot
-cp .env.example .env
-```
-
-Isi `.env`:
+Set di environment (server):
 
 ```
-BOT_TOKEN=123456:ABC...
-AUTHORIZED_USER_IDS=123456789
-PUTARIN_API_KEY=
-STREAMTAPE_LOGIN=
-STREAMTAPE_KEY=
+STREAMTAPE_LOGIN=...
+STREAMTAPE_KEY=...
 ```
 
-Cara dapat Telegram user ID: chat `@userinfobot`.
+Kalau key tidak ada, thumbnail menampilkan placeholder branded (bukan gambar rusak).
 
-Tidak perlu `npm install`. Cukup Node 18+.
-
-```bash
-node bot.js
-```
-
-## 2. Format chat
-
-Link saja:
+## Struktur data lokal
 
 ```
-https://streamtape.com/e/Y6XxXjZ3lrSvAmR
+src/lib/catalog/
+  videos.json       ← katalog utama (IndoAV, UserBokep, dll)
+  streamtape.json   ← batch Streamtape
 ```
 
-```
-https://panel.putarin.com/v/ABC123xyz
-```
-
-Atau lengkap:
-
-```
-Judul: Tante Viral Hotel
-Kategori: tante
-https://streamtape.com/e/xxxxx
-```
-
-Boleh beberapa link sekaligus.
-
-## 3. Hasil JSON
+Format item:
 
 ```json
 {
   "id": "Y6XxXjZ3lrSvAmR",
-  "title": "Tante Viral Hotel",
+  "title": "Judul Video",
   "embed": "https://streamtape.com/e/Y6XxXjZ3lrSvAmR",
   "direct": "https://streamtape.com/e/Y6XxXjZ3lrSvAmR",
   "source": "Streamtape",
-  "category": "tante",
-  "tags": ["tante", "streamtape", "telegram"],
-  "date": "2026-09-15"
+  "category": "amatir"
 }
 ```
 
-Link sama (ID sama) tidak diduplikasi. Data lama di-update.
+## Bot Telegram (opsional)
 
-## 4. Biar muncul di website
+`bot.js` bisa nulis ke `data/videos.json` / `data/putarin.json`.  
+Setelah itu **copy/merge** ke `src/lib/catalog/` lalu deploy ulang.
 
-Pilih salah satu:
+Atau set `GITHUB_TOKEN` + `GITHUB_OWNER` + `GITHUB_REPO` agar bot commit langsung.
 
-1. Copy `data/videos.json` dan `data/putarin.json` ke repo/project `koleksidrpinguin.site` folder `data/`, lalu deploy ulang.
-2. Isi `GITHUB_TOKEN`, `GITHUB_OWNER`, `GITHUB_REPO` di `.env`. Bot akan commit file ke repo setiap ada video baru.
+## Dev
 
-Tanpa langkah ini, JSON hanya tersimpan di mesin tempat bot jalan.
+```bash
+npm install
+npm run dev
+```
 
-## 5. Host yang diterima
+Build:
 
-- `streamtape.com/e/{id}`
-- `streamtape.com/v/{id}`
-- `panel.putarin.com/e/{code}`
-- `panel.putarin.com/v/{code}`
-- `putarin.com/...`
+```bash
+npm run build
+```
 
-Domain lain ditolak.
+## Env penting
 
-## 6. Keamanan
+| Key | Wajib | Keterangan |
+|-----|-------|------------|
+| `STREAMTAPE_LOGIN` | Tidak | Thumb Streamtape via API resmi |
+| `STREAMTAPE_KEY` | Tidak | Thumb Streamtape via API resmi |
+| `CATALOG_REMOTE` | Tidak | `1` = izinkan fetch feed remote |
 
-Jangan commit file `.env`.
-Jangan taruh API key di frontend.
-Kalau key Putarin/Streamtape pernah kepaste di chat, regenerate.
+Tanpa key Streamtape pun situs tetap jalan penuh — hanya thumbnail Streamtape yang pakai placeholder.

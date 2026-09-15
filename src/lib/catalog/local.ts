@@ -3,22 +3,37 @@ import type { PagedVideos, VideoCard, VideoDetail } from "./types";
 import { findCategory } from "./categories";
 import localCatalog from "./videos.json";
 import streamtapeBatch from "./streamtape.json";
+import localPosters from "./posters.json";
 
-const SITE_FEEDS = [
-  // Upload baru (chunk kecil < 1MB)
-  "https://www.koleksidrpinguin.site/data/videos-latest.json",
-  "https://www.koleksidrpinguin.site/data/putarin-latest.json",
-  "https://www.koleksidrpinguin.site/data/campur-latest.json",
-  // Arsip lama
-  "https://www.koleksidrpinguin.site/data/videos.json",
-  "https://www.koleksidrpinguin.site/data/campur.json",
-  "https://www.koleksidrpinguin.site/data/putarin.json",
-];
-const POSTER_URLS = [
-  "https://www.koleksidrpinguin.site/data/posters.json",
-  "https://www.koleksidrpinguin.site/data/latest-posters.json",
-];
+/**
+ * Catalog is LOCAL-FIRST.
+ * Remote feeds are opt-in only (set CATALOG_REMOTE=1) and never required.
+ * Site keeps working fully offline / without koleksidrpinguin.site.
+ */
 const CACHE_MS = 10 * 60 * 1000;
+
+/** Optional remote enrichment — disabled by default for independence. */
+const REMOTE_ENABLED =
+  typeof process !== "undefined" &&
+  (process.env.CATALOG_REMOTE === "1" || process.env.CATALOG_REMOTE === "true");
+
+const SITE_FEEDS = REMOTE_ENABLED
+  ? [
+      "https://www.koleksidrpinguin.site/data/videos-latest.json",
+      "https://www.koleksidrpinguin.site/data/putarin-latest.json",
+      "https://www.koleksidrpinguin.site/data/campur-latest.json",
+      "https://www.koleksidrpinguin.site/data/videos.json",
+      "https://www.koleksidrpinguin.site/data/campur.json",
+      "https://www.koleksidrpinguin.site/data/putarin.json",
+    ]
+  : [];
+
+const POSTER_URLS = REMOTE_ENABLED
+  ? [
+      "https://www.koleksidrpinguin.site/data/posters.json",
+      "https://www.koleksidrpinguin.site/data/latest-posters.json",
+    ]
+  : [];
 
 type RawItem = {
   id: string;
@@ -124,8 +139,23 @@ function merge(lists: Array<unknown>): RawItem[] {
 
 let cache: { at: number; items: RawItem[]; posters: Record<string, string> } | null = null;
 
-async function loadPosters(): Promise<Record<string, string>> {
+function basePosters(): Record<string, string> {
   const map: Record<string, string> = {};
+  const raw = localPosters as Record<string, unknown>;
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const [key, value] of Object.entries(raw)) {
+      const src = String(value || "").trim();
+      if (!key || !/^https?:\/\//i.test(src)) continue;
+      map[key] = src;
+      map[key.toLowerCase()] = src;
+    }
+  }
+  return map;
+}
+
+async function loadPosters(): Promise<Record<string, string>> {
+  const map = basePosters();
+  if (!POSTER_URLS.length) return map;
   await Promise.all(
     POSTER_URLS.map(async (url) => {
       try {
@@ -140,7 +170,7 @@ async function loadPosters(): Promise<Record<string, string>> {
           map[key.toLowerCase()] = src;
         }
       } catch {
-        /* ignore */
+        /* ignore — remote posters optional */
       }
     }),
   );
@@ -148,6 +178,7 @@ async function loadPosters(): Promise<Record<string, string>> {
 }
 
 async function loadRemoteLists(): Promise<unknown[]> {
+  if (!SITE_FEEDS.length) return [];
   const packs = await Promise.all(
     SITE_FEEDS.map(async (url) => {
       try {
@@ -166,8 +197,24 @@ async function loadItems(): Promise<{ items: RawItem[]; posters: Record<string, 
   const now = Date.now();
   if (cache && now - cache.at < CACHE_MS) return cache;
 
-  const [remote, posters] = await Promise.all([loadRemoteLists(), loadPosters()]);
-  const items = merge([streamtapeBatch, ...remote, localCatalog]);
+  // Local sources always present
+  const localPacks: unknown[] = [streamtapeBatch, localCatalog];
+
+  // Posters always from bundled local map; remote posters only if enabled
+  let remote: unknown[] = [];
+  let posters: Record<string, string> = basePosters();
+  try {
+    if (REMOTE_ENABLED) {
+      const [r, p] = await Promise.all([loadRemoteLists(), loadPosters()]);
+      remote = r;
+      posters = p;
+    }
+  } catch {
+    /* keep local posters */
+  }
+
+  // Newest first: remote (if any) → streamtape → main local catalog
+  const items = merge([...remote, ...localPacks]);
   cache = { at: now, items, posters };
   return cache;
 }
@@ -191,22 +238,55 @@ function videyFile(item: RawItem): string {
   return `https://cdn.videy.co/${id}${ext}`;
 }
 
+/**
+ * Thumbnail resolution — fully self-contained, no .site dependency.
+ *
+ * Priority:
+ * 1. Poster map (optional remote / future local)
+ * 2. Videy CDN direct file (acts as poster via <video>)
+ * 3. Streamtape public thumb host (best-effort patterns)
+ * 4. IndoAV / UserBokep: no reliable public thumb → empty (UI shows nice placeholder)
+ */
 function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const id = embedId(item.embed) || embedId(item.direct || "");
+  const blob = `${item.embed} ${item.direct || ""} ${item.source || ""}`;
+
   if (id) {
     const hit = posters[id] || posters[id.toLowerCase()];
     if (hit) return hit;
   }
-  if (id && /streamtape|strcloud/i.test(`${item.embed} ${item.direct || ""}`)) {
-    return `https://www.koleksidrpinguin.site/api/tape-thumb?id=${encodeURIComponent(id)}`;
-  }
+
   const videy = videyFile(item);
   if (videy) return videy;
-  return "/logo.svg";
+
+  // Streamtape — use self-hosted proxy (needs STREAMTAPE_LOGIN + STREAMTAPE_KEY on server)
+  // Works without any external .site domain.
+  if (id && /streamtape|strcloud|tapecontent/i.test(blob)) {
+    return `/api/tape-thumb?id=${encodeURIComponent(id)}`;
+  }
+
+  // IndoAV / UserBokep: no stable public thumbnail URL without scraping
+  return "";
+}
+
+function normalizeCategorySlug(raw?: string): string | null {
+  if (!raw) return null;
+  const key = raw.trim().toLowerCase().replace(/\s+/g, "-").replace(/_/g, "-");
+  if (findCategory(key)) return key;
+  // common aliases
+  const aliases: Record<string, string> = {
+    "open bo": "open-bo",
+    openbo: "open-bo",
+    umum: "lainnya",
+    other: "lainnya",
+  };
+  const aliased = aliases[key] || aliases[raw.trim().toLowerCase()];
+  if (aliased && findCategory(aliased)) return aliased;
+  return null;
 }
 
 function toCard(item: RawItem, posters: Record<string, string>): VideoCard {
-  const slug = classify(item.title || "");
+  const slug = normalizeCategorySlug(item.category) || classify(item.title || "");
   const label = findCategory(slug)?.label ?? "Lainnya";
   return {
     id: item.id,
@@ -243,7 +323,7 @@ function toDetail(item: RawItem, posters: Record<string, string>): VideoDetail {
 }
 
 function slugOf(item: RawItem): string {
-  return classify(item.title || "");
+  return normalizeCategorySlug(item.category) || classify(item.title || "");
 }
 
 export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {

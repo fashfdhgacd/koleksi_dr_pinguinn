@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, LoaderCircle, Play } from "lucide-react";
+import { AlertTriangle, ExternalLink, LoaderCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { VideoDetail, VideoQuality } from "@/lib/catalog/types";
 import { hostLabel, resolveSource, type ResolvedSource } from "@/lib/catalog/embed";
@@ -16,11 +16,37 @@ function sourcesFromItem(item: VideoDetail): ResolvedSource[] {
     seen.add(resolved.url);
     out.push(resolved);
   }
+  // Prefer direct file sources first (better UX than iframe ads)
+  out.sort((a, b) => {
+    const af = /\.(mp4|mov|webm)($|\?)/i.test(a.url) ? 0 : 1;
+    const bf = /\.(mp4|mov|webm)($|\?)/i.test(b.url) ? 0 : 1;
+    return af - bf;
+  });
   return out;
 }
 
 function isFileUrl(url: string | null): boolean {
   return Boolean(url && /\.(mp4|mov|webm)($|\?)/i.test(url));
+}
+
+/** Normalize embed URLs so players load more reliably */
+function normalizePlayUrl(url: string, host: string): string {
+  try {
+    const u = new URL(url);
+    // Streamtape: force /e/ embed path
+    if (/streamtape|strcloud/i.test(host + u.hostname)) {
+      u.pathname = u.pathname.replace(/\/(?:v|d)\//, "/e/");
+      return u.toString();
+    }
+    // IndoAV / UserBokep: prefer /e/ embed
+    if (/indoav|userbokep/i.test(host + u.hostname)) {
+      u.pathname = u.pathname.replace(/\/d\//, "/e/");
+      return u.toString();
+    }
+    return url;
+  } catch {
+    return url;
+  }
 }
 
 export function VideoPlayer({ item }: { item: VideoDetail }) {
@@ -33,7 +59,8 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const [fallbackAt, setFallbackAt] = useState(0);
 
   const current = list[active] ?? null;
-  const playUrl = current?.fallbacks[fallbackAt] ?? current?.url ?? null;
+  const rawPlay = current?.fallbacks[fallbackAt] ?? current?.url ?? null;
+  const playUrl = rawPlay && current ? normalizePlayUrl(rawPlay, current.host) : rawPlay;
   const useVideo = isFileUrl(playUrl);
 
   useEffect(() => {
@@ -69,13 +96,17 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     pickSource(idx >= 0 ? idx : 0);
   }
 
+  function openExternal() {
+    if (playUrl) window.open(playUrl, "_blank", "noopener,noreferrer");
+  }
+
   return (
     <div className="overflow-hidden rounded-2xl bg-surface">
       <div className="relative aspect-video bg-background">
         {!started ? (
           <>
             <VideoThumb src={item.thumbnail} alt={item.title} eager className="size-full object-cover" />
-            <div className="absolute inset-0 bg-background/25" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent" />
             <button
               type="button"
               className="absolute inset-0 flex items-center justify-center"
@@ -83,8 +114,8 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
               disabled={!current}
               aria-label={current ? `Putar ${item.title}` : "Video tidak tersedia"}
             >
-              <span className="flex size-16 items-center justify-center rounded-full bg-primary text-primary-foreground transition-transform duration-150 active:scale-[0.96]">
-                <Play className="size-6 fill-current" style={{ marginLeft: 3 }} />
+              <span className="flex size-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform duration-150 active:scale-[0.96] sm:size-20">
+                <Play className="size-7 fill-current sm:size-8" style={{ marginLeft: 3 }} />
               </span>
             </button>
           </>
@@ -94,21 +125,22 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
             src={playUrl}
             title={item.title}
             className="size-full border-0 bg-background"
-            allow="autoplay; encrypted-media; fullscreen; picture-in-picture"
-            referrerPolicy="strict-origin-when-cross-origin"
+            allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write"
+            referrerPolicy="no-referrer-when-downgrade"
             allowFullScreen
+            loading="eager"
           />
         ) : (
           <video
             key={playUrl ?? item.id}
             ref={videoRef}
             className="size-full bg-background object-contain"
-            poster={item.thumbnail}
+            poster={item.thumbnail || undefined}
             controls
             playsInline
-            preload="metadata"
+            preload="auto"
             autoPlay
-            referrerPolicy="strict-origin-when-cross-origin"
+            referrerPolicy="no-referrer-when-downgrade"
             src={playUrl ?? undefined}
             onWaiting={() => setBuffering(true)}
             onPlaying={() => {
@@ -120,6 +152,11 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
               const next = fallbackAt + 1;
               if (current && next < current.fallbacks.length) {
                 setFallbackAt(next);
+                return;
+              }
+              // Try next host if available
+              if (active + 1 < list.length) {
+                pickSource(active + 1);
                 return;
               }
               setBuffering(false);
@@ -135,18 +172,28 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
         ) : null}
 
         {failed ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 px-6 text-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/85 px-6 text-center">
             <AlertTriangle className="size-7 text-destructive" />
-            <p className="max-w-sm text-sm text-muted">Sumber gagal dimuat. Coba host lain atau ulangi.</p>
-            <Button
-              onClick={() => {
-                setFailed(false);
-                setFallbackAt(0);
-                start();
-              }}
-            >
-              Coba lagi
-            </Button>
+            <p className="max-w-sm text-sm text-muted">
+              Sumber gagal dimuat. Coba host lain, buka sumber asli, atau ulangi.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <Button
+                onClick={() => {
+                  setFailed(false);
+                  setFallbackAt(0);
+                  start();
+                }}
+              >
+                Coba lagi
+              </Button>
+              {playUrl ? (
+                <Button variant="secondary" onClick={openExternal}>
+                  <ExternalLink className="mr-1.5 size-4" />
+                  Buka sumber
+                </Button>
+              ) : null}
+            </div>
           </div>
         ) : null}
 
@@ -184,7 +231,9 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
               onClick={() => changeQuality(q)}
               className={cn(
                 "h-8 rounded-md px-2.5 text-xs font-medium transition-colors duration-150",
-                resolveSource(q.url)?.url === current?.url ? "bg-primary text-primary-foreground" : "bg-secondary text-muted",
+                resolveSource(q.url)?.url === current?.url
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-muted",
               )}
             >
               {q.label || hostLabel(q.url)}
@@ -192,7 +241,20 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
           ))}
         </div>
       ) : current ? (
-        <div className="border-t border-border px-4 py-2 text-xs text-muted">Sumber: {current.host}</div>
+        <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2 text-xs text-muted">
+          <span>Sumber: {current.host}</span>
+          {playUrl ? (
+            <a
+              href={playUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 text-foreground hover:underline"
+            >
+              Buka di tab baru
+              <ExternalLink className="size-3" />
+            </a>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

@@ -34,7 +34,7 @@ export function hostLabel(url: string): string {
   if (/videy/.test(s)) return "Videy";
   if (/indoav/.test(s)) return "IndoAV";
   if (/userbokep/.test(s)) return "UserBokep";
-  if (/streamtape|campur|lulu/.test(s)) return "Streamtape";
+  if (/streamtape|campur|lulu|strcloud|tapecontent/.test(s)) return "Streamtape";
   if (/putarin|puterin/.test(s)) return "Puterin";
   if (/archive\.org/.test(s)) return "Arsip";
   try {
@@ -48,9 +48,26 @@ function isFile(url: string): boolean {
   return /\.(mp4|mov|webm)($|\?)/i.test(url);
 }
 
+/** Convert /v/ or /d/ paths to /e/ embed path when applicable */
+function toEmbedPath(url: string): string {
+  try {
+    const u = new URL(url);
+    if (/\/(?:v|d)\//.test(u.pathname)) {
+      u.pathname = u.pathname.replace(/\/(?:v|d)\//, "/e/");
+      return u.toString();
+    }
+  } catch {
+    /* ignore */
+  }
+  return url;
+}
+
 export function resolveSource(raw: string | null | undefined): ResolvedSource | null {
   if (!raw) return null;
-  const url = raw.replace("/d/", "/e/");
+  let url = raw.trim();
+  // Common streamtape typo/path fixes
+  url = url.replace("/d/", "/e/");
+
   const id = videyId(url);
   if (id && /videy/i.test(url)) {
     const page = `https://videy.co/v/?id=${encodeURIComponent(id)}`;
@@ -61,6 +78,7 @@ export function resolveSource(raw: string | null | undefined): ResolvedSource | 
       host: "Videy",
     };
   }
+
   if (isFile(url)) {
     return {
       mode: "video",
@@ -69,10 +87,14 @@ export function resolveSource(raw: string | null | undefined): ResolvedSource | 
       host: hostLabel(url),
     };
   }
+
+  // Prefer embed path for known hosts
+  const embedUrl = toEmbedPath(url);
+
   return {
     mode: "iframe",
-    url,
-    fallbacks: [url],
+    url: embedUrl,
+    fallbacks: embedUrl !== url ? [embedUrl, url] : [url],
     host: hostLabel(url),
   };
 }

@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiDataRouteImport } from './routes/api/data'
+import { Route as ApiTapeThumbRouteImport } from './routes/api/tape-thumb'
 import { Route as WatchIdRouteImport } from './routes/watch.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -23,6 +24,11 @@ const ApiDataRoute = ApiDataRouteImport.update({
   path: '/api/data',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTapeThumbRoute = ApiTapeThumbRouteImport.update({
+  id: '/api/tape-thumb',
+  path: '/api/tape-thumb',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const WatchIdRoute = WatchIdRouteImport.update({
   id: '/watch/$id',
   path: '/watch/$id',
@@ -32,30 +38,34 @@ const WatchIdRoute = WatchIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/api/data': typeof ApiDataRoute
+  '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/watch/$id': typeof WatchIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/api/data': typeof ApiDataRoute
+  '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/watch/$id': typeof WatchIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/api/data': typeof ApiDataRoute
+  '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/watch/$id': typeof WatchIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/data' | '/watch/$id'
+  fullPaths: '/' | '/api/data' | '/api/tape-thumb' | '/watch/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/data' | '/watch/$id'
-  id: '__root__' | '/' | '/api/data' | '/watch/$id'
+  to: '/' | '/api/data' | '/api/tape-thumb' | '/watch/$id'
+  id: '__root__' | '/' | '/api/data' | '/api/tape-thumb' | '/watch/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ApiDataRoute: typeof ApiDataRoute
+  ApiTapeThumbRoute: typeof ApiTapeThumbRoute
   WatchIdRoute: typeof WatchIdRoute
 }
 
@@ -75,6 +85,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/tape-thumb': {
+      id: '/api/tape-thumb'
+      path: '/api/tape-thumb'
+      fullPath: '/api/tape-thumb'
+      preLoaderRoute: typeof ApiTapeThumbRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/watch/$id': {
       id: '/watch/$id'
       path: '/watch/$id'
@@ -88,6 +105,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ApiDataRoute: ApiDataRoute,
+  ApiTapeThumbRoute: ApiTapeThumbRoute,
   WatchIdRoute: WatchIdRoute,
 }
 export const routeTree = rootRouteImport
