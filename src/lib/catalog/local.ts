@@ -273,7 +273,8 @@ function normalizeCategorySlug(raw?: string): string | null {
 
 function seoBlurb(title: string, label: string): string {
   const t = cleanTitle(title);
-  return `Nonton ${t} bokep Indo ${label} full di Dr. Pinguin. Streaming amatir, jilbab, tante, viral. Konten 18+.`};
+  return `Nonton ${t} bokep Indo ${label} full di Dr. Pinguin. Streaming amatir, jilbab, tante, viral. Konten 18+.`;
+}
 
 function toCard(item: RawItem, posters: Record<string, string>): VideoCard {
   const slug = normalizeCategorySlug(item.category) || classify(item.title || "");
@@ -286,7 +287,7 @@ function toCard(item: RawItem, posters: Record<string, string>): VideoCard {
     description: seoBlurb(title, label),
     category: label,
     duration: null,
-    durationLabel: "—",
+    durationLabel: "\u2014",
     quality: isIndoAv(item) ? "IndoAV" : item.source || "HD",
     year: null,
     creator: isIndoAv(item) ? "IndoAV" : item.source || null,
