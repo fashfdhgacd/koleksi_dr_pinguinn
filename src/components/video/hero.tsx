@@ -15,6 +15,12 @@ type HeroProps = {
   intervalMs?: number;
 };
 
+function isSpamDescription(text: string | null | undefined): boolean {
+  const t = (text || "").trim();
+  if (!t) return true;
+  return /nonton .+ bokep indo|streaming amatir, jilbab|konten 18\+/i.test(t);
+}
+
 export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
   const list =
     videos && videos.length > 0 ? videos : video ? [video] : [];
@@ -53,10 +59,13 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
   const current = list[index];
   if (!current) return null;
 
+  const showDuration = Boolean(current.durationLabel && current.durationLabel !== "\u2014");
+  const showDescription = !isSpamDescription(current.description);
+
   return (
     <section className="relative overflow-hidden rounded-[28px] bg-surface">
       <div
-        className={`relative aspect-[4/5] transition-opacity duration-300 sm:aspect-[16/9] lg:aspect-[21/9] ${
+        className={`relative aspect-[16/9] transition-opacity duration-300 sm:aspect-[16/9] lg:aspect-[21/9] ${
           fade ? "opacity-100" : "opacity-0"
         }`}
       >
@@ -65,10 +74,10 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
           src={current.thumbnail}
           alt={current.title}
           eager
-          className="size-full object-cover"
+          className="size-full object-cover object-center"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/55 to-background/10" />
-        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-4 p-5 sm:p-8 lg:max-w-2xl lg:p-10">
+        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-3 p-5 sm:gap-4 sm:p-8 lg:max-w-2xl lg:p-10">
           <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
             Pilihan koleksi
             {list.length > 1 ? (
@@ -77,16 +86,18 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
               </span>
             ) : null}
           </p>
-          <h1 className="font-display text-4xl leading-[1.1] text-foreground sm:text-5xl">
+          <h1 className="font-display text-3xl leading-[1.1] text-foreground sm:text-4xl lg:text-5xl">
             {current.title}
           </h1>
-          <p className="line-clamp-3 max-w-xl text-sm leading-relaxed text-muted">
-            {current.description}
-          </p>
+          {showDescription ? (
+            <p className="line-clamp-2 max-w-xl text-sm leading-relaxed text-muted">
+              {current.description}
+            </p>
+          ) : null}
           <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
             {current.year ? <span>{current.year}</span> : null}
-            <span>{current.durationLabel}</span>
-            <span>{current.category}</span>
+            {showDuration ? <span>{current.durationLabel}</span> : null}
+            {current.category ? <span>{current.category}</span> : null}
           </div>
           <div>
             <Button asChild size="lg" className="rounded-lg pl-5 pr-4">
