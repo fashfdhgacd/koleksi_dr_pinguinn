@@ -1,8 +1,16 @@
 /**
- * Read/write JSON in GitHub — handles files > 1MB (Contents API returns empty content).
+ * Read/write JSON di GitHub dengan chunk < 1MB.
  * Env: GH_TOKEN|GITHUB_TOKEN, GH_OWNER|GITHUB_OWNER, GH_REPO|GITHUB_REPO,
  *      GH_BRANCH|GITHUB_BRANCH, GH_DATA_PREFIX|GITHUB_DATA_PREFIX
+ *
+ * Skema file Streamtape:
+ *   data/videos.json          → chunk aktif (baru)
+ *   data/videos-p02.json      → chunk penuh berikutnya
+ *   data/videos-index.json    → daftar semua chunk
+ * Putarin: putarin.json / putarin-p02.json / putarin-index.json
  */
+
+const MAX_CHUNK_BYTES = 850_000; // di bawah limit 1MB GitHub Contents API
 
 function cfg(env) {
   const token = env.GITHUB_TOKEN || env.GH_TOKEN || "";
@@ -25,42 +33,45 @@ function headers(token) {
   };
 }
 
-function pathName(prefix, relativePath) {
+function fullPath(prefix, relativePath) {
   return `${prefix}/${relativePath}`.replace(/\/+/g, "/");
 }
 
-/** Baca array JSON dari repo (aman untuk file > 1MB). */
-export async function fetchJsonFromGithub(env, relativePath) {
+function baseName(fileName) {
+  // videos.json → videos | putarin.json → putarin
+  return String(fileName).replace(/\.json$/i, "").replace(/-p\d+$/i, "");
+}
+
+function indexName(fileName) {
+  return `${baseName(fileName)}-index.json`;
+}
+
+function partName(base, n) {
+  if (n <= 1) return `${base}.json`;
+  return `${base}-p${String(n).padStart(2, "0")}.json`;
+}
+
+async function getContentsMeta(env, relativePath) {
   const { token, owner, repo, branch, prefix } = cfg(env);
-  if (!token || !owner || !repo) {
-    return { ok: false, items: [], sha: null, reason: "missing_github_env" };
-  }
-
-  const p = pathName(prefix, relativePath);
-  const metaUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${p}?ref=${encodeURIComponent(branch)}`;
-  const res = await fetch(metaUrl, { headers: headers(token) });
-
-  if (res.status === 404) {
-    return { ok: true, items: [], sha: null, pathName: p };
-  }
+  if (!token || !owner || !repo) return { ok: false, status: 0, body: null };
+  const p = fullPath(prefix, relativePath);
+  const url = `https://api.github.com/repos/${owner}/${repo}/contents/${p}?ref=${encodeURIComponent(branch)}`;
+  const res = await fetch(url, { headers: headers(token) });
+  if (res.status === 404) return { ok: true, status: 404, body: null, path: p };
   if (!res.ok) {
     const err = await res.text();
-    return {
-      ok: false,
-      items: [],
-      sha: null,
-      reason: `GitHub GET ${res.status}: ${err.slice(0, 200)}`,
-    };
+    return { ok: false, status: res.status, body: null, error: err.slice(0, 200), path: p };
   }
+  return { ok: true, status: 200, body: await res.json(), path: p };
+}
 
-  const body = await res.json();
-  const sha = body.sha || null;
-  let raw = "";
-
+async function readRawFromMeta(token, body) {
+  if (!body) return "";
   if (body.encoding === "base64" && body.content) {
-    raw = Buffer.from(body.content.replace(/\n/g, ""), "base64").toString("utf8");
-  } else if (body.download_url) {
-    const dl = await fetch(body.download_url, {
+    return Buffer.from(body.content.replace(/\n/g, ""), "base64").toString("utf8");
+  }
+  if (body.download_url) {
+    let dl = await fetch(body.download_url, {
       headers: {
         Authorization: `Bearer ${token}`,
         "User-Agent": "kdp-telegram-bot",
@@ -68,39 +79,26 @@ export async function fetchJsonFromGithub(env, relativePath) {
       },
     });
     if (!dl.ok) {
-      const dl2 = await fetch(body.download_url, {
+      dl = await fetch(body.download_url, {
         headers: { "User-Agent": "kdp-telegram-bot" },
       });
-      if (!dl2.ok) {
-        return {
-          ok: false,
-          items: [],
-          sha,
-          reason: `GitHub download ${dl.status}`,
-        };
-      }
-      raw = await dl2.text();
-    } else {
-      raw = await dl.text();
     }
-  } else if (body.git_url) {
-    const blobRes = await fetch(body.git_url, { headers: headers(token) });
-    if (!blobRes.ok) {
-      return {
-        ok: false,
-        items: [],
-        sha,
-        reason: `GitHub blob ${blobRes.status}`,
-      };
-    }
-    const blob = await blobRes.json();
-    if (blob.encoding === "base64" && blob.content) {
-      raw = Buffer.from(blob.content.replace(/\n/g, ""), "base64").toString(
-        "utf8"
-      );
-    }
+    if (!dl.ok) return "";
+    return await dl.text();
   }
+  return "";
+}
 
+async function readJsonFile(env, relativePath) {
+  const { token } = cfg(env);
+  const meta = await getContentsMeta(env, relativePath);
+  if (!meta.ok) {
+    return { ok: false, items: [], sha: null, reason: meta.error || `GET ${meta.status}` };
+  }
+  if (meta.status === 404) {
+    return { ok: true, items: [], sha: null, missing: true };
+  }
+  const raw = await readRawFromMeta(token, meta.body);
   let items = [];
   try {
     const data = JSON.parse(raw || "[]");
@@ -108,24 +106,17 @@ export async function fetchJsonFromGithub(env, relativePath) {
   } catch {
     items = [];
   }
-  return { ok: true, items, sha, pathName: p };
+  return { ok: true, items, sha: meta.body?.sha || null, missing: false };
 }
 
-export async function pushJsonToGithub(env, relativePath, content, sha) {
+async function putJsonFile(env, relativePath, items, sha) {
   const { token, owner, repo, branch, prefix } = cfg(env);
   if (!token || !owner || !repo) return { skipped: true };
 
-  const p = pathName(prefix, relativePath);
-  const bytes = Buffer.byteLength(content, "utf8");
-
-  if (bytes < 900_000) {
-    return pushViaContentsApi({ token, owner, repo, branch, pathName: p, content, sha });
-  }
-  return pushViaGitDataApi({ token, owner, repo, branch, pathName: p, content });
-}
-
-async function pushViaContentsApi({ token, owner, repo, branch, pathName: p, content, sha }) {
+  const p = fullPath(prefix, relativePath);
+  const content = JSON.stringify(items, null, 2) + "\n";
   const api = `https://api.github.com/repos/${owner}/${repo}/contents/${p}`;
+
   let currentSha = sha;
   if (!currentSha) {
     const existing = await fetch(`${api}?ref=${encodeURIComponent(branch)}`, {
@@ -138,7 +129,7 @@ async function pushViaContentsApi({ token, owner, repo, branch, pathName: p, con
   }
 
   const payload = {
-    message: `bot: update ${p.split("/").pop()}`,
+    message: `bot: update ${relativePath}`,
     content: Buffer.from(content, "utf8").toString("base64"),
     branch,
   };
@@ -152,92 +143,206 @@ async function pushViaContentsApi({ token, owner, repo, branch, pathName: p, con
 
   if (!res.ok) {
     const err = await res.text();
-    if (res.status === 422 || res.status === 413 || /too large|size limit|1 MB|100 MB/i.test(err)) {
-      return pushViaGitDataApi({ token, owner, repo, branch, pathName: p, content });
-    }
-    throw new Error(`GitHub ${res.status}: ${err.slice(0, 300)}`);
+    throw new Error(`GitHub PUT ${relativePath} ${res.status}: ${err.slice(0, 250)}`);
   }
-  return { skipped: false, path: p, method: "contents" };
+  return { skipped: false, path: p, bytes: Buffer.byteLength(content, "utf8") };
 }
 
-async function pushViaGitDataApi({ token, owner, repo, branch, pathName: p, content }) {
-  const h = headers(token);
-  const base = `https://api.github.com/repos/${owner}/${repo}`;
-
-  const refRes = await fetch(`${base}/git/ref/heads/${encodeURIComponent(branch)}`, {
-    headers: h,
-  });
-  if (!refRes.ok) {
-    const err = await refRes.text();
-    throw new Error(`GitHub ref ${refRes.status}: ${err.slice(0, 200)}`);
+/** Baca index chunk; kalau belum ada, default [base.json] */
+async function readIndex(env, fileName) {
+  const idx = indexName(fileName);
+  const got = await readJsonFile(env, idx);
+  if (!got.ok) return { ok: false, parts: [partName(baseName(fileName), 1)], sha: null, reason: got.reason };
+  if (got.missing || !Array.isArray(got.items) || !got.items.length) {
+    return {
+      ok: true,
+      parts: [partName(baseName(fileName), 1)],
+      sha: got.sha,
+      missing: true,
+    };
   }
-  const ref = await refRes.json();
-  const parentSha = ref.object.sha;
+  // index boleh array string atau { parts: [] }
+  const parts = Array.isArray(got.items)
+    ? got.items.map(String)
+    : Array.isArray(got.items.parts)
+      ? got.items.parts.map(String)
+      : [partName(baseName(fileName), 1)];
+  return { ok: true, parts, sha: got.sha, missing: false };
+}
 
-  const commitRes = await fetch(`${base}/git/commits/${parentSha}`, { headers: h });
-  if (!commitRes.ok) {
-    const err = await commitRes.text();
-    throw new Error(`GitHub commit ${commitRes.status}: ${err.slice(0, 200)}`);
-  }
-  const parentCommit = await commitRes.json();
-  const baseTree = parentCommit.tree.sha;
-
-  const blobRes = await fetch(`${base}/git/blobs`, {
-    method: "POST",
-    headers: { ...h, "Content-Type": "application/json" },
-    body: JSON.stringify({ content, encoding: "utf-8" }),
-  });
-  if (!blobRes.ok) {
-    const err = await blobRes.text();
-    throw new Error(`GitHub blob ${blobRes.status}: ${err.slice(0, 200)}`);
-  }
-  const blob = await blobRes.json();
-
-  const treeRes = await fetch(`${base}/git/trees`, {
-    method: "POST",
-    headers: { ...h, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      base_tree: baseTree,
-      tree: [
-        {
-          path: p,
-          mode: "100644",
-          type: "blob",
-          sha: blob.sha,
-        },
-      ],
-    }),
-  });
-  if (!treeRes.ok) {
-    const err = await treeRes.text();
-    throw new Error(`GitHub tree ${treeRes.status}: ${err.slice(0, 200)}`);
-  }
-  const tree = await treeRes.json();
-
-  const newCommitRes = await fetch(`${base}/git/commits`, {
-    method: "POST",
-    headers: { ...h, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      message: `bot: update ${p.split("/").pop()}`,
-      tree: tree.sha,
-      parents: [parentSha],
-    }),
-  });
-  if (!newCommitRes.ok) {
-    const err = await newCommitRes.text();
-    throw new Error(`GitHub new-commit ${newCommitRes.status}: ${err.slice(0, 200)}`);
-  }
-  const newCommit = await newCommitRes.json();
-
-  const updateRef = await fetch(`${base}/git/refs/heads/${encodeURIComponent(branch)}`, {
-    method: "PATCH",
-    headers: { ...h, "Content-Type": "application/json" },
-    body: JSON.stringify({ sha: newCommit.sha }),
-  });
-  if (!updateRef.ok) {
-    const err = await updateRef.text();
-    throw new Error(`GitHub update-ref ${updateRef.status}: ${err.slice(0, 200)}`);
+/**
+ * Kompatibel API lama: baca SEMUA chunk lalu merge (baru di depan).
+ * Dipakai kalau masih ada pemanggil fetchJsonFromGithub(fileName).
+ */
+export async function fetchJsonFromGithub(env, relativePath) {
+  const { token, owner, repo } = cfg(env);
+  if (!token || !owner || !repo) {
+    return { ok: false, items: [], sha: null, reason: "missing_github_env" };
   }
 
-  return { skipped: false, path: p, method: "git-data" };
+  // Kalau path index / part eksplisit, baca file itu saja
+  if (/-index\.json$/i.test(relativePath) || /-p\d+\.json$/i.test(relativePath)) {
+    return readJsonFile(env, relativePath);
+  }
+
+  const index = await readIndex(env, relativePath);
+  if (!index.ok) {
+    return { ok: false, items: [], sha: null, reason: index.reason };
+  }
+
+  const all = [];
+  let lastSha = null;
+  for (const part of index.parts) {
+    const got = await readJsonFile(env, part);
+    if (!got.ok) continue;
+    if (got.sha) lastSha = got.sha;
+    if (got.items?.length) all.push(...got.items);
+  }
+
+  // Fallback: file monolih lama tanpa index
+  if (!all.length) {
+    const legacy = await readJsonFile(env, relativePath);
+    if (legacy.ok && legacy.items.length) {
+      return { ok: true, items: legacy.items, sha: legacy.sha, pathName: relativePath };
+    }
+  }
+
+  return {
+    ok: true,
+    items: all,
+    sha: lastSha,
+    pathName: relativePath,
+    parts: index.parts,
+  };
+}
+
+/**
+ * Upsert 1 record ke chunk aktif (< 1MB). Chunk penuh → buat file baru.
+ * Tidak menulis ulang file 1.9MB.
+ */
+export async function upsertVideoToGithub(env, fileName, record) {
+  const { token, owner, repo } = cfg(env);
+  if (!token || !owner || !repo) {
+    return { ok: false, reason: "missing_github_env" };
+  }
+
+  // Jangan sentuh arsip raksasa videos.json / putarin.json.
+  // Data baru selalu ke *-latest.json (chunk < 1MB).
+  const map = {
+    "videos.json": "videos-latest.json",
+    "putarin.json": "putarin-latest.json",
+    "campur.json": "campur-latest.json",
+  };
+  fileName = map[fileName] || fileName;
+
+  const base = baseName(fileName);
+  const index = await readIndex(env, fileName);
+  if (!index.ok) return { ok: false, reason: index.reason };
+
+  let parts = index.parts.slice();
+  if (!parts.length) parts = [partName(base, 1)];
+
+  // Cari apakah id sudah ada di salah satu chunk (update in-place)
+  const keyOf = (it) =>
+    String(it.id || "")
+      .toLowerCase()
+      .trim();
+
+  const want = keyOf(record);
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i];
+    const got = await readJsonFile(env, part);
+    if (!got.ok) continue;
+    const idx = got.items.findIndex((it) => keyOf(it) === want);
+    if (idx >= 0) {
+      const next = got.items.slice();
+      next[idx] = { ...next[idx], ...record, updated_at: new Date().toISOString() };
+      await putJsonFile(env, part, next, got.sha);
+      return {
+        ok: true,
+        action: "updated",
+        file: part,
+        total: next.length,
+        record: next[idx],
+      };
+    }
+  }
+
+  // Insert di chunk aktif = parts[0] (paling baru). Kalau penuh, buat part baru di depan.
+  let active = parts[0];
+  let got = await readJsonFile(env, active);
+  if (!got.ok) return { ok: false, reason: got.reason };
+
+  let items = got.items.slice();
+  items.unshift(record);
+  let content = JSON.stringify(items, null, 2) + "\n";
+  let bytes = Buffer.byteLength(content, "utf8");
+
+  if (bytes > MAX_CHUNK_BYTES && got.items.length > 0) {
+    // Chunk aktif penuh → arsipkan di belakang, mulai file baru hanya berisi record baru
+    const nextNum = parts.length + 1;
+    // parts: [aktif, ...lama] → aktif penuh jadi pN, file baru jadi aktif
+    const archivedName = partName(base, nextNum);
+    // Tulis ulang chunk lama (tanpa record baru) tetap di active dulu? 
+    // Lebih jelas: pindah isi penuh ke archivedName, active = file baru isinya [record]
+    // Tapi active mungkin sudah videos.json — rename logika:
+    // 1) tulis isi penuh (tanpa record baru) ke part baru archived
+    // 2) videos.json diganti hanya [record]
+
+    const fullItems = got.items.slice(); // tanpa record baru
+    await putJsonFile(env, archivedName, fullItems, null);
+
+    items = [record];
+    content = JSON.stringify(items, null, 2) + "\n";
+    await putJsonFile(env, active, items, got.sha);
+
+    // index: [active, archived, ...oldParts without duplicate]
+    const newParts = [active, archivedName, ...parts.slice(1).filter((x) => x !== archivedName && x !== active)];
+    await putJsonFile(env, indexName(fileName), newParts, index.missing ? null : index.sha);
+
+    return {
+      ok: true,
+      action: "created",
+      file: active,
+      rotated: archivedName,
+      total: 1,
+      record,
+    };
+  }
+
+  await putJsonFile(env, active, items, got.sha);
+
+  // Pastikan index ada
+  if (index.missing || index.parts[0] !== active) {
+    const newParts = [active, ...parts.filter((x) => x !== active)];
+    await putJsonFile(env, indexName(fileName), newParts, index.missing ? null : index.sha);
+  }
+
+  return {
+    ok: true,
+    action: "created",
+    file: active,
+    total: items.length,
+    record,
+  };
+}
+
+/** API lama: push full content (masih dipakai fallback). */
+export async function pushJsonToGithub(env, relativePath, content, sha) {
+  let items = [];
+  try {
+    const data = JSON.parse(content);
+    items = Array.isArray(data) ? data : [];
+  } catch {
+    throw new Error("pushJsonToGithub: content bukan JSON array");
+  }
+  // Ambil record pertama sebagai upsert target jika dipanggil cara lama — hindari
+  // Lebih aman: tulis langsung ke relativePath jika < MAX
+  const bytes = Buffer.byteLength(content, "utf8");
+  if (bytes > MAX_CHUNK_BYTES) {
+    throw new Error(
+      `File terlalu besar (${bytes} byte). Pakai upsertVideoToGithub agar di-chunk.`
+    );
+  }
+  return putJsonFile(env, relativePath, items, sha);
 }
