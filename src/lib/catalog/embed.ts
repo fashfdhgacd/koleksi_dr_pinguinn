@@ -31,9 +31,9 @@ function videyCdns(id: string): string[] {
 
 export function hostLabel(url: string): string {
   const s = url.toLowerCase();
-  if (/videy/.test(s)) return "Videy";
   if (/indoav/.test(s)) return "IndoAV";
   if (/userbokep/.test(s)) return "UserBokep";
+  if (/videy/.test(s)) return "Videy";
   if (/streamtape|campur|lulu|strcloud|tapecontent/.test(s)) return "Streamtape";
   if (/putarin|puterin/.test(s)) return "Puterin";
   if (/archive\.org/.test(s)) return "Arsip";
@@ -42,6 +42,21 @@ export function hostLabel(url: string): string {
   } catch {
     return "Sumber";
   }
+}
+
+/** Lower = higher priority. IndoAV first so viewer bonus can count. */
+export function hostPriority(urlOrHost: string): number {
+  const s = urlOrHost.toLowerCase();
+  if (/indoav/.test(s)) return 0;
+  if (/userbokep/.test(s)) return 1;
+  if (/videy/.test(s)) return 2;
+  if (/streamtape|strcloud|tapecontent/.test(s)) return 3;
+  if (/\.(mp4|mov|webm)($|\?)/.test(s)) return 4;
+  return 5;
+}
+
+export function isIndoAvUrl(url: string): boolean {
+  return /indoav/i.test(url);
 }
 
 function isFile(url: string): boolean {
@@ -65,7 +80,6 @@ function toEmbedPath(url: string): string {
 export function resolveSource(raw: string | null | undefined): ResolvedSource | null {
   if (!raw) return null;
   let url = raw.trim();
-  // Common streamtape typo/path fixes
   url = url.replace("/d/", "/e/");
 
   const id = videyId(url);
@@ -88,7 +102,6 @@ export function resolveSource(raw: string | null | undefined): ResolvedSource | 
     };
   }
 
-  // Prefer embed path for known hosts
   const embedUrl = toEmbedPath(url);
 
   return {
