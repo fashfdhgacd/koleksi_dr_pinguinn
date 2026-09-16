@@ -85,11 +85,12 @@ export function resolveSource(raw: string | null | undefined): ResolvedSource | 
 
   const id = videyId(url);
   if (id && /videy/i.test(url)) {
-    const page = `https://videy.co/v/?id=${encodeURIComponent(id)}`;
+    // Play CDN mp4/mov in <video>, never iframe the videy.co page UI.
+    const cdns = videyCdns(id);
     return {
-      mode: "iframe",
-      url: page,
-      fallbacks: [page, ...videyCdns(id)],
+      mode: "video",
+      url: cdns[0],
+      fallbacks: cdns,
       host: "Videy",
     };
   }
