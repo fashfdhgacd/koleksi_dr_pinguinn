@@ -1,5 +1,0 @@
-{
-  "functions": {
-    "src/routes/api/telegram.ts": { "maxDuration": 60 }
-  }
-}
