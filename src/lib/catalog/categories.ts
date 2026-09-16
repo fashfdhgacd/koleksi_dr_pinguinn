@@ -30,6 +30,27 @@ export const CATEGORY_LIST: CategoryInfo[] = CATEGORIES.map(({ slug, label }) =>
   label,
 }));
 
+/** Chip utama di header; sisanya di menu "Lainnya". */
+export const PRIMARY_CATEGORY_SLUGS = [
+  "jav",
+  "ai-plus",
+  "jilbab",
+  "tante",
+  "amatir",
+  "viral",
+  "istri",
+  "live",
+  "abg",
+] as const;
+
+export const PRIMARY_CATEGORIES: CategoryInfo[] = PRIMARY_CATEGORY_SLUGS.map(
+  (slug) => CATEGORY_LIST.find((c) => c.slug === slug)!,
+).filter(Boolean);
+
+export const MORE_CATEGORIES: CategoryInfo[] = CATEGORY_LIST.filter(
+  (c) => !(PRIMARY_CATEGORY_SLUGS as readonly string[]).includes(c.slug),
+);
+
 export function findCategory(slug: string | null | undefined): CategoryDef | undefined {
   if (!slug) return undefined;
   const key = slug.trim().toLowerCase();
