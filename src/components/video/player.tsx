@@ -219,10 +219,12 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
             </button>
           ))}
         </div>
-      ) : item.qualities.length > 1 ? (
+      ) : item.qualities.filter((q) => !/^direct$/i.test(q.label || "")).length > 1 ? (
         <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
-          <span className="text-xs text-muted">Kualitas</span>
-          {item.qualities.map((q) => (
+          <span className="text-xs text-muted">Sumber</span>
+          {item.qualities
+            .filter((q) => !/^direct$/i.test(q.label || ""))
+            .map((q) => (
             <button
               key={q.url}
               type="button"
