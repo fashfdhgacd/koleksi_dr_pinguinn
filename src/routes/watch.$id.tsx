@@ -16,7 +16,7 @@ import {
   videoSeoTitle,
 } from "@/lib/seo";
 
-const SHARE_CARD_VERSION = "6";
+const SHARE_CARD_VERSION = "7";
 
 export const Route = createFileRoute("/watch/$id")({
   loader: async ({ params }) => {
