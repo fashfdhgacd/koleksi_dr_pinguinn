@@ -329,8 +329,14 @@ async function handleUpload(
         lines.push(`⚠️ Gagal upload: ${result.reason || "unknown"}`);
         continue;
       }
-      const mark = result.action === "created" ? "✅" : "♻️";
-      const label = result.action === "created" ? "BERHASIL diupload" : "DIUPDATE";
+      const mark =
+        result.action === "created" ? "✅" : result.action === "skipped" ? "⏭️" : "♻️";
+      const label =
+        result.action === "created"
+          ? "BERHASIL diupload"
+          : result.action === "skipped"
+            ? "SKIP (link/ID sudah ada)"
+            : "DIUPDATE";
       const extra = result.rotated ? `\nArsip penuh → data/${result.rotated}` : "";
       lines.push(
         [
