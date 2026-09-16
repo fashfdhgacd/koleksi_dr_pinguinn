@@ -51,7 +51,7 @@ export function homeSeo(q?: string, category?: string) {
   const cat = findCategory(category);
   if (cat) {
     return {
-      title: pageTitle([`Bokok Indo ${cat.label}`, cat.label]),
+      title: pageTitle([`Bokep Indo ${cat.label}`, cat.label]),
       description: `Kumpulan bokep Indo ${cat.label.toLowerCase()} terbaru di ${SITE_NAME}. Streaming gratis, update setiap hari. Konten 18+.`,
       keywords: categoryKeywords(cat.slug),
     };
