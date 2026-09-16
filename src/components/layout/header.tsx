@@ -10,6 +10,7 @@ import { BRAND_LOGO_SRC } from "@/lib/brand-logo";
 const QUICK_CATS = [
   { slug: "jav", label: "Jav" },
   { slug: "ai-plus", label: "AI+" },
+  { slug: "videy", label: "Videy" },
 ] as const;
 
 export function Header({
