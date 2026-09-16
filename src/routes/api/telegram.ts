@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { listCategory, listLatest, listSearch } from "@/lib/catalog/local";
 import { parseMessage, detectCategory, cleanTitle } from "@/lib/bot/parse.js";
 import { toRecord } from "@/lib/bot/store.js";
-import { fetchPutarinTitle, fetchStreamtapeTitle } from "@/lib/bot/providers.js";
+import { fetchPutarinTitle, fetchStreamtapeTitle, expandPutarinFolder } from "@/lib/bot/providers.js";
 import { upsertVideoToGithub } from "@/lib/bot/github.js";
 
 const HOST = "https://koleksidrpinguin.com";
@@ -233,11 +233,40 @@ async function handleUpload(
   const env = envBag();
   const lines: string[] = [];
 
+  // Expand Puterin /f/ folders into individual /v/ videos before upsert.
+  const queue: Array<(typeof parsedMsg.videos)[number] & { title?: string }> = [];
   for (const video of parsedMsg.videos) {
-    const title = await resolveTitle(video, parsedMsg.title);
+    const folderTitle = cleanTitle(
+      String((video as { title?: string }).title || parsedMsg.title || ""),
+    );
+    if (video.host === "putarin-folder" || (video as { folder?: boolean }).folder) {
+      try {
+        const kids = await expandPutarinFolder(video.id, folderTitle);
+        if (!kids.length) {
+          lines.push(`⚠️ Folder kosong / gagal dibaca: ${video.id}`);
+          continue;
+        }
+        lines.push(`📁 Folder ${video.id}: ${kids.length} video`);
+        for (const kid of kids) queue.push(kid);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        lines.push(`⚠️ Gagal baca folder ${video.id}: ${msg}`);
+      }
+      continue;
+    }
+    queue.push(
+      folderTitle && folderTitle !== "Video"
+        ? { ...video, title: folderTitle }
+        : video,
+    );
+  }
+
+  for (const video of queue) {
+    const given = cleanTitle(String((video as { title?: string }).title || parsedMsg.title || ""));
+    const title = await resolveTitle(video, given);
     const category =
       parsedMsg.category ||
-      (video.host === "putarin"
+      (video.host === "putarin" || video.host === "putarin-folder"
         ? "jav"
         : video.host === "streamtape"
           ? "ai-plus"
