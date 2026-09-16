@@ -12,7 +12,10 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as KategoriRouteImport } from './routes/kategori'
 import { Route as ApiDataRouteImport } from './routes/api/data'
+import { Route as ApiPuterinThumbRouteImport } from './routes/api/puterin-thumb'
 import { Route as ApiTapeThumbRouteImport } from './routes/api/tape-thumb'
+import { Route as ApiTelegramRouteImport } from './routes/api/telegram'
+import { Route as VIdRouteImport } from './routes/v.$id'
 import { Route as WatchIdRouteImport } from './routes/watch.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -30,9 +33,24 @@ const ApiDataRoute = ApiDataRouteImport.update({
   path: '/api/data',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPuterinThumbRoute = ApiPuterinThumbRouteImport.update({
+  id: '/api/puterin-thumb',
+  path: '/api/puterin-thumb',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTapeThumbRoute = ApiTapeThumbRouteImport.update({
   id: '/api/tape-thumb',
   path: '/api/tape-thumb',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTelegramRoute = ApiTelegramRouteImport.update({
+  id: '/api/telegram',
+  path: '/api/telegram',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VIdRoute = VIdRouteImport.update({
+  id: '/v/$id',
+  path: '/v/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WatchIdRoute = WatchIdRouteImport.update({
@@ -45,14 +63,20 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/kategori': typeof KategoriRoute
   '/api/data': typeof ApiDataRoute
+  '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
+  '/api/telegram': typeof ApiTelegramRoute
+  '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/kategori': typeof KategoriRoute
   '/api/data': typeof ApiDataRoute
+  '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
+  '/api/telegram': typeof ApiTelegramRoute
+  '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
 }
 export interface FileRoutesById {
@@ -60,22 +84,53 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/kategori': typeof KategoriRoute
   '/api/data': typeof ApiDataRoute
+  '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
+  '/api/telegram': typeof ApiTelegramRoute
+  '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/kategori' | '/api/data' | '/api/tape-thumb' | '/watch/$id'
+  fullPaths:
+    | '/'
+    | '/kategori'
+    | '/api/data'
+    | '/api/puterin-thumb'
+    | '/api/tape-thumb'
+    | '/api/telegram'
+    | '/v/$id'
+    | '/watch/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/kategori' | '/api/data' | '/api/tape-thumb' | '/watch/$id'
-  id: '__root__' | '/' | '/kategori' | '/api/data' | '/api/tape-thumb' | '/watch/$id'
+  to:
+    | '/'
+    | '/kategori'
+    | '/api/data'
+    | '/api/puterin-thumb'
+    | '/api/tape-thumb'
+    | '/api/telegram'
+    | '/v/$id'
+    | '/watch/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/kategori'
+    | '/api/data'
+    | '/api/puterin-thumb'
+    | '/api/tape-thumb'
+    | '/api/telegram'
+    | '/v/$id'
+    | '/watch/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   KategoriRoute: typeof KategoriRoute
   ApiDataRoute: typeof ApiDataRoute
+  ApiPuterinThumbRoute: typeof ApiPuterinThumbRoute
   ApiTapeThumbRoute: typeof ApiTapeThumbRoute
+  ApiTelegramRoute: typeof ApiTelegramRoute
+  VIdRoute: typeof VIdRoute
   WatchIdRoute: typeof WatchIdRoute
 }
 
@@ -102,11 +157,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/puterin-thumb': {
+      id: '/api/puterin-thumb'
+      path: '/api/puterin-thumb'
+      fullPath: '/api/puterin-thumb'
+      preLoaderRoute: typeof ApiPuterinThumbRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/tape-thumb': {
       id: '/api/tape-thumb'
       path: '/api/tape-thumb'
       fullPath: '/api/tape-thumb'
       preLoaderRoute: typeof ApiTapeThumbRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/telegram': {
+      id: '/api/telegram'
+      path: '/api/telegram'
+      fullPath: '/api/telegram'
+      preLoaderRoute: typeof ApiTelegramRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/v/$id': {
+      id: '/v/$id'
+      path: '/v/$id'
+      fullPath: '/v/$id'
+      preLoaderRoute: typeof VIdRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/watch/$id': {
@@ -123,7 +199,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   KategoriRoute: KategoriRoute,
   ApiDataRoute: ApiDataRoute,
+  ApiPuterinThumbRoute: ApiPuterinThumbRoute,
   ApiTapeThumbRoute: ApiTapeThumbRoute,
+  ApiTelegramRoute: ApiTelegramRoute,
+  VIdRoute: VIdRoute,
   WatchIdRoute: WatchIdRoute,
 }
 export const routeTree = rootRouteImport
