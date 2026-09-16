@@ -2,7 +2,7 @@ import { findCategory } from "@/lib/catalog/categories";
 
 export const SITE_ORIGIN = "https://koleksidrpinguin.com";
 export const SITE_NAME = "Dr. Pinguin";
-export const DEFAULT_OG = `${SITE_ORIGIN}/og.jpg`;
+export const DEFAULT_OG = `${SITE_ORIGIN}/og.svg`;
 
 const HOME_DESCRIPTION =
   "Nonton bokep Indo terbaru di Dr. Pinguin. Koleksi amatir, jilbab, tante, viral, dan percakapan. Konten 18+.";
@@ -51,7 +51,7 @@ export function homeSeo(q?: string, category?: string) {
   const cat = findCategory(category);
   if (cat) {
     return {
-      title: pageTitle([`Bokep Indo ${cat.label}`, cat.label]),
+      title: pageTitle([`Bokok Indo ${cat.label}`, cat.label]),
       description: `Kumpulan bokep Indo ${cat.label.toLowerCase()} terbaru di ${SITE_NAME}. Streaming gratis, update setiap hari. Konten 18+.`,
       keywords: categoryKeywords(cat.slug),
     };
