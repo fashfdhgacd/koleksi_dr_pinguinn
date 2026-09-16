@@ -95,8 +95,22 @@ export function parseVideoLink(url) {
   }
 
   if (PUTARIN_HOST.test(host)) {
+    const folder = path.match(/\/f\/([A-Za-z0-9_-]+)/i);
+    if (folder) {
+      const id = folder[1];
+      const base = /puterin\./i.test(host) ? origin : "https://panel.putarin.com";
+      return {
+        id,
+        host: "putarin-folder",
+        source: "Putarin",
+        embed: `${base}/f/${id}`,
+        direct: `${base}/f/${id}`,
+        file: `putarin.json`,
+        folder: true,
+      };
+    }
     const m =
-      path.match(/\/(?:e|v|d|watch|f|video)\/([A-Za-z0-9_-]+)/i) ||
+      path.match(/\/(?:e|v|d|watch|video)\/([A-Za-z0-9_-]+)/i) ||
       parsed.search.match(/[?&](?:code|id)=([A-Za-z0-9_-]+)/i);
     if (!m) return null;
     const id = m[1];
