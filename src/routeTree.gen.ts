@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as KategoriRouteImport } from './routes/kategori'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiTapeThumbRouteImport } from './routes/api/tape-thumb'
 import { Route as WatchIdRouteImport } from './routes/watch.$id'
@@ -17,6 +18,11 @@ import { Route as WatchIdRouteImport } from './routes/watch.$id'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KategoriRoute = KategoriRouteImport.update({
+  id: '/kategori',
+  path: '/kategori',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDataRoute = ApiDataRouteImport.update({
@@ -37,12 +43,14 @@ const WatchIdRoute = WatchIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/kategori': typeof KategoriRoute
   '/api/data': typeof ApiDataRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/watch/$id': typeof WatchIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/kategori': typeof KategoriRoute
   '/api/data': typeof ApiDataRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/watch/$id': typeof WatchIdRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/kategori': typeof KategoriRoute
   '/api/data': typeof ApiDataRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/watch/$id': typeof WatchIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/data' | '/api/tape-thumb' | '/watch/$id'
+  fullPaths: '/' | '/kategori' | '/api/data' | '/api/tape-thumb' | '/watch/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/data' | '/api/tape-thumb' | '/watch/$id'
-  id: '__root__' | '/' | '/api/data' | '/api/tape-thumb' | '/watch/$id'
+  to: '/' | '/kategori' | '/api/data' | '/api/tape-thumb' | '/watch/$id'
+  id: '__root__' | '/' | '/kategori' | '/api/data' | '/api/tape-thumb' | '/watch/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  KategoriRoute: typeof KategoriRoute
   ApiDataRoute: typeof ApiDataRoute
   ApiTapeThumbRoute: typeof ApiTapeThumbRoute
   WatchIdRoute: typeof WatchIdRoute
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kategori': {
+      id: '/kategori'
+      path: '/kategori'
+      fullPath: '/kategori'
+      preLoaderRoute: typeof KategoriRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/data': {
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  KategoriRoute: KategoriRoute,
   ApiDataRoute: ApiDataRoute,
   ApiTapeThumbRoute: ApiTapeThumbRoute,
   WatchIdRoute: WatchIdRoute,
