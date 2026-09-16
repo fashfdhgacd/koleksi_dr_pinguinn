@@ -250,31 +250,37 @@ export async function upsertVideoToGithub(env, fileName, record) {
   let parts = index.parts.slice();
   if (!parts.length) parts = [partName(base, 1)];
 
-  // Cari apakah id sudah ada di salah satu chunk (update in-place)
+  // Cari apakah id/link sudah ada — duplicate = skip
   const keyOf = (it) =>
     String(it.id || "")
       .toLowerCase()
       .trim();
 
   const want = keyOf(record);
+  const linkOf = (it) => {
+    const embed = String(it.embed || it.direct || it.video_url || "").toLowerCase().trim();
+    const m = embed.match(/\/(?:e|v|d|f|watch)\/([a-z0-9_-]+)/i);
+    return m ? m[1].toLowerCase() : embed;
+  };
+  const wantLink = linkOf(record);
   for (let i = 0; i < parts.length; i++) {
     const part = parts[i];
     const got = await readJsonFile(env, part);
     if (!got.ok) continue;
-    const idx = got.items.findIndex((it) => keyOf(it) === want);
+    const idx = got.items.findIndex((it) => {
+      if (want && keyOf(it) === want) return true;
+      if (wantLink && linkOf(it) && linkOf(it) === wantLink) return true;
+      return false;
+    });
     if (idx >= 0) {
-      const next = got.items.slice();
-      const merged = { ...next[idx], ...record, updated_at: new Date().toISOString() };
-      next.splice(idx, 1);
-      // Link baru / update harus di depan katalog, bukan tetap di belakang.
-      next.unshift(merged);
-      await putJsonFile(env, part, next, got.sha);
+      // Link/ID sama: skip, jangan update dan jangan dipindah.
       return {
         ok: true,
-        action: "updated",
+        action: "skipped",
         file: part,
-        total: next.length,
-        record: merged,
+        total: got.items.length,
+        record: got.items[idx],
+        reason: "duplicate",
       };
     }
   }
