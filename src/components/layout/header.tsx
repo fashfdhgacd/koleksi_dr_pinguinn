@@ -1,12 +1,16 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "@tanstack/react-router";
-import { Menu, Search, X } from "lucide-react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { LayoutGrid, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { CATEGORY_LIST } from "@/lib/catalog/categories";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { BRAND_LOGO_SRC } from "@/lib/brand-logo";
+
+const QUICK_CATS = [
+  { slug: "jav", label: "Jav" },
+  { slug: "ai-plus", label: "AI+" },
+] as const;
 
 export function Header({
   query,
@@ -16,9 +20,11 @@ export function Header({
   category?: string;
 }) {
   const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const onCategoriesPage = pathname === "/kategori" || pathname.startsWith("/kategori/");
   const [draft, setDraft] = useState(query ?? "");
   const debounced = useDebounce(draft, 400);
+  const quickActive = Boolean(category && QUICK_CATS.some((c) => c.slug === category));
 
   useEffect(() => {
     setDraft(query ?? "");
@@ -88,46 +94,43 @@ export function Header({
           ) : null}
         </form>
 
-        <Button
-          variant="ghost"
-          size="icon"
-          className="lg:hidden"
-          onClick={() => setOpen((v) => !v)}
-          aria-label="Menu kategori"
-        >
-          {open ? <X className="size-5" /> : <Menu className="size-5" />}
+        <Button variant="ghost" size="icon" asChild aria-label="Semua kategori">
+          <Link to="/kategori">
+            <LayoutGrid className="size-5" />
+          </Link>
         </Button>
       </div>
 
-      <nav
-        className={cn(
-          "mx-auto max-w-[1440px] overflow-x-auto px-4 sm:px-6",
-          open ? "block border-t border-border py-3" : "hidden lg:block",
-        )}
-      >
-        <ul className={cn("flex gap-1 pb-3", open && "flex-col lg:flex-row")}>
+      <nav className="mx-auto max-w-[1440px] px-4 sm:px-6" aria-label="Navigasi cepat">
+        <ul className="flex flex-wrap gap-1 py-2">
           <li>
             <Link
               to="/"
               search={{ q: undefined, category: undefined }}
-              className={chipClass(!query && !category)}
-              onClick={() => setOpen(false)}
+              className={chipClass(!query && !category && !onCategoriesPage)}
             >
               Terbaru
             </Link>
           </li>
-          {CATEGORY_LIST.map((cat) => (
+          {QUICK_CATS.map((cat) => (
             <li key={cat.slug}>
               <Link
                 to="/"
                 search={{ q: undefined, category: cat.slug }}
                 className={chipClass(category === cat.slug && !query)}
-                onClick={() => setOpen(false)}
               >
                 {cat.label}
               </Link>
             </li>
           ))}
+          <li>
+            <Link
+              to="/kategori"
+              className={chipClass(onCategoriesPage || Boolean(category && !quickActive))}
+            >
+              Kategori
+            </Link>
+          </li>
         </ul>
       </nav>
     </header>
