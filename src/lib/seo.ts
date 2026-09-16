@@ -90,7 +90,7 @@ export function videoJsonLd(input: {
   const content = (input.contentUrl || "").trim();
   const thumb =
     input.thumbnail && input.thumbnail.startsWith("http") ? input.thumbnail : DEFAULT_OG;
-  const data: Record<string, unknown> = {
+  return {
     "@context": "https://schema.org",
     "@type": "VideoObject",
     name: input.title,
@@ -102,13 +102,12 @@ export function videoJsonLd(input: {
     isFamilyFriendly: "false",
     url: `${SITE_ORIGIN}/watch/${input.id}`,
     mainEntityOfPage: `${SITE_ORIGIN}/watch/${input.id}`,
+    ...(embed ? { embedUrl: normalizeEmbedUrl(embed) } : {}),
+    ...(content ? { contentUrl: content } : {}),
+    ...(input.durationSec && input.durationSec > 0
+      ? { duration: `PT${Math.round(input.durationSec)}S` }
+      : {}),
   };
-  if (embed) data.embedUrl = normalizeEmbedUrl(embed);
-  if (content) data.contentUrl = content;
-  if (input.durationSec && input.durationSec > 0) {
-    data.duration = `PT${Math.round(input.durationSec)}S`;
-  }
-  return data;
 }
 
 export function websiteJsonLd() {
