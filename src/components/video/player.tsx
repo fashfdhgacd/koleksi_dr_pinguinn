@@ -47,7 +47,11 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const list = useMemo(() => sourcesFromItem(item), [item]);
   const [active, setActive] = useState(0);
-  const [started, setStarted] = useState(false);
+  // SSR + first paint: embed iframe must exist in HTML for Google Video indexing.
+  const [started, setStarted] = useState(() => {
+    const first = sourcesFromItem(item)[0];
+    return Boolean(first && !isFileUrl(first.url) && isEmbedHostUrl(first.url));
+  });
   const [buffering, setBuffering] = useState(false);
   const [failed, setFailed] = useState(false);
   const [fallbackAt, setFallbackAt] = useState(0);
