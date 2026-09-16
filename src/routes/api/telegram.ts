@@ -49,12 +49,55 @@ async function tgSend(
   chatId: string | number,
   text: string,
   extra: Record<string, unknown> = {}
+): Promise<boolean> {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, ...extra }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error("tgSend failed", res.status, body.slice(0, 200));
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error("tgSend error", err);
+    return false;
+  }
+}
+
+/** Telegram max ~4096; kirim potongan biar batch besar tetap kebalas. */
+async function tgSendChunks(
+  token: string,
+  chatId: string | number,
+  text: string,
+  extra: Record<string, unknown> = {},
 ) {
-  await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, ...extra }),
-  });
+  const limit = 3500;
+  const raw = String(text || "").trim();
+  if (!raw) return;
+  if (raw.length <= limit) {
+    await tgSend(token, chatId, raw, extra);
+    return;
+  }
+  const parts: string[] = [];
+  let buf = "";
+  for (const block of raw.split("\n\n")) {
+    const next = buf ? `${buf}\n\n${block}` : block;
+    if (next.length > limit && buf) {
+      parts.push(buf);
+      buf = block;
+    } else {
+      buf = next;
+    }
+  }
+  if (buf) parts.push(buf);
+  for (let i = 0; i < parts.length; i++) {
+    const chunk = parts.length > 1 ? `(${i + 1}/${parts.length})\n${parts[i]}` : parts[i];
+    await tgSend(token, chatId, chunk, i === parts.length - 1 ? extra : {});
+  }
 }
 
 function parseCount(text: string): number {
@@ -230,6 +273,12 @@ async function handleUpload(
     return;
   }
 
+  await tgSend(
+    token,
+    chatId,
+    `⏳ Menerima ${parsedMsg.videos.length} link. Sedang diproses…`,
+  );
+
   const env = envBag();
   const lines: string[] = [];
 
@@ -300,7 +349,7 @@ async function handleUpload(
     }
   }
 
-  await tgSend(
+  await tgSendChunks(
     token,
     chatId,
     lines.join("\n\n") || "Tidak ada yang diproses.",
