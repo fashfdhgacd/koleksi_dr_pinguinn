@@ -5,13 +5,13 @@ export const SITE_NAME = "Dr. Pinguin";
 export const DEFAULT_OG = `${SITE_ORIGIN}/og.svg`;
 
 const HOME_DESCRIPTION =
-  "Nonton bokep Indo terbaru di Dr. Pinguin. Koleksi amatir, jilbab, tante, viral, dan percakapan. Konten 18+.";
+  "Koleksi Dr. Pinguin Bokep (M.S.B.) — nonton bokep Indo terbaru di Dr. Pinguin. Amatir, jilbab, tante, viral. Konten 18+.";
 
 export function categoryKeywords(slugOrLabel?: string | null): string {
   const key = (slugOrLabel || "").trim().toLowerCase();
   const cat = findCategory(key) || findCategory(key.replace(/\s+/g, "-"));
   const label = cat?.label || slugOrLabel || "Indo";
-  return `bokep indo, bokep ${label.toLowerCase()}, ${label.toLowerCase()} viral, video dewasa indo, dr pinguin`;
+  return `bokep indo, bokep ${label.toLowerCase()}, ${label.toLowerCase()} viral, koleksi dr pinguin, m.s.b, dr pinguin`;
 }
 
 export function pageTitle(parts: Array<string | null | undefined>): string {
@@ -57,9 +57,10 @@ export function homeSeo(q?: string, category?: string) {
     };
   }
   return {
-    title: pageTitle(["Bokep Indo Terbaru"]),
+    title: pageTitle(["Koleksi Dr. Pinguin Bokep", "M.S.B."]),
     description: HOME_DESCRIPTION,
-    keywords: "bokep indo, bokep indo terbaru, bokep viral, bokep jilbab, bokep tante, dr pinguin",
+    keywords:
+      "koleksi dr pinguin bokep, m.s.b, msb, dr pinguin bokep, bokep dr pinguin, koleksi dr pinguin, bokep indo, bokep indo terbaru, dr pinguin",
   };
 }
 
@@ -81,5 +82,21 @@ export function videoJsonLd(input: {
     genre: input.category || "Adult",
     isFamilyFriendly: "false",
     url: `${SITE_ORIGIN}/watch/${input.id}`,
+  };
+}
+
+export function websiteJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: SITE_NAME,
+    alternateName: ["Koleksi Dr. Pinguin", "Koleksi Dr. Pinguin Bokep", "M.S.B.", "MSB"],
+    url: SITE_ORIGIN,
+    description: HOME_DESCRIPTION,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${SITE_ORIGIN}/?q={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
   };
 }

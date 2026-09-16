@@ -6,7 +6,7 @@ import { InfiniteSentinel } from "@/components/video/infinite-sentinel";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { findCategory } from "@/lib/catalog/categories";
 import { useCatalogFeed } from "@/hooks/use-catalog";
-import { SITE_ORIGIN, homeSeo } from "@/lib/seo";
+import { SITE_ORIGIN, homeSeo, websiteJsonLd } from "@/lib/seo";
 
 type HomeSearch = {
   q?: string;
@@ -30,6 +30,7 @@ export const Route = createFileRoute("/")({
       : category
         ? `${SITE_ORIGIN}/?category=${encodeURIComponent(category)}`
         : SITE_ORIGIN;
+    const jsonLd = !q && !category ? websiteJsonLd() : null;
     return {
       meta: [
         { title: seo.title },
@@ -42,6 +43,9 @@ export const Route = createFileRoute("/")({
         { name: "robots", content: "index,follow" },
       ],
       links: [{ rel: "canonical", href: url }],
+      scripts: jsonLd
+        ? [{ type: "application/ld+json", children: JSON.stringify(jsonLd) }]
+        : [],
     };
   },
   component: HomePage,
@@ -58,8 +62,8 @@ function HomePage() {
     ? feed.items.filter((item) => !heroIds.has(item.id))
     : feed.items;
 
-  const title = q ? `Hasil untuk “${q}”` : cat ? `Bokep Indo ${cat.label}` : "Bokep Indo Terbaru";
-  const subtitle = feed.total ? `${feed.total.toLocaleString("id-ID")} judul` : "Koleksi Dr. Pinguin";
+  const title = q ? `Hasil untuk “${q}”` : cat ? `Bokep Indo ${cat.label}` : "Koleksi Dr. Pinguin Bokep";
+  const subtitle = feed.total ? `${feed.total.toLocaleString("id-ID")} judul · M.S.B.` : "M.S.B. — Koleksi Dr. Pinguin";
 
   return (
     <Shell query={q} category={category}>
