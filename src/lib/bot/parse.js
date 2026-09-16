@@ -34,6 +34,9 @@ export function detectCategory(title = "", fallback = "") {
 export function cleanTitle(raw = "") {
   return String(raw)
     .replace(/^\u25b6\s*/, "")
+    .replace(/^[\u{1F4C1}\u{1F4C2}\u{1F3AC}\u{1F3A5}\u{1F4F9}]\s*/u, "") // 📁📂🎬🎥📹
+    .replace(/^judul\s*[:：-]\s*/i, "")
+    .replace(/^title\s*[:：-]\s*/i, "")
     .replace(/koleksidrpinguin\.(com|site)/gi, "")
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
@@ -191,8 +194,10 @@ export function parseMessage(text = "") {
       pendingTitle = "";
       continue;
     }
-    // Baris judul (termasuk yang diawali emoji film)
-    pendingTitle = line.replace(/^\uD83C\uDFAC\s*/u, "").replace(/^🎬\s*/, "");
+    // Baris judul (📁 / 🎬 / sejenis)
+    pendingTitle = line
+      .replace(/^[\u{1F4C1}\u{1F4C2}\u{1F3AC}\u{1F3A5}\u{1F4F9}]\s*/u, "")
+      .replace(/^🎬\s*/, "");
   }
 
   // Fallback kalau URL tidak di baris sendiri
