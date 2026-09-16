@@ -174,10 +174,18 @@ function sourceLabel(item: RawItem): string {
   return item.source || "Unknown";
 }
 
+const PLACEHOLDER_IMAGE_RE =
+  /picsum\.photos|loremflickr|placeholder|placehold\.co|via\.placeholder|dummyimage/i;
+
 function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const id = item.id;
+  // Videy always has a real CDN file — never fall back to a stock/placeholder poster for it.
+  if (isVidey(item)) {
+    const videy = videyFile(item);
+    if (videy) return videy;
+  }
   const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
-  if (fromPoster && !/picsum\.photos|loremflickr|placeholder/i.test(fromPoster)) {
+  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
     return fromPoster;
   }
   const videy = videyFile(item);
@@ -267,6 +275,20 @@ function normalizeList(raw: unknown): RawItem[] {
   return [];
 }
 
+/** Deterministic id for feed items missing one, so valid entries aren't dropped. */
+function fallbackId(item: RawItem): string {
+  const basis = `${item.embed || ""}|${item.direct || ""}|${item.title || ""}`;
+  let hash = 0;
+  for (let i = 0; i < basis.length; i++) {
+    hash = (hash * 31 + basis.charCodeAt(i)) | 0;
+  }
+  return `gen-${Math.abs(hash).toString(36)}`;
+}
+
+function withId(it: RawItem): RawItem {
+  return it?.id ? it : { ...it, id: fallbackId(it) };
+}
+
 async function loadItems(): Promise<{ items: RawItem[]; posters: Record<string, string> }> {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache;
 
@@ -279,24 +301,26 @@ async function loadItems(): Promise<{ items: RawItem[]; posters: Record<string, 
     ...(typeof localPosters === "object" && localPosters ? (localPosters as Record<string, string>) : {}),
   };
 
-  for (const url of BOT_FEEDS) {
-    const data = await fetchJson(url);
+  const botResults = await Promise.all(BOT_FEEDS.map((url) => fetchJson(url)));
+  for (const data of botResults) {
     const list = normalizeList(data);
     for (const it of list) {
-      if (it?.id && it?.embed) base.push(it);
+      if (it?.embed) base.push(withId(it));
     }
   }
 
   if (REMOTE_ENABLED) {
-    for (const url of SITE_FEEDS) {
-      const data = await fetchJson(url);
+    const [siteResults, posterResults] = await Promise.all([
+      Promise.all(SITE_FEEDS.map((url) => fetchJson(url))),
+      Promise.all(POSTER_URLS.map((url) => fetchJson(url))),
+    ]);
+    for (const data of siteResults) {
       const list = normalizeList(data);
       for (const it of list) {
-        if (it?.id && it?.embed) base.push(it);
+        if (it?.embed) base.push(withId(it));
       }
     }
-    for (const url of POSTER_URLS) {
-      const data = await fetchJson(url);
+    for (const data of posterResults) {
       if (data && typeof data === "object") Object.assign(posters, data);
     }
   }
