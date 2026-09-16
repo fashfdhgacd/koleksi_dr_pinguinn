@@ -484,7 +484,14 @@ function toDetail(item: RawItem, posters: Record<string, string>): VideoDetail {
   } else {
     qualities.push({ label: item.source || "Embed", url: item.embed, format: "embed" });
   }
-  if (item.direct && item.direct !== item.embed) {
+  // Direct /v/ untuk Puterin/Streamtape/IndoAV biasanya sama dengan embed /e/ — jangan tampil sebagai "kualitas".
+  if (
+    item.direct &&
+    item.direct !== item.embed &&
+    !isPutarin(item) &&
+    !isStreamtape(item) &&
+    !isIndoAv(item)
+  ) {
     qualities.push({ label: "Direct", url: item.direct, format: "direct" });
   }
   const videy = videyFile(item);
