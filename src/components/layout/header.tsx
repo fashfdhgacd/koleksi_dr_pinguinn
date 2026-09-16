@@ -3,7 +3,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Menu, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { MORE_CATEGORIES, PRIMARY_CATEGORIES } from "@/lib/catalog/categories";
+import { CATEGORY_LIST } from "@/lib/catalog/categories";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { BRAND_LOGO_SRC } from "@/lib/brand-logo";
@@ -19,7 +19,6 @@ export function Header({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(query ?? "");
   const debounced = useDebounce(draft, 400);
-  const inMore = Boolean(category && MORE_CATEGORIES.some((c) => c.slug === category));
 
   useEffect(() => {
     setDraft(query ?? "");
@@ -92,16 +91,21 @@ export function Header({
         <Button
           variant="ghost"
           size="icon"
+          className="lg:hidden"
           onClick={() => setOpen((v) => !v)}
-          aria-label="Kategori lainnya"
-          aria-expanded={open}
+          aria-label="Menu kategori"
         >
           {open ? <X className="size-5" /> : <Menu className="size-5" />}
         </Button>
       </div>
 
-      <nav className="mx-auto max-w-[1440px] overflow-x-auto px-4 sm:px-6" aria-label="Kategori utama">
-        <ul className="flex gap-1 py-2">
+      <nav
+        className={cn(
+          "mx-auto max-w-[1440px] overflow-x-auto px-4 sm:px-6",
+          open ? "block border-t border-border py-3" : "hidden lg:block",
+        )}
+      >
+        <ul className={cn("flex gap-1 pb-3", open && "flex-col lg:flex-row")}>
           <li>
             <Link
               to="/"
@@ -112,7 +116,7 @@ export function Header({
               Terbaru
             </Link>
           </li>
-          {PRIMARY_CATEGORIES.map((cat) => (
+          {CATEGORY_LIST.map((cat) => (
             <li key={cat.slug}>
               <Link
                 to="/"
@@ -124,36 +128,8 @@ export function Header({
               </Link>
             </li>
           ))}
-          <li>
-            <button
-              type="button"
-              className={chipClass(open || inMore)}
-              onClick={() => setOpen((v) => !v)}
-            >
-              Lainnya
-            </button>
-          </li>
         </ul>
       </nav>
-
-      {open ? (
-        <nav className="border-t border-border" aria-label="Kategori lainnya">
-          <ul className="mx-auto grid max-w-[1440px] grid-cols-2 gap-1 px-4 py-3 sm:grid-cols-3 sm:px-6 md:grid-cols-4">
-            {MORE_CATEGORIES.map((cat) => (
-              <li key={cat.slug}>
-                <Link
-                  to="/"
-                  search={{ q: undefined, category: cat.slug }}
-                  className={chipClass(category === cat.slug && !query)}
-                  onClick={() => setOpen(false)}
-                >
-                  {cat.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
-      ) : null}
     </header>
   );
 }
