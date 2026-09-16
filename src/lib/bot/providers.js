@@ -104,3 +104,59 @@ export async function fetchStreamtapeTitle(fileId, env) {
   const info = data.result?.[fileId] || data.result;
   return String(info?.name || info?.title || "").replace(/\.[a-z0-9]+$/i, "").trim();
 }
+
+
+/** Expand puterin.biz/f/{id} folder page into individual /v/ videos. */
+export async function expandPutarinFolder(folderId, folderTitle = "") {
+  const id = String(folderId || "").trim();
+  if (!id) return [];
+  const urls = [
+    `https://puterin.biz/f/${encodeURIComponent(id)}`,
+    `https://panel.putarin.com/f/${encodeURIComponent(id)}`,
+  ];
+  let html = "";
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          accept: "text/html",
+          "user-agent": "Mozilla/5.0 (compatible; kdp-bot/1.0)",
+        },
+        redirect: "follow",
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!res.ok) continue;
+      html = await res.text();
+      if (html.includes('class="pcard"') && /\/v\/[A-Za-z0-9_-]+/.test(html)) break;
+    } catch {
+      /* next */
+    }
+  }
+  if (!html) return [];
+
+  const out = [];
+  const seen = new Set();
+  const cardRe = /<a class="pcard"[^>]*href="\/v\/([A-Za-z0-9_-]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  let m;
+  while ((m = cardRe.exec(html))) {
+    const vid = m[1];
+    if (!vid || seen.has(vid)) continue;
+    seen.add(vid);
+    const body = m[2] || "";
+    const tm = body.match(/<div class="pt">([\s\S]*?)<\/div>/i);
+    let title = tm ? decodeEntities(tm[1].replace(/<[^>]+>/g, "")).trim() : "";
+    if (!title) title = folderTitle ? `${folderTitle} #${out.length + 1}` : `Video ${vid}`;
+    const base = "https://puterin.biz";
+    out.push({
+      id: vid,
+      host: "putarin",
+      source: "Putarin",
+      embed: `${base}/e/${vid}`,
+      direct: `${base}/v/${vid}`,
+      file: "putarin.json",
+      title,
+      folderId: id,
+    });
+  }
+  return out;
+}
