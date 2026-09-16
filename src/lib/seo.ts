@@ -64,25 +64,51 @@ export function homeSeo(q?: string, category?: string) {
   };
 }
 
+function normalizeEmbedUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    if (/indoav|userbokep|puterin|putarin|streamtape|strcloud|lulu/i.test(`${u.hostname}${u.pathname}`)) {
+      u.pathname = u.pathname.replace(/\/(?:v|d|watch)\//, "/e/");
+    }
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function videoJsonLd(input: {
   id: string;
   title: string;
   description: string;
   thumbnail?: string | null;
   category?: string | null;
+  embedUrl?: string | null;
+  contentUrl?: string | null;
+  durationSec?: number | null;
 }) {
-  return {
+  const embed = (input.embedUrl || "").trim();
+  const content = (input.contentUrl || "").trim();
+  const thumb =
+    input.thumbnail && input.thumbnail.startsWith("http") ? input.thumbnail : DEFAULT_OG;
+  const data: Record<string, unknown> = {
     "@context": "https://schema.org",
     "@type": "VideoObject",
     name: input.title,
     description: input.description,
-    thumbnailUrl: input.thumbnail && input.thumbnail.startsWith("http") ? input.thumbnail : DEFAULT_OG,
+    thumbnailUrl: thumb,
     uploadDate: "2026-01-01",
     publisher: { "@type": "Organization", name: SITE_NAME, url: SITE_ORIGIN },
     genre: input.category || "Adult",
     isFamilyFriendly: "false",
     url: `${SITE_ORIGIN}/watch/${input.id}`,
+    mainEntityOfPage: `${SITE_ORIGIN}/watch/${input.id}`,
   };
+  if (embed) data.embedUrl = normalizeEmbedUrl(embed);
+  if (content) data.contentUrl = content;
+  if (input.durationSec && input.durationSec > 0) {
+    data.duration = `PT${Math.round(input.durationSec)}S`;
+  }
+  return data;
 }
 
 export function websiteJsonLd() {

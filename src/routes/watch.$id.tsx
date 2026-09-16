@@ -42,6 +42,11 @@ export const Route = createFileRoute("/watch/$id")({
       image = `${SITE_ORIGIN}${thumb}`;
     }
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
+    const embedUrl = item
+      ? (item.video_url || item.qualities?.[0]?.url || "").trim() || null
+      : null;
+    const contentUrl =
+      embedUrl && /\.(mp4|webm|mov)($|\?)/i.test(embedUrl) ? embedUrl : null;
     const jsonLd = item
       ? videoJsonLd({
           id: item.id,
@@ -49,6 +54,9 @@ export const Route = createFileRoute("/watch/$id")({
           description,
           thumbnail: item.thumbnail,
           category: item.category,
+          embedUrl: contentUrl ? null : embedUrl,
+          contentUrl,
+          durationSec: item.duration,
         })
       : null;
 
@@ -345,6 +353,21 @@ function WatchPage() {
         <article className="space-y-8">
           <div className="-mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0">
             <VideoPlayer key={item.id} item={item} />
+            {(() => {
+              const src = (item.video_url || item.qualities[0]?.url || "").trim();
+              if (!src || /\.(mp4|webm|mov)($|\?)/i.test(src)) return null;
+              return (
+                <noscript>
+                  <iframe
+                    src={src.replace(/\/(?:v|d|watch)\//, "/e/")}
+                    title={item.title}
+                    width="640"
+                    height="360"
+                    allowFullScreen
+                  />
+                </noscript>
+              );
+            })()}
           </div>
 
           <NextUp next={related[0] ?? null} />
