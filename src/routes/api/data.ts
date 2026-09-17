@@ -16,7 +16,8 @@ function cacheControl(ok: boolean, type: string | null): string {
   if (type === "categories") {
     return "public, s-maxage=86400, stale-while-revalidate=604800";
   }
-  return "public, s-maxage=180, stale-while-revalidate=1800";
+  // home / latest / featured / search / category — 5 menit di edge
+  return "public, s-maxage=300, stale-while-revalidate=3600";
 }
 
 async function handle(request: Request): Promise<Response> {

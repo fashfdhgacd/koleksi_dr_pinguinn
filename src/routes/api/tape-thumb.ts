@@ -29,7 +29,7 @@ async function fetchStreamtapeThumb(fileId: string): Promise<string | null> {
 
     const res = await fetch(url.toString(), {
       headers: { accept: "application/json" },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(4000),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { status?: number; result?: string };
@@ -37,7 +37,7 @@ async function fetchStreamtapeThumb(fileId: string): Promise<string | null> {
       return data.result;
     }
   } catch {
-    /* ignore */
+    /* timeout / network — fallback placeholder, jangan biarkan function error */
   }
   return null;
 }
@@ -69,12 +69,12 @@ export const Route = createFileRoute("/api/tape-thumb")({
           });
         }
 
-        // No credentials / API failed → transparent placeholder
+        // No credentials / API failed → transparent placeholder (cache lebih lama biar tidak spam function)
         return new Response(TRANSPARENT_GIF, {
           status: 200,
           headers: {
             "content-type": "image/gif",
-            "cache-control": "public, max-age=300",
+            "cache-control": "public, max-age=3600, stale-while-revalidate=86400",
           },
         });
       },

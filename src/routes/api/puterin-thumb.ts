@@ -31,7 +31,7 @@ async function fetchPuterinPoster(code: string): Promise<string | null> {
           accept: "text/html",
           "user-agent": "Mozilla/5.0 (compatible; kdp-thumb/1.0)",
         },
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(4000),
         redirect: "follow",
       });
       if (!page.ok) continue;
@@ -48,7 +48,7 @@ async function fetchPuterinPoster(code: string): Promise<string | null> {
             "user-agent": "Mozilla/5.0 (compatible; kdp-thumb/1.0)",
             referer: embedUrl,
           },
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(3000),
         },
       );
       if (!pkRes.ok) continue;
@@ -104,11 +104,12 @@ export const Route = createFileRoute("/api/puterin-thumb")({
           });
         }
 
+        // Placeholder gagal decrypt — cache 1 jam biar tidak spam function invocations
         return new Response(TRANSPARENT_GIF, {
           status: 200,
           headers: {
             "content-type": "image/gif",
-            "cache-control": "public, max-age=300",
+            "cache-control": "public, max-age=3600, stale-while-revalidate=86400",
           },
         });
       },
