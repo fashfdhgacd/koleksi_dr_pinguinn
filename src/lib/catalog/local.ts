@@ -5,7 +5,8 @@ import localCatalog from "./videos.json";
 import streamtapeBatch from "./streamtape.json";
 import localPosters from "./posters.json";
 
-const CACHE_MS = 60 * 1000;
+/** In-memory cache katalog — 5 menit, selaras dengan hero time-slot. */
+const CACHE_MS = 5 * 60 * 1000;
 
 const BOT_FEEDS = [
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin-latest.json",
@@ -302,7 +303,8 @@ function numberVidey(items: RawItem[]): Map<string, number> {
 
 async function fetchJson(url: string): Promise<unknown> {
   try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    // Timeout ketat supaya function Vercel tidak hang / timeout 502
+    const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
     if (!r.ok) return null;
     return await r.json();
   } catch {
