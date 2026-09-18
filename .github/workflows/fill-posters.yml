@@ -1,4 +1,4 @@
-# Auto poster setiap jam 00:00 WIB — scrape IndoAV/UserBokep → posters + latest-posters
+# Auto poster setiap jam 00:00 WIB
 name: Fill posters
 
 on:
@@ -33,12 +33,10 @@ jobs:
         run: |
           node --input-type=commonjs <<'SCRIPT'
           const fs = require("fs");
-
           function embedId(embed = "") {
             const m = String(embed).match(/\/(?:e|v|d)\/([A-Za-z0-9_-]+)/i) || String(embed).match(/[?&]id=([A-Za-z0-9_-]+)/i);
             return m ? m[1] : "";
           }
-
           async function fetchEmbedPoster(code, src) {
             const hosts = src === "userbokep"
               ? ["https://tv1.userbokep.com", "https://tv1.indoav.app"]
@@ -62,7 +60,6 @@ jobs:
             }
             return null;
           }
-
           async function fetchStreamtape(fileId) {
             const login = process.env.STREAMTAPE_LOGIN || "";
             const key = process.env.STREAMTAPE_KEY || "";
@@ -75,72 +72,61 @@ jobs:
             } catch {}
             return null;
           }
-
           function loadJson(p, fb) {
             try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return fb; }
           }
-
           (async () => {
-          const postersPath = "src/lib/catalog/posters.json";
-          const latestPath = "data/latest-posters.json";
-          let posters = loadJson(postersPath, {});
-          if (typeof posters !== "object" || Array.isArray(posters)) posters = {};
-
-          const videos = [
-            ...loadJson("data/videos-latest.json", []),
-            ...loadJson("src/lib/catalog/videos.json", []),
-            ...loadJson("src/lib/catalog/streamtape.json", []),
-          ];
-
-          const seen = new Set();
-          const need = [];
-          for (const v of videos) {
-            if (!v?.id || seen.has(v.id)) continue;
-            seen.add(v.id);
-            if (posters[v.id]?.startsWith?.("http")) continue;
-            const blob = `${v.embed||""} ${v.source||""} ${v.direct||""}`;
-            if (/indoav|userbokep|streamtape/i.test(blob)) need.push(v);
-          }
-
-          console.log("Need posters:", need.length);
-          let ok = 0, fail = 0;
-
-          for (let i = 0; i < need.length; i++) {
-            const v = need[i];
-            const code = embedId(v.embed || v.direct || "") || v.id;
-            const blob = `${v.embed||""} ${v.source||""}`;
-            let url = null;
-            if (/streamtape/i.test(blob)) url = await fetchStreamtape(code);
-            else if (/userbokep/i.test(blob)) url = await fetchEmbedPoster(code, "userbokep");
-            else url = await fetchEmbedPoster(code, "indoav");
-
-            if (url) {
-              posters[v.id] = url;
-              if (code !== v.id) posters[code] = url;
-              ok++;
-              console.log(`OK ${v.id}`);
-            } else {
-              fail++;
-              if (fail <= 15) console.log(`FAIL ${v.id}`);
+            const postersPath = "src/lib/catalog/posters.json";
+            const latestPath = "data/latest-posters.json";
+            let posters = loadJson(postersPath, {});
+            if (typeof posters !== "object" || Array.isArray(posters)) posters = {};
+            const videos = [
+              ...loadJson("data/videos-latest.json", []),
+              ...loadJson("src/lib/catalog/videos.json", []),
+              ...loadJson("src/lib/catalog/streamtape.json", []),
+            ];
+            const seen = new Set();
+            const need = [];
+            for (const v of videos) {
+              if (!v?.id || seen.has(v.id)) continue;
+              seen.add(v.id);
+              if (posters[v.id]?.startsWith?.("http")) continue;
+              const blob = `${v.embed||""} ${v.source||""} ${v.direct||""}`;
+              if (/indoav|userbokep|streamtape/i.test(blob)) need.push(v);
             }
-            await new Promise(r => setTimeout(r, 300));
-            if ((ok + fail) % 25 === 0) {
-              fs.writeFileSync(postersPath, JSON.stringify(posters));
+            console.log("Need posters:", need.length);
+            let ok = 0, fail = 0;
+            for (let i = 0; i < need.length; i++) {
+              const v = need[i];
+              const code = embedId(v.embed || v.direct || "") || v.id;
+              const blob = `${v.embed||""} ${v.source||""}`;
+              let url = null;
+              if (/streamtape/i.test(blob)) url = await fetchStreamtape(code);
+              else if (/userbokep/i.test(blob)) url = await fetchEmbedPoster(code, "userbokep");
+              else url = await fetchEmbedPoster(code, "indoav");
+              if (url) {
+                posters[v.id] = url;
+                if (code !== v.id) posters[code] = url;
+                ok++;
+                console.log(`OK ${v.id}`);
+              } else {
+                fail++;
+                if (fail <= 15) console.log(`FAIL ${v.id}`);
+              }
+              await new Promise(r => setTimeout(r, 300));
+              if ((ok + fail) % 25 === 0) fs.writeFileSync(postersPath, JSON.stringify(posters));
             }
-          }
-
-          fs.mkdirSync("data", { recursive: true });
-          fs.writeFileSync(postersPath, JSON.stringify(posters));
-          let latest = loadJson(latestPath, {});
-          if (typeof latest !== "object" || Array.isArray(latest)) latest = {};
-          const latestVideos = loadJson("data/videos-latest.json", []);
-          for (const v of latestVideos) {
-            if (!v || !v.id) continue;
-            const url = posters[v.id];
-            if (typeof url === "string" && url.startsWith("http")) latest[v.id] = url;
-          }
-          fs.writeFileSync(latestPath, JSON.stringify(latest, null, 2) + "\n");
-          console.log("Done ok=", ok, "fail=", fail, "posters=", Object.keys(posters).length, "latest=", Object.keys(latest).length);
+            fs.mkdirSync("data", { recursive: true });
+            fs.writeFileSync(postersPath, JSON.stringify(posters));
+            let latest = loadJson(latestPath, {});
+            if (typeof latest !== "object" || Array.isArray(latest)) latest = {};
+            for (const v of loadJson("data/videos-latest.json", [])) {
+              if (!v?.id) continue;
+              const url = posters[v.id];
+              if (typeof url === "string" && url.startsWith("http")) latest[v.id] = url;
+            }
+            fs.writeFileSync(latestPath, JSON.stringify(latest, null, 2) + "\n");
+            console.log("Done ok=", ok, "fail=", fail, "posters=", Object.keys(posters).length);
           })().catch(e => { console.error(e); process.exit(1); });
           SCRIPT
 
@@ -149,36 +135,19 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
           git add src/lib/catalog/posters.json data/latest-posters.json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No poster changes."
             exit 0
           fi
-
           COUNT=$(node --input-type=commonjs -e "try{console.log(Object.keys(require('./src/lib/catalog/posters.json')).length)}catch(e){console.log(0)}")
-          git commit -m "chore(posters): midnight auto-fill ($COUNT) [skip ci]"
-
-          # Branch sering maju saat scrape → pull rebase + retry push
+          git commit -m "chore(posters): auto-fill ($COUNT)"
           for i in 1 2 3 4 5; do
-            git pull --rebase origin main || {
-              echo "rebase conflict, abort and retry"
-              git rebase --abort 2>/dev/null || true
-              git fetch origin main
-              git reset --soft origin/main
-              git add src/lib/catalog/posters.json data/latest-posters.json 2>/dev/null || true
-              if git diff --cached --quiet; then
-                echo "Nothing to commit after reset"
-                exit 0
-              fi
-              git commit -m "chore(posters): midnight auto-fill ($COUNT) [skip ci]" || true
-            }
+            git pull --rebase origin main || true
             if git push origin HEAD:main; then
-              echo "Pushed OK (attempt $i)"
+              echo "Pushed OK"
               exit 0
             fi
-            echo "Push rejected (attempt $i), retry..."
             sleep 3
           done
-          echo "Failed to push after retries"
           exit 1
