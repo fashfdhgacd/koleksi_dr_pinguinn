@@ -1,27 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { listCategory, listLatest, listSearch } from "@/lib/catalog/local";
+import { collectSharePool } from "@/lib/bot/share-pool";
+import { loadShareUsed, saveShareUsed } from "@/lib/bot/share-used";
 import { parseMessage, detectCategory, cleanTitle } from "@/lib/bot/parse.js";
 import { toRecord } from "@/lib/bot/store.js";
 import { fetchPutarinTitle, fetchStreamtapeTitle, expandPutarinFolder } from "@/lib/bot/providers.js";
 import { upsertVideoToGithub } from "@/lib/bot/github.js";
 
 const HOST = "https://koleksidrpinguin.com";
-/** 24h no-repeat per chat */
-const SHARE_TTL_MS = 24 * 60 * 60 * 1000;
-const shareHistory = new Map<string, Map<string, number>>();
-function getShareHistory(chatId: string | number): Map<string, number> {
-  const key = String(chatId);
-  let h = shareHistory.get(key);
-  if (!h) { h = new Map(); shareHistory.set(key, h); }
-  const now = Date.now();
-  for (const [id, at] of [...h]) if (now - at > SHARE_TTL_MS) h.delete(id);
-  return h;
-}
-function markShareSent(chatId: string | number, ids: string[]) {
-  const h = getShareHistory(chatId);
-  const now = Date.now();
-  for (const id of ids) if (id) h.set(id, now);
-}
 
 
 /** Reply keyboard mirip bot lama + Streamtape */
@@ -183,81 +168,49 @@ async function handleShare(
   chatId: string | number,
   text: string
 ) {
-  const n = parseCount(text);
-  const cat = parseCat(text);
-  const source = parseSource(text);
-  const wantAll = /^(semua|lagi|menu)$/i.test(text.trim());
+  const usedFile = await loadShareUsed();
+  const raw = text.trim();
+  const isLagi = /^lagi$/i.test(raw);
+  const n = /\b(5|10|15|20|25|30)\b/.test(raw)
+    ? parseCount(raw)
+    : usedFile.lastCount || parseCount(raw);
+  const cat = parseCat(raw) || (isLagi ? usedFile.lastCat || "" : "");
+  const source = parseSource(raw) || (isLagi ? usedFile.lastSource || "" : "");
 
-  let page;
-  if (cat) {
-    page = await listCategory(cat, 1, 800);
-  } else if (/cari\s+(.+)/i.test(text)) {
-    page = await listSearch(text.replace(/^.*cari\s+/i, ""), 1, 400);
-  } else if (source === "putarin") {
-    page = await listCategory("jav", 1, 400);
-  } else if (source === "streamtape") {
-    page = await listCategory("ai-plus", 1, 400);
-  } else if (source) {
-    page = await listLatest(1, 800);
-  } else {
-    page = await listLatest(1, 800);
-  }
+  const picked = await collectSharePool({
+    count: n,
+    category: cat,
+    source,
+    excludeIds: usedFile.used,
+    excludeTitles: usedFile.titles,
+  });
 
-  let items = page.items.slice();
-
-  if (source) {
-    items = items.filter((v) => {
-      const blob = [
-        (v as { creator?: string | null }).creator,
-        (v as { quality?: string }).quality,
-        (v as { description?: string }).description,
-        (v as { title?: string }).title,
-        (v as { id?: string }).id,
-      ]
-        .map((x) => String(x || "").toLowerCase())
-        .join(" ");
-      if (source === "streamtape")
-        return /streamtape|strcloud|\bstream\b/.test(blob);
-      if (source === "putarin") return /putarin/.test(blob);
-      if (source === "lulu") return /lulu/.test(blob);
-      return true;
-    });
-  }
-
-  if (source && !items.length) {
-    const q =
-      source === "streamtape"
-        ? "streamtape"
-        : source === "putarin"
-          ? "putarin"
-          : "lulu";
-    const searched = await listSearch(q, 1, 400);
-    items = searched.items.slice();
-  }
-
-  const hist = getShareHistory(chatId);
-  const fresh = items.filter((v) => v?.id && !hist.has(v.id));
-  items = fresh.length > 0 ? fresh : items;
-  for (let i = items.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const tmp = items[i];
-    items[i] = items[j];
-    items[j] = tmp;
-  }
-  const take = items.slice(0, n);
-  markShareSent(chatId, take.map((v) => String(v.id || "")).filter(Boolean));
-  if (!take.length) {
-    const label = cat || source || (wantAll ? "katalog" : "filter");
-    await tgSend(token, chatId, `Kosong: ${label}. Coba yang lain.`, {
+  if (!picked.items.length) {
+    const label = cat || source || "katalog";
+    await tgSend(token, chatId, `Kosong: ${label}. Coba kategori lain.`, {
       reply_markup: MAIN_KEYBOARD,
     });
     return;
   }
 
-  const body = take
-    .map((v) => `▶ ${v.title}\n${HOST}/v/${v.id}`)
-    .join("\n\n");
-  await tgSend(token, chatId, body, { reply_markup: MAIN_KEYBOARD });
+  const take = picked.items;
+  const nextUsed = usedFile.used.concat(take.map((v) => String(v.id)));
+  const nextTitles = (usedFile.titles || []).concat(take.map((v) => String(v.title || "")));
+  await saveShareUsed({
+    resetAt: picked.reset ? Date.now() : usedFile.resetAt,
+    used: picked.reset ? take.map((v) => String(v.id)) : nextUsed,
+    titles: picked.reset ? take.map((v) => String(v.title || "")) : nextTitles,
+    lastCat: cat,
+    lastSource: source,
+    lastCount: n,
+  }).catch((err) => console.error("saveShareUsed", err));
+
+  const note = picked.reset
+    ? `\n\n(Pool ${picked.poolSize} habis dipakai — acak ulang dari awal)`
+    : `\n\nSisa belum dipakai: ${Math.max(0, picked.freshSize - take.length)} / ${picked.poolSize}`;
+  const body =
+    take.map((v) => `▶ ${v.title}\n${HOST}/v/${v.id}`).join("\n\n") + note;
+  await tgSendChunks(token, chatId, body, { reply_markup: MAIN_KEYBOARD });
 }
 
 async function resolveTitle(
