@@ -1,5 +1,5 @@
 const SHARE_USED_PATH = "data/share-used.json";
-const SHARE_USED_MAX = 4000;
+const SHARE_USED_MAX = 8000;
 
 export type ShareUsedFile = {
   resetAt: number;
@@ -10,6 +10,13 @@ export type ShareUsedFile = {
   lastCount?: number;
 };
 
+function emptyUsed(): ShareUsedFile {
+  return { resetAt: Date.now(), used: [], titles: [], lastCat: "", lastSource: "", lastCount: 10 };
+}
+
+/** Cache RAM per instance — cegah ulang sebelum GitHub sempat tersimpan. */
+let mem: ShareUsedFile | null = null;
+
 function ghCfg() {
   const token = String(process.env.GH_TOKEN || process.env.GITHUB_TOKEN || "").trim();
   const owner = String(process.env.GH_OWNER || process.env.GITHUB_OWNER || "fashfdhgacd").trim();
@@ -19,27 +26,58 @@ function ghCfg() {
   return { token, owner, repo, branch };
 }
 
+function mergeUsed(a: ShareUsedFile, b: ShareUsedFile): ShareUsedFile {
+  const used = Array.from(new Set([...(a.used || []), ...(b.used || [])].map(String)));
+  const titles = Array.from(new Set([...(a.titles || []), ...(b.titles || [])].map(String)));
+  return {
+    resetAt: Math.max(Number(a.resetAt) || 0, Number(b.resetAt) || 0) || Date.now(),
+    used,
+    titles,
+    lastCat: b.lastCat || a.lastCat || "",
+    lastSource: b.lastSource || a.lastSource || "",
+    lastCount: b.lastCount || a.lastCount || 10,
+  };
+}
+
 export async function loadShareUsed(): Promise<ShareUsedFile> {
   const { owner, repo, branch } = ghCfg();
   const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${SHARE_USED_PATH}?t=${Date.now()}`;
+  let remote = emptyUsed();
   try {
     const r = await fetch(url, { headers: { "user-agent": "kdp-share-bot" }, cache: "no-store" });
-    if (!r.ok) return { resetAt: Date.now(), used: [], titles: [] };
-    const d = (await r.json()) as ShareUsedFile;
-    return {
-      resetAt: Number(d.resetAt) || Date.now(),
-      used: Array.isArray(d.used) ? d.used.map(String) : [],
-      titles: Array.isArray(d.titles) ? d.titles.map(String) : [],
-      lastCat: d.lastCat || "",
-      lastSource: d.lastSource || "",
-      lastCount: d.lastCount || 10,
-    };
+    if (r.ok) {
+      const d = (await r.json()) as ShareUsedFile;
+      remote = {
+        resetAt: Number(d.resetAt) || Date.now(),
+        used: Array.isArray(d.used) ? d.used.map(String) : [],
+        titles: Array.isArray(d.titles) ? d.titles.map(String) : [],
+        lastCat: d.lastCat || "",
+        lastSource: d.lastSource || "",
+        lastCount: d.lastCount || 10,
+      };
+    }
   } catch {
-    return { resetAt: Date.now(), used: [], titles: [] };
+    /* keep empty */
   }
+  if (mem) {
+    mem = mergeUsed(remote, mem);
+    return mem;
+  }
+  mem = remote;
+  return mem;
 }
 
 export async function saveShareUsed(file: ShareUsedFile): Promise<void> {
+  const used = file.used.slice(-SHARE_USED_MAX);
+  const titles = (file.titles || []).slice(-SHARE_USED_MAX);
+  mem = {
+    resetAt: file.resetAt || Date.now(),
+    used,
+    titles,
+    lastCat: file.lastCat || "",
+    lastSource: file.lastSource || "",
+    lastCount: file.lastCount || 10,
+  };
   const { token, owner, repo, branch } = ghCfg();
   if (!token) return;
   const api = `https://api.github.com/repos/${owner}/${repo}/contents/${SHARE_USED_PATH}`;
@@ -59,18 +97,9 @@ export async function saveShareUsed(file: ShareUsedFile): Promise<void> {
   } catch {
     /* create */
   }
-  const used = file.used.slice(-SHARE_USED_MAX);
-  const titles = (file.titles || []).slice(-SHARE_USED_MAX);
-  const payload = {
-    resetAt: file.resetAt,
-    used,
-    titles,
-    lastCat: file.lastCat || "",
-    lastSource: file.lastSource || "",
-    lastCount: file.lastCount || 10,
-  };
+  const payload = mem;
   const content = Buffer.from(JSON.stringify(payload, null, 2) + "\n", "utf8").toString("base64");
-  await fetch(api, {
+  const res = await fetch(api, {
     method: "PUT",
     headers,
     body: JSON.stringify({
@@ -80,4 +109,8 @@ export async function saveShareUsed(file: ShareUsedFile): Promise<void> {
       ...(sha ? { sha } : {}),
     }),
   });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error("saveShareUsed failed", res.status, body.slice(0, 200));
+  }
 }
