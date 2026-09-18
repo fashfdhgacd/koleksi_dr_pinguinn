@@ -16,6 +16,7 @@ export function toRecord({ parsed, title, category }) {
     category: cat,
     tags: [cat, parsed.host, "telegram"],
     date: today(),
+    updated_at: new Date().toISOString(),
   };
 }
 
