@@ -13,6 +13,7 @@ const BOT_FEEDS = [
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguin/main/data/putarin.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/videos-latest.json",
+  "https://cdn.jsdelivr.net/gh/fashfdhgacd/koleksi_dr_pinguinn@main/data/videos-latest.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/campur-latest.json",
 ];
 
@@ -23,6 +24,7 @@ const REMOTE_ENABLED =
 const SITE_FEEDS = REMOTE_ENABLED
   ? [
       "https://www.koleksidrpinguin.site/data/videos-latest.json",
+  "https://cdn.jsdelivr.net/gh/fashfdhgacd/koleksi_dr_pinguinn@main/data/videos-latest.json",
       "https://www.koleksidrpinguin.site/data/putarin-latest.json",
       "https://www.koleksidrpinguin.site/data/campur-latest.json",
       "https://www.koleksidrpinguin.site/data/videos.json",
