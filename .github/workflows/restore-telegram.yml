@@ -1,0 +1,76 @@
+name: Restore Telegram
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -e
+          git show 5ad7b851e9c9f8f7d5706dde971a69abf4eb8461:src/routes/api/telegram.ts > src/routes/api/telegram.ts
+          # Inject 24h history with python regex-friendly
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+          t = Path("src/routes/api/telegram.ts").read_text()
+          inject = '''
+          /** 24h no-repeat per chat */
+          const SHARE_TTL_MS = 24 * 60 * 60 * 1000;
+          const shareHistory = new Map<string, Map<string, number>>();
+          function getShareHistory(chatId: string | number): Map<string, number> {
+            const key = String(chatId);
+            let h = shareHistory.get(key);
+            if (!h) { h = new Map(); shareHistory.set(key, h); }
+            const now = Date.now();
+            for (const [id, at] of [...h]) if (now - at > SHARE_TTL_MS) h.delete(id);
+            return h;
+          }
+          function markShareSent(chatId: string | number, ids: string[]) {
+            const h = getShareHistory(chatId);
+            const now = Date.now();
+            for (const id of ids) if (id) h.set(id, now);
+          }
+          '''
+          if "shareHistory" not in t:
+            t = t.replace('const HOST = "https://koleksidrpinguin.com";', 'const HOST = "https://koleksidrpinguin.com";' + inject, 1)
+          # Before take = items.slice - filter history
+          t2, n = re.subn(
+            r'for \(let i = items\.length - 1; i > 0; i--\) \{[^}]+const j = Math\.floor\(Math\.random\(\) \* \(i \+ 1\)\);[^}]+items\[i\] = items\[j\];[^}]+items\[j\] = tmp;[^}]+\}\s*const take = items\.slice\(0, n\);',
+            '''const hist = getShareHistory(chatId);
+            const fresh = items.filter((v) => v?.id && !hist.has(v.id));
+            items = fresh.length > 0 ? fresh : items;
+            for (let i = items.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              const tmp = items[i];
+              items[i] = items[j];
+              items[j] = tmp;
+            }
+            const take = items.slice(0, n);
+            markShareSent(chatId, take.map((v) => String(v.id || "")).filter(Boolean));''',
+            t,
+            count=1,
+            flags=re.S,
+          )
+          print("replace n", n)
+          if n != 1:
+            # fallback: just restore without history if regex fails
+            print("regex failed, restored file only")
+            Path("src/routes/api/telegram.ts").write_text(t)
+          else:
+            t = t2
+            t = t.replace("listCategory(cat, 1, 400)", "listCategory(cat, 1, 800)")
+            t = t.replace("listLatest(1, 400)", "listLatest(1, 800)")
+            Path("src/routes/api/telegram.ts").write_text(t)
+          print("shareHistory", "shareHistory" in Path("src/routes/api/telegram.ts").read_text())
+          print("len", len(Path("src/routes/api/telegram.ts").read_text()))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/routes/api/telegram.ts
+          git commit -m "fix(bot): restore telegram + 24h no-repeat share" || echo "no change"
+          git push
