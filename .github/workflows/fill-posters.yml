@@ -1,0 +1,110 @@
+# Auto-isi posters.json tiap malam (prioritas IndoAV + UserBokep)
+# + bisa dijalankan manual dari tab Actions → "Fill posters" → Run workflow
+#
+# Secrets yang perlu di-set di repo Settings → Secrets and variables → Actions:
+#   STREAMTAPE_LOGIN  = API/FTP Username Streamtape
+#   STREAMTAPE_KEY    = API/FTP Password Streamtape
+#
+# Workflow pakai GITHUB_TOKEN bawaan untuk commit (permission contents: write).
+
+name: Fill posters
+
+on:
+  schedule:
+    # Setiap hari jam 17:00 UTC = 00:00 WIB
+    - cron: "0 17 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Mode isi poster"
+        required: true
+        default: "cuan"
+        type: choice
+        options:
+          - cuan
+          - all
+          - indoav
+          - userbokep
+          - streamtape
+      limit:
+        description: "Batas jumlah (0 = unlimited)"
+        required: false
+        default: "0"
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fill-posters
+  cancel-in-progress: false
+
+jobs:
+  fill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history supaya commit push aman
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install deps (minimal)
+        run: |
+          # Script fill-posters murni Node, tidak butuh full install.
+          # Tetap install kalau ada dependency di masa depan.
+          if [ -f package-lock.json ]; then
+            npm ci --ignore-scripts --no-audit --no-fund || npm install --ignore-scripts --no-audit --no-fund
+          fi
+
+      - name: Fill posters
+        env:
+          STREAMTAPE_LOGIN: ${{ secrets.STREAMTAPE_LOGIN }}
+          STREAMTAPE_KEY: ${{ secrets.STREAMTAPE_KEY }}
+          CONCURRENCY: "3"
+          DELAY_MS: "400"
+        run: |
+          set -e
+          MODE="${{ github.event.inputs.mode || 'cuan' }}"
+          LIMIT="${{ github.event.inputs.limit || '0' }}"
+
+          ARGS=""
+          case "$MODE" in
+            cuan)       ARGS="--only=cuan" ;;
+            all)        ARGS="--all" ;;
+            indoav)     ARGS="--only=indoav" ;;
+            userbokep)  ARGS="--only=userbokep" ;;
+            streamtape) ARGS="--only=streamtape --all" ;;
+            *)          ARGS="--only=cuan" ;;
+          esac
+
+          if [ -n "$LIMIT" ] && [ "$LIMIT" != "0" ]; then
+            ARGS="$ARGS --limit=$LIMIT"
+          fi
+
+          echo "Running: node scripts/fill-posters.mjs $ARGS"
+          node scripts/fill-posters.mjs $ARGS
+
+      - name: Commit & push if changed
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- src/lib/catalog/posters.json data/latest-posters.json; then
+            echo "No poster changes."
+            exit 0
+          fi
+
+          git add src/lib/catalog/posters.json data/latest-posters.json 2>/dev/null || git add src/lib/catalog/posters.json
+          COUNT=$(node -e "const p=require('./src/lib/catalog/posters.json'); console.log(Object.keys(p).length)")
+          git commit -m "chore(posters): auto-fill midnight ($COUNT entries) [skip ci]"
+          git push
+          echo "Pushed posters.json update."
