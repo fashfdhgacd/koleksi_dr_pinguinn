@@ -1,0 +1,55 @@
+name: Polish share
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -e
+          FILE=src/routes/api/telegram.ts
+          # Fix Map iteration
+          sed -i 's/for (const \[id, at\] of \[\.\.\.h\])/for (const [id, at] of h)/' "$FILE"
+          python3 <<'PY'
+          from pathlib import Path
+          t = Path("src/routes/api/telegram.ts").read_text()
+          old = """  const take = items.slice(0, n);
+  markShareSent(chatId, take.map((v) => String(v.id || "")).filter(Boolean));
+  if (!take.length) {
+    const label = cat || source || (wantAll ? "katalog" : "filter");
+    await tgSend(token, chatId, `Kosong: ${label}. Coba yang lain.`, {
+      reply_markup: MAIN_KEYBOARD,
+    });
+    return;
+  }
+
+  const body = take"""
+          new = """  const take = items.slice(0, n);
+  if (!take.length) {
+    const label = cat || source || (wantAll ? "katalog" : "filter");
+    await tgSend(token, chatId, `Kosong: ${label}. Semua link kategori ini sudah dikasih dalam 24 jam. Coba kategori lain.`, {
+      reply_markup: MAIN_KEYBOARD,
+    });
+    return;
+  }
+
+  markShareSent(chatId, take.map((v) => String(v.id || "")).filter(Boolean));
+
+  const body = take"""
+          if old in t:
+              t = t.replace(old, new, 1)
+              Path("src/routes/api/telegram.ts").write_text(t)
+              print("order fixed")
+          else:
+              print("order already ok or different")
+          print("ok", "shareHistory" in t)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/routes/api/telegram.ts
+          git diff --cached --quiet && echo nochange && exit 0
+          git commit -m "fix(bot): polish 24h share history"
+          git push
