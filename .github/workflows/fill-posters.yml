@@ -31,7 +31,7 @@ jobs:
           STREAMTAPE_LOGIN: ${{ secrets.STREAMTAPE_LOGIN }}
           STREAMTAPE_KEY: ${{ secrets.STREAMTAPE_KEY }}
         run: |
-          node <<'SCRIPT'
+          node --input-type=commonjs <<'SCRIPT'
           const fs = require("fs");
 
           function embedId(embed = "") {
@@ -132,11 +132,14 @@ jobs:
           fs.writeFileSync(postersPath, JSON.stringify(posters));
           let latest = loadJson(latestPath, {});
           if (typeof latest !== "object" || Array.isArray(latest)) latest = {};
-          for (const [k, v] of Object.entries(posters)) {
-            if (typeof v === "string" && v.startsWith("http")) latest[k] = v;
+          const latestVideos = loadJson("data/videos-latest.json", []);
+          for (const v of latestVideos) {
+            if (!v || !v.id) continue;
+            const url = posters[v.id];
+            if (typeof url === "string" && url.startsWith("http")) latest[v.id] = url;
           }
           fs.writeFileSync(latestPath, JSON.stringify(latest, null, 2) + "\n");
-          console.log("Done ok=", ok, "fail=", fail, "posters=", Object.keys(posters).length);
+          console.log("Done ok=", ok, "fail=", fail, "posters=", Object.keys(posters).length, "latest=", Object.keys(latest).length);
           SCRIPT
 
       - name: Commit posters
@@ -148,6 +151,6 @@ jobs:
             echo "No changes"
             exit 0
           fi
-          COUNT=$(node -e "try{console.log(Object.keys(require('./src/lib/catalog/posters.json')).length)}catch(e){console.log(0)}")
+          COUNT=$(node --input-type=commonjs -e "try{console.log(Object.keys(require('./src/lib/catalog/posters.json')).length)}catch(e){console.log(0)}")
           git commit -m "chore(posters): midnight auto-fill ($COUNT) [skip ci]"
           git push
