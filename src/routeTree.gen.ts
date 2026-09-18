@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as KategoriRouteImport } from './routes/kategori'
 import { Route as ApiDataRouteImport } from './routes/api/data'
+import { Route as ApiEmbedThumbRouteImport } from './routes/api/embed-thumb'
 import { Route as ApiPuterinThumbRouteImport } from './routes/api/puterin-thumb'
 import { Route as ApiTapeThumbRouteImport } from './routes/api/tape-thumb'
 import { Route as ApiTelegramRouteImport } from './routes/api/telegram'
@@ -31,6 +32,11 @@ const KategoriRoute = KategoriRouteImport.update({
 const ApiDataRoute = ApiDataRouteImport.update({
   id: '/api/data',
   path: '/api/data',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiEmbedThumbRoute = ApiEmbedThumbRouteImport.update({
+  id: '/api/embed-thumb',
+  path: '/api/embed-thumb',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPuterinThumbRoute = ApiPuterinThumbRouteImport.update({
@@ -63,6 +69,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/kategori': typeof KategoriRoute
   '/api/data': typeof ApiDataRoute
+  '/api/embed-thumb': typeof ApiEmbedThumbRoute
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
@@ -73,6 +80,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/kategori': typeof KategoriRoute
   '/api/data': typeof ApiDataRoute
+  '/api/embed-thumb': typeof ApiEmbedThumbRoute
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
@@ -84,6 +92,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/kategori': typeof KategoriRoute
   '/api/data': typeof ApiDataRoute
+  '/api/embed-thumb': typeof ApiEmbedThumbRoute
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
@@ -96,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/kategori'
     | '/api/data'
+    | '/api/embed-thumb'
     | '/api/puterin-thumb'
     | '/api/tape-thumb'
     | '/api/telegram'
@@ -106,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/kategori'
     | '/api/data'
+    | '/api/embed-thumb'
     | '/api/puterin-thumb'
     | '/api/tape-thumb'
     | '/api/telegram'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/'
     | '/kategori'
     | '/api/data'
+    | '/api/embed-thumb'
     | '/api/puterin-thumb'
     | '/api/tape-thumb'
     | '/api/telegram'
@@ -127,6 +139,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   KategoriRoute: typeof KategoriRoute
   ApiDataRoute: typeof ApiDataRoute
+  ApiEmbedThumbRoute: typeof ApiEmbedThumbRoute
   ApiPuterinThumbRoute: typeof ApiPuterinThumbRoute
   ApiTapeThumbRoute: typeof ApiTapeThumbRoute
   ApiTelegramRoute: typeof ApiTelegramRoute
@@ -155,6 +168,13 @@ declare module '@tanstack/react-router' {
       path: '/api/data'
       fullPath: '/api/data'
       preLoaderRoute: typeof ApiDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/embed-thumb': {
+      id: '/api/embed-thumb'
+      path: '/api/embed-thumb'
+      fullPath: '/api/embed-thumb'
+      preLoaderRoute: typeof ApiEmbedThumbRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/puterin-thumb': {
@@ -199,6 +219,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   KategoriRoute: KategoriRoute,
   ApiDataRoute: ApiDataRoute,
+  ApiEmbedThumbRoute: ApiEmbedThumbRoute,
   ApiPuterinThumbRoute: ApiPuterinThumbRoute,
   ApiTapeThumbRoute: ApiTapeThumbRoute,
   ApiTelegramRoute: ApiTelegramRoute,
