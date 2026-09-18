@@ -1,0 +1,175 @@
+name: Fix telegram share
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore and patch telegram share logic
+        run: |
+          set -e
+          # Restore last good telegram.ts before PLACEHOLDER
+          git show 5ad7b851e9c9f8f7d5706dde971a69abf4eb8461:src/routes/api/telegram.ts > src/routes/api/telegram.ts
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path("src/routes/api/telegram.ts")
+          t = p.read_text()
+          start = t.find("async function handleShare(")
+          end = t.find("async function resolveTitle(")
+          if start < 0 or end < 0:
+              raise SystemExit(f"markers missing {start} {end}")
+          new = r'''/** Riwayat link per chat — tidak boleh berulang dalam 24 jam */
+const SHARE_TTL_MS = 24 * 60 * 60 * 1000;
+/** chatId → Map<videoId, sentAtMs> */
+const shareHistory = new Map<string, Map<string, number>>();
+
+function pruneShareHistory(hist: Map<string, number>) {
+  const now = Date.now();
+  for (const [id, at] of hist) {
+    if (now - at > SHARE_TTL_MS) hist.delete(id);
+  }
+}
+
+function getShareHistory(chatId: string | number): Map<string, number> {
+  const key = String(chatId);
+  let hist = shareHistory.get(key);
+  if (!hist) {
+    hist = new Map();
+    shareHistory.set(key, hist);
+  }
+  pruneShareHistory(hist);
+  return hist;
+}
+
+function markShareSent(chatId: string | number, ids: string[]) {
+  const hist = getShareHistory(chatId);
+  const now = Date.now();
+  for (const id of ids) {
+    if (id) hist.set(id, now);
+  }
+}
+
+/** Fisher–Yates shuffle — tiap minta wajib random */
+function shuffleInPlace<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+  return arr;
+}
+
+async function handleShare(
+  token: string,
+  chatId: string | number,
+  text: string
+) {
+  const n = parseCount(text);
+  const cat = parseCat(text);
+  const source = parseSource(text);
+  const wantAll = /^(semua|lagi)$/i.test(text.trim()) || /^(minta|sebar|share)\\b/i.test(text.trim());
+
+  const poolSize = Math.max(800, n * 40);
+
+  let page;
+  if (cat) {
+    page = await listCategory(cat, 1, poolSize);
+  } else if (/cari\\s+(.+)/i.test(text)) {
+    page = await listSearch(text.replace(/^.*cari\\s+/i, "").trim(), 1, poolSize);
+  } else if (source === "putarin") {
+    page = await listCategory("jav", 1, poolSize);
+  } else if (source === "streamtape") {
+    page = await listCategory("ai-plus", 1, poolSize);
+  } else if (source) {
+    page = await listLatest(1, poolSize);
+  } else {
+    page = await listLatest(1, poolSize);
+  }
+
+  let items = page.items.slice();
+
+  if (source) {
+    items = items.filter((v) => {
+      const blob = [
+        (v as { creator?: string | null }).creator,
+        (v as { quality?: string }).quality,
+        (v as { description?: string }).description,
+        (v as { title?: string }).title,
+        (v as { id?: string }).id,
+      ]
+        .map((x) => String(x || "").toLowerCase())
+        .join(" ");
+      if (source === "streamtape")
+        return /streamtape|strcloud|\\bstream\\b/.test(blob);
+      if (source === "putarin") return /putarin/.test(blob);
+      if (source === "lulu") return /lulu/.test(blob);
+      return true;
+    });
+  }
+
+  if (source && !items.length) {
+    const q =
+      source === "streamtape"
+        ? "streamtape"
+        : source === "putarin"
+          ? "putarin"
+          : "lulu";
+    const searched = await listSearch(q, 1, poolSize);
+    items = searched.items.slice();
+  }
+
+  const hist = getShareHistory(chatId);
+  const fresh = items.filter((v) => v?.id && !hist.has(v.id));
+  const pool = fresh.length > 0 ? fresh : items;
+
+  shuffleInPlace(pool);
+
+  const take = pool.slice(0, n);
+  if (!take.length) {
+    const label = cat || source || (wantAll ? "katalog" : "filter");
+    await tgSend(
+      token,
+      chatId,
+      `Kosong: ${label}.\\nCoba kategori lain atau tunggu 24 jam (link tidak diulang).`,
+      { reply_markup: MAIN_KEYBOARD }
+    );
+    return;
+  }
+
+  markShareSent(
+    chatId,
+    take.map((v) => String(v.id || "")).filter(Boolean)
+  );
+
+  const skipped = items.length - fresh.length;
+  const header =
+    skipped > 0
+      ? `🎲 ${take.length} link random` +
+        (cat ? ` · ${cat}` : source ? ` · ${source}` : "") +
+        ` (skip ${skipped} yg sudah dikasih 24j)\\n\\n`
+      : "";
+
+  const body =
+    header +
+    take.map((v) => `▶ ${v.title}\\n${HOST}/v/${v.id}`).join("\\n\\n");
+  await tgSendChunks(token, chatId, body, { reply_markup: MAIN_KEYBOARD });
+}
+
+'''
+          p.write_text(t[:start] + new + t[end:])
+          out = p.read_text()
+          assert "shareHistory" in out
+          assert "PLACEHOLDER" not in out or out.count("PLACEHOLDER") == 0
+          print("patched", len(out))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/routes/api/telegram.ts
+          git commit -m "fix(bot): 24h no-repeat, random, category-strict share"
+          git push
