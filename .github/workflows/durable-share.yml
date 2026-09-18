@@ -1,1 +1,189 @@
-SEE_FILE
+name: Durable share
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch durable share history
+        run: |
+          set -e
+          python3 <<'PY'
+          from pathlib import Path
+          import re
+          p = Path("src/routes/api/telegram.ts")
+          t = p.read_text()
+          hist = r'''
+          /** 24h no-repeat — PERSISTEN di data/share-history.json (tahan serverless) */
+          const SHARE_TTL_MS = 24 * 60 * 60 * 1000;
+          const SHARE_HISTORY_PATH = "data/share-history.json";
+          const shareHistoryMem = new Map<string, Map<string, number>>();
+          function ghCfg() {
+            const token = String(process.env.GH_TOKEN || process.env.GITHUB_TOKEN || "").trim();
+            const owner = String(process.env.GH_OWNER || process.env.GITHUB_OWNER || "fashfdhgacd").trim();
+            let repo = String(process.env.GH_REPO || process.env.GITHUB_REPO || "koleksi_dr_pinguinn").trim();
+            if (repo === "koleksi_dr_pinguin" || repo === "koleksi-dr-pinguin") repo = "koleksi_dr_pinguinn";
+            const branch = String(process.env.GH_BRANCH || process.env.GITHUB_BRANCH || "main").trim();
+            return { token, owner, repo, branch };
+          }
+          function pruneMap(h: Map<string, number>) {
+            const now = Date.now();
+            for (const [id, at] of h) if (now - at > SHARE_TTL_MS) h.delete(id);
+          }
+          async function loadShareHistory(chatId: string | number): Promise<Map<string, number>> {
+            const key = String(chatId);
+            const mem = shareHistoryMem.get(key) || new Map<string, number>();
+            pruneMap(mem);
+            const { token, owner, repo, branch } = ghCfg();
+            if (!token) { shareHistoryMem.set(key, mem); return mem; }
+            try {
+              const url = `https://api.github.com/repos/${owner}/${repo}/contents/${SHARE_HISTORY_PATH}?ref=${encodeURIComponent(branch)}`;
+              const res = await fetch(url, {
+                headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "kdp-share" },
+                signal: AbortSignal.timeout(8000),
+              });
+              if (res.ok) {
+                const body = await res.json() as { content?: string; encoding?: string; sha?: string };
+                if (body.encoding === "base64" && body.content) {
+                  const raw = Buffer.from(body.content.replace(/\n/g, ""), "base64").toString("utf8");
+                  const data = JSON.parse(raw || "{}") as Record<string, Record<string, number>>;
+                  const now = Date.now();
+                  for (const [id, at] of Object.entries(data[key] || {})) {
+                    if (typeof at === "number" && now - at <= SHARE_TTL_MS) mem.set(id, at);
+                  }
+                }
+              }
+            } catch (e) { console.error("loadShareHistory", e); }
+            shareHistoryMem.set(key, mem);
+            return mem;
+          }
+          async function saveShareHistory(chatId: string | number, hist: Map<string, number>) {
+            const key = String(chatId);
+            pruneMap(hist);
+            shareHistoryMem.set(key, hist);
+            const { token, owner, repo, branch } = ghCfg();
+            if (!token) return;
+            try {
+              let all: Record<string, Record<string, number>> = {};
+              let sha: string | undefined;
+              const metaUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${SHARE_HISTORY_PATH}?ref=${encodeURIComponent(branch)}`;
+              const metaRes = await fetch(metaUrl, {
+                headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "kdp-share" },
+                signal: AbortSignal.timeout(8000),
+              });
+              if (metaRes.ok) {
+                const body = await metaRes.json() as { content?: string; encoding?: string; sha?: string };
+                sha = body.sha;
+                if (body.encoding === "base64" && body.content) {
+                  try { all = JSON.parse(Buffer.from(body.content.replace(/\n/g, ""), "base64").toString("utf8") || "{}"); } catch { all = {}; }
+                }
+              }
+              const now = Date.now();
+              const next: Record<string, Record<string, number>> = {};
+              for (const [ck, ids] of Object.entries(all)) {
+                const kept: Record<string, number> = {};
+                for (const [id, at] of Object.entries(ids || {})) {
+                  if (typeof at === "number" && now - at <= SHARE_TTL_MS) kept[id] = at;
+                }
+                if (Object.keys(kept).length) next[ck] = kept;
+              }
+              const chatObj: Record<string, number> = {};
+              for (const [id, at] of hist) chatObj[id] = at;
+              if (Object.keys(chatObj).length) next[key] = chatObj;
+              const content = Buffer.from(JSON.stringify(next) + "\n", "utf8").toString("base64");
+              const putRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${SHARE_HISTORY_PATH}`, {
+                method: "PUT",
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  Accept: "application/vnd.github+json",
+                  "User-Agent": "kdp-share",
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ message: `chore(share): ${key} (${Object.keys(chatObj).length})`, content, branch, ...(sha ? { sha } : {}) }),
+                signal: AbortSignal.timeout(12000),
+              });
+              if (!putRes.ok) console.error("saveShareHistory", putRes.status, (await putRes.text()).slice(0, 180));
+            } catch (e) { console.error("saveShareHistory", e); }
+          }
+          '''
+          t2, n = re.subn(
+              r'const HOST = "https://koleksidrpinguin\.com";.*?/\*\* Reply keyboard',
+              'const HOST = "https://koleksidrpinguin.com";\n' + hist + '\n/** Reply keyboard',
+              t, count=1, flags=re.S)
+          if n != 1:
+              t2, n = re.subn(
+                  r'const HOST = "https://koleksidrpinguin\.com";.*?const MAIN_KEYBOARD',
+                  'const HOST = "https://koleksidrpinguin.com";\n' + hist + '\nconst MAIN_KEYBOARD',
+                  t, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit(f"hist block fail n={n}")
+          t = t2
+          old_core = '''  const hist = getShareHistory(chatId);
+          const fresh = items.filter((v) => v?.id && !hist.has(v.id));
+          items = fresh.length > 0 ? fresh : items;
+          for (let i = items.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = items[i];
+            items[i] = items[j];
+            items[j] = tmp;
+          }
+          const take = items.slice(0, n);
+          markShareSent(chatId, take.map((v) => String(v.id || "")).filter(Boolean));
+          if (!take.length) {
+            const label = cat || source || (wantAll ? "katalog" : "filter");
+            await tgSend(token, chatId, `Kosong: ${label}. Coba yang lain.`, {
+              reply_markup: MAIN_KEYBOARD,
+            });
+            return;
+          }
+
+          const body = take
+            .map((v) => `▶ ${v.title}\n${HOST}/v/${v.id}`)
+            .join("\n\n");
+          await tgSend(token, chatId, body, { reply_markup: MAIN_KEYBOARD });
+          }'''
+          new_core = '''  const hist = await loadShareHistory(chatId);
+          const fresh = items.filter((v) => v?.id && !hist.has(String(v.id)));
+          if (!fresh.length) {
+            const label = cat || source || (wantAll ? "katalog" : "filter");
+            await tgSend(token, chatId, `Kosong: ${label}. Semua link pool sudah dikasih 24 jam (${hist.size} tercatat). Coba kategori lain.`, {
+              reply_markup: MAIN_KEYBOARD,
+            });
+            return;
+          }
+          for (let i = fresh.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = fresh[i];
+            fresh[i] = fresh[j];
+            fresh[j] = tmp;
+          }
+          const take = fresh.slice(0, n);
+          const now = Date.now();
+          for (const v of take) if (v?.id) hist.set(String(v.id), now);
+          await saveShareHistory(chatId, hist);
+          const body =
+            `🎲 ${take.length} unik · sisa ${Math.max(0, fresh.length - take.length)} · riwayat 24j: ${hist.size}\n\n` +
+            take.map((v) => `▶ ${v.title}\n${HOST}/v/${v.id}`).join("\n\n");
+          await tgSendChunks(token, chatId, body, { reply_markup: MAIN_KEYBOARD });
+          }'''
+          if old_core not in t:
+              i = t.find("const hist =")
+              print("SNIP", repr(t[i:i+400] if i>=0 else "none"))
+              raise SystemExit("core not found")
+          t = t.replace(old_core, new_core, 1)
+          t = t.replace("listCategory(cat, 1, 800)", "listCategory(cat, 1, 1200)")
+          t = t.replace("listLatest(1, 800)", "listLatest(1, 1200)")
+          assert "loadShareHistory" in t
+          p.write_text(t)
+          print("OK", len(t))
+          PY
+          mkdir -p data
+          echo '{}' > data/share-history.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/routes/api/telegram.ts data/share-history.json
+          git commit -m "fix(bot): durable 24h share history on GitHub (fix serverless duplicates)"
+          git push
