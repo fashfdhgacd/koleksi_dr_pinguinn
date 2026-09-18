@@ -1,36 +1,10 @@
-# Auto-isi posters.json tiap malam (prioritas IndoAV + UserBokep)
-# + bisa dijalankan manual dari tab Actions → "Fill posters" → Run workflow
-#
-# Secrets yang perlu di-set di repo Settings → Secrets and variables → Actions:
-#   STREAMTAPE_LOGIN  = API/FTP Username Streamtape
-#   STREAMTAPE_KEY    = API/FTP Password Streamtape
-#
-# Workflow pakai GITHUB_TOKEN bawaan untuk commit (permission contents: write).
-
+# Auto poster setiap jam 00:00 WIB — scrape IndoAV/UserBokep → posters + latest-posters
 name: Fill posters
 
 on:
   schedule:
-    # Setiap hari jam 17:00 UTC = 00:00 WIB
     - cron: "0 17 * * *"
   workflow_dispatch:
-    inputs:
-      mode:
-        description: "Mode isi poster"
-        required: true
-        default: "cuan"
-        type: choice
-        options:
-          - cuan
-          - all
-          - indoav
-          - userbokep
-          - streamtape
-      limit:
-        description: "Batas jumlah (0 = unlimited)"
-        required: false
-        default: "0"
-        type: string
 
 permissions:
   contents: write
@@ -44,67 +18,136 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
-          # Full history supaya commit push aman
           fetch-depth: 0
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: "npm"
 
-      - name: Install deps (minimal)
-        run: |
-          # Script fill-posters murni Node, tidak butuh full install.
-          # Tetap install kalau ada dependency di masa depan.
-          if [ -f package-lock.json ]; then
-            npm ci --ignore-scripts --no-audit --no-fund || npm install --ignore-scripts --no-audit --no-fund
-          fi
-
-      - name: Fill posters
+      - name: Scrape posters IndoAV/UserBokep
         env:
           STREAMTAPE_LOGIN: ${{ secrets.STREAMTAPE_LOGIN }}
           STREAMTAPE_KEY: ${{ secrets.STREAMTAPE_KEY }}
-          CONCURRENCY: "3"
-          DELAY_MS: "400"
         run: |
-          set -e
-          MODE="${{ github.event.inputs.mode || 'cuan' }}"
-          LIMIT="${{ github.event.inputs.limit || '0' }}"
+          node <<'SCRIPT'
+          const fs = require("fs");
 
-          ARGS=""
-          case "$MODE" in
-            cuan)       ARGS="--only=cuan" ;;
-            all)        ARGS="--all" ;;
-            indoav)     ARGS="--only=indoav" ;;
-            userbokep)  ARGS="--only=userbokep" ;;
-            streamtape) ARGS="--only=streamtape --all" ;;
-            *)          ARGS="--only=cuan" ;;
-          esac
+          function embedId(embed = "") {
+            const m = String(embed).match(/\/(?:e|v|d)\/([A-Za-z0-9_-]+)/i) || String(embed).match(/[?&]id=([A-Za-z0-9_-]+)/i);
+            return m ? m[1] : "";
+          }
 
-          if [ -n "$LIMIT" ] && [ "$LIMIT" != "0" ]; then
-            ARGS="$ARGS --limit=$LIMIT"
-          fi
+          async function fetchEmbedPoster(code, src) {
+            const hosts = src === "userbokep"
+              ? ["https://tv1.userbokep.com", "https://tv1.indoav.app"]
+              : ["https://tv1.indoav.app", "https://tv1.userbokep.com"];
+            for (const host of hosts) {
+              try {
+                const res = await fetch(`${host}/e/${encodeURIComponent(code)}`, {
+                  headers: { accept: "text/html", "user-agent": "Mozilla/5.0 (compatible; kdp-poster/1.0)" },
+                  signal: AbortSignal.timeout(8000),
+                  redirect: "follow",
+                });
+                if (!res.ok) continue;
+                const html = await res.text();
+                const m =
+                  html.match(/poster=["'](https?:\/\/[^"']*embedan[^"']+)["']/i) ||
+                  html.match(/poster=["'](https?:\/\/[^"']+\.(?:webp|jpg|jpeg|png)[^"']*)["']/i) ||
+                  html.match(/property=["']og:image["']\s+content=["'](https?:\/\/[^"']+)["']/i);
+                const url = m?.[1]?.replace(/&amp;/g, "&")?.trim();
+                if (url?.startsWith("http")) return url;
+              } catch {}
+            }
+            return null;
+          }
 
-          echo "Running: node scripts/fill-posters.mjs $ARGS"
-          node scripts/fill-posters.mjs $ARGS
+          async function fetchStreamtape(fileId) {
+            const login = process.env.STREAMTAPE_LOGIN || "";
+            const key = process.env.STREAMTAPE_KEY || "";
+            if (!login || !key || !fileId) return null;
+            try {
+              const u = `https://api.streamtape.com/file/getsplash?login=${encodeURIComponent(login)}&key=${encodeURIComponent(key)}&file=${encodeURIComponent(fileId)}`;
+              const res = await fetch(u, { signal: AbortSignal.timeout(8000) });
+              const data = await res.json();
+              if (data?.status === 200 && typeof data.result === "string" && data.result.startsWith("http")) return data.result;
+            } catch {}
+            return null;
+          }
 
-      - name: Commit & push if changed
+          function loadJson(p, fb) {
+            try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return fb; }
+          }
+
+          const postersPath = "src/lib/catalog/posters.json";
+          const latestPath = "data/latest-posters.json";
+          let posters = loadJson(postersPath, {});
+          if (typeof posters !== "object" || Array.isArray(posters)) posters = {};
+
+          const videos = [
+            ...loadJson("data/videos-latest.json", []),
+            ...loadJson("src/lib/catalog/videos.json", []),
+            ...loadJson("src/lib/catalog/streamtape.json", []),
+          ];
+
+          const seen = new Set();
+          const need = [];
+          for (const v of videos) {
+            if (!v?.id || seen.has(v.id)) continue;
+            seen.add(v.id);
+            if (posters[v.id]?.startsWith?.("http")) continue;
+            const blob = `${v.embed||""} ${v.source||""} ${v.direct||""}`;
+            if (/indoav|userbokep|streamtape/i.test(blob)) need.push(v);
+          }
+
+          console.log("Need posters:", need.length);
+          let ok = 0, fail = 0;
+
+          for (let i = 0; i < need.length; i++) {
+            const v = need[i];
+            const code = embedId(v.embed || v.direct || "") || v.id;
+            const blob = `${v.embed||""} ${v.source||""}`;
+            let url = null;
+            if (/streamtape/i.test(blob)) url = await fetchStreamtape(code);
+            else if (/userbokep/i.test(blob)) url = await fetchEmbedPoster(code, "userbokep");
+            else url = await fetchEmbedPoster(code, "indoav");
+
+            if (url) {
+              posters[v.id] = url;
+              if (code !== v.id) posters[code] = url;
+              ok++;
+              console.log(`OK ${v.id}`);
+            } else {
+              fail++;
+              if (fail <= 15) console.log(`FAIL ${v.id}`);
+            }
+            await new Promise(r => setTimeout(r, 300));
+            if ((ok + fail) % 25 === 0) {
+              fs.writeFileSync(postersPath, JSON.stringify(posters));
+            }
+          }
+
+          fs.mkdirSync("data", { recursive: true });
+          fs.writeFileSync(postersPath, JSON.stringify(posters));
+          let latest = loadJson(latestPath, {});
+          if (typeof latest !== "object" || Array.isArray(latest)) latest = {};
+          for (const [k, v] of Object.entries(posters)) {
+            if (typeof v === "string" && v.startsWith("http")) latest[k] = v;
+          }
+          fs.writeFileSync(latestPath, JSON.stringify(latest, null, 2) + "\n");
+          console.log("Done ok=", ok, "fail=", fail, "posters=", Object.keys(posters).length);
+          SCRIPT
+
+      - name: Commit posters
         run: |
-          set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          if git diff --quiet -- src/lib/catalog/posters.json data/latest-posters.json; then
-            echo "No poster changes."
+          git add src/lib/catalog/posters.json data/latest-posters.json 2>/dev/null || true
+          if git diff --cached --quiet; then
+            echo "No changes"
             exit 0
           fi
-
-          git add src/lib/catalog/posters.json data/latest-posters.json 2>/dev/null || git add src/lib/catalog/posters.json
-          COUNT=$(node -e "const p=require('./src/lib/catalog/posters.json'); console.log(Object.keys(p).length)")
-          git commit -m "chore(posters): auto-fill midnight ($COUNT entries) [skip ci]"
+          COUNT=$(node -e "try{console.log(Object.keys(require('./src/lib/catalog/posters.json')).length)}catch(e){console.log(0)}")
+          git commit -m "chore(posters): midnight auto-fill ($COUNT) [skip ci]"
           git push
-          echo "Pushed posters.json update."
