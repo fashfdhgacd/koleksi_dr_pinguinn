@@ -1,0 +1,21 @@
+name: Restore local
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  r:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: |
+          set -e
+          git show bfcfaddaa8419b416a17ee2d559f91a71ed2ab59:src/lib/catalog/local.ts > src/lib/catalog/local.ts
+          sed -i 's/const CACHE_MS = 5 \* 60 \* 1000;/const CACHE_MS = 90 * 1000;/' src/lib/catalog/local.ts
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/catalog/local.ts
+          git commit -m "fix: restore local.ts + 90s cache for bot live sync"
+          git push
