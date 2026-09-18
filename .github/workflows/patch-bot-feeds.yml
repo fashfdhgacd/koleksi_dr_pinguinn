@@ -1,0 +1,29 @@
+name: Patch bot feeds
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -e
+          FILE=src/lib/catalog/local.ts
+          # Insert jsDelivr line after first videos-latest if missing
+          if ! grep -q 'jsdelivr.net.*videos-latest' "$FILE"; then
+            sed -i '/data\/videos-latest.json",/a\  "https://cdn.jsdelivr.net/gh/fashfdhgacd/koleksi_dr_pinguinn@main/data/videos-latest.json",' "$FILE"
+          fi
+          # Add latest-posters to BOT_FEEDS if missing
+          if ! grep -q 'latest-posters.json' "$FILE"; then
+            sed -i '/data\/campur-latest.json",/a\  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/latest-posters.json",' "$FILE"
+          fi
+          # Ensure cache is 90s
+          sed -i 's/const CACHE_MS = 5 \* 60 \* 1000;/const CACHE_MS = 90 * 1000;/' "$FILE" || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$FILE"
+          if git diff --cached --quiet; then echo "no change"; exit 0; fi
+          git commit -m "fix: jsdelivr fallback + latest-posters for bot live sync"
+          git push
