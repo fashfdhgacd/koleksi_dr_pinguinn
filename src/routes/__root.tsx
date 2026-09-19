@@ -25,13 +25,6 @@ export const Route = createRootRoute({
       { name: "robots", content: "index,follow,max-image-preview:large" },
       { name: "rating", content: "adult" },
     ],
-    scripts: [
-      {
-        src: "https://cloud.umami.is/script.js",
-        defer: true,
-        "data-website-id": "b952a905-cb5b-419d-8aa4-534435e5cc8b",
-      },
-    ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -53,11 +46,6 @@ function RootComponent() {
     <html lang="id" suppressHydrationWarning className="antialiased">
       <head>
         <HeadContent />
-        <script
-          defer
-          src="https://cloud.umami.is/script.js"
-          data-website-id="b952a905-cb5b-419d-8aa4-534435e5cc8b"
-        />
       </head>
       <body className="min-h-dvh bg-background font-sans text-foreground">
         <PreviewHostBridge />
