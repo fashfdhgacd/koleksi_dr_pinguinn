@@ -551,6 +551,44 @@ function takeRoundRobin(buckets: RawItem[][], limit: number): RawItem[] {
   return out;
 }
 
+/** Slot 15 menit: Tonton juga berganti otomatis tanpa cron / tanpa nulis file. */
+const RELATED_SLOT_MS = 15 * 60 * 1000;
+const RELATED_POOL_MAX = 240;
+
+function hashSeed(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+function uniquePool(list: RawItem[], max = RELATED_POOL_MAX): RawItem[] {
+  const out: RawItem[] = [];
+  const seen = new Set<string>();
+  for (const it of list) {
+    if (!it?.id || seen.has(it.id)) continue;
+    seen.add(it.id);
+    out.push(it);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+function rotatePick(pool: RawItem[], limit: number, seedKey: string): RawItem[] {
+  if (!pool.length) return [];
+  const want = Math.min(Math.max(1, limit || 12), pool.length);
+  const slot = Math.floor(Date.now() / RELATED_SLOT_MS);
+  const start = (slot + hashSeed(seedKey)) % pool.length;
+  const out: RawItem[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < pool.length && out.length < want; i++) {
+    const it = pool[(start + i) % pool.length];
+    if (!it?.id || seen.has(it.id)) continue;
+    seen.add(it.id);
+    out.push(it);
+  }
+  return out;
+}
+
 export async function listRelated(id: string, limit = 12, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters, videyNo } = await loadItems();
   const current = items.find((x) => x.id === id) || items.find((x) => embedId(x.embed || x.direct || "") === id);
@@ -558,40 +596,37 @@ export async function listRelated(id: string, limit = 12, _signal?: AbortSignal)
     return { page: 1, limit, total: 0, hasMore: false, items: [] };
   }
 
-  let picked: RawItem[];
+  let pool: RawItem[];
   if (isVidey(current)) {
     const rest = items.filter((x) => x.id !== current.id);
-    picked = takeRoundRobin(
+    pool = takeRoundRobin(
       [rest.filter(isIndoAv), rest.filter(isUserBokep), rest.filter(isVidey)],
-      limit,
+      RELATED_POOL_MAX,
     );
   } else if (isPutarin(current)) {
-    picked = items.filter((x) => x.id !== current.id && isPutarin(x)).slice(0, limit);
+    pool = uniquePool(items.filter((x) => x.id !== current.id && isPutarin(x)));
   } else if (isStreamtape(current)) {
-    picked = items.filter((x) => x.id !== current.id && isStreamtape(x)).slice(0, limit);
+    pool = uniquePool(items.filter((x) => x.id !== current.id && isStreamtape(x)));
   } else {
     const main = mainCatalog(items).filter((x) => x.id !== current.id);
     const sameCat = main.filter((x) => slugOf(x) === slugOf(current));
+    const sameSet = new Set(sameCat.map((x) => x.id));
     const indoSame = sameCat.filter(isIndoAv);
     const userSame = sameCat.filter(isUserBokep);
     const restSame = sameCat.filter((x) => !isIndoAv(x) && !isUserBokep(x));
     const indoAll = main.filter(isIndoAv);
     const userAll = main.filter(isUserBokep);
-    const pool = [
+    pool = uniquePool([
       ...indoSame,
       ...userSame,
       ...restSame,
-      ...indoAll.filter((x) => !sameCat.includes(x)),
-      ...userAll.filter((x) => !sameCat.includes(x)),
-      ...main.filter((x) => !isIndoAv(x) && !isUserBokep(x) && !sameCat.includes(x)),
-    ];
-    const seen = new Set<string>();
-    picked = pool.filter((x) => {
-      if (seen.has(x.id)) return false;
-      seen.add(x.id);
-      return true;
-    }).slice(0, limit);
+      ...indoAll.filter((x) => !sameSet.has(x.id)),
+      ...userAll.filter((x) => !sameSet.has(x.id)),
+      ...main.filter((x) => !isIndoAv(x) && !isUserBokep(x) && !sameSet.has(x.id)),
+    ]);
   }
 
-  return { page: 1, limit, total: picked.length, hasMore: false, items: picked.map((x) => toCard(x, posters, videyNo)) };
+  const picked = rotatePick(pool, limit, current.id);
+
+  return { page: 1, limit, total: pool.length, hasMore: false, items: picked.map((x) => toCard(x, posters, videyNo)) };
 }
