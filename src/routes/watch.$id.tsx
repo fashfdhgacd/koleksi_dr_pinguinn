@@ -347,6 +347,35 @@ function WatchPage() {
     return () => controller.abort();
   }, [id, reload, loaderData]);
 
+  // Tonton juga: refresh diam-diam tiap slot 15 menit. Player tidak di-remount.
+  useEffect(() => {
+    if (status !== "success" || !id) return;
+    const SLOT = 15 * 60 * 1000;
+    let tid = 0;
+    let cancelled = false;
+    const arm = () => {
+      const wait = Math.max(2500, SLOT - (Date.now() % SLOT) + 120);
+      tid = window.setTimeout(() => {
+        void (async () => {
+          try {
+            const res = await fetchCatalog({ type: "related", id, limit: 12 });
+            if (cancelled || !res.ok || res.type !== "related") return;
+            setRelated(res.items.filter((v) => v.id !== id));
+          } catch {
+            /* biarkan list lama — jangan ganggu player */
+          } finally {
+            if (!cancelled) arm();
+          }
+        })();
+      }, wait);
+    };
+    arm();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(tid);
+    };
+  }, [id, status]);
+
   return (
     <Shell>
       {status === "loading" ? (
