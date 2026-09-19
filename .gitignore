@@ -8,6 +8,7 @@ artifacts
 *.log
 .env
 .env.*
+!.env.example
 .DS_Store
 .project_id
 .node_modules.lock
