@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 
 function isVideoSrc(src: string): boolean {
@@ -61,7 +61,7 @@ function Placeholder({
   );
 }
 
-const LOAD_TIMEOUT_MS = 4500;
+const LOAD_TIMEOUT_MS = 5000;
 
 export function VideoThumb({
   src,
@@ -76,17 +76,16 @@ export function VideoThumb({
 }) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const loadedRef = useRef(false);
 
-  // Reset saat src ganti + timeout biar gak nunggu CDN embedan lama-lama (kotak kosong)
   useEffect(() => {
     setFailed(false);
     setLoaded(false);
+    loadedRef.current = false;
     if (!src) return;
     const t = window.setTimeout(() => {
-      setFailed((f) => {
-        if (!f) return true; // treat slow as failed → placeholder kaya
-        return f;
-      });
+      // Hanya gagal kalau belum sempat load (CDN embedan macet)
+      if (!loadedRef.current) setFailed(true);
     }, LOAD_TIMEOUT_MS);
     return () => window.clearTimeout(t);
   }, [src]);
@@ -104,7 +103,10 @@ export function VideoThumb({
         preload="metadata"
         className={cn("media-thumb size-full object-cover bg-surface-2", className)}
         onError={() => setFailed(true)}
-        onLoadedData={() => setLoaded(true)}
+        onLoadedData={() => {
+          loadedRef.current = true;
+          setLoaded(true);
+        }}
         aria-label={alt}
       />
     );
@@ -112,7 +114,6 @@ export function VideoThumb({
 
   return (
     <div className={cn("relative size-full overflow-hidden", className)}>
-      {/* Sementara load: placeholder di belakang biar gak hitam kosong */}
       {!loaded ? <Placeholder alt={alt} className="absolute inset-0" /> : null}
       <img
         src={src}
@@ -130,6 +131,7 @@ export function VideoThumb({
             setFailed(true);
             return;
           }
+          loadedRef.current = true;
           setLoaded(true);
         }}
       />
