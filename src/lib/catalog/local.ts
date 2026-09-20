@@ -118,11 +118,21 @@ function cleanTitle(t: string): string {
 }
 function classify(title: string): string {
   const t = title.toLowerCase();
-  if (/jilbab|hijab/.test(t)) return "jilbab";
-  if (/tante/.test(t)) return "tante";
-  if (/abg|sma|smk/.test(t)) return "abg";
+  if (/jilbab|hijab|tudung/.test(t)) return "jilbab";
+  if (/tante|milf/.test(t)) return "tante";
+  if (/istri|suami|selingkuh/.test(t)) return "istri";
+  if (/kosan|kontrakan|indekos/.test(t)) return "kosan";
+  if (/amatir|reallife|real ?couple/.test(t)) return "amatir";
   if (/viral/.test(t)) return "viral";
-  if (/live/.test(t)) return "live";
+  if (/\blive\b|bokep live/.test(t)) return "live";
+  if (/abg|\bsma\b|\bsmk\b|mahasisw/.test(t)) return "abg";
+  if (/colmek|\bcoli\b/.test(t)) return "colmek";
+  if (/doggy/.test(t)) return "doggy";
+  if (/open\s*bo|openbo/.test(t)) return "open-bo";
+  if (/malaysia|\bmalay\b/.test(t)) return "malaysia";
+  if (/chindo|cina indo/.test(t)) return "chindo";
+  if (/gangbang|threesome|\bgroup\b/.test(t)) return "gangbang";
+  if (/percakapan|obrolan/.test(t)) return "percakapan";
   return "lainnya";
 }
 function slugOf(item: RawItem): string {
@@ -130,8 +140,8 @@ function slugOf(item: RawItem): string {
   if (isPutarin(item)) return "jav";
   if (isStreamtape(item)) return "ai-plus";
   const raw = (item.category || "").toLowerCase().trim();
-  const mapped = raw ? findCategory(raw) : undefined;
-  if (mapped) return mapped.slug;
+  const mapped = raw && raw !== "lainnya" ? findCategory(raw) : undefined;
+  if (mapped && mapped.slug !== "lainnya") return mapped.slug;
   return classify(item.title || "");
 }
 function sourceLabel(item: RawItem): string {
@@ -342,7 +352,9 @@ export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: 
 
 export async function listFeatured(page = 1, limit = 8, _signal?: AbortSignal): Promise<PagedVideos> {
   const { mainSorted, posters, videyNo } = await loadItems();
-  return pageOf(mainSorted, page, limit, posters, videyNo);
+  const withArt = mainSorted.filter((x) => Boolean(thumbOf(x, posters)));
+  const pool = withArt.length >= limit ? withArt : mainSorted;
+  return pageOf(pool, page, limit, posters, videyNo);
 }
 
 export async function listHome(limit = DEFAULT_PAGE_SIZE): Promise<{ featured: VideoCard[]; latest: PagedVideos }> {
