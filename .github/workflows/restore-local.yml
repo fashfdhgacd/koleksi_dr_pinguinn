@@ -1,21 +1,50 @@
-name: Restore local
+name: Restore Local
 on:
   workflow_dispatch:
 permissions:
   contents: write
 jobs:
-  r:
+  restore:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
       - run: |
           set -e
-          git show bfcfaddaa8419b416a17ee2d559f91a71ed2ab59:src/lib/catalog/local.ts > src/lib/catalog/local.ts
-          sed -i 's/const CACHE_MS = 5 \* 60 \* 1000;/const CACHE_MS = 90 * 1000;/' src/lib/catalog/local.ts
+          python3 <<'PY'
+          import urllib.request
+          from pathlib import Path
+          # pull good copy from parent commit tree via raw previous good sha
+          url = "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/a694e64272a1fea079adce4f45939b788a66e5c9/src/lib/catalog/local.ts"
+          text = urllib.request.urlopen(url, timeout=30).read().decode()
+          if not text.startswith("import"):
+              raise SystemExit("bad download")
+          old = """  const fromPoster = posters[id] || posters[embedKey(item.embed || \"\")] || \"\";
+  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
+    return fromPoster;
+  }"""
+          # fix quotes - use real content
+          old = '''  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
+  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
+    return fromPoster;
+  }'''
+          new = '''  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
+  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
+    if (/embedan\\.com/i.test(fromPoster)) {
+      return `/api/img-proxy?u=${encodeURIComponent(fromPoster)}`;
+    }
+    return fromPoster;
+  }'''
+          if old in text:
+              text = text.replace(old, new, 1)
+              print("proxy added")
+          else:
+              print("no proxy patch, keep as-is")
+          Path("src/lib/catalog/local.ts").write_text(text)
+          print("bytes", len(text))
+          print(text[:80])
+          PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/catalog/local.ts
-          git commit -m "fix: restore local.ts + 90s cache for bot live sync"
+          git commit -m "fix: restore local.ts (fix PLACEHOLDER corruption / build)"
           git push
