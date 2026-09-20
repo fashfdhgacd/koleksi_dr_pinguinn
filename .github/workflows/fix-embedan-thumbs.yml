@@ -1,0 +1,69 @@
+name: Fix Embadan Thumbs
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -e
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('src/lib/catalog/local.ts')
+          t = p.read_text()
+          old = '''function thumbOf(item: RawItem, posters: Record<string, string>): string {
+  const id = item.id;
+  if (isVidey(item)) {
+    const videy = videyFile(item);
+    if (videy) return videy;
+  }
+  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
+  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
+    return fromPoster;
+  }
+  const videy = videyFile(item);
+  if (videy) return videy;
+  const eid = embedId(item.embed || item.direct || "") || id;
+  if (isStreamtape(item) && eid) return `/api/tape-thumb?id=${encodeURIComponent(eid)}`;
+  if (isPutarin(item) && eid) return `/api/puterin-thumb?id=${encodeURIComponent(eid)}`;
+  if (isIndoAv(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=indoav`;
+  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
+  return "";
+}'''
+          new = '''function thumbOf(item: RawItem, posters: Record<string, string>): string {
+  const id = item.id;
+  if (isVidey(item)) {
+    const videy = videyFile(item);
+    if (videy) return videy;
+  }
+  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
+  // embedan.com sering down/timeout → skip, pakai /api/embed-thumb
+  const posterOk =
+    fromPoster &&
+    !PLACEHOLDER_IMAGE_RE.test(fromPoster) &&
+    !/embedan\\.com/i.test(fromPoster);
+  if (posterOk) {
+    return fromPoster;
+  }
+  const videy = videyFile(item);
+  if (videy) return videy;
+  const eid = embedId(item.embed || item.direct || "") || id;
+  if (isStreamtape(item) && eid) return `/api/tape-thumb?id=${encodeURIComponent(eid)}`;
+  if (isPutarin(item) && eid) return `/api/puterin-thumb?id=${encodeURIComponent(eid)}`;
+  if (isIndoAv(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=indoav`;
+  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
+  return `/brand-poster.jpg`;
+}'''
+          if old not in t:
+              raise SystemExit('thumbOf block not found')
+          p.write_text(t.replace(old, new, 1))
+          print('OK')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/catalog/local.ts
+          git commit -m "fix: skip embedan.com (down) — use embed-thumb + brand-poster"
+          git push
