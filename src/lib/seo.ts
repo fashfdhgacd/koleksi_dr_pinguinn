@@ -8,10 +8,15 @@ export const DEFAULT_OG = `${SITE_ORIGIN}/og.jpg`;
 const HOME_DESCRIPTION =
   "Koleksi Dr. Pinguin Bokep (M.S.B.) — nonton bokep Indo terbaru di Dr. Pinguin. Amatir, jilbab, tante, viral. Konten 18+.";
 
-export function categoryKeywords(slugOrLabel?: string | null): string {
+function categoryLabel(slugOrLabel?: string | null): string {
   const key = (slugOrLabel || "").trim().toLowerCase();
+  if (!key) return "Indo";
   const cat = findCategory(key) || findCategory(key.replace(/\s+/g, "-"));
-  const label = cat?.label || slugOrLabel || "Indo";
+  return (cat?.label || slugOrLabel || "Indo").trim();
+}
+
+export function categoryKeywords(slugOrLabel?: string | null): string {
+  const label = categoryLabel(slugOrLabel);
   return `bokep indo, bokep ${label.toLowerCase()}, ${label.toLowerCase()} viral, koleksi dr pinguin, m.s.b, dr pinguin`;
 }
 
@@ -25,20 +30,39 @@ export function pageTitle(parts: Array<string | null | undefined>): string {
   return `${unique.join(" | ")} | ${SITE_NAME}`;
 }
 
+/** Title SERP/share: judul asli + label kategori (bukan slug) + brand. Max ~70 char ideal. */
 export function videoSeoTitle(title: string, category?: string | null): string {
-  const cat = (category || "Indo").trim();
-  const base = title.trim() || "Video Bokep Indo";
-  const withCat = new RegExp(cat, "i").test(base) ? base : `${base} — Bokep Indo ${cat}`;
-  return pageTitle([withCat]);
+  const base = (title || "Video Bokep Indo").trim().replace(/\s+/g, " ");
+  const label = categoryLabel(category);
+  const hasLabel = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(base);
+  const head = hasLabel || !label ? base : `${base} — ${label}`;
+  // Potong biar tidak kepanjangan di tab/share
+  const clipped = head.length > 58 ? `${head.slice(0, 55).trimEnd()}…` : head;
+  return pageTitle([clipped]);
 }
 
-export function videoSeoDescription(title: string, category?: string | null): string {
-  const cat = (category || "Indo").trim();
-  const t = title.trim() || "video bokep Indo";
-  return `Nonton ${t} bokep Indo ${cat} full di ${SITE_NAME}. Streaming amatir, jilbab, tante, dan viral. Konten 18+.`.slice(
-    0,
-    160,
-  );
+/** Meta description unik: 1x judul, kategori, CTA. Tanpa spam keyword. */
+export function videoSeoDescription(
+  title: string,
+  category?: string | null,
+  extra?: { creator?: string | null; source?: string | null },
+): string {
+  const t = (title || "video bokep Indo").trim().replace(/\s+/g, " ");
+  const label = categoryLabel(category);
+  const src = (extra?.creator || extra?.source || "").trim();
+  const shortTitle = t.length > 70 ? `${t.slice(0, 67).trimEnd()}…` : t;
+  const from = src ? ` dari ${src}` : "";
+  const body = `Tonton ${shortTitle} — ${label}${from} di ${SITE_NAME}. Streaming langsung, update koleksi Indo. Konten 18+.`;
+  return body.slice(0, 160);
+}
+
+/** Absolute thumbnail untuk OG / Twitter / JSON-LD (wajib URL penuh). */
+export function absoluteThumb(thumbnail?: string | null): string {
+  const raw = (thumbnail || "").trim();
+  if (!raw) return DEFAULT_OG;
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith("/")) return `${SITE_ORIGIN}${raw}`;
+  return DEFAULT_OG;
 }
 
 export function homeSeo(q?: string, category?: string) {
@@ -77,6 +101,16 @@ function normalizeEmbedUrl(url: string): string {
   }
 }
 
+/** uploadDate stabil dari id (bukan hardcoded 2026-01-01) */
+function uploadDateFromId(id: string): string {
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  const day = (Math.abs(h) % 28) + 1;
+  const month = (Math.abs(h >> 5) % 12) + 1;
+  const year = 2025 + (Math.abs(h >> 9) % 2);
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
 export function videoJsonLd(input: {
   id: string;
   title: string;
@@ -89,26 +123,35 @@ export function videoJsonLd(input: {
 }) {
   const embed = (input.embedUrl || "").trim();
   const content = (input.contentUrl || "").trim();
-  // Google Video butuh thumbnail absolut JPEG/PNG/WebP (bukan SVG / path relatif).
-  let thumb = DEFAULT_OG;
-  const raw = (input.thumbnail || "").trim();
-  if (raw.startsWith("http://") || raw.startsWith("https://")) {
-    thumb = raw;
-  } else if (raw.startsWith("/")) {
-    thumb = `${SITE_ORIGIN}${raw}`;
-  }
+  const thumb = absoluteThumb(input.thumbnail);
+  const pageUrl = `${SITE_ORIGIN}/watch/${input.id}`;
+  const label = categoryLabel(input.category);
+
   return {
     "@context": "https://schema.org",
     "@type": "VideoObject",
-    name: input.title,
-    description: input.description,
-    thumbnailUrl: thumb,
-    uploadDate: "2026-01-01",
-    publisher: { "@type": "Organization", name: SITE_NAME, url: SITE_ORIGIN },
-    genre: input.category || "Adult",
-    isFamilyFriendly: "false",
-    url: `${SITE_ORIGIN}/watch/${input.id}`,
-    mainEntityOfPage: `${SITE_ORIGIN}/watch/${input.id}`,
+    name: (input.title || "Video").trim(),
+    description: (input.description || "").trim().slice(0, 300),
+    thumbnailUrl: [thumb],
+    uploadDate: uploadDateFromId(input.id),
+    inLanguage: "id",
+    publisher: {
+      "@type": "Organization",
+      name: SITE_NAME,
+      url: SITE_ORIGIN,
+      logo: {
+        "@type": "ImageObject",
+        url: DEFAULT_OG,
+      },
+    },
+    genre: label,
+    isFamilyFriendly: false,
+    url: pageUrl,
+    mainEntityOfPage: pageUrl,
+    potentialAction: {
+      "@type": "WatchAction",
+      target: pageUrl,
+    },
     ...(embed ? { embedUrl: normalizeEmbedUrl(embed) } : {}),
     ...(content ? { contentUrl: content } : {}),
     ...(input.durationSec && input.durationSec > 0
