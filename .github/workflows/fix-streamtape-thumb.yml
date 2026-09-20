@@ -1,0 +1,33 @@
+name: Fix Streamtape Thumb
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -e
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('src/lib/catalog/local.ts')
+          t = p.read_text()
+          old = '  if (isStreamtape(item) && eid) return `/api/tape-thumb?id=${encodeURIComponent(eid)}`;'
+          new = '  if (isStreamtape(item) && eid) return `/brand-poster.jpg`;'
+          if old not in t:
+              # already patched?
+              if 'brand-poster.jpg' in t:
+                  print('already ok')
+              else:
+                  raise SystemExit('pattern missing')
+          else:
+              p.write_text(t.replace(old, new, 1))
+              print('patched')
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/catalog/local.ts
+          git diff --cached --quiet && echo nochange || git commit -m "fix: Streamtape fallback → brand-poster.jpg (Dr. Pinguin)"
+          git push
