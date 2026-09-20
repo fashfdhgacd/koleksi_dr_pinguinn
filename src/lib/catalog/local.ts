@@ -312,37 +312,34 @@ async function refreshRemote(base: { items: RawItem[]; posters: Record<string, s
   return buildIndexes(items, posters, videyNo, Date.now());
 }
 
-export async function loadItems(): Promise<CatalogCache> {
-  const now = Date.now();
-  if (cache && now - cache.at < CACHE_MS) return cache;
-  if (inflight) return inflight;
-  if (cache && now - cache.at < STALE_MS) {
-    inflight = refreshRemote({ items: cache.items, posters: cache.posters })
-      .then((next) => {
-        cache = next;
-        return next;
-      })
-      .catch(() => cache as CatalogCache)
-      .finally(() => {
-        inflight = null;
-      });
-    return cache;
-  }
+function seedLocalCache(): CatalogCache {
   const local = assembleLocal();
-  inflight = refreshRemote(local)
+  return buildIndexes(local.items, local.posters, buildVideyNo(local.items), Date.now());
+}
+
+function kickRemoteRefresh(base: { items: RawItem[]; posters: Record<string, string> }): void {
+  if (inflight) return;
+  inflight = refreshRemote(base)
     .then((next) => {
       cache = next;
       return next;
     })
-    .catch(() => {
-      const videyNo = buildVideyNo(local.items);
-      cache = buildIndexes(local.items, local.posters, videyNo, Date.now());
-      return cache;
-    })
+    .catch(() => cache as CatalogCache)
     .finally(() => {
       inflight = null;
     });
-  return inflight;
+}
+
+export async function loadItems(): Promise<CatalogCache> {
+  const now = Date.now();
+  if (cache && now - cache.at < CACHE_MS) return cache;
+  if (cache && now - cache.at < STALE_MS) {
+    kickRemoteRefresh({ items: cache.items, posters: cache.posters });
+    return cache;
+  }
+  if (!cache) cache = seedLocalCache();
+  kickRemoteRefresh({ items: cache.items, posters: cache.posters });
+  return cache;
 }
 
 export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
