@@ -1,12 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import postersMap from "../../lib/catalog/posters.json";
 
-/**
- * Same-origin proxy. Browser jangan hit embedan.com — hotlink/ABP ganti
- * jadi kartu "Please watch www.indoav.com".
- * URL diambil dari posters.json (hasil Fill posters), baru fetch bytes.
- */
-
 const TRANSPARENT_GIF = Buffer.from(
   "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
   "base64",
@@ -28,7 +22,7 @@ async function fetchPosterBytes(url: string, referer: string): Promise<{ body: A
         "user-agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
       },
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(7000),
       redirect: "follow",
     });
     if (!res.ok) return null;
@@ -123,7 +117,13 @@ export const Route = createFileRoute("/api/embed-thumb")({
           }
         }
 
-        return Response.redirect(new URL("/brand-poster.jpg", u.origin), 302);
+        return new Response(TRANSPARENT_GIF, {
+          status: 404,
+          headers: {
+            "content-type": "image/gif",
+            "cache-control": "public, max-age=30",
+          },
+        });
       },
     },
   },
