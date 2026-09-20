@@ -56,21 +56,20 @@ export function useCatalogFeed(params: BrowseParams) {
   const [status, setStatus] = useState<CatalogStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const seenRef = useRef(new Set<string>());
-  const abortRef = useRef<AbortController | null>(null);
   const inflightRef = useRef(false);
   const genRef = useRef(0);
   const pageRef = useRef(1);
   const hasMoreRef = useRef(true);
   const itemsRef = useRef<VideoCard[]>([]);
+  const autoRetryRef = useRef(0);
   itemsRef.current = items;
   const paramsKey = `${params.mode}:${params.category ?? ""}:${params.q ?? ""}`;
 
   const load = useCallback(
     async (nextPage: number, reason: "reset" | "more" | "retry") => {
       if (reason === "more" && (inflightRef.current || !hasMoreRef.current)) return;
-      abortRef.current?.abort();
-      const controller = new AbortController();
-      abortRef.current = controller;
+
+      // JANGAN AbortController.abort() — memicu HTTP 499 di Vercel saat React remount
       const gen = reason === "more" ? genRef.current : ++genRef.current;
       inflightRef.current = true;
       setError(null);
@@ -91,13 +90,22 @@ export function useCatalogFeed(params: BrowseParams) {
               : { type: "latest", page: nextPage, limit: DEFAULT_PAGE_SIZE };
 
       try {
-        const res = await fetchCatalog(query, controller.signal);
+        const res = await fetchCatalog(query);
         if (gen !== genRef.current) return;
         if (!res.ok) {
+          if (reason !== "more" && autoRetryRef.current < 2) {
+            autoRetryRef.current += 1;
+            await new Promise((r) => setTimeout(r, 500 * autoRetryRef.current));
+            if (gen !== genRef.current) return;
+            inflightRef.current = false;
+            void load(nextPage, "retry");
+            return;
+          }
           setError(res.error);
           setStatus(itemsRef.current.length ? "success" : "error");
           return;
         }
+        autoRetryRef.current = 0;
         const pageData = extractPage(res);
         if (nextPage === 1) seenRef.current = new Set();
         const base = nextPage === 1 ? [] : itemsRef.current;
@@ -117,8 +125,15 @@ export function useCatalogFeed(params: BrowseParams) {
         setTotal(pageData.total);
         setStatus(merged.length ? "success" : "empty");
       } catch (err) {
-        if (controller.signal.aborted) return;
         if (gen !== genRef.current) return;
+        if (reason !== "more" && autoRetryRef.current < 2) {
+          autoRetryRef.current += 1;
+          await new Promise((r) => setTimeout(r, 500 * autoRetryRef.current));
+          if (gen !== genRef.current) return;
+          inflightRef.current = false;
+          void load(nextPage, "retry");
+          return;
+        }
         const message = err instanceof Error ? err.message : "Gagal memuat katalog.";
         setError(message);
         setStatus(itemsRef.current.length ? "success" : "error");
@@ -132,11 +147,13 @@ export function useCatalogFeed(params: BrowseParams) {
   useEffect(() => {
     pageRef.current = 1;
     hasMoreRef.current = true;
+    autoRetryRef.current = 0;
     void load(1, "reset");
-    return () => abortRef.current?.abort();
+    return () => {
+      genRef.current += 1;
+    };
   }, [load, paramsKey]);
 
-  // Hero IndoAV: ganti tiap slot 5 menit menurut jam, meski tab ditutup lalu dibuka lagi.
   useEffect(() => {
     if (params.mode !== "home") return;
     const SLOT = 5 * 60 * 1000;
@@ -158,6 +175,7 @@ export function useCatalogFeed(params: BrowseParams) {
   }, [load]);
 
   const retry = useCallback(() => {
+    autoRetryRef.current = 0;
     void load(1, "retry");
   }, [load]);
 
