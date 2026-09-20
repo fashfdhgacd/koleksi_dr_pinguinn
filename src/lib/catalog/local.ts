@@ -6,20 +6,18 @@ import streamtapeBatch from "./streamtape.json";
 import putarinBatch from "./putarin.json";
 import postersMap from "./posters.json";
 
-const CACHE_MS = 90 * 1000;
+const CACHE_MS = 10 * 60 * 1000;
+const STALE_MS = 30 * 60 * 1000;
 
 function feedUrl(path: string): string {
-  const t = Math.floor(Date.now() / 60_000);
+  const t = Math.floor(Date.now() / 600_000);
   return `${path}${path.includes("?") ? "&" : "?"}t=${t}`;
 }
 
 const BOT_FEEDS = [
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/videos-latest.json",
-  "https://cdn.jsdelivr.net/gh/fashfdhgacd/koleksi_dr_pinguinn@main/data/videos-latest.json",
-  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin-latest.json",
-  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin.json",
-  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/campur-latest.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/latest-posters.json",
+  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin-latest.json",
 ];
 
 type RawItem = {
@@ -37,12 +35,19 @@ type RawItem = {
   [k: string]: unknown;
 };
 
-let cache: {
+type CatalogCache = {
   at: number;
   items: RawItem[];
   posters: Record<string, string>;
   videyNo: Map<string, number>;
-} | null = null;
+  byId: Map<string, RawItem>;
+  bySlug: Map<string, RawItem[]>;
+  mainSorted: RawItem[];
+  haystack: { item: RawItem; hay: string }[];
+};
+
+let cache: CatalogCache | null = null;
+let inflight: Promise<CatalogCache> | null = null;
 
 function asList(data: unknown): RawItem[] {
   if (Array.isArray(data)) return data as RawItem[];
@@ -65,11 +70,9 @@ function asPosterMap(data: unknown): Record<string, string> {
 
 async function fetchJson(url: string): Promise<unknown> {
   try {
-    const bust = feedUrl(url);
-    const r = await fetch(bust, {
-      signal: AbortSignal.timeout(8000),
-      headers: { accept: "application/json", "user-agent": "kdp-catalog/1.0" },
-      cache: "no-store",
+    const r = await fetch(feedUrl(url), {
+      signal: AbortSignal.timeout(4000),
+      headers: { accept: "application/json", "user-agent": "kdp-catalog/1.1" },
     });
     if (!r.ok) return null;
     return await r.json();
@@ -182,6 +185,15 @@ function videyDisplayTitle(_item: RawItem, index: number): string {
   return `Videy koleksidrpinguin.com ${index}`;
 }
 
+function isUsable(item: RawItem): boolean {
+  if (!item?.id || typeof item.id !== "string") return false;
+  if (item.id.length < 3) return false;
+  const play = String(item.embed || item.direct || "").trim();
+  if (!play) return false;
+  if (/^https?:\/\//i.test(play) || play.startsWith("/")) return true;
+  return play.length >= 6;
+}
+
 function toCard(item: RawItem, posters: Record<string, string>, videyNo?: Map<string, number>): VideoCard {
   const id = item.id;
   const title = isVidey(item)
@@ -229,54 +241,108 @@ function buildVideyNo(items: RawItem[]): Map<string, number> {
   return m;
 }
 
-export async function loadItems(): Promise<{
-  items: RawItem[];
-  posters: Record<string, string>;
-  videyNo: Map<string, number>;
-}> {
-  if (cache && Date.now() - cache.at < CACHE_MS) return cache;
-  const local = asList(localCatalog);
-  const st = asList(streamtapeBatch);
-  const pu = asList(putarinBatch);
-  let posters: Record<string, string> = { ...(postersMap as Record<string, string>) };
-  const botResults = await Promise.all(BOT_FEEDS.map((url) => fetchJson(url)));
+function buildIndexes(
+  items: RawItem[],
+  posters: Record<string, string>,
+  videyNo: Map<string, number>,
+  at: number,
+): CatalogCache {
+  const byId = new Map<string, RawItem>();
+  const bySlug = new Map<string, RawItem[]>();
+  const haystack: { item: RawItem; hay: string }[] = [];
+  for (const it of items) {
+    byId.set(it.id, it);
+    const slug = slugOf(it);
+    const bucket = bySlug.get(slug);
+    if (bucket) bucket.push(it);
+    else bySlug.set(slug, [it]);
+    haystack.push({
+      item: it,
+      hay: `${(it.title || "").toLowerCase()} ${it.id.toLowerCase()}`,
+    });
+  }
+  const mainSorted = sortByNewest(mainCatalog(items));
+  for (const [slug, list] of bySlug) {
+    bySlug.set(slug, sortByNewest(list));
+  }
+  return { at, items, posters, videyNo, byId, bySlug, mainSorted, haystack };
+}
+
+function pageOf(pool: RawItem[], page: number, limit: number, posters: Record<string, string>, videyNo: Map<string, number>): PagedVideos {
+  const p = Math.max(1, page);
+  const start = (p - 1) * limit;
+  const slice = pool.slice(start, start + limit);
+  return {
+    page: p,
+    limit,
+    total: pool.length,
+    hasMore: start + limit < pool.length,
+    items: slice.map((x) => toCard(x, posters, videyNo)),
+  };
+}
+
+function assembleLocal(): { items: RawItem[]; posters: Record<string, string> } {
+  const local = asList(localCatalog).filter(isUsable);
+  const st = asList(streamtapeBatch).filter(isUsable);
+  const pu = asList(putarinBatch).filter(isUsable);
+  const posters: Record<string, string> = { ...(postersMap as Record<string, string>) };
+  return { items: uniqById([...st, ...pu, ...local]), posters };
+}
+
+async function refreshRemote(base: { items: RawItem[]; posters: Record<string, string> }): Promise<CatalogCache> {
+  const posters = { ...base.posters };
   const remote: RawItem[] = [];
+  const botResults = await Promise.all(BOT_FEEDS.map((url) => fetchJson(url)));
   for (const data of botResults) {
-    remote.push(...asList(data));
+    remote.push(...asList(data).filter(isUsable));
     Object.assign(posters, asPosterMap(data));
   }
-  const items = uniqById([...remote, ...st, ...pu, ...local]);
+  const items = uniqById([...remote, ...base.items]);
   const videyNo = buildVideyNo(items);
-  cache = { at: Date.now(), items, posters, videyNo };
-  return cache;
+  return buildIndexes(items, posters, videyNo, Date.now());
+}
+
+export async function loadItems(): Promise<CatalogCache> {
+  const now = Date.now();
+  if (cache && now - cache.at < CACHE_MS) return cache;
+  if (inflight) return inflight;
+  if (cache && now - cache.at < STALE_MS) {
+    inflight = refreshRemote({ items: cache.items, posters: cache.posters })
+      .then((next) => {
+        cache = next;
+        return next;
+      })
+      .catch(() => cache as CatalogCache)
+      .finally(() => {
+        inflight = null;
+      });
+    return cache;
+  }
+  const local = assembleLocal();
+  inflight = refreshRemote(local)
+    .then((next) => {
+      cache = next;
+      return next;
+    })
+    .catch(() => {
+      const videyNo = buildVideyNo(local.items);
+      cache = buildIndexes(local.items, local.posters, videyNo, Date.now());
+      return cache;
+    })
+    .finally(() => {
+      inflight = null;
+    });
+  return inflight;
 }
 
 export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
-  const { items, posters, videyNo } = await loadItems();
-  const main = sortByNewest(mainCatalog(items));
-  const start = (Math.max(1, page) - 1) * limit;
-  const slice = main.slice(start, start + limit);
-  return {
-    page: Math.max(1, page),
-    limit,
-    total: main.length,
-    hasMore: start + limit < main.length,
-    items: slice.map((x) => toCard(x, posters, videyNo)),
-  };
+  const { mainSorted, posters, videyNo } = await loadItems();
+  return pageOf(mainSorted, page, limit, posters, videyNo);
 }
 
 export async function listFeatured(page = 1, limit = 8, _signal?: AbortSignal): Promise<PagedVideos> {
-  const { items, posters, videyNo } = await loadItems();
-  const main = sortByNewest(mainCatalog(items));
-  const start = (Math.max(1, page) - 1) * limit;
-  const slice = main.slice(start, start + limit);
-  return {
-    page: Math.max(1, page),
-    limit,
-    total: main.length,
-    hasMore: start + limit < main.length,
-    items: slice.map((x) => toCard(x, posters, videyNo)),
-  };
+  const { mainSorted, posters, videyNo } = await loadItems();
+  return pageOf(mainSorted, page, limit, posters, videyNo);
 }
 
 export async function listHome(limit = DEFAULT_PAGE_SIZE): Promise<{ featured: VideoCard[]; latest: PagedVideos }> {
@@ -291,23 +357,14 @@ export async function listCategory(
   limit = DEFAULT_PAGE_SIZE,
   _signal?: AbortSignal,
 ): Promise<PagedVideos> {
-  const { items, posters, videyNo } = await loadItems();
+  const { items, posters, videyNo, bySlug, mainSorted } = await loadItems();
   const s = category.toLowerCase().trim();
   let pool: RawItem[];
-  if (s === "jav") pool = items.filter(isPutarin);
-  else if (s === "ai-plus" || s === "streamtape") pool = items.filter(isStreamtape);
-  else if (s === "videy") pool = items.filter(isVidey);
-  else pool = mainCatalog(items).filter((x) => slugOf(x) === s);
-  pool = sortByNewest(pool);
-  const start = (Math.max(1, page) - 1) * limit;
-  const slice = pool.slice(start, start + limit);
-  return {
-    page: Math.max(1, page),
-    limit,
-    total: pool.length,
-    hasMore: start + limit < pool.length,
-    items: slice.map((x) => toCard(x, posters, videyNo)),
-  };
+  if (s === "jav") pool = bySlug.get("jav") || items.filter(isPutarin);
+  else if (s === "ai-plus" || s === "streamtape") pool = bySlug.get("ai-plus") || items.filter(isStreamtape);
+  else if (s === "videy") pool = bySlug.get("videy") || items.filter(isVidey);
+  else pool = bySlug.get(s) || mainSorted.filter((x) => slugOf(x) === s);
+  return pageOf(pool, page, limit, posters, videyNo);
 }
 
 export async function listSearch(
@@ -318,26 +375,18 @@ export async function listSearch(
 ): Promise<PagedVideos> {
   const key = q.trim().toLowerCase();
   if (!key) return listLatest(page, limit, _signal);
-  const { items, posters, videyNo } = await loadItems();
-  const pool = sortByNewest(
-    items.filter(
-      (x) => (x.title || "").toLowerCase().includes(key) || (x.id || "").toLowerCase().includes(key),
-    ),
-  );
-  const start = (Math.max(1, page) - 1) * limit;
-  const slice = pool.slice(start, start + limit);
-  return {
-    page: Math.max(1, page),
-    limit,
-    total: pool.length,
-    hasMore: start + limit < pool.length,
-    items: slice.map((x) => toCard(x, posters, videyNo)),
-  };
+  const { haystack, posters, videyNo } = await loadItems();
+  const tokens = key.split(/\s+/).filter(Boolean);
+  const matched: RawItem[] = [];
+  for (const row of haystack) {
+    if (tokens.every((t) => row.hay.includes(t))) matched.push(row.item);
+  }
+  return pageOf(sortByNewest(matched), page, limit, posters, videyNo);
 }
 
 export async function getDetail(id: string, _signal?: AbortSignal): Promise<VideoDetail> {
-  const { items, posters, videyNo } = await loadItems();
-  const item = items.find((x) => x.id === id);
+  const { byId, posters, videyNo } = await loadItems();
+  const item = byId.get(id);
   if (!item) {
     throw Object.assign(new Error("Video tidak ditemukan"), { code: "not_found" as const });
   }
@@ -353,18 +402,23 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
 }
 
 export async function listRelated(id: string, limit = 12, _signal?: AbortSignal): Promise<PagedVideos> {
-  const { items, posters, videyNo } = await loadItems();
-  const current = items.find((x) => x.id === id);
-  if (!current) return { page: 1, limit, total: 0, hasMore: false, items: [] };
-  let pool: RawItem[];
-  if (isStreamtape(current)) pool = items.filter((x) => x.id !== id && isStreamtape(x));
-  else if (isPutarin(current)) pool = items.filter((x) => x.id !== id && isPutarin(x));
-  else if (isVidey(current)) pool = items.filter((x) => x.id !== id && isVidey(x));
-  else {
-    const slug = slugOf(current);
-    pool = mainCatalog(items).filter((x) => x.id !== id && slugOf(x) === slug);
+  const { items, posters, videyNo, bySlug, mainSorted } = await loadItems();
+  const current = items.find((x) => x.id === id) || null;
+  if (!current) {
+    return pageOf(mainSorted.filter((x) => x.id !== id), 1, limit, posters, videyNo);
   }
-  pool = sortByNewest(pool).slice(0, limit);
+  const slug = slugOf(current);
+  let pool = (bySlug.get(slug) || []).filter((x) => x.id !== id);
+  if (pool.length < limit) {
+    const extra = mainSorted.filter((x) => x.id !== id && slugOf(x) !== slug);
+    const seen = new Set(pool.map((x) => x.id));
+    for (const x of extra) {
+      if (seen.has(x.id)) continue;
+      pool.push(x);
+      if (pool.length >= limit * 2) break;
+    }
+  }
+  pool = pool.slice(0, limit);
   return {
     page: 1,
     limit,
@@ -375,16 +429,11 @@ export async function listRelated(id: string, limit = 12, _signal?: AbortSignal)
 }
 
 export async function listCategories(): Promise<{ slug: string; label: string; count: number }[]> {
-  const { items } = await loadItems();
-  const counts = new Map<string, number>();
-  for (const it of items) {
-    const s = slugOf(it);
-    counts.set(s, (counts.get(s) || 0) + 1);
-  }
+  const { bySlug } = await loadItems();
   const out: { slug: string; label: string; count: number }[] = [];
-  for (const [slug, count] of counts) {
+  for (const [slug, list] of bySlug) {
     const cat = findCategory(slug);
-    out.push({ slug, label: cat?.label || slug, count });
+    out.push({ slug, label: cat?.label || slug, count: list.length });
   }
   return out.sort((a, b) => b.count - a.count);
 }
