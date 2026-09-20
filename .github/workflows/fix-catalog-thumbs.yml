@@ -1,0 +1,54 @@
+name: Fix Catalog Thumbs
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -e
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path("src/lib/catalog/local.ts")
+          t = p.read_text()
+          old = """  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
+  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
+    return fromPoster;
+  }"""
+          new = """  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
+  // embedan.com sering down → skip, pakai /api/embed-thumb
+  const posterOk =
+    fromPoster &&
+    !PLACEHOLDER_IMAGE_RE.test(fromPoster) &&
+    !/embedan\.com/i.test(fromPoster);
+  if (posterOk) {
+    return fromPoster;
+  }"""
+          if old not in t:
+              if "embedan" in t and "posterOk" in t:
+                  print("already patched")
+              else:
+                  raise SystemExit("block not found")
+          else:
+              t = t.replace(old, new, 1)
+          # ensure empty return uses brand
+          t2 = t.replace(
+              "  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;\n  return \"\";",
+              "  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;\n  return `/brand-poster.jpg`;",
+              1,
+          )
+          if t2 == t and "brand-poster" not in t[t.find("function thumbOf"):t.find("function thumbOf")+800]:
+              print("warn: brand return not set")
+          t = t2
+          p.write_text(t)
+          assert "embedan" in p.read_text()
+          print("OK")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/catalog/local.ts
+          git commit -m "fix: skip dead embedan.com posters, use embed-thumb"
+          git push
