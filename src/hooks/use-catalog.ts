@@ -61,19 +61,20 @@ export function useCatalogFeed(params: BrowseParams) {
   const pageRef = useRef(1);
   const hasMoreRef = useRef(true);
   const itemsRef = useRef<VideoCard[]>([]);
-  const autoRetryRef = useRef(0);
   itemsRef.current = items;
   const paramsKey = `${params.mode}:${params.category ?? ""}:${params.q ?? ""}`;
 
   const load = useCallback(
-    async (nextPage: number, reason: "reset" | "more" | "retry") => {
+    async (nextPage: number, reason: "reset" | "more" | "retry" | "silent") => {
       if (reason === "more" && (inflightRef.current || !hasMoreRef.current)) return;
+      if ((reason === "silent" || reason === "retry") && inflightRef.current) return;
 
-      // JANGAN AbortController.abort() — memicu HTTP 499 di Vercel saat React remount
-      const gen = reason === "more" ? genRef.current : ++genRef.current;
+      const gen = reason === "more" || reason === "silent" ? genRef.current : ++genRef.current;
       inflightRef.current = true;
-      setError(null);
-      setStatus(reason === "more" ? "loadingMore" : reason === "retry" ? "retrying" : "loading");
+      if (reason !== "silent") setError(null);
+      if (reason === "more") setStatus("loadingMore");
+      else if (reason === "retry" && !itemsRef.current.length) setStatus("retrying");
+      else if (reason === "reset") setStatus("loading");
 
       const query =
         params.mode === "search"
@@ -93,47 +94,35 @@ export function useCatalogFeed(params: BrowseParams) {
         const res = await fetchCatalog(query);
         if (gen !== genRef.current) return;
         if (!res.ok) {
-          if (reason !== "more" && autoRetryRef.current < 2) {
-            autoRetryRef.current += 1;
-            await new Promise((r) => setTimeout(r, 500 * autoRetryRef.current));
-            if (gen !== genRef.current) return;
-            inflightRef.current = false;
-            void load(nextPage, "retry");
-            return;
-          }
+          if (reason === "silent") return;
           setError(res.error);
           setStatus(itemsRef.current.length ? "success" : "error");
           return;
         }
-        autoRetryRef.current = 0;
         const pageData = extractPage(res);
         if (nextPage === 1) seenRef.current = new Set();
         const base = nextPage === 1 ? [] : itemsRef.current;
         const merged: VideoCard[] = [...base];
         for (const item of pageData.items) {
-          if (seenRef.current.has(item.id)) continue;
+          if (!item?.id || seenRef.current.has(item.id)) continue;
           seenRef.current.add(item.id);
           merged.push(item);
         }
         setItems(merged);
         itemsRef.current = merged;
-        if (nextPage === 1) setFeatured(pageData.featured);
-        setPage(pageData.page);
-        pageRef.current = pageData.page;
+        if (nextPage === 1 && pageData.featured.length) setFeatured(pageData.featured);
+        const resolvedPage = pageData.page || nextPage;
+        setPage(resolvedPage);
+        pageRef.current = resolvedPage;
         setHasMore(pageData.hasMore);
         hasMoreRef.current = pageData.hasMore;
         setTotal(pageData.total);
-        setStatus(merged.length ? "success" : "empty");
+        if (reason !== "silent") setStatus(merged.length ? "success" : "empty");
+        else if (!merged.length) setStatus("empty");
+        else setStatus("success");
       } catch (err) {
         if (gen !== genRef.current) return;
-        if (reason !== "more" && autoRetryRef.current < 2) {
-          autoRetryRef.current += 1;
-          await new Promise((r) => setTimeout(r, 500 * autoRetryRef.current));
-          if (gen !== genRef.current) return;
-          inflightRef.current = false;
-          void load(nextPage, "retry");
-          return;
-        }
+        if (reason === "silent") return;
         const message = err instanceof Error ? err.message : "Gagal memuat katalog.";
         setError(message);
         setStatus(itemsRef.current.length ? "success" : "error");
@@ -147,10 +136,10 @@ export function useCatalogFeed(params: BrowseParams) {
   useEffect(() => {
     pageRef.current = 1;
     hasMoreRef.current = true;
-    autoRetryRef.current = 0;
     void load(1, "reset");
     return () => {
       genRef.current += 1;
+      inflightRef.current = false;
     };
   }, [load, paramsKey]);
 
@@ -159,9 +148,9 @@ export function useCatalogFeed(params: BrowseParams) {
     const SLOT = 5 * 60 * 1000;
     let tid = 0;
     const arm = () => {
-      const wait = Math.max(1500, SLOT - (Date.now() % SLOT) + 50);
+      const wait = Math.max(8000, SLOT - (Date.now() % SLOT) + 50);
       tid = window.setTimeout(() => {
-        void load(1, "retry");
+        void load(1, "silent");
         arm();
       }, wait);
     };
@@ -175,7 +164,6 @@ export function useCatalogFeed(params: BrowseParams) {
   }, [load]);
 
   const retry = useCallback(() => {
-    autoRetryRef.current = 0;
     void load(1, "retry");
   }, [load]);
 
