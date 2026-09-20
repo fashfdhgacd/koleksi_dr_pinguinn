@@ -1,9 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 /**
- * Self-hosted Streamtape thumbnail proxy.
- * Uses STREAMTAPE_LOGIN + STREAMTAPE_KEY from env when available.
- * Falls back to a 1x1 transparent pixel so the UI never depends on .site.
+ * Streamtape thumbnail proxy — selalu HTTP 200 image/*
+ * (302 ditolak Google: "Thumbnail tidak dapat dijangkau")
  */
 
 const TRANSPARENT_GIF = Buffer.from(
@@ -16,7 +15,7 @@ function env(key: string): string | undefined {
   return v || undefined;
 }
 
-async function fetchStreamtapeThumb(fileId: string): Promise<string | null> {
+async function fetchStreamtapeThumbUrl(fileId: string): Promise<string | null> {
   const login = env("STREAMTAPE_LOGIN");
   const key = env("STREAMTAPE_KEY");
   if (!login || !key) return null;
@@ -37,9 +36,30 @@ async function fetchStreamtapeThumb(fileId: string): Promise<string | null> {
       return data.result;
     }
   } catch {
-    /* timeout / network — fallback placeholder, jangan biarkan function error */
+    /* ignore */
   }
   return null;
+}
+
+async function proxyImage(url: string): Promise<{ body: ArrayBuffer; type: string } | null> {
+  try {
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(6000),
+      headers: {
+        accept: "image/*,*/*",
+        "user-agent": "Mozilla/5.0 (compatible; KDPThumb/1.0)",
+      },
+      redirect: "follow",
+    });
+    if (!res.ok) return null;
+    const type = (res.headers.get("content-type") || "image/jpeg").split(";")[0].trim();
+    if (!type.startsWith("image/")) return null;
+    const body = await res.arrayBuffer();
+    if (!body.byteLength || body.byteLength < 100) return null;
+    return { body, type };
+  } catch {
+    return null;
+  }
 }
 
 export const Route = createFileRoute("/api/tape-thumb")({
@@ -57,24 +77,26 @@ export const Route = createFileRoute("/api/tape-thumb")({
           });
         }
 
-        const thumbUrl = await fetchStreamtapeThumb(id);
+        const thumbUrl = await fetchStreamtapeThumbUrl(id);
         if (thumbUrl) {
-          // Redirect so CDN/browser can cache the real image
-          return new Response(null, {
-            status: 302,
-            headers: {
-              location: thumbUrl,
-              "cache-control": "public, max-age=86400, stale-while-revalidate=604800",
-            },
-          });
+          const proxied = await proxyImage(thumbUrl);
+          if (proxied) {
+            return new Response(proxied.body, {
+              status: 200,
+              headers: {
+                "content-type": proxied.type,
+                "cache-control": "public, max-age=86400, stale-while-revalidate=604800",
+                "x-thumb-source": "streamtape-proxy",
+              },
+            });
+          }
         }
 
-        // No credentials / API failed → transparent placeholder (cache lebih lama biar tidak spam function)
-        return new Response(TRANSPARENT_GIF, {
-          status: 200,
+        return new Response(null, {
+          status: 302,
           headers: {
-            "content-type": "image/gif",
-            "cache-control": "public, max-age=3600, stale-while-revalidate=86400",
+            location: "https://koleksidrpinguin.com/og.jpg",
+            "cache-control": "public, max-age=3600",
           },
         });
       },
