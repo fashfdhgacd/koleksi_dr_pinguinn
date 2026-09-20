@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 function isVideoSrc(src: string): boolean {
@@ -11,7 +11,7 @@ function hashHue(s: string): number {
   return Math.abs(h) % 360;
 }
 
-/** Placeholder kaya — jangan kotak hitam polos saat CDN lambat/gagal. */
+/** Hanya dipakai kalau poster asli GAGAL load — bukan pengganti utama. */
 function Placeholder({
   alt,
   className,
@@ -61,8 +61,11 @@ function Placeholder({
   );
 }
 
-const LOAD_TIMEOUT_MS = 5000;
-
+/**
+ * Prioritas WAJIB: poster asli (src dari posters.json / tape-thumb / embed).
+ * Placeholder HANYA jika src kosong atau onError (gambar gagal total).
+ * Tidak ada timeout yang memaksa gagal — poster lambat tetap ditunggu.
+ */
 export function VideoThumb({
   src,
   alt,
@@ -76,20 +79,13 @@ export function VideoThumb({
 }) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
-  const loadedRef = useRef(false);
 
   useEffect(() => {
     setFailed(false);
     setLoaded(false);
-    loadedRef.current = false;
-    if (!src) return;
-    const t = window.setTimeout(() => {
-      // Hanya gagal kalau belum sempat load (CDN embedan macet)
-      if (!loadedRef.current) setFailed(true);
-    }, LOAD_TIMEOUT_MS);
-    return () => window.clearTimeout(t);
   }, [src]);
 
+  // Tanpa src sama sekali → baru placeholder
   if (!src || failed) {
     return <Placeholder alt={alt} className={className} />;
   }
@@ -103,35 +99,39 @@ export function VideoThumb({
         preload="metadata"
         className={cn("media-thumb size-full object-cover bg-surface-2", className)}
         onError={() => setFailed(true)}
-        onLoadedData={() => {
-          loadedRef.current = true;
-          setLoaded(true);
-        }}
+        onLoadedData={() => setLoaded(true)}
         aria-label={alt}
       />
     );
   }
 
   return (
-    <div className={cn("relative size-full overflow-hidden", className)}>
-      {!loaded ? <Placeholder alt={alt} className="absolute inset-0" /> : null}
+    <div className={cn("relative size-full overflow-hidden bg-surface-2", className)}>
+      {/* Shimmer ringan saat nunggu — poster asli tetap prioritas, tidak di-force gagal */}
+      {!loaded ? (
+        <div
+          className="absolute inset-0 animate-pulse bg-gradient-to-br from-zinc-800 via-zinc-900 to-zinc-950"
+          aria-hidden
+        />
+      ) : null}
       <img
         src={src}
         alt={alt}
         loading={eager ? "eager" : "lazy"}
         decoding="async"
+        referrerPolicy="no-referrer"
         className={cn(
-          "media-thumb relative size-full object-cover transition-opacity duration-200",
+          "media-thumb relative size-full object-cover transition-opacity duration-150",
           loaded ? "opacity-100" : "opacity-0",
         )}
         onError={() => setFailed(true)}
         onLoad={(e) => {
           const img = e.currentTarget;
+          // GIF 1x1 = API gagal, baru anggap failed
           if (img.naturalWidth <= 2 && img.naturalHeight <= 2) {
             setFailed(true);
             return;
           }
-          loadedRef.current = true;
           setLoaded(true);
         }}
       />
