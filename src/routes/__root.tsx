@@ -5,6 +5,7 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "DR. PINGUIN";
+const UMAMI_WEBSITE_ID = "b952a905-cb5b-419d-8aa4-534435e5cc8b";
 
 export const Route = createRootRoute({
   head: () => ({
@@ -36,6 +37,13 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/site.webmanifest" },
       { rel: "apple-touch-icon", href: "/favicon.svg" },
+    ],
+    scripts: [
+      {
+        defer: true,
+        src: "https://cloud.umami.is/script.js",
+        "data-website-id": UMAMI_WEBSITE_ID,
+      },
     ],
   }),
   component: RootComponent,
