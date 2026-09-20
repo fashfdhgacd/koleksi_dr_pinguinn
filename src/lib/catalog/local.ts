@@ -22,9 +22,6 @@ const BOT_FEEDS = [
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/latest-posters.json",
 ];
 
-const SITE_FEEDS: string[] = [];
-const POSTER_URLS: string[] = [];
-
 type RawItem = {
   id: string;
   title?: string;
@@ -168,13 +165,13 @@ function videyFile(item: RawItem): string {
   return "";
 }
 
+/** IndoAV / UserBokep: posters.json dulu (poster asli). */
 function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const id = item.id;
   if (isVidey(item)) {
     const videy = videyFile(item);
     if (videy) return videy;
   }
-  // posters.json = sumber utama IndoAV / UserBokep
   const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
   if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
     return fromPoster;
@@ -202,23 +199,19 @@ function toCard(item: RawItem, posters: Record<string, string>, videyNo?: Map<st
   if (isStreamtape(item)) quality = "Streamtape";
   else if (isPutarin(item)) quality = "Puterin";
   const thumb = thumbOf(item, posters);
-  const embed = String(item.embed || item.direct || "");
   return {
     id,
     title,
     thumbnail: thumb,
+    description: "",
+    category: slugOf(item),
     duration: typeof item.duration === "number" ? item.duration : null,
     durationLabel: "—",
-    year: null,
-    category: slugOf(item),
     quality,
+    year: null,
     creator: sourceLabel(item),
-    rating: null,
-    href: `/watch/${id}`,
-    description: null,
-    video_url: embed || null,
-    qualities: embed ? [{ label: quality, url: embed }] : [],
-  } as VideoCard;
+    views: null,
+  };
 }
 
 function sortByNewest(items: RawItem[]): RawItem[] {
@@ -274,18 +267,6 @@ export async function loadItems(): Promise<{
   return cache;
 }
 
-function pageSlice(items: RawItem[], page: number, limit: number): PagedVideos {
-  const start = (page - 1) * limit;
-  const slice = items.slice(start, start + limit);
-  return {
-    page,
-    limit,
-    total: items.length,
-    hasMore: start + limit < items.length,
-    items: slice as unknown as VideoCard[],
-  };
-}
-
 export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters, videyNo } = await loadItems();
   const main = sortByNewest(mainCatalog(items));
@@ -336,12 +317,19 @@ export async function listCategory(
   };
 }
 
-export async function listSearch(q: string, page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
+export async function listSearch(
+  q: string,
+  page = 1,
+  limit = DEFAULT_PAGE_SIZE,
+  _signal?: AbortSignal,
+): Promise<PagedVideos> {
   const key = q.trim().toLowerCase();
   if (!key) return listLatest(page, limit, _signal);
   const { items, posters, videyNo } = await loadItems();
   const pool = sortByNewest(
-    items.filter((x) => (x.title || "").toLowerCase().includes(key) || (x.id || "").toLowerCase().includes(key)),
+    items.filter(
+      (x) => (x.title || "").toLowerCase().includes(key) || (x.id || "").toLowerCase().includes(key),
+    ),
   );
   const start = (page - 1) * limit;
   const slice = pool.slice(start, start + limit);
@@ -359,11 +347,14 @@ export async function getDetail(id: string): Promise<VideoDetail | null> {
   const item = items.find((x) => x.id === id);
   if (!item) return null;
   const card = toCard(item, posters, videyNo);
+  const embed = String(item.embed || item.direct || "");
   return {
     ...card,
+    video_url: embed || null,
+    qualities: embed ? [{ label: card.quality, url: embed, format: "embed" }] : [],
+    subjects: [],
     playable: true,
-    description: card.description,
-  } as VideoDetail;
+  };
 }
 
 export async function listRelated(id: string, limit = 12): Promise<PagedVideos> {
