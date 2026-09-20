@@ -14,38 +14,90 @@ jobs:
           from pathlib import Path
           p = Path("src/lib/catalog/local.ts")
           t = p.read_text()
-          # Rewrite embedan poster URLs through img-proxy
-          needle = "  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {\n    return fromPoster;\n  }"
-          insert = '''  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
-    // embedan tanpa proxy sering = watermark "Please watch On Original Website"
+          old = """  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
+  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
+    return fromPoster;
+  }"""
+          new = """  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
+  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
+    // posters.json tetap sumber utama. embedan lewat proxy + Referer biar tidak watermark IndoAV.
     if (/embedan\\.com/i.test(fromPoster)) {
       return `/api/img-proxy?u=${encodeURIComponent(fromPoster)}`;
     }
     return fromPoster;
-  }'''
-          if "img-proxy" in t:
-              print("already proxy")
-          elif needle in t:
-              t = t.replace(needle, insert, 1)
-              print("patched thumbOf")
-          else:
-              # try posterOk variant
-              needle2 = "  if (posterOk) {\n    return fromPoster;\n  }"
-              insert2 = '''  if (posterOk) {
-    if (/embedan\\.com/i.test(fromPoster)) {
-      return `/api/img-proxy?u=${encodeURIComponent(fromPoster)}`;
-    }
-    return fromPoster;
-  }'''
-              if needle2 in t:
-                  t = t.replace(needle2, insert2, 1)
-                  print("patched posterOk")
+  }"""
+          if "img-proxy" in t and "fromPoster" in t:
+              # ensure pattern is correct
+              if "/api/img-proxy?u=" in t:
+                  print("already has img-proxy")
+              elif old in t:
+                  t = t.replace(old, new, 1)
+                  print("patched")
               else:
-                  raise SystemExit("thumbOf poster block not found")
+                  print("has img-proxy string but odd structure")
+          elif old in t:
+              t = t.replace(old, new, 1)
+              print("patched")
+          else:
+              raise SystemExit("block not found")
           p.write_text(t)
+          # ensure img-proxy route exists
+          proxy = Path("src/routes/api/img-proxy.ts")
+          if not proxy.exists():
+              proxy.write_text('''import { createFileRoute } from "@tanstack/react-router";
+
+const ALLOW = /^(https?:\\/\\/)?([a-z0-9.-]*\\.)?(embedan\\.com)\\//i;
+
+export const Route = createFileRoute("/api/img-proxy")({
+  server: {
+    handlers: {
+      GET: async ({ request }) => {
+        const raw = new URL(request.url).searchParams.get("u")?.trim() || "";
+        let target = "";
+        try { target = decodeURIComponent(raw); } catch { target = raw; }
+        if (!target || !ALLOW.test(target)) {
+          return new Response(null, { status: 302, headers: { location: "https://koleksidrpinguin.com/brand-poster.jpg" } });
+        }
+        try {
+          const res = await fetch(target, {
+            signal: AbortSignal.timeout(8000),
+            headers: {
+              accept: "image/*,*/*;q=0.8",
+              referer: "https://tv1.indoav.app/",
+              "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            },
+            redirect: "follow",
+          });
+          if (!res.ok) {
+            return new Response(null, { status: 302, headers: { location: "https://koleksidrpinguin.com/brand-poster.jpg" } });
+          }
+          const type = (res.headers.get("content-type") || "image/jpeg").split(";")[0].trim();
+          if (!type.startsWith("image/")) {
+            return new Response(null, { status: 302, headers: { location: "https://koleksidrpinguin.com/brand-poster.jpg" } });
+          }
+          const buf = await res.arrayBuffer();
+          if (!buf.byteLength || buf.byteLength < 800) {
+            return new Response(null, { status: 302, headers: { location: "https://koleksidrpinguin.com/brand-poster.jpg" } });
+          }
+          return new Response(buf, {
+            status: 200,
+            headers: {
+              "content-type": type,
+              "cache-control": "public, max-age=86400, stale-while-revalidate=604800",
+            },
+          });
+        } catch {
+          return new Response(null, { status: 302, headers: { location: "https://koleksidrpinguin.com/brand-poster.jpg" } });
+        }
+      },
+    },
+  },
+});
+''')
+              print("wrote img-proxy")
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/catalog/local.ts src/routes/api/img-proxy.ts
-          git commit -m "fix: embedan via img-proxy (anti watermark IndoAV)" || echo nochange
+          git commit -m "fix: posters.json tetap utama, embedan lewat img-proxy anti-watermark" || echo nochange
           git push
