@@ -2,7 +2,8 @@ import { findCategory } from "@/lib/catalog/categories";
 
 export const SITE_ORIGIN = "https://koleksidrpinguin.com";
 export const SITE_NAME = "Dr. Pinguin";
-export const DEFAULT_OG = `${SITE_ORIGIN}/og.svg`;
+/** Google Video: JPEG/PNG/WebP — jangan SVG */
+export const DEFAULT_OG = `${SITE_ORIGIN}/og.jpg`;
 
 const HOME_DESCRIPTION =
   "Koleksi Dr. Pinguin Bokep (M.S.B.) — nonton bokep Indo terbaru di Dr. Pinguin. Amatir, jilbab, tante, viral. Konten 18+.";
@@ -88,8 +89,14 @@ export function videoJsonLd(input: {
 }) {
   const embed = (input.embedUrl || "").trim();
   const content = (input.contentUrl || "").trim();
-  const thumb =
-    input.thumbnail && input.thumbnail.startsWith("http") ? input.thumbnail : DEFAULT_OG;
+  // Google Video butuh thumbnail absolut JPEG/PNG/WebP (bukan SVG / path relatif).
+  let thumb = DEFAULT_OG;
+  const raw = (input.thumbnail || "").trim();
+  if (raw.startsWith("http://") || raw.startsWith("https://")) {
+    thumb = raw;
+  } else if (raw.startsWith("/")) {
+    thumb = `${SITE_ORIGIN}${raw}`;
+  }
   return {
     "@context": "https://schema.org",
     "@type": "VideoObject",
