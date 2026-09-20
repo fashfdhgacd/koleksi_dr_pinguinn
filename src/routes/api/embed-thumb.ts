@@ -54,7 +54,7 @@ async function scrapePosterUrl(code: string, src: string): Promise<{ url: string
       const m =
         html.match(/poster=["'](https?:\/\/[^"']*embedan[^"']+)["']/i) ||
         html.match(/poster=["'](https?:\/\/[^"']+\.(?:webp|jpg|jpeg|png)[^"']*)["']/i);
-      const url = m?.[1]?.replace(/&/g, "&").trim();
+      const url = m?.[1]?.replace(/&amp;/g, "&").trim();
       if (url?.startsWith("http") && !/please.?watch|indoav\.com\//i.test(url)) {
         return { url, referer: embedUrl };
       }
@@ -97,10 +97,14 @@ export const Route = createFileRoute("/api/embed-thumb")({
               status: 200,
               headers: {
                 "content-type": img.type,
-                "cache-control": "public, max-age=86400, stale-while-revalidate=604800",
+                "cache-control": "public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000",
               },
             });
           }
+          return new Response(null, {
+            status: 404,
+            headers: { "cache-control": "public, max-age=30" },
+          });
         }
 
         const scraped = await scrapePosterUrl(id, src);
@@ -111,7 +115,7 @@ export const Route = createFileRoute("/api/embed-thumb")({
               status: 200,
               headers: {
                 "content-type": img.type,
-                "cache-control": "public, max-age=86400, stale-while-revalidate=604800",
+                "cache-control": "public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000",
               },
             });
           }
