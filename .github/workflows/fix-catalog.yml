@@ -14,25 +14,29 @@ jobs:
           from pathlib import Path
           p = Path('src/lib/catalog/local.ts')
           t = p.read_text()
-          # Restore streamtape to real tape-thumb API
-          t2 = t.replace(
-            'if (isStreamtape(item) && eid) return `/brand-poster.jpg`;',
-            'if (isStreamtape(item) && eid) return `/api/tape-thumb?id=${encodeURIComponent(eid)}`;',
-          )
-          if t2 == t:
-              # try already tape-thumb
-              if 'tape-thumb?id=' in t:
-                  print('already tape-thumb')
-              else:
-                  raise SystemExit('streamtape line not found')
+          # final fallback empty string → brand poster
+          old = '''  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
+  return "";'''
+          new = '''  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
+  return `/brand-poster.jpg`;'''
+          if old in t:
+              t = t.replace(old, new, 1)
+              print('fallback brand')
+          elif 'brand-poster.jpg' in t:
+              print('fallback already brand')
           else:
-              t = t2
-              print('restored tape-thumb')
+              # softer: any bare return "" at end of thumbOf
+              import re
+              m = re.search(r'(function thumbOf[\s\S]*?)(  return "";\n})', t)
+              if m:
+                  t = t[:m.start(2)] + '  return `/brand-poster.jpg`;\n}' + t[m.end(2):]
+                  print('fallback via regex')
+              else:
+                  print('warn: no empty return')
           p.write_text(t)
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/catalog/local.ts
-          git diff --cached --quiet && echo nochange && exit 0
-          git commit -m "fix: Streamtape pakai /api/tape-thumb lagi (poster asli)"
+          git diff --cached --quiet || git commit -m "fix: thumbOf empty → brand-poster.jpg"
           git push
