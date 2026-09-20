@@ -12,31 +12,52 @@ jobs:
           set -e
           python3 <<'PY'
           from pathlib import Path
-          p = Path('src/lib/catalog/local.ts')
+          import re
+          p = Path("src/routes/watch.$id.tsx")
           t = p.read_text()
-          # final fallback empty string → brand poster
-          old = '''  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
-  return "";'''
-          new = '''  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
-  return `/brand-poster.jpg`;'''
-          if old in t:
-              t = t.replace(old, new, 1)
-              print('fallback brand')
-          elif 'brand-poster.jpg' in t:
-              print('fallback already brand')
+          if "function watchDescription" not in t:
+              helper = '''
+function watchDescription(item: { title: string; description?: string | null; category?: string | null; creator?: string | null; source?: string | null }): string {
+  const title = (item.title || "").trim();
+  const raw = (item.description || "").trim();
+  if (
+    raw &&
+    raw.toLowerCase() !== title.toLowerCase() &&
+    !/^nonton\\s+/i.test(raw) &&
+    !/streaming amatir, jilbab/i.test(raw) &&
+    raw.length >= 12
+  ) {
+    return raw.length > 180 ? `${raw.slice(0, 177).trimEnd()}…` : raw;
+  }
+  const cat = (item.category || "Indo").trim();
+  const src = (item.creator || item.source || "koleksi").trim();
+  return `Tonton ${cat} dari ${src} di Dr. Pinguin. Streaming langsung, konten 18+.`;
+}
+
+'''
+              idx = t.find("function cleanWatchUrl(id: string): string {")
+              if idx < 0:
+                  raise SystemExit("no cleanWatchUrl")
+              end = t.find("\n}\n", idx) + 3
+              t = t[:end] + helper + t[end:]
+              print("helper ok")
+          t2, n = re.subn(
+              r'<h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">\{item\.title\}</h1>\s*<p className="text-sm leading-relaxed text-muted">[\s\S]*?</p>',
+              '<h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>\n            <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>',
+              t,
+              count=1,
+          )
+          if n:
+              t = t2
+              print("replaced", n)
+          elif "watchDescription(item)" in t:
+              print("already")
           else:
-              # softer: any bare return "" at end of thumbOf
-              import re
-              m = re.search(r'(function thumbOf[\s\S]*?)(  return "";\n})', t)
-              if m:
-                  t = t[:m.start(2)] + '  return `/brand-poster.jpg`;\n}' + t[m.end(2):]
-                  print('fallback via regex')
-              else:
-                  print('warn: no empty return')
+              raise SystemExit("no match")
           p.write_text(t)
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/catalog/local.ts
-          git diff --cached --quiet || git commit -m "fix: thumbOf empty → brand-poster.jpg"
+          git add "src/routes/watch.\$id.tsx"
+          git commit -m "fix(watch): deskripsi di bawah judul, bukan ulang judul" || echo nochange
           git push
