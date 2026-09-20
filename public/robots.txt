@@ -1,5 +1,9 @@
 User-agent: *
 Allow: /
+Allow: /api/tape-thumb
+Allow: /api/embed-thumb
+Allow: /api/puterin-thumb
 Disallow: /api/
 
 Sitemap: https://koleksidrpinguin.com/sitemap.xml
+Sitemap: https://koleksidrpinguin.com/sitemap-video.xml
