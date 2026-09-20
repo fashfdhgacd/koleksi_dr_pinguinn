@@ -429,9 +429,8 @@ async function loadItems(): Promise<{
 
 export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters, videyNo } = await loadItems();
-  // Terbaru = katalog utama + Streamtape. JAV/Videy tetap silo sendiri.
-  const pool = items.filter((x) => !isPutarin(x) && !isVidey(x));
-  const main = sortByNewest(pool);
+  // Terbaru = katalog utama SAJA (IndoAV/UserBokep). Streamtape hanya di tab AI+.
+  const main = sortByNewest(mainCatalog(items));
   const { slice, total, hasMore, page: p, limit: lim } = pageOf(main, page, limit);
   return { page: p, limit: lim, total, hasMore, items: slice.map((x) => toCard(x, posters, videyNo)) };
 }
