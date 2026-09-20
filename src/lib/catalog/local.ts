@@ -150,26 +150,31 @@ function videyFile(item: RawItem): string {
   return "";
 }
 
-/** IndoAV/UserBokep selalu same-origin proxy. Jangan expose embedan.com ke browser. */
+function proxiedPoster(url: string): string {
+  if (!url.startsWith("http")) return "";
+  if (PLACEHOLDER_IMAGE_RE.test(url)) return "";
+  if (/embedan\.com/i.test(url)) return `/api/img-proxy?u=${encodeURIComponent(url)}`;
+  return url;
+}
+
 function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const id = item.id;
   if (isVidey(item)) {
     const videy = videyFile(item);
     if (videy) return videy;
   }
-  const eid = embedId(item.embed || item.direct || "") || id;
-  if (isIndoAv(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=indoav`;
-  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
-  if (isStreamtape(item) && eid) return `/api/tape-thumb?id=${encodeURIComponent(eid)}`;
-  if (isPutarin(item) && eid) return `/api/puterin-thumb?id=${encodeURIComponent(eid)}`;
   const fromPoster =
     posters[id] ||
     posters[embedKey(item.embed || "")] ||
     String(item.poster || "") ||
     String(item.thumbnail || "");
-  if (fromPoster.startsWith("http") && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
-    return fromPoster;
-  }
+  const proxied = proxiedPoster(fromPoster);
+  if (proxied) return proxied;
+  const eid = embedId(item.embed || item.direct || "") || id;
+  if (isIndoAv(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=indoav`;
+  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
+  if (isStreamtape(item) && eid) return `/api/tape-thumb?id=${encodeURIComponent(eid)}`;
+  if (isPutarin(item) && eid) return `/api/puterin-thumb?id=${encodeURIComponent(eid)}`;
   return "";
 }
 
