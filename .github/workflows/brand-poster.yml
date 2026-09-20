@@ -1,0 +1,57 @@
+name: Brand poster
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  up:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -e
+          python3 <<'PY'
+          import base64
+          from pathlib import Path
+          # Minimal branded JPEG via PIL if available, else write SVG only
+          try:
+            from PIL import Image, ImageDraw, ImageFont
+            img = Image.new('RGB', (1280, 720), (10, 10, 12))
+            d = ImageDraw.Draw(img)
+            # gradient-ish bands
+            for y in range(720):
+              c = 10 + int(12 * y / 720)
+              d.line([(0, y), (1280, y)], fill=(c, c, min(28, c + 6)))
+            d.rounded_rectangle([48, 48, 1232, 672], radius=28, outline=(39, 39, 42), width=2)
+            d.ellipse([568, 228, 712, 372], fill=(24, 24, 27), outline=(82, 82, 91), width=3)
+            d.ellipse([584, 244, 696, 356], fill=(250, 250, 250))
+            d.ellipse([612, 278, 628, 294], fill=(9, 9, 11))
+            d.ellipse([652, 278, 668, 294], fill=(9, 9, 11))
+            d.ellipse([612, 300, 668, 336], fill=(9, 9, 11))
+            d.arc([616, 300, 664, 330], 20, 160, fill=(245, 158, 11), width=3)
+            try:
+              font_lg = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf', 52)
+              font_sm = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 20)
+              font_xs = ImageFont.truetype('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', 16)
+            except Exception:
+              font_lg = font_sm = font_xs = ImageFont.load_default()
+            def center(text, y, font, fill):
+              bbox = d.textbbox((0, 0), text, font=font)
+              w = bbox[2] - bbox[0]
+              d.text(((1280 - w) / 2, y), text, font=font, fill=fill)
+            center('DR. PINGUIN', 400, font_lg, (250, 250, 250))
+            center('KOLEKSI  ·  18+', 470, font_sm, (161, 161, 170))
+            center('koleksidrpinguin.com', 620, font_xs, (82, 82, 91))
+            img.save('public/brand-poster.jpg', 'JPEG', quality=90)
+            img.save('public/og.jpg', 'JPEG', quality=90)
+            print('PIL ok')
+          except Exception as e:
+            print('PIL fail', e)
+            raise
+          PY
+          ls -la public/brand-poster.jpg public/og.jpg
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/brand-poster.jpg public/og.jpg
+          git commit -m "feat: Dr. Pinguin branded poster fallback (replace LAYAR)"
+          git push
