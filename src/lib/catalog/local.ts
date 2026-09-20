@@ -141,7 +141,7 @@ function sourceLabel(item: RawItem): string {
 }
 
 const PLACEHOLDER_IMAGE_RE =
-  /placeholder|1x1|transparent|data:image\/gif|indoav\.com|please.?watch|original.?website/i;
+  /placeholder|1x1|transparent|data:image\/gif|please.?watch|original.?website/i;
 
 function videyFile(item: RawItem): string {
   if (!item.id || !isVidey(item)) return "";
@@ -150,23 +150,26 @@ function videyFile(item: RawItem): string {
   return "";
 }
 
-/** IndoAV/UserBokep selalu lewat proxy same-origin. */
+/** Poster asli dulu (embedan / posters.json). Proxy cuma kalau map kosong. */
 function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const id = item.id;
   if (isVidey(item)) {
     const videy = videyFile(item);
     if (videy) return videy;
   }
-  const eid = embedId(item.embed || item.direct || "") || id;
-  if (isIndoAv(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=indoav`;
-  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
-  if (isStreamtape(item) && eid) return `/api/tape-thumb?id=${encodeURIComponent(eid)}`;
-  if (isPutarin(item) && eid) return `/api/puterin-thumb?id=${encodeURIComponent(eid)}`;
   const fromPoster =
-    posters[id] || posters[embedKey(item.embed || "")] || String(item.poster || item.thumbnail || "");
+    posters[id] ||
+    posters[embedKey(item.embed || "")] ||
+    String(item.poster || "") ||
+    String(item.thumbnail || "");
   if (fromPoster.startsWith("http") && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
     return fromPoster;
   }
+  const eid = embedId(item.embed || item.direct || "") || id;
+  if (isStreamtape(item) && eid) return `/api/tape-thumb?id=${encodeURIComponent(eid)}`;
+  if (isPutarin(item) && eid) return `/api/puterin-thumb?id=${encodeURIComponent(eid)}`;
+  if (isIndoAv(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=indoav`;
+  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
   return "";
 }
 
@@ -189,7 +192,7 @@ function toCard(item: RawItem, posters: Record<string, string>, videyNo?: Map<st
     description: "",
     category: slugOf(item),
     duration: typeof item.duration === "number" ? item.duration : null,
-    durationLabel: "—",
+    durationLabel: "\u2014",
     quality,
     year: null,
     creator: sourceLabel(item),
