@@ -14,39 +14,25 @@ jobs:
           from pathlib import Path
           p = Path('src/lib/catalog/local.ts')
           t = p.read_text()
-          old = '''  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
-  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
-    return fromPoster;
-  }'''
-          new = '''  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
-  // embedan.com down/timeout → skip, pakai /api/embed-thumb
-  const posterOk =
-    fromPoster &&
-    !PLACEHOLDER_IMAGE_RE.test(fromPoster) &&
-    !/embedan\.com/i.test(fromPoster);
-  if (posterOk) {
-    return fromPoster;
-  }'''
-          if old in t:
-              t = t.replace(old, new, 1)
-              print('poster filter patched')
-          elif 'posterOk' in t:
-              print('poster filter already ok')
+          # Restore streamtape to real tape-thumb API
+          t2 = t.replace(
+            'if (isStreamtape(item) && eid) return `/brand-poster.jpg`;',
+            'if (isStreamtape(item) && eid) return `/api/tape-thumb?id=${encodeURIComponent(eid)}`;',
+          )
+          if t2 == t:
+              # try already tape-thumb
+              if 'tape-thumb?id=' in t:
+                  print('already tape-thumb')
+              else:
+                  raise SystemExit('streamtape line not found')
           else:
-              raise SystemExit('fromPoster block missing')
-          old2 = '''  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
-  return "";'''
-          new2 = '''  if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
-  return `/brand-poster.jpg`;'''
-          if old2 in t:
-              t = t.replace(old2, new2, 1)
-              print('brand fallback patched')
+              t = t2
+              print('restored tape-thumb')
           p.write_text(t)
-          print('done')
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/catalog/local.ts
           git diff --cached --quiet && echo nochange && exit 0
-          git commit -m "fix: skip dead embedan.com — use embed-thumb + brand-poster"
+          git commit -m "fix: Streamtape pakai /api/tape-thumb lagi (poster asli)"
           git push
