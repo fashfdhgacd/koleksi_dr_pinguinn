@@ -1,0 +1,65 @@
+name: Fix Watch Desc
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          set -e
+          python3 <<'PY'
+          from pathlib import Path
+          p = Path('src/routes/watch.$id.tsx')
+          t = p.read_text()
+          helper = '''
+function watchDescription(item: { title: string; description?: string | null; category?: string | null; creator?: string | null; source?: string | null }): string {
+  const title = (item.title || "").trim();
+  const raw = (item.description || "").trim();
+  if (
+    raw &&
+    raw.toLowerCase() !== title.toLowerCase() &&
+    !/^nonton\\s+/i.test(raw) &&
+    !/streaming amatir, jilbab/i.test(raw) &&
+    raw.length >= 12
+  ) {
+    return raw.length > 180 ? `${raw.slice(0, 177).trimEnd()}…` : raw;
+  }
+  const cat = (item.category || "Indo").trim();
+  const src = (item.creator || item.source || "koleksi").trim();
+  return `Tonton ${cat} dari ${src} di Dr. Pinguin. Streaming langsung, konten 18+.`;
+}
+
+'''
+          if 'function watchDescription' not in t:
+              anchor = 'function cleanWatchUrl(id: string): string {'
+              idx = t.find(anchor)
+              if idx < 0:
+                  raise SystemExit('cleanWatchUrl missing')
+              end = t.find('\n}\n', idx) + 3
+              t = t[:end] + helper + t[end:]
+              print('helper added')
+          old = '''            <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>
+            <p className="text-sm leading-relaxed text-muted">
+              {(item.description && !/nonton .+ bokep indo|streaming amatir, jilbab/i.test(item.description))
+                ? item.description
+                : null}
+            </p>'''
+          new = '''            <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>
+            <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>'''
+          if old in t:
+              t = t.replace(old, new, 1)
+              print('block replaced')
+          elif 'watchDescription(item)' in t:
+              print('already patched')
+          else:
+              raise SystemExit('title block not found')
+          p.write_text(t)
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'src/routes/watch.$id.tsx'
+          git commit -m "fix(watch): deskripsi di bawah judul, jangan ulang judul"
+          git push
