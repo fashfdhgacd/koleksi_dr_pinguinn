@@ -14,17 +14,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Restore local.ts
+      - name: Restore full local.ts from known good commit
         run: |
           set -e
           curl -fsSL -o src/lib/catalog/local.ts \
             "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/a694e64272a1fea079adce4f45939b788a66e5c9/src/lib/catalog/local.ts"
+          # Ensure posters.json is primary for IndoAV/UserBokep (already in that commit)
+          grep -q "fromPoster" src/lib/catalog/local.ts
+          grep -q "listFeatured" src/lib/catalog/local.ts
           head -5 src/lib/catalog/local.ts
           wc -c src/lib/catalog/local.ts
-          test "$(head -c 6 src/lib/catalog/local.ts)" = "import"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/catalog/local.ts
-          git status
-          git commit -m "fix: restore local.ts — IndoAV/UserBokep pakai posters.json" || echo nochange
+          git commit -m "fix: full local.ts restore (listFeatured + posters.json)" || echo nochange
           git push
