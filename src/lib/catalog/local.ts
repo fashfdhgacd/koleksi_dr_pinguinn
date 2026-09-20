@@ -3,135 +3,118 @@ import type { PagedVideos, VideoCard, VideoDetail } from "./types";
 import { findCategory } from "./categories";
 import localCatalog from "./videos.json";
 import streamtapeBatch from "./streamtape.json";
-import localPosters from "./posters.json";
+import putarinBatch from "./putarin.json";
+import postersMap from "./posters.json";
 
-/** In-memory cache katalog — 5 menit, selaras dengan hero time-slot. */
 const CACHE_MS = 90 * 1000;
 
+function feedUrl(path: string): string {
+  const t = Math.floor(Date.now() / 60_000);
+  return `${path}${path.includes("?") ? "&" : "?"}t=${t}`;
+}
+
 const BOT_FEEDS = [
-  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin-latest.json",
-  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin.json",
-  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguin/main/data/putarin.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/videos-latest.json",
   "https://cdn.jsdelivr.net/gh/fashfdhgacd/koleksi_dr_pinguinn@main/data/videos-latest.json",
+  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin-latest.json",
+  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/campur-latest.json",
+  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/latest-posters.json",
 ];
 
-const REMOTE_ENABLED =
-  typeof process !== "undefined" &&
-  (process.env.CATALOG_REMOTE === "1" || process.env.CATALOG_REMOTE === "true");
-
-const SITE_FEEDS = REMOTE_ENABLED
-  ? [
-      "https://www.koleksidrpinguin.site/data/videos-latest.json",
-  "https://cdn.jsdelivr.net/gh/fashfdhgacd/koleksi_dr_pinguinn@main/data/videos-latest.json",
-      "https://www.koleksidrpinguin.site/data/putarin-latest.json",
-      "https://www.koleksidrpinguin.site/data/campur-latest.json",
-      "https://www.koleksidrpinguin.site/data/videos.json",
-      "https://www.koleksidrpinguin.site/data/campur.json",
-      "https://www.koleksidrpinguin.site/data/putarin.json",
-    ]
-  : [];
-
-const POSTER_URLS = REMOTE_ENABLED
-  ? [
-      "https://www.koleksidrpinguin.site/data/posters.json",
-      "https://www.koleksidrpinguin.site/data/latest-posters.json",
-    ]
-  : [];
+const SITE_FEEDS: string[] = [];
+const POSTER_URLS: string[] = [];
 
 type RawItem = {
   id: string;
-  title: string;
-  embed: string;
+  title?: string;
+  embed?: string;
   direct?: string;
-  source?: string;
   category?: string;
+  source?: string;
+  poster?: string;
+  thumbnail?: string;
+  createdAt?: string | number;
   date?: string;
-  updated_at?: string;
-  tags?: string[];
+  duration?: number;
+  [k: string]: unknown;
 };
 
-const RULES: Array<[string, RegExp]> = [
-  ["jilbab", /jilbab|hijab|ukhty|ukhti|tudung|berhijab/i],
-  ["tante", /tante|janda|\bstw\b|milf|ibu ?tiri|\bemak\b/i],
-  ["live", /\blive\b/i],
-  ["chindo", /chindo/i],
-  ["malaysia", /malay|malaysia/i],
-  ["open-bo", /open ?bo|michat/i],
-  ["percakapan", /percakapan/i],
-  ["viral", /viral/i],
-  ["gangbang", /gangbang|gilir|rame rame|threesome|foursome|bertiga/i],
-  ["doggy", /doggy|nungging/i],
-  ["colmek", /colmek|omek|coliin|dildo/i],
-  ["kosan", /pacar|kosan|check ?in|hotel|\bkos\b|\bkost\b/i],
-  ["istri", /istri|suami|selingkuh|hamil/i],
-  ["amatir", /amatir|bokepindo|bokep indo|pasutri|pasangan/i],
-  ["abg", /\babg\b|\bsma\b|mahasiswi|mahasiswa|pelajar/i],
-];
+let cache: {
+  at: number;
+  items: RawItem[];
+  posters: Record<string, string>;
+  videyNo: Map<string, number>;
+} | null = null;
 
-function classify(title: string): string {
-  for (const [slug, re] of RULES) {
-    if (re.test(title)) return slug;
+function asList(data: unknown): RawItem[] {
+  if (Array.isArray(data)) return data as RawItem[];
+  if (data && typeof data === "object") {
+    const o = data as Record<string, unknown>;
+    if (Array.isArray(o.items)) return o.items as RawItem[];
+    if (Array.isArray(o.videos)) return o.videos as RawItem[];
   }
-  return "lainnya";
+  return [];
 }
 
-function cleanTitle(title: string, keepBrand = false): string {
-  let t = title
-    .replace(/^\u25b6\s*/, "")
-    .replace(/^\uD83C\uDFAC\s*/, "")
-    .replace(/^judul\s*[:：-]\s*/i, "")
-    .replace(/^title\s*[:：-]\s*/i, "")
-    .replace(/Collection Dr\.?\s*Anjing Bokep[^,]*[,.]?\s*S\.\s*M\.\s*Sc\.?/gi, "");
-  if (!keepBrand) {
-    t = t
-      .replace(/\bAI-\s*koleksidrpinguin\.(com|site)\b/gi, "")
-      .replace(/koleksidrpinguin\.(com|site)/gi, "");
+function asPosterMap(data: unknown): Record<string, string> {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
+    if (typeof v === "string" && v.startsWith("http")) out[k] = v;
   }
-  return (
-    t
-      .replace(/dibokepindo\.com/gi, "")
-      .replace(/playbokep\.id/gi, "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .replace(/^[\-|]+|[\-|]+$/g, "") || "Video"
-  );
+  return out;
 }
 
-function embedId(embed: string): string {
+async function fetchJson(url: string): Promise<unknown> {
+  try {
+    const bust = feedUrl(url);
+    const r = await fetch(bust, {
+      signal: AbortSignal.timeout(8000),
+      headers: { accept: "application/json", "user-agent": "kdp-catalog/1.0" },
+      cache: "no-store",
+    });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch {
+    return null;
+  }
+}
+
+function embedId(embed = ""): string {
   const m =
-    embed.match(/[?&]id=([A-Za-z0-9_-]+)/i) ||
-    embed.match(/\/(?:e|v|d)\/([A-Za-z0-9_-]+)/i);
+    String(embed).match(/\/(?:e|v|d)\/([A-Za-z0-9_-]+)/i) ||
+    String(embed).match(/[?&]id=([A-Za-z0-9_-]+)/i);
   return m ? m[1] : "";
 }
 
-function embedKey(embed: string): string {
-  return embedId(embed) || embed;
-}
-
-function blobOf(item: RawItem): string {
-  return `${item.embed} ${item.direct || ""} ${item.source || ""} ${item.title || ""}`;
+function embedKey(embed = ""): string {
+  return embedId(embed) || String(embed).slice(0, 64);
 }
 
 function isIndoAv(item: RawItem): boolean {
-  return /indoav|tv1\.indoav/i.test(blobOf(item));
+  const s = `${item.embed || ""} ${item.source || ""} ${item.direct || ""}`;
+  return /indoav/i.test(s);
 }
 
 function isUserBokep(item: RawItem): boolean {
-  return /userbokep|tv1\.userbokep/i.test(blobOf(item));
+  const s = `${item.embed || ""} ${item.source || ""} ${item.direct || ""}`;
+  return /userbokep/i.test(s);
 }
 
 function isPutarin(item: RawItem): boolean {
-  return /putarin|puterin|doodstream|ds2play|ds2video|panel\.putarin/i.test(blobOf(item));
+  const s = `${item.embed || ""} ${item.source || ""} ${item.direct || ""}`;
+  return /putarin|puterin/i.test(s);
 }
 
 function isStreamtape(item: RawItem): boolean {
-  return /streamtape/i.test(blobOf(item));
+  const s = `${item.embed || ""} ${item.source || ""} ${item.direct || ""}`;
+  return /streamtape|strcloud/i.test(s);
 }
 
 function isVidey(item: RawItem): boolean {
-  return /videy\.co|cdn\.videy|\bvidey\b/i.test(blobOf(item));
+  const s = `${item.embed || ""} ${item.source || ""} ${item.direct || ""}`;
+  return /videy/i.test(s);
 }
 
 function isSideSilo(item: RawItem): boolean {
@@ -142,22 +125,18 @@ function mainCatalog(items: RawItem[]): RawItem[] {
   return items.filter((x) => !isSideSilo(x));
 }
 
-function videyFile(item: RawItem): string {
-  if (item.direct && /cdn\.videy\.co\/.+\.(mp4|mov)($|\?)/i.test(item.direct)) return item.direct;
-  const id = embedId(item.embed || item.direct || "");
-  if (!id || !isVidey(item)) return "";
-  const ext = id.length === 9 && id.charAt(8) === "2" ? ".mov" : ".mp4";
-  return `https://cdn.videy.co/${id}${ext}`;
+function cleanTitle(t: string): string {
+  return t.replace(/\s+/g, " ").trim() || "Video";
 }
 
-function videyFallbacks(item: RawItem): string[] {
-  const file = videyFile(item);
-  if (!file) return [];
-  const id = embedId(item.embed || item.direct || file);
-  if (!id) return [file];
-  const mp4 = `https://cdn.videy.co/${id}.mp4`;
-  const mov = `https://cdn.videy.co/${id}.mov`;
-  return file.endsWith(".mov") ? [file, mp4] : [file, mov];
+function classify(title: string): string {
+  const t = title.toLowerCase();
+  if (/jilbab|hijab/.test(t)) return "jilbab";
+  if (/tante/.test(t)) return "tante";
+  if (/abg|sma|smk/.test(t)) return "abg";
+  if (/viral/.test(t)) return "viral";
+  if (/live/.test(t)) return "live";
+  return "lainnya";
 }
 
 function slugOf(item: RawItem): string {
@@ -170,22 +149,7 @@ function slugOf(item: RawItem): string {
   return classify(item.title || "");
 }
 
-const SOURCE_MAP: Record<string, string> = {
-  indoav: "IndoAV",
-  "indoav.app": "IndoAV",
-  userbokep: "UserBokep",
-  "userbokep.com": "UserBokep",
-  putarin: "Putarin",
-  streamtape: "Streamtape",
-  videy: "videy",
-  "videy.co": "videy",
-};
-
 function sourceLabel(item: RawItem): string {
-  const s = (item.source || "").toLowerCase();
-  for (const [k, v] of Object.entries(SOURCE_MAP)) {
-    if (s.includes(k)) return v;
-  }
   if (isIndoAv(item)) return "IndoAV";
   if (isUserBokep(item)) return "UserBokep";
   if (isPutarin(item)) return "Putarin";
@@ -194,8 +158,15 @@ function sourceLabel(item: RawItem): string {
   return item.source || "Unknown";
 }
 
-const PLACEHOLDER_IMAGE_RE =
-  /picsum\.photos|loremflickr|placeholder|placehold\.co|via\.placeholder|dummyimage/i;
+const PLACEHOLDER_IMAGE_RE = /placeholder|1x1|transparent|data:image\/gif/i;
+
+function videyFile(item: RawItem): string {
+  const id = item.id;
+  if (!id || !isVidey(item)) return "";
+  const direct = String(item.direct || item.embed || "");
+  if (/cdn\.videy\.co/i.test(direct)) return direct;
+  return "";
+}
 
 function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const id = item.id;
@@ -203,6 +174,7 @@ function thumbOf(item: RawItem, posters: Record<string, string>): string {
     const videy = videyFile(item);
     if (videy) return videy;
   }
+  // posters.json = sumber utama IndoAV / UserBokep
   const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
   if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
     return fromPoster;
@@ -227,388 +199,208 @@ function toCard(item: RawItem, posters: Record<string, string>, videyNo?: Map<st
     ? videyDisplayTitle(item, videyNo?.get(id) || 1)
     : cleanTitle(item.title || "Video");
   let quality = "HD";
-  let creator: string | null = sourceLabel(item);
-  if (isVidey(item)) {
-    quality = "Videy";
-    creator = "Videy";
-  } else if (isStreamtape(item)) {
-    quality = "Streamtape";
-  } else if (isPutarin(item)) {
-    quality = "Puterin";
-  }
+  if (isStreamtape(item)) quality = "Streamtape";
+  else if (isPutarin(item)) quality = "Puterin";
+  const thumb = thumbOf(item, posters);
+  const embed = String(item.embed || item.direct || "");
   return {
     id,
     title,
-    thumbnail: thumbOf(item, posters),
-    description: title,
-    category: slugOf(item),
-    duration: null,
-    durationLabel: "",
-    quality,
+    thumbnail: thumb,
+    duration: typeof item.duration === "number" ? item.duration : null,
+    durationLabel: "—",
     year: null,
-    creator,
-    views: null,
-  };
-}
-
-function toDetail(item: RawItem, posters: Record<string, string>, videyNo?: Map<string, number>): VideoDetail {
-  const card = toCard(item, posters, videyNo);
-  const qualities: { label: string; url: string; format: string }[] = [];
-  const videyUrls = videyFallbacks(item);
-  for (const url of videyUrls) {
-    if (!qualities.some((q) => q.url === url)) {
-      qualities.push({ label: "Videy MP4", url, format: "mp4" });
-    }
-  }
-  if (!isVidey(item) && item.embed) {
-    qualities.push({ label: "Embed", url: item.embed, format: "iframe" });
-  }
-  if (!isVidey(item) && item.direct && item.direct !== item.embed) {
-    qualities.push({ label: "Direct", url: item.direct, format: "mp4" });
-  }
-  const primary = isVidey(item)
-    ? videyUrls[0] || item.direct || item.embed
-    : item.embed;
-  return {
-    ...card,
-    video_url: primary,
-    qualities,
-    subjects: [card.category],
-    playable: Boolean(primary),
-  };
-}
-
-function pageOf<T>(arr: T[], page: number, limit: number) {
-  const p = Math.max(1, page || 1);
-  const lim = Math.min(Math.max(1, limit || DEFAULT_PAGE_SIZE), 48);
-  const start = (p - 1) * lim;
-  const slice = arr.slice(start, start + lim);
-  return { slice, total: arr.length, hasMore: start + lim < arr.length, page: p, limit: lim };
-}
-
-let cache: {
-  at: number;
-  items: RawItem[];
-  posters: Record<string, string>;
-  videyNo: Map<string, number>;
-} | null = null;
-
-function numberVidey(items: RawItem[]): Map<string, number> {
-  const map = new Map<string, number>();
-  let n = 1;
-  for (const it of items) {
-    if (!isVidey(it) || !it.id || map.has(it.id)) continue;
-    map.set(it.id, n++);
-  }
-  return map;
-}
-
-async function fetchJson(url: string): Promise<unknown> {
-  try {
-    const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch {
-    return null;
-  }
-}
-
-function normalizeList(raw: unknown): RawItem[] {
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw as RawItem[];
-  if (typeof raw === "object" && raw !== null && "items" in raw && Array.isArray((raw as any).items)) {
-    return (raw as any).items as RawItem[];
-  }
-  return [];
-}
-
-function fallbackId(item: RawItem): string {
-  const basis = `${item.embed || ""}|${item.direct || ""}|${item.title || ""}`;
-  let hash = 0;
-  for (let i = 0; i < basis.length; i++) {
-    hash = (hash * 31 + basis.charCodeAt(i)) | 0;
-  }
-  return `gen-${Math.abs(hash).toString(36)}`;
-}
-
-function withId(it: RawItem): RawItem {
-  return it?.id ? it : { ...it, id: fallbackId(it) };
-}
-
-function itemTime(it: RawItem): number {
-  if (it.updated_at) {
-    const t = Date.parse(it.updated_at);
-    if (Number.isFinite(t)) return t;
-  }
-  if (it.date) {
-    const t = Date.parse(it.date.length === 10 ? `${it.date}T23:59:59.000Z` : it.date);
-    if (Number.isFinite(t)) return t;
-  }
-  return 0;
-}
-
-function isNewer(a: RawItem, b: RawItem): boolean {
-  return itemTime(a) >= itemTime(b);
+    category: slugOf(item),
+    quality,
+    creator: sourceLabel(item),
+    rating: null,
+    href: `/watch/${id}`,
+    description: null,
+    video_url: embed || null,
+    qualities: embed ? [{ label: quality, url: embed }] : [],
+  } as VideoCard;
 }
 
 function sortByNewest(items: RawItem[]): RawItem[] {
-  return items
-    .map((it, index) => ({ it, index, t: itemTime(it) }))
-    .sort((a, b) => {
-      if (b.t !== a.t) return b.t - a.t;
-      return a.index - b.index;
-    })
-    .map((x) => x.it);
+  return [...items].sort((a, b) => {
+    const ta = Number(a.createdAt || a.date || 0);
+    const tb = Number(b.createdAt || b.date || 0);
+    return tb - ta;
+  });
 }
 
-async function loadItems(): Promise<{
+function uniqById(items: RawItem[]): RawItem[] {
+  const seen = new Set<string>();
+  const out: RawItem[] = [];
+  for (const it of items) {
+    if (!it?.id || seen.has(it.id)) continue;
+    seen.add(it.id);
+    out.push(it);
+  }
+  return out;
+}
+
+function buildVideyNo(items: RawItem[]): Map<string, number> {
+  const m = new Map<string, number>();
+  let n = 0;
+  for (const it of items) {
+    if (isVidey(it) && !m.has(it.id)) m.set(it.id, ++n);
+  }
+  return m;
+}
+
+export async function loadItems(): Promise<{
   items: RawItem[];
   posters: Record<string, string>;
   videyNo: Map<string, number>;
 }> {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache;
 
-  const base: RawItem[] = [];
-
-  const posters: Record<string, string> = {
-    ...(typeof localPosters === "object" && localPosters ? (localPosters as Record<string, string>) : {}),
-  };
+  const local = asList(localCatalog);
+  const st = asList(streamtapeBatch);
+  const pu = asList(putarinBatch);
+  let posters: Record<string, string> = { ...(postersMap as Record<string, string>) };
 
   const botResults = await Promise.all(BOT_FEEDS.map((url) => fetchJson(url)));
+  const remote: RawItem[] = [];
   for (const data of botResults) {
-    const list = normalizeList(data);
-    for (const it of list) {
-      if (it?.embed) base.push(withId(it as RawItem));
-    }
+    remote.push(...asList(data));
+    Object.assign(posters, asPosterMap(data));
   }
 
-  if (REMOTE_ENABLED) {
-    const [siteResults, posterResults] = await Promise.all([
-      Promise.all(SITE_FEEDS.map((url) => fetchJson(url))),
-      Promise.all(POSTER_URLS.map((url) => fetchJson(url))),
-    ]);
-    for (const data of siteResults) {
-      const list = normalizeList(data);
-      for (const it of list) {
-        if (it?.embed) base.push(withId(it as RawItem));
-      }
-    }
-    for (const data of posterResults) {
-      if (data && typeof data === "object") Object.assign(posters, data);
-    }
-  }
-
-  if (Array.isArray(localCatalog)) {
-    for (const it of localCatalog as RawItem[]) {
-      if (it?.embed) base.push(withId(it));
-    }
-  }
-  if (Array.isArray(streamtapeBatch)) {
-    for (const it of streamtapeBatch as RawItem[]) {
-      if (it?.embed) base.push(withId(it));
-    }
-  }
-
-  const map = new Map<string, RawItem>();
-  for (const it of base) {
-    if (!it?.id) continue;
-    const prev = map.get(it.id);
-    if (!prev || isNewer(it, prev)) {
-      map.set(it.id, prev ? { ...prev, ...it } : it);
-    } else {
-      map.set(it.id, { ...it, ...prev });
-    }
-  }
-
-  const items = sortByNewest(Array.from(map.values()));
-  const videyNo = numberVidey(items);
-
+  const items = uniqById([...remote, ...st, ...pu, ...local]);
+  const videyNo = buildVideyNo(items);
   cache = { at: Date.now(), items, posters, videyNo };
   return cache;
 }
 
-export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
-  const { items, posters, videyNo } = await loadItems();
-  // Terbaru = katalog utama SAJA (IndoAV/UserBokep). Streamtape hanya di tab AI+.
-  const main = sortByNewest(mainCatalog(items));
-  const { slice, total, hasMore, page: p, limit: lim } = pageOf(main, page, limit);
-  return { page: p, limit: lim, total, hasMore, items: slice.map((x) => toCard(x, posters, videyNo)) };
-}
-
-export async function listFeatured(page = 1, limit = 8, _signal?: AbortSignal): Promise<PagedVideos> {
-  const { items, posters, videyNo } = await loadItems();
-  const main = mainCatalog(items);
-
-  const indo = main.filter(isIndoAv);
-  const user = main.filter(isUserBokep);
-  const pool =
-    indo.length >= 12 ? indo : user.length >= 12 ? [...indo, ...user] : main.length ? main : items;
-
-  if (!pool.length) {
-    return { page: 1, limit: 0, total: 0, hasMore: false, items: [] };
-  }
-
-  const SLOT_MS = 5 * 60 * 1000;
-  const slot = Math.floor(Date.now() / SLOT_MS);
-  const want = Math.min(Math.max(1, limit || 8), 16, pool.length);
-  const start = slot % pool.length;
-
-  const picked: RawItem[] = [];
-  const seen = new Set<string>();
-  for (let i = 0; i < pool.length && picked.length < want; i++) {
-    const it = pool[(start + i) % pool.length];
-    if (!it?.id || seen.has(it.id)) continue;
-    seen.add(it.id);
-    picked.push(it);
-  }
-
+function pageSlice(items: RawItem[], page: number, limit: number): PagedVideos {
+  const start = (page - 1) * limit;
+  const slice = items.slice(start, start + limit);
   return {
-    page: 1,
-    limit: picked.length,
-    total: pool.length,
-    hasMore: false,
-    items: picked.map((x) => toCard(x, posters, videyNo)),
+    page,
+    limit,
+    total: items.length,
+    hasMore: start + limit < items.length,
+    items: slice as unknown as VideoCard[],
   };
 }
 
-export async function listCategory(slug: string, page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
+export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters, videyNo } = await loadItems();
-  const s = slug.toLowerCase().trim();
+  const main = sortByNewest(mainCatalog(items));
+  const start = (page - 1) * limit;
+  const slice = main.slice(start, start + limit);
+  return {
+    page,
+    limit,
+    total: main.length,
+    hasMore: start + limit < main.length,
+    items: slice.map((x) => toCard(x, posters, videyNo)),
+  };
+}
+
+export async function listHome(limit = DEFAULT_PAGE_SIZE): Promise<{
+  featured: VideoCard[];
+  latest: PagedVideos;
+}> {
+  const { items, posters, videyNo } = await loadItems();
+  const main = sortByNewest(mainCatalog(items));
+  const featured = main.slice(0, 8).map((x) => toCard(x, posters, videyNo));
+  const latest = await listLatest(1, limit);
+  return { featured, latest };
+}
+
+export async function listCategory(
+  category: string,
+  page = 1,
+  limit = DEFAULT_PAGE_SIZE,
+  _signal?: AbortSignal,
+): Promise<PagedVideos> {
+  const { items, posters, videyNo } = await loadItems();
+  const s = category.toLowerCase().trim();
   let pool: RawItem[];
-  if (s === "videy") {
-    pool = items.filter(isVidey);
-  } else if (s === "jav" || s === "putarin" || s === "puterin") {
-    pool = items.filter(isPutarin);
-  } else if (s === "ai-plus" || s === "ai+" || s === "streamtape" || s === "streampie") {
-    pool = items.filter(isStreamtape);
-  } else {
-    pool = mainCatalog(items).filter((x) => slugOf(x) === s);
-  }
-  const { slice, total, hasMore, page: p, limit: lim } = pageOf(pool, page, limit);
-  return { page: p, limit: lim, total, hasMore, items: slice.map((x) => toCard(x, posters, videyNo)) };
+  if (s === "jav") pool = items.filter(isPutarin);
+  else if (s === "ai-plus" || s === "streamtape") pool = items.filter(isStreamtape);
+  else if (s === "videy") pool = items.filter(isVidey);
+  else pool = mainCatalog(items).filter((x) => slugOf(x) === s);
+  pool = sortByNewest(pool);
+  const start = (page - 1) * limit;
+  const slice = pool.slice(start, start + limit);
+  return {
+    page,
+    limit,
+    total: pool.length,
+    hasMore: start + limit < pool.length,
+    items: slice.map((x) => toCard(x, posters, videyNo)),
+  };
 }
 
 export async function listSearch(q: string, page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
-  if (!q || !q.trim()) {
-    return listLatest(page, limit, _signal);
-  }
   const key = q.trim().toLowerCase();
+  if (!key) return listLatest(page, limit, _signal);
   const { items, posters, videyNo } = await loadItems();
-  const filtered = items.filter((x) =>
-    `${x.title} ${x.source ?? ""} ${x.category ?? ""} ${slugOf(x)}`.toLowerCase().includes(key),
+  const pool = sortByNewest(
+    items.filter((x) => (x.title || "").toLowerCase().includes(key) || (x.id || "").toLowerCase().includes(key)),
   );
-  const { slice, total, hasMore, page: p, limit: lim } = pageOf(filtered, page, limit);
-  return { page: p, limit: lim, total, hasMore, items: slice.map((x) => toCard(x, posters, videyNo)) };
+  const start = (page - 1) * limit;
+  const slice = pool.slice(start, start + limit);
+  return {
+    page,
+    limit,
+    total: pool.length,
+    hasMore: start + limit < pool.length,
+    items: slice.map((x) => toCard(x, posters, videyNo)),
+  };
 }
 
-export async function getDetail(id: string, _signal?: AbortSignal): Promise<VideoDetail> {
+export async function getDetail(id: string): Promise<VideoDetail | null> {
   const { items, posters, videyNo } = await loadItems();
-  const item = items.find((x) => x.id === id) || items.find((x) => embedId(x.embed || x.direct || "") === id);
-  if (!item) {
-    throw Object.assign(new Error("Video tidak ditemukan."), { code: "not_found" as const });
-  }
-  return toDetail(item, posters, videyNo);
+  const item = items.find((x) => x.id === id);
+  if (!item) return null;
+  const card = toCard(item, posters, videyNo);
+  return {
+    ...card,
+    playable: true,
+    description: card.description,
+  } as VideoDetail;
 }
 
-function takeRoundRobin(buckets: RawItem[][], limit: number): RawItem[] {
-  const copies = buckets.map((b) => b.slice());
-  const out: RawItem[] = [];
-  const seen = new Set<string>();
-  let guard = 0;
-  while (out.length < limit && guard < 4000) {
-    guard++;
-    let added = false;
-    for (const bucket of copies) {
-      while (bucket.length) {
-        const v = bucket.shift()!;
-        if (!v.id || seen.has(v.id)) continue;
-        seen.add(v.id);
-        out.push(v);
-        added = true;
-        break;
-      }
-      if (out.length >= limit) break;
-    }
-    if (!added) break;
-  }
-  return out;
-}
-
-const RELATED_SLOT_MS = 15 * 60 * 1000;
-const RELATED_POOL_MAX = 240;
-
-function hashSeed(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-
-function uniquePool(list: RawItem[], max = RELATED_POOL_MAX): RawItem[] {
-  const out: RawItem[] = [];
-  const seen = new Set<string>();
-  for (const it of list) {
-    if (!it?.id || seen.has(it.id)) continue;
-    seen.add(it.id);
-    out.push(it);
-    if (out.length >= max) break;
-  }
-  return out;
-}
-
-function rotatePick(pool: RawItem[], limit: number, seedKey: string): RawItem[] {
-  if (!pool.length) return [];
-  const want = Math.min(Math.max(1, limit || 12), pool.length);
-  const slot = Math.floor(Date.now() / RELATED_SLOT_MS);
-  const start = (slot + hashSeed(seedKey)) % pool.length;
-  const out: RawItem[] = [];
-  const seen = new Set<string>();
-  for (let i = 0; i < pool.length && out.length < want; i++) {
-    const it = pool[(start + i) % pool.length];
-    if (!it?.id || seen.has(it.id)) continue;
-    seen.add(it.id);
-    out.push(it);
-  }
-  return out;
-}
-
-export async function listRelated(id: string, limit = 12, _signal?: AbortSignal): Promise<PagedVideos> {
+export async function listRelated(id: string, limit = 12): Promise<PagedVideos> {
   const { items, posters, videyNo } = await loadItems();
-  const current = items.find((x) => x.id === id) || items.find((x) => embedId(x.embed || x.direct || "") === id);
+  const current = items.find((x) => x.id === id);
   if (!current) {
     return { page: 1, limit, total: 0, hasMore: false, items: [] };
   }
-
   let pool: RawItem[];
-  if (isVidey(current)) {
-    const rest = items.filter((x) => x.id !== current.id);
-    pool = takeRoundRobin(
-      [rest.filter(isIndoAv), rest.filter(isUserBokep), rest.filter(isVidey)],
-      RELATED_POOL_MAX,
-    );
-  } else if (isPutarin(current)) {
-    pool = uniquePool(items.filter((x) => x.id !== current.id && isPutarin(x)));
-  } else if (isStreamtape(current)) {
-    pool = uniquePool(items.filter((x) => x.id !== current.id && isStreamtape(x)));
-  } else {
-    const main = mainCatalog(items).filter((x) => x.id !== current.id);
-    const sameCat = main.filter((x) => slugOf(x) === slugOf(current));
-    const sameSet = new Set(sameCat.map((x) => x.id));
-    const indoSame = sameCat.filter(isIndoAv);
-    const userSame = sameCat.filter(isUserBokep);
-    const restSame = sameCat.filter((x) => !isIndoAv(x) && !isUserBokep(x));
-    const indoAll = main.filter(isIndoAv);
-    const userAll = main.filter(isUserBokep);
-    pool = uniquePool([
-      ...indoSame,
-      ...userSame,
-      ...restSame,
-      ...indoAll.filter((x) => !sameSet.has(x.id)),
-      ...userAll.filter((x) => !sameSet.has(x.id)),
-      ...main.filter((x) => !isIndoAv(x) && !isUserBokep(x) && !sameSet.has(x.id)),
-    ]);
+  if (isStreamtape(current)) pool = items.filter((x) => x.id !== id && isStreamtape(x));
+  else if (isPutarin(current)) pool = items.filter((x) => x.id !== id && isPutarin(x));
+  else if (isVidey(current)) pool = items.filter((x) => x.id !== id && isVidey(x));
+  else {
+    const slug = slugOf(current);
+    pool = mainCatalog(items).filter((x) => x.id !== id && slugOf(x) === slug);
   }
+  pool = sortByNewest(pool).slice(0, limit);
+  return {
+    page: 1,
+    limit,
+    total: pool.length,
+    hasMore: false,
+    items: pool.map((x) => toCard(x, posters, videyNo)),
+  };
+}
 
-  const picked = rotatePick(pool, limit, current.id);
-
-  return { page: 1, limit, total: pool.length, hasMore: false, items: picked.map((x) => toCard(x, posters, videyNo)) };
+export async function listCategories(): Promise<{ slug: string; label: string; count: number }[]> {
+  const { items } = await loadItems();
+  const counts = new Map<string, number>();
+  for (const it of items) {
+    const s = slugOf(it);
+    counts.set(s, (counts.get(s) || 0) + 1);
+  }
+  const out: { slug: string; label: string; count: number }[] = [];
+  for (const [slug, count] of counts) {
+    const cat = findCategory(slug);
+    out.push({ slug, label: cat?.label || slug, count });
+  }
+  return out.sort((a, b) => b.count - a.count);
 }
