@@ -12,52 +12,78 @@ jobs:
           set -e
           python3 <<'PY'
           from pathlib import Path
-          import re
           p = Path("src/routes/watch.$id.tsx")
           t = p.read_text()
-          if "function watchDescription" not in t:
-              helper = '''
-function watchDescription(item: { title: string; description?: string | null; category?: string | null; creator?: string | null; source?: string | null }): string {
-  const title = (item.title || "").trim();
-  const raw = (item.description || "").trim();
-  if (
-    raw &&
-    raw.toLowerCase() !== title.toLowerCase() &&
-    !/^nonton\\s+/i.test(raw) &&
-    !/streaming amatir, jilbab/i.test(raw) &&
-    raw.length >= 12
-  ) {
-    return raw.length > 180 ? `${raw.slice(0, 177).trimEnd()}…` : raw;
-  }
-  const cat = (item.category || "Indo").trim();
-  const src = (item.creator || item.source || "koleksi").trim();
-  return `Tonton ${cat} dari ${src} di Dr. Pinguin. Streaming langsung, konten 18+.`;
-}
-
-'''
-              idx = t.find("function cleanWatchUrl(id: string): string {")
-              if idx < 0:
-                  raise SystemExit("no cleanWatchUrl")
-              end = t.find("\n}\n", idx) + 3
-              t = t[:end] + helper + t[end:]
-              print("helper ok")
-          t2, n = re.subn(
-              r'<h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">\{item\.title\}</h1>\s*<p className="text-sm leading-relaxed text-muted">[\s\S]*?</p>',
-              '<h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>\n            <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>',
-              t,
-              count=1,
-          )
-          if n:
-              t = t2
-              print("replaced", n)
-          elif "watchDescription(item)" in t:
-              print("already")
-          else:
-              raise SystemExit("no match")
+          if "absoluteThumb" not in t:
+              t = t.replace(
+                  "  videoJsonLd,\n  videoSeoDescription,\n  videoSeoTitle,\n} from \"@/lib/seo\";",
+                  "  absoluteThumb,\n  videoJsonLd,\n  videoSeoDescription,\n  videoSeoTitle,\n} from \"@/lib/seo\";",
+              )
+              print("import")
+          old = '''    const description = item
+      ? item.description?.trim()?.length > 40
+        ? item.description.trim().slice(0, 160)
+        : videoSeoDescription(item.title, item.category)
+      : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
+    const thumb = (item?.thumbnail || "").trim();
+    let image = DEFAULT_OG;
+    if (/^https?:\\/\\//i.test(thumb)) {
+      image = thumb;
+    } else if (thumb.startsWith("/")) {
+      // Absolute URL agar X/Twitter/OG crawler dapat poster asli (puterin-thumb / tape-thumb)
+      image = `${SITE_ORIGIN}${thumb}`;
+    }'''
+          new = '''    const description = item
+      ? (() => {
+          const raw = (item.description || "").trim();
+          const title = (item.title || "").trim();
+          if (
+            raw.length >= 40 &&
+            raw.toLowerCase() !== title.toLowerCase() &&
+            !/^nonton\\s+/i.test(raw) &&
+            !/streaming amatir, jilbab/i.test(raw)
+          ) {
+            return raw.slice(0, 160);
+          }
+          return videoSeoDescription(item.title, item.category, {
+            creator: item.creator,
+            source: (item as { source?: string }).source,
+          });
+        })()
+      : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
+    const image = absoluteThumb(item?.thumbnail);'''
+          # softer match without over-escaping
+          if "const image = absoluteThumb" not in t:
+              import re
+              t2, n = re.subn(
+                  r"const description = item\n[\s\S]*?let image = DEFAULT_OG;[\s\S]*?image = `\$\{SITE_ORIGIN\}\$\{thumb\}`;\n    \}",
+                  new.strip(),
+                  t,
+                  count=1,
+              )
+              if n:
+                  t = t2
+                  print("regex meta ok")
+              else:
+                  # try exact from file
+                  if old.replace("\\\\", "\\") in t:
+                      t = t.replace(old.replace("\\\\", "\\"), new)
+                      print("exact")
+                  else:
+                      print("WARN meta block not found")
+          if 'og:image:alt' not in t and 'og:image:height' in t:
+              t = t.replace(
+                  '{ property: "og:image:height", content: "630" },',
+                  '{ property: "og:image:height", content: "630" },\n        { property: "og:image:alt", content: item?.title || "Dr. Pinguin" },',
+                  1,
+              )
+              print("alt")
           p.write_text(t)
+          print("done")
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "src/routes/watch.\$id.tsx"
-          git commit -m "fix(watch): deskripsi di bawah judul, bukan ulang judul" || echo nochange
+          git add "src/routes/watch.\$id.tsx" src/lib/seo.ts
+          git status
+          git commit -m "seo: watch meta pakai absoluteThumb + deskripsi lebih bersih" || echo nochange
           git push
