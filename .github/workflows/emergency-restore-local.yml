@@ -2,6 +2,9 @@ name: Emergency restore local.ts
 
 on:
   workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/emergency-restore-local.yml"
 
 permissions:
   contents: write
@@ -11,119 +14,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Restore local.ts from last good commit + permanent fixes
+      - name: Restore local.ts
         run: |
           set -e
-          git show bfcfaddaa8419b416a17ee2d559f91a71ed2ab59:src/lib/catalog/local.ts > src/lib/catalog/local.ts
-
-          python3 <<'PY'
-          from pathlib import Path
-          import re
-          p = Path("src/lib/catalog/local.ts")
-          t = p.read_text()
-
-          t = t.replace(
-              "const CACHE_MS = 5 * 60 * 1000;",
-              "const CACHE_MS = 90 * 1000; // 90s bot upload appears on live fast",
-          )
-
-          t2, n = re.subn(
-              r'const BOT_FEEDS = \[[^\]]*?\];',
-              '''function feedUrl(path: string): string {
-            const t = Math.floor(Date.now() / 60_000);
-            return `${path}${path.includes("?") ? "&" : "?"}t=${t}`;
-          }
-
-          const BOT_FEEDS = [
-            "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/videos-latest.json",
-            "https://cdn.jsdelivr.net/gh/fashfdhgacd/koleksi_dr_pinguinn@main/data/videos-latest.json",
-            "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin-latest.json",
-            "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin.json",
-            "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/campur-latest.json",
-            "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/latest-posters.json",
-          ];''',
-              t,
-              count=1,
-              flags=re.S,
-          )
-          if n != 1:
-              raise SystemExit(f"BOT_FEEDS replace failed n={n}")
-          t = t2
-
-          new_f = '''async function fetchJson(url: string): Promise<unknown> {
-            try {
-              const bust = feedUrl(url);
-              const r = await fetch(bust, {
-                signal: AbortSignal.timeout(8000),
-                headers: { accept: "application/json", "user-agent": "kdp-catalog/1.0" },
-                cache: "no-store",
-              });
-              if (!r.ok) return null;
-              return await r.json();
-            } catch {
-              return null;
-            }
-          }'''
-          t2, n = re.subn(
-              r'async function fetchJson\(url: string\): Promise<unknown> \{.*?\n\}',
-              new_f,
-              t,
-              count=1,
-              flags=re.S,
-          )
-          if n != 1:
-              raise SystemExit(f"fetchJson replace failed n={n}")
-          t = t2
-
-          new_b = '''  const botResults = await Promise.all(BOT_FEEDS.map((url) => fetchJson(url)));
-            const now = Date.now();
-            for (const data of botResults) {
-              if (data && typeof data === "object" && !Array.isArray(data) && !("items" in (data as object))) {
-                const keys = Object.keys(data as object);
-                if (keys.length && keys.every((k) => typeof (data as any)[k] === "string")) {
-                  Object.assign(posters, data);
-                  continue;
-                }
-              }
-              const list = normalizeList(data);
-              list.forEach((it, idx) => {
-                if (!it?.embed) return;
-                const row = withId(it as RawItem);
-                if (!row.updated_at && !row.date) {
-                  row.updated_at = new Date(now - idx * 1000).toISOString();
-                } else if (!row.updated_at && row.date) {
-                  const baseT = Date.parse(row.date.length === 10 ? `${row.date}T23:59:59.000Z` : row.date);
-                  if (Number.isFinite(baseT)) row.updated_at = new Date(baseT - idx * 1000).toISOString();
-                }
-                base.push(row);
-              });
-            }'''
-          t2, n = re.subn(
-              r'const botResults = await Promise\.all\(BOT_FEEDS\.map\(\(url\) => fetchJson\(url\)\)\);.*?for \(const data of botResults\) \{.*?base\.push\(withId\(it as RawItem\)\);.*?\}.*?
-  \}',
-              new_b,
-              t,
-              count=1,
-              flags=re.S,
-          )
-          if n != 1:
-              print("WARN botResults replace n=", n)
-          else:
-              t = t2
-
-          if "PLACEHOLDER" in t:
-              raise SystemExit("still placeholder")
-          if "jsdelivr" not in t:
-              raise SystemExit("missing jsdelivr")
-          p.write_text(t)
-          print("patched ok", len(t))
-          PY
-
+          curl -fsSL -o src/lib/catalog/local.ts \
+            "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/a694e64272a1fea079adce4f45939b788a66e5c9/src/lib/catalog/local.ts"
+          head -5 src/lib/catalog/local.ts
+          wc -c src/lib/catalog/local.ts
+          test "$(head -c 6 src/lib/catalog/local.ts)" = "import"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/catalog/local.ts
-          git commit -m "fix: restore local.ts + permanent bot to live sync"
+          git status
+          git commit -m "fix: restore local.ts — IndoAV/UserBokep pakai posters.json" || echo nochange
           git push
