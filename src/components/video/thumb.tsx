@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-/** Fallback resmi saat poster asli benar-benar tidak ada */
 export const BRAND_POSTER = "/brand-poster.jpg";
 
 function isVideoSrc(src: string): boolean {
@@ -32,11 +31,9 @@ export function VideoThumb({
   className?: string;
 }) {
   const [failed, setFailed] = useState(false);
-  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     setFailed(false);
-    setLoaded(false);
   }, [src]);
 
   if (!src || src === BRAND_POSTER) {
@@ -54,36 +51,27 @@ export function VideoThumb({
         muted
         playsInline
         preload="metadata"
-        className={cn("media-thumb size-full object-cover bg-surface-2", className)}
+        className={cn("media-thumb size-full object-cover bg-zinc-900", className)}
         onError={() => setFailed(true)}
-        onLoadedData={() => setLoaded(true)}
         aria-label={alt}
       />
     );
   }
 
   return (
-    <div className={cn("relative size-full overflow-hidden bg-zinc-900", className)}>
-      <img
-        src={src}
-        alt={alt}
-        loading={eager ? "eager" : "lazy"}
-        decoding="async"
-        referrerPolicy="no-referrer"
-        className={cn(
-          "media-thumb relative size-full object-cover transition-opacity duration-200",
-          loaded ? "opacity-100" : "opacity-0",
-        )}
-        onError={() => setFailed(true)}
-        onLoad={(e) => {
-          const img = e.currentTarget;
-          if (img.naturalWidth <= 2 && img.naturalHeight <= 2) {
-            setFailed(true);
-            return;
-          }
-          setLoaded(true);
-        }}
-      />
-    </div>
+    <img
+      src={src}
+      alt={alt}
+      loading={eager ? "eager" : "lazy"}
+      decoding="async"
+      fetchPriority={eager ? "high" : "low"}
+      referrerPolicy="no-referrer"
+      className={cn("media-thumb size-full object-cover bg-zinc-900", className)}
+      onError={() => setFailed(true)}
+      onLoad={(e) => {
+        const img = e.currentTarget;
+        if (img.naturalWidth <= 2 && img.naturalHeight <= 2) setFailed(true);
+      }}
+    />
   );
 }
