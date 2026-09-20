@@ -1,14 +1,13 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
-/** Fallback resmi saat poster asli tidak ada / gagal load */
+/** Fallback resmi saat poster asli benar-benar tidak ada */
 export const BRAND_POSTER = "/brand-poster.jpg";
 
 function isVideoSrc(src: string): boolean {
   return /\.(mp4|mov|webm)(\?|$)/i.test(src) || /cdn\.videy\.co\//i.test(src);
 }
 
-/** Logo DR. PINGUIN — dipakai SEMUA slot tanpa gambar. */
 function BrandFallback({ className, alt }: { className?: string; alt?: string }) {
   return (
     <img
@@ -21,9 +20,6 @@ function BrandFallback({ className, alt }: { className?: string; alt?: string })
   );
 }
 
-/**
- * Prioritas: poster asli → kalau kosong/gagal → logo brand DR. PINGUIN.
- */
 export function VideoThumb({
   src,
   alt,
@@ -43,8 +39,11 @@ export function VideoThumb({
     setLoaded(false);
   }, [src]);
 
-  // Tidak ada src ATAU gagal load → logo brand (wajib seragam)
-  if (!src || failed || src === BRAND_POSTER) {
+  if (!src || src === BRAND_POSTER) {
+    return <BrandFallback className={className} alt={alt} />;
+  }
+
+  if (failed) {
     return <BrandFallback className={className} alt={alt} />;
   }
 
@@ -64,15 +63,7 @@ export function VideoThumb({
   }
 
   return (
-    <div className={cn("relative size-full overflow-hidden bg-surface-2", className)}>
-      {!loaded ? (
-        <img
-          src={BRAND_POSTER}
-          alt=""
-          aria-hidden
-          className="absolute inset-0 size-full object-cover opacity-60"
-        />
-      ) : null}
+    <div className={cn("relative size-full overflow-hidden bg-zinc-900", className)}>
       <img
         src={src}
         alt={alt}
@@ -80,7 +71,7 @@ export function VideoThumb({
         decoding="async"
         referrerPolicy="no-referrer"
         className={cn(
-          "media-thumb relative size-full object-cover transition-opacity duration-150",
+          "media-thumb relative size-full object-cover transition-opacity duration-200",
           loaded ? "opacity-100" : "opacity-0",
         )}
         onError={() => setFailed(true)}
