@@ -1,5 +1,8 @@
 name: Restore Local
 on:
+  push:
+    paths:
+      - ".github/workflows/restore-local.yml"
   workflow_dispatch:
 permissions:
   contents: write
@@ -13,38 +16,33 @@ jobs:
           python3 <<'PY'
           import urllib.request
           from pathlib import Path
-          # pull good copy from parent commit tree via raw previous good sha
           url = "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/a694e64272a1fea079adce4f45939b788a66e5c9/src/lib/catalog/local.ts"
-          text = urllib.request.urlopen(url, timeout=30).read().decode()
-          if not text.startswith("import"):
-              raise SystemExit("bad download")
-          old = """  const fromPoster = posters[id] || posters[embedKey(item.embed || \"\")] || \"\";
+          text = urllib.request.urlopen(url, timeout=60).read().decode()
+          assert text.startswith("import"), text[:80]
+          old = "  const fromPoster = posters[id] || posters[embedKey(item.embed || \"\")] || \"\";\n  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {\n    return fromPoster;\n  }"
+          old = """  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
   if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
     return fromPoster;
   }"""
-          # fix quotes - use real content
-          old = '''  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
-  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
-    return fromPoster;
-  }'''
-          new = '''  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
+          new = """  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
   if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
     if (/embedan\\.com/i.test(fromPoster)) {
       return `/api/img-proxy?u=${encodeURIComponent(fromPoster)}`;
     }
     return fromPoster;
-  }'''
+  }"""
           if old in text:
               text = text.replace(old, new, 1)
-              print("proxy added")
+              print("proxy ok")
           else:
-              print("no proxy patch, keep as-is")
+              print("keep original thumbOf")
           Path("src/lib/catalog/local.ts").write_text(text)
-          print("bytes", len(text))
-          print(text[:80])
+          print("restored", len(text))
           PY
+          head -2 src/lib/catalog/local.ts
+          wc -c src/lib/catalog/local.ts
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add src/lib/catalog/local.ts
-          git commit -m "fix: restore local.ts (fix PLACEHOLDER corruption / build)"
+          git commit -m "fix: restore local.ts from good commit (build fix)" || echo nochange
           git push
