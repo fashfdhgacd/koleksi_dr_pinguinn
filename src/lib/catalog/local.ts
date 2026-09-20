@@ -210,7 +210,7 @@ function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const videy = videyFile(item);
   if (videy) return videy;
   const eid = embedId(item.embed || item.direct || "") || id;
-  if (isStreamtape(item) && eid) return `/api/tape-thumb?id=${encodeURIComponent(eid)}`;
+  if (isStreamtape(item) && eid) return `/brand-poster.jpg`;
   if (isPutarin(item) && eid) return `/api/puterin-thumb?id=${encodeURIComponent(eid)}`;
   if (isIndoAv(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=indoav`;
   if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
