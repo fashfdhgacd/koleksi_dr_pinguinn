@@ -5,6 +5,8 @@ import localCatalog from "./videos.json";
 import streamtapeBatch from "./streamtape.json";
 import putarinBatch from "./putarin.json";
 import postersMap from "./posters.json";
+import latestVideos from "../../../data/videos-latest.json";
+import latestPosters from "../../../data/latest-posters.json";
 
 const CACHE_MS = 10 * 60 * 1000;
 const STALE_MS = 30 * 60 * 1000;
@@ -293,10 +295,14 @@ function pageOf(pool: RawItem[], page: number, limit: number, posters: Record<st
 
 function assembleLocal(): { items: RawItem[]; posters: Record<string, string> } {
   const local = asList(localCatalog).filter(isUsable);
+  const latest = asList(latestVideos).filter(isUsable);
   const st = asList(streamtapeBatch).filter(isUsable);
   const pu = asList(putarinBatch).filter(isUsable);
-  const posters: Record<string, string> = { ...(postersMap as Record<string, string>) };
-  return { items: uniqById([...st, ...pu, ...local]), posters };
+  const posters: Record<string, string> = {
+    ...(postersMap as Record<string, string>),
+    ...asPosterMap(latestPosters),
+  };
+  return { items: uniqById([...latest, ...st, ...pu, ...local]), posters };
 }
 
 async function refreshRemote(base: { items: RawItem[]; posters: Record<string, string> }): Promise<CatalogCache> {
@@ -394,12 +400,16 @@ export async function listSearch(
 }
 
 export async function getDetail(id: string, _signal?: AbortSignal): Promise<VideoDetail> {
-  const { byId, posters, videyNo } = await loadItems();
-  const item = byId.get(id);
+  let bag = await loadItems();
+  let item = bag.byId.get(id);
+  if (!item && inflight) {
+    bag = await inflight;
+    item = bag.byId.get(id);
+  }
   if (!item) {
     throw Object.assign(new Error("Video tidak ditemukan"), { code: "not_found" as const });
   }
-  const card = toCard(item, posters, videyNo);
+  const card = toCard(item, bag.posters, bag.videyNo);
   const embed = String(item.embed || item.direct || "");
   return {
     ...card,
