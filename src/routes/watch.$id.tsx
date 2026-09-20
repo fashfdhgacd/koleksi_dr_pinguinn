@@ -16,6 +16,7 @@ import {
   videoSeoDescription,
   videoSeoTitle,
 } from "@/lib/seo";
+import { watchDescription } from "@/lib/catalog/watch-description";
 
 const SHARE_CARD_VERSION = "9";
 
@@ -32,14 +33,13 @@ export const Route = createFileRoute("/watch/$id")({
     const description = item
       ? item.description?.trim()?.length > 40
         ? item.description.trim().slice(0, 160)
-        : videoSeoDescription(item.title, item.category)
+        : videoSeoDescription(item.title, item.category, { creator: item.creator })
       : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
     const thumb = (item?.thumbnail || "").trim();
     let image = DEFAULT_OG;
     if (/^https?:\/\//i.test(thumb)) {
       image = thumb;
     } else if (thumb.startsWith("/")) {
-      // Absolute URL agar X/Twitter/OG crawler dapat poster asli (puterin-thumb / tape-thumb)
       image = `${SITE_ORIGIN}${thumb}`;
     }
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
@@ -193,7 +193,7 @@ function ShareSheet({
             onClick={() => void copyLink()}
             className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-secondary px-4 text-base font-medium text-foreground active:scale-[0.98]"
           >
-            {copied ? "✓ Link disalin" : "Salin link"}
+            {copied ? "\u2713 Link disalin" : "Salin link"}
           </button>
           {typeof navigator !== "undefined" && typeof navigator.share === "function" ? (
             <button
@@ -257,7 +257,6 @@ function NextUp({ next }: { next: VideoCard | null }) {
     </div>
   );
 }
-
 
 function catalogSearchFromItem(item: VideoDetail): { q: undefined; category: string | undefined } {
   const raw = (item.category || item.creator || "").trim().toLowerCase();
@@ -347,7 +346,6 @@ function WatchPage() {
     return () => controller.abort();
   }, [id, reload, loaderData]);
 
-  // Tonton juga: refresh diam-diam tiap slot 15 menit. Player tidak di-remount.
   useEffect(() => {
     if (status !== "success" || !id) return;
     const SLOT = 15 * 60 * 1000;
@@ -362,7 +360,7 @@ function WatchPage() {
             if (cancelled || !res.ok || res.type !== "related") return;
             setRelated(res.items.filter((v) => v.id !== id));
           } catch {
-            /* biarkan list lama — jangan ganggu player */
+            /* biarkan list lama */
           } finally {
             if (!cancelled) arm();
           }
@@ -415,15 +413,11 @@ function WatchPage() {
           <header className="max-w-3xl space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
               {item.category}
-              {item.year ? ` · ${item.year}` : ""}
-              {item.creator ? ` · ${item.creator}` : ""}
+              {item.year ? ` \u00b7 ${item.year}` : ""}
+              {item.creator ? ` \u00b7 ${item.creator}` : ""}
             </p>
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>
-            <p className="text-sm leading-relaxed text-muted">
-              {(item.description && !/nonton .+ bokep indo|streaming amatir, jilbab/i.test(item.description))
-                ? item.description
-                : null}
-            </p>
+            <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
