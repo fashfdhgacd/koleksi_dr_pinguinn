@@ -140,7 +140,8 @@ function sourceLabel(item: RawItem): string {
   return item.source || "Unknown";
 }
 
-const PLACEHOLDER_IMAGE_RE = /placeholder|1x1|transparent|data:image\/gif/i;
+const PLACEHOLDER_IMAGE_RE =
+  /placeholder|1x1|transparent|data:image\/gif|indoav\.com|please.?watch|original.?website/i;
 
 function videyFile(item: RawItem): string {
   if (!item.id || !isVidey(item)) return "";
@@ -149,24 +150,23 @@ function videyFile(item: RawItem): string {
   return "";
 }
 
-/** IndoAV/UserBokep: posters.json dulu (poster asli). */
+/** IndoAV/UserBokep selalu lewat proxy same-origin. */
 function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const id = item.id;
   if (isVidey(item)) {
     const videy = videyFile(item);
     if (videy) return videy;
   }
-  const fromPoster = posters[id] || posters[embedKey(item.embed || "")] || "";
-  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
-    return fromPoster;
-  }
-  const videy = videyFile(item);
-  if (videy) return videy;
   const eid = embedId(item.embed || item.direct || "") || id;
-  if (isStreamtape(item) && eid) return `/api/tape-thumb?id=${encodeURIComponent(eid)}`;
-  if (isPutarin(item) && eid) return `/api/puterin-thumb?id=${encodeURIComponent(eid)}`;
   if (isIndoAv(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=indoav`;
   if (isUserBokep(item) && eid) return `/api/embed-thumb?id=${encodeURIComponent(eid)}&src=userbokep`;
+  if (isStreamtape(item) && eid) return `/api/tape-thumb?id=${encodeURIComponent(eid)}`;
+  if (isPutarin(item) && eid) return `/api/puterin-thumb?id=${encodeURIComponent(eid)}`;
+  const fromPoster =
+    posters[id] || posters[embedKey(item.embed || "")] || String(item.poster || item.thumbnail || "");
+  if (fromPoster.startsWith("http") && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
+    return fromPoster;
+  }
   return "";
 }
 
