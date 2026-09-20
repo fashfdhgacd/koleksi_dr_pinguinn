@@ -12,78 +12,40 @@ jobs:
           set -e
           python3 <<'PY'
           from pathlib import Path
-          p = Path("src/routes/watch.$id.tsx")
+          p = Path("src/lib/catalog/local.ts")
           t = p.read_text()
-          if "absoluteThumb" not in t:
-              t = t.replace(
-                  "  videoJsonLd,\n  videoSeoDescription,\n  videoSeoTitle,\n} from \"@/lib/seo\";",
-                  "  absoluteThumb,\n  videoJsonLd,\n  videoSeoDescription,\n  videoSeoTitle,\n} from \"@/lib/seo\";",
-              )
-              print("import")
-          old = '''    const description = item
-      ? item.description?.trim()?.length > 40
-        ? item.description.trim().slice(0, 160)
-        : videoSeoDescription(item.title, item.category)
-      : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
-    const thumb = (item?.thumbnail || "").trim();
-    let image = DEFAULT_OG;
-    if (/^https?:\\/\\//i.test(thumb)) {
-      image = thumb;
-    } else if (thumb.startsWith("/")) {
-      // Absolute URL agar X/Twitter/OG crawler dapat poster asli (puterin-thumb / tape-thumb)
-      image = `${SITE_ORIGIN}${thumb}`;
-    }'''
-          new = '''    const description = item
-      ? (() => {
-          const raw = (item.description || "").trim();
-          const title = (item.title || "").trim();
-          if (
-            raw.length >= 40 &&
-            raw.toLowerCase() !== title.toLowerCase() &&
-            !/^nonton\\s+/i.test(raw) &&
-            !/streaming amatir, jilbab/i.test(raw)
-          ) {
-            return raw.slice(0, 160);
-          }
-          return videoSeoDescription(item.title, item.category, {
-            creator: item.creator,
-            source: (item as { source?: string }).source,
-          });
-        })()
-      : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
-    const image = absoluteThumb(item?.thumbnail);'''
-          # softer match without over-escaping
-          if "const image = absoluteThumb" not in t:
-              import re
-              t2, n = re.subn(
-                  r"const description = item\n[\s\S]*?let image = DEFAULT_OG;[\s\S]*?image = `\$\{SITE_ORIGIN\}\$\{thumb\}`;\n    \}",
-                  new.strip(),
-                  t,
-                  count=1,
-              )
-              if n:
-                  t = t2
-                  print("regex meta ok")
+          # Rewrite embedan poster URLs through img-proxy
+          needle = "  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {\n    return fromPoster;\n  }"
+          insert = '''  if (fromPoster && !PLACEHOLDER_IMAGE_RE.test(fromPoster)) {
+    // embedan tanpa proxy sering = watermark "Please watch On Original Website"
+    if (/embedan\\.com/i.test(fromPoster)) {
+      return `/api/img-proxy?u=${encodeURIComponent(fromPoster)}`;
+    }
+    return fromPoster;
+  }'''
+          if "img-proxy" in t:
+              print("already proxy")
+          elif needle in t:
+              t = t.replace(needle, insert, 1)
+              print("patched thumbOf")
+          else:
+              # try posterOk variant
+              needle2 = "  if (posterOk) {\n    return fromPoster;\n  }"
+              insert2 = '''  if (posterOk) {
+    if (/embedan\\.com/i.test(fromPoster)) {
+      return `/api/img-proxy?u=${encodeURIComponent(fromPoster)}`;
+    }
+    return fromPoster;
+  }'''
+              if needle2 in t:
+                  t = t.replace(needle2, insert2, 1)
+                  print("patched posterOk")
               else:
-                  # try exact from file
-                  if old.replace("\\\\", "\\") in t:
-                      t = t.replace(old.replace("\\\\", "\\"), new)
-                      print("exact")
-                  else:
-                      print("WARN meta block not found")
-          if 'og:image:alt' not in t and 'og:image:height' in t:
-              t = t.replace(
-                  '{ property: "og:image:height", content: "630" },',
-                  '{ property: "og:image:height", content: "630" },\n        { property: "og:image:alt", content: item?.title || "Dr. Pinguin" },',
-                  1,
-              )
-              print("alt")
+                  raise SystemExit("thumbOf poster block not found")
           p.write_text(t)
-          print("done")
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add "src/routes/watch.\$id.tsx" src/lib/seo.ts
-          git status
-          git commit -m "seo: watch meta pakai absoluteThumb + deskripsi lebih bersih" || echo nochange
+          git add src/lib/catalog/local.ts src/routes/api/img-proxy.ts
+          git commit -m "fix: embedan via img-proxy (anti watermark IndoAV)" || echo nochange
           git push
