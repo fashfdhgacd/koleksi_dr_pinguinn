@@ -16,8 +16,8 @@ function isRealFeaturedThumb(url: string | null | undefined): boolean {
   if (!u || /brand-poster/i.test(u)) return false;
   if (/\/api\/embed-thumb\?/i.test(u)) return false;
   if (/\/api\/(tape|puterin)-thumb\?/i.test(u)) return false;
-  // Videy CDN / raw video files are not static art — never hero-eligible.
-  if (/cdn\.videy\.co\//i.test(u)) return false;
+  // Videy removed — never treat CDN / raw video as featured art.
+  if (/cdn\.videy\.co\/|videy\.co\//i.test(u)) return false;
   if (/\.(mp4|mov|webm)(\?|$)/i.test(u)) return false;
   if (/\/api\/img-proxy\?/i.test(u)) return true;
   if (/^https?:\/\//i.test(u)) return true;
