@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { BRAND_LOGO_SRC } from "@/lib/brand-logo";
+import { prefetchCatalog } from "@/lib/catalog/client";
+import { DEFAULT_PAGE_SIZE } from "@/lib/catalog/types";
 
 const QUICK_CATS = [
   { slug: "jav", label: "Jav" },
@@ -118,6 +120,22 @@ export function Header({
                 to="/"
                 search={{ q: undefined, category: cat.slug }}
                 className={chipClass(category === cat.slug && !query)}
+                onMouseEnter={() =>
+                  prefetchCatalog({
+                    type: "category",
+                    category: cat.slug,
+                    page: 1,
+                    limit: DEFAULT_PAGE_SIZE,
+                  })
+                }
+                onFocus={() =>
+                  prefetchCatalog({
+                    type: "category",
+                    category: cat.slug,
+                    page: 1,
+                    limit: DEFAULT_PAGE_SIZE,
+                  })
+                }
               >
                 {cat.label}
               </Link>

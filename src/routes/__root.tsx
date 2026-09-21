@@ -30,6 +30,10 @@ export const Route = createRootRoute({
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      { rel: "preconnect", href: "https://tv1.indoav.app" },
+      { rel: "preconnect", href: "https://tv1.userbokep.com" },
+      { rel: "dns-prefetch", href: "https://tv1.indoav.app" },
+      { rel: "dns-prefetch", href: "https://tv1.userbokep.com" },
       {
         rel: "stylesheet",
         href: "https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&display=swap",
