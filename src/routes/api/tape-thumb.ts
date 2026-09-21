@@ -85,7 +85,7 @@ export const Route = createFileRoute("/api/tape-thumb")({
               status: 200,
               headers: {
                 "content-type": proxied.type,
-                "cache-control": "public, max-age=86400, stale-while-revalidate=604800",
+                "cache-control": "public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000",
                 "x-thumb-source": "streamtape-proxy",
               },
             });
