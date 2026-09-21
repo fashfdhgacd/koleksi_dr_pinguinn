@@ -1,0 +1,30 @@
+name: restore-catalog-videy-filter
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/restore-catalog-videy-filter.yml"
+      - "scripts/restore_videy_filter.py"
+permissions:
+  contents: write
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Restore + filter Videy
+        run: python3 scripts/restore_videy_filter.py
+      - name: Commit if changed
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/catalog/local.ts "src/routes/watch.$id.tsx"
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "fix: restore local.ts+watch from 039704e4; hide Videy from lists/related/categories/search/detail"
+          git push
