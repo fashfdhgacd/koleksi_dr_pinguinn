@@ -3,12 +3,16 @@ import { Play } from "lucide-react";
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { VideoThumb } from "./thumb";
 
+type VideoCardPreload = false | "intent" | "viewport";
+
 export function VideoCard({
   video,
   eager = false,
+  preload = false,
 }: {
   video: VideoCardType;
   eager?: boolean;
+  preload?: VideoCardPreload;
 }) {
   const showDuration = video.durationLabel && video.durationLabel !== "\u2014";
 
@@ -16,7 +20,8 @@ export function VideoCard({
     <Link
       to="/watch/$id"
       params={{ id: video.id }}
-      className="group block rounded-xl p-1 transition-[transform,background-color] duration-150 ease-out hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      preload={preload}
+      className="group block rounded-xl p-1 transition-colors duration-150 ease-out hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div className="relative aspect-video overflow-hidden rounded-lg bg-surface-2">
         <VideoThumb src={video.thumbnail} alt={video.title} eager={eager} />
@@ -26,7 +31,7 @@ export function VideoCard({
             <span className="rounded-sm bg-background/70 px-1.5 py-0.5">{video.durationLabel}</span>
           </div>
         ) : null}
-        <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100">
           <span className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <Play className="size-4 fill-current" style={{ marginLeft: 2 }} />
           </span>

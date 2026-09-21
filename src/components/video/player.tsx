@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ExternalLink, LoaderCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { VideoDetail, VideoQuality } from "@/lib/catalog/types";
@@ -75,12 +75,14 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
 
   function start() {
     if (!current || !playUrl) {
-      setFailed(true);
+      startTransition(() => setFailed(true));
       return;
     }
-    setFailed(false);
-    setStarted(true);
-    setBuffering(useVideo);
+    startTransition(() => {
+      setFailed(false);
+      setStarted(true);
+      setBuffering(useVideo);
+    });
   }
 
   function pickSource(index: number) {
