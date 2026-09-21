@@ -40,10 +40,12 @@ function VideoFrameThumb({
   src,
   alt,
   className,
+  onUnavailable,
 }: {
   src: string;
   alt: string;
   className?: string;
+  onUnavailable?: () => void;
 }) {
   const shellRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -193,6 +195,13 @@ function VideoFrameThumb({
     };
   }, [inView, failed, frameUrl, src]);
 
+  useEffect(() => {
+    if (!failed) return;
+    onUnavailable?.();
+    // intentionally only when `failed` flips true for this src
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [failed, src]);
+
   if (failed) {
     return <BrandFallback className={className} alt={alt} />;
   }
@@ -234,21 +243,32 @@ export function VideoThumb({
   alt,
   eager = false,
   className,
+  onUnavailable,
 }: {
   src: string;
   alt: string;
   eager?: boolean;
   className?: string;
+  /** Fires when thumb is missing/brand or load fails (hero can skip the slide). */
+  onUnavailable?: () => void;
 }) {
   const [failed, setFailed] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const brandOrEmpty = !src || src === BRAND_POSTER || /brand-poster/i.test(src);
 
   useEffect(() => {
     setFailed(false);
     setLoaded(false);
   }, [src]);
 
-  if (!src || src === BRAND_POSTER) {
+  useEffect(() => {
+    if (!(brandOrEmpty || failed)) return;
+    onUnavailable?.();
+    // one-shot per src / failed flip — avoid loops if parent recreates callback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brandOrEmpty, failed, src]);
+
+  if (brandOrEmpty) {
     return <BrandFallback className={className} alt={alt} />;
   }
 
@@ -258,7 +278,7 @@ export function VideoThumb({
 
   if (isVideoSrc(src)) {
     // eager must NOT mean "download 64MB" — VideoFrameThumb is viewport-gated.
-    return <VideoFrameThumb src={src} alt={alt} className={className} />;
+    return <VideoFrameThumb src={src} alt={alt} className={className} onUnavailable={onUnavailable} />;
   }
 
   return (
