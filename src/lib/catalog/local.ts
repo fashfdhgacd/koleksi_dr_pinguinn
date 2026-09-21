@@ -196,10 +196,8 @@ function proxiedPoster(url: string): string {
 
 function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const id = item.id;
-  if (isVidey(item)) {
-    const videy = videyFile(item);
-    if (videy) return videy;
-  }
+  // Videy removed from UI: never feed cdn.videy.co MP4 into thumbs/grids.
+  if (isVidey(item)) return "";
   const fromPoster =
     posters[id] ||
     posters[embedKey(item.embed || "")] ||
@@ -220,6 +218,7 @@ function videyDisplayTitle(_item: RawItem, index: number): string {
 }
 
 function isUsable(item: RawItem): boolean {
+  if (isVidey(item)) return false; // cabut Videy dari index/feed
   if (!item?.id || typeof item.id !== "string") return false;
   if (item.id.length < 3) return false;
   const play = String(item.embed || item.direct || "").trim();
@@ -335,17 +334,14 @@ async function refreshRemote(base: { items: RawItem[]; posters: Record<string, s
     remote.push(...withIds(asList(data)).filter(isUsable));
     Object.assign(posters, asPosterMap(data));
   }
-  let items = uniqById([...remote, ...base.items]);
-  // Videy removed from public catalog (mobile bandwidth).
-  items = items.filter((it) => !isVidey(it));
+  const items = uniqById([...remote, ...base.items]);
   const videyNo = buildVideyNo(items);
   return buildIndexes(items, posters, videyNo, Date.now());
 }
 
 function seedLocalCache(): CatalogCache {
   const local = assembleLocal();
-  const localItems = local.items.filter((it) => !isVidey(it));
-  return buildIndexes(localItems, local.posters, buildVideyNo(localItems), Date.now());
+  return buildIndexes(local.items, local.posters, buildVideyNo(local.items), Date.now());
 }
 
 function kickRemoteRefresh(base: { items: RawItem[]; posters: Record<string, string> }): void {
@@ -503,10 +499,11 @@ export async function listCategory(
     pool = hit && hit.length ? hit : items.filter(isStreamtape);
   }
   else if (s === "videy") {
-    // Category retired — empty page.
-    pool = [];
+    // Videy category hidden — empty listing.
+    return pageOf([], page, limit, posters, videyNo);
   }
   else pool = bySlug.get(s) || mainSorted.filter((x) => slugOf(x) === s);
+  pool = pool.filter((x) => !isVidey(x));
   return pageOf(pool, page, limit, posters, videyNo);
 }
 
@@ -522,6 +519,7 @@ export async function listSearch(
   const tokens = key.split(/\s+/).filter(Boolean);
   const matched: RawItem[] = [];
   for (const row of haystack) {
+    if (isVidey(row.item)) continue;
     if (tokens.every((t) => row.hay.includes(t))) matched.push(row.item);
   }
   return pageOf(sortByNewest(matched), page, limit, posters, videyNo);
@@ -550,13 +548,10 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
 
 export async function listRelated(id: string, limit = 12, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters, videyNo } = await loadItems();
-  const current = items.find((x) => x.id === id) || null;
   const seed = slotIndex(hashId(id) % 997);
-  let pool: RawItem[];
 
-  // Videy stripped — related is IndoAV-heavy only.
-  void current;
-  pool = mixIndoHeavy(items, id, limit, seed);
+  // Videy filtered from all related/"Tonton juga" grids.
+  const pool = mixIndoHeavy(items, id, limit, seed).filter((x) => !isVidey(x));
 
   return {
     page: 1,
@@ -571,9 +566,11 @@ export async function listCategories(): Promise<{ slug: string; label: string; c
   const { bySlug } = await loadItems();
   const out: { slug: string; label: string; count: number }[] = [];
   for (const [slug, list] of bySlug) {
-    if (slug === "videy") continue;
+    if (slug === "videy") continue; // hide Videy category chip/nav
+    const nonVidey = list.filter((x) => !isVidey(x));
+    if (!nonVidey.length) continue;
     const cat = findCategory(slug);
-    out.push({ slug, label: cat?.label || slug, count: list.length });
+    out.push({ slug, label: cat?.label || slug, count: nonVidey.length });
   }
   return out.sort((a, b) => b.count - a.count);
 }

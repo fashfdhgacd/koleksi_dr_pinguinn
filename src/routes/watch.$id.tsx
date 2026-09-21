@@ -214,6 +214,7 @@ function ShareSheet({
 
 function catalogSearchFromItem(item: VideoDetail): { q: undefined; category: string | undefined } {
   const raw = (item.category || item.creator || "").trim().toLowerCase();
+  // Videy category hidden — fall through to home (no category).
   if (/videy/.test(raw)) return { q: undefined, category: undefined };
   if (/jav|putarin|puterin/.test(raw)) return { q: undefined, category: "jav" };
   if (/ai\+|ai-plus|streamtape/.test(raw)) return { q: undefined, category: "ai-plus" };
