@@ -20,6 +20,8 @@ const BOT_FEEDS = [
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/videos-latest.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/latest-posters.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin-latest.json",
+  // Arsip Putarin penuh (~563) dari repo lama
+  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguin/main/data/putarin.json",
 ];
 
 type RawItem = {
@@ -349,6 +351,17 @@ export async function loadItems(): Promise<CatalogCache> {
     return cache;
   }
   if (!cache) cache = seedLocalCache();
+  const putarinN = cache.items.filter(isPutarin).length;
+  // Cold start serverless: tunggu remote sekali kalau Jav/Putarin masih tipis
+  if (putarinN < 200) {
+    try {
+      if (inflight) cache = await inflight;
+      else cache = await refreshRemote({ items: cache.items, posters: cache.posters });
+    } catch {
+      kickRemoteRefresh({ items: cache.items, posters: cache.posters });
+    }
+    return cache;
+  }
   kickRemoteRefresh({ items: cache.items, posters: cache.posters });
   return cache;
 }
