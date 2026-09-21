@@ -75,7 +75,7 @@ function asPosterMap(data: unknown): Record<string, string> {
 async function fetchJson(url: string): Promise<unknown> {
   try {
     const r = await fetch(feedUrl(url), {
-      signal: AbortSignal.timeout(4000),
+      signal: AbortSignal.timeout(12000),
       headers: { accept: "application/json", "user-agent": "kdp-catalog/1.1" },
     });
     if (!r.ok) return null;
@@ -94,6 +94,21 @@ function embedId(embed = ""): string {
 
 function embedKey(embed = ""): string {
   return embedId(embed) || String(embed).slice(0, 64);
+}
+
+/** Arsip Putarin lama sering tanpa `id` — ambil dari /e/ atau /v/ di URL. */
+function withIds(items: RawItem[]): RawItem[] {
+  const out: RawItem[] = [];
+  for (const item of items) {
+    if (!item || typeof item !== "object") continue;
+    let id = typeof item.id === "string" ? item.id.trim() : "";
+    if (!id || id.length < 3) {
+      id = embedId(String(item.embed || "")) || embedId(String(item.direct || ""));
+    }
+    if (!id || id.length < 3) continue;
+    out.push(id === item.id ? item : { ...item, id });
+  }
+  return out;
 }
 
 function isIndoAv(item: RawItem): boolean {
@@ -301,10 +316,10 @@ function pageOf(pool: RawItem[], page: number, limit: number, posters: Record<st
 }
 
 function assembleLocal(): { items: RawItem[]; posters: Record<string, string> } {
-  const local = asList(localCatalog).filter(isUsable);
-  const latest = asList(latestVideos).filter(isUsable);
-  const st = asList(streamtapeBatch).filter(isUsable);
-  const pu = asList(putarinBatch).filter(isUsable);
+  const local = withIds(asList(localCatalog)).filter(isUsable);
+  const latest = withIds(asList(latestVideos)).filter(isUsable);
+  const st = withIds(asList(streamtapeBatch)).filter(isUsable);
+  const pu = withIds(asList(putarinBatch)).filter(isUsable);
   const posters: Record<string, string> = {
     ...(postersMap as Record<string, string>),
     ...asPosterMap(latestPosters),
@@ -317,7 +332,7 @@ async function refreshRemote(base: { items: RawItem[]; posters: Record<string, s
   const remote: RawItem[] = [];
   const botResults = await Promise.all(BOT_FEEDS.map((url) => fetchJson(url)));
   for (const data of botResults) {
-    remote.push(...asList(data).filter(isUsable));
+    remote.push(...withIds(asList(data)).filter(isUsable));
     Object.assign(posters, asPosterMap(data));
   }
   const items = uniqById([...remote, ...base.items]);
