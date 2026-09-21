@@ -21,10 +21,10 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/catalog/local.ts "src/routes/watch.$id.tsx"
+          git add src/lib/catalog/local.ts 'src/routes/watch.$id.tsx'
           if git diff --cached --quiet; then
             echo "No changes"
             exit 0
           fi
-          git commit -m "fix: restore local.ts+watch from 039704e4; hide Videy from lists/related/categories/search/detail"
+          git commit -m "fix: restore local.ts+watch; hide Videy from lists/related/search/detail"
           git push
