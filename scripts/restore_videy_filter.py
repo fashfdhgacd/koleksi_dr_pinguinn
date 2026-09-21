@@ -99,7 +99,7 @@ def patch_local(s: str) -> str:
     out.push({ slug, label: cat?.label || slug, count: list.length });
   }"""
     new_cats = """  for (const [slug, list] of bySlug) {
-    if (slug === "videy") continue; // hide Videy category chip/nav
+    if (slug === \"videy\") continue; // hide Videy category chip/nav
     const nonVidey = list.filter((x) => !isVidey(x));
     if (!nonVidey.length) continue;
     const cat = findCategory(slug);
@@ -108,6 +108,17 @@ def patch_local(s: str) -> str:
     if old_cats not in s:
         raise SystemExit("listCategories block missing")
     s = s.replace(old_cats, new_cats, 1)
+
+    old_use = """function isUsable(item: RawItem): boolean {
+  if (!item?.id || typeof item.id !== \"string\") return false;
+"""
+    new_use = """function isUsable(item: RawItem): boolean {
+  if (isVidey(item)) return false; // cabut Videy dari index/feed
+  if (!item?.id || typeof item.id !== \"string\") return false;
+"""
+    if old_use not in s:
+        raise SystemExit("isUsable block missing")
+    s = s.replace(old_use, new_use, 1)
 
     if "PLACEHOLDER_WILL_REPLACE" in s:
         raise SystemExit("placeholder leaked")
