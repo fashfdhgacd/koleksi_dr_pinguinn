@@ -1,1 +1,1 @@
-@/tmp/cou_github_ascii.json
+PLACEHOLDER_WILL_FAIL
