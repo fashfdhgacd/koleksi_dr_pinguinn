@@ -18,7 +18,7 @@ import {
 } from "@/lib/seo";
 import { watchDescription } from "@/lib/catalog/watch-description";
 
-const SHARE_CARD_VERSION = "9";
+const SHARE_CARD_VERSION = "10";
 
 export const Route = createFileRoute("/watch/$id")({
   loader: async ({ params }) => {
@@ -35,9 +35,8 @@ export const Route = createFileRoute("/watch/$id")({
         ? item.description.trim().slice(0, 160)
         : videoSeoDescription(item.title, item.category, { creator: item.creator })
       : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
-    const image = item
-      ? `${SITE_ORIGIN}/api/og?id=${encodeURIComponent(item.id)}&v=${SHARE_CARD_VERSION}`
-      : DEFAULT_OG;
+    // X menolak poster embedan/API. Kartu share = logo statis /og.jpg.
+    const image = DEFAULT_OG;
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
     const embedUrl = item
       ? (item.video_url || item.qualities?.[0]?.url || "").trim() || null
@@ -72,12 +71,13 @@ export const Route = createFileRoute("/watch/$id")({
         { property: "og:url", content: url },
         { property: "og:image", content: image },
         { property: "og:image:type", content: "image/jpeg" },
-        { property: "og:image:width", content: "1200" },
-        { property: "og:image:height", content: "630" },
+        { property: "og:image:width", content: "1280" },
+        { property: "og:image:height", content: "720" },
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:title", content: title },
         { name: "twitter:description", content: description },
         { name: "twitter:image", content: image },
+        { name: "twitter:image:alt", content: "DR. PINGUIN" },
         { name: "robots", content: "index,follow,max-video-preview:120" },
         { name: "rating", content: "adult" },
       ],
