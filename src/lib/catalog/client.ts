@@ -24,12 +24,9 @@ function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/** Retry 499/502/503/504 — Vercel kadang batalkan request (cold start / abort). */
-export async function fetchCatalog(
-  query: ClientQuery,
-  signal?: AbortSignal,
-): Promise<CatalogResponse> {
-  const path = catalogPath(query);
+const inflight = new Map<string, Promise<CatalogResponse>>();
+
+async function fetchCatalogOnce(path: string, signal?: AbortSignal): Promise<CatalogResponse> {
   const maxAttempts = 3;
   let lastStatus = 0;
 
@@ -82,4 +79,20 @@ export async function fetchCatalog(
     error: `Gagal memuat katalog (${lastStatus || "network"}).`,
     code: "upstream",
   };
+}
+
+/** Retry 499/502/503/504 — Vercel kadang batalkan request (cold start / abort). */
+export function fetchCatalog(query: ClientQuery, signal?: AbortSignal): Promise<CatalogResponse> {
+  const path = catalogPath(query);
+  const existing = inflight.get(path);
+  if (existing) return existing;
+  const pending = fetchCatalogOnce(path, signal).finally(() => {
+    inflight.delete(path);
+  });
+  inflight.set(path, pending);
+  return pending;
+}
+
+export function prefetchCatalog(query: ClientQuery): void {
+  void fetchCatalog(query);
 }
