@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
@@ -211,52 +211,6 @@ function ShareSheet({
   );
 }
 
-function NextUp({ next }: { next: VideoCard | null }) {
-  const navigate = useNavigate();
-  const [left, setLeft] = useState(25);
-  const [armed, setArmed] = useState(false);
-
-  useEffect(() => {
-    setLeft(25);
-    setArmed(false);
-    if (!next) return;
-    const arm = window.setTimeout(() => setArmed(true), 90_000);
-    return () => window.clearTimeout(arm);
-  }, [next?.id]);
-
-  useEffect(() => {
-    if (!armed || !next) return;
-    if (left <= 0) {
-      void navigate({ to: "/watch/$id", params: { id: next.id } });
-      return;
-    }
-    const t = window.setTimeout(() => setLeft((n) => n - 1), 1000);
-    return () => window.clearTimeout(t);
-  }, [armed, left, next, navigate]);
-
-  if (!next || !armed) return null;
-
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-secondary/60 px-4 py-3">
-      <div className="min-w-0">
-        <p className="text-xs uppercase tracking-wider text-muted">Berikutnya dalam {left}d</p>
-        <p className="truncate text-sm font-medium text-foreground">{next.title}</p>
-      </div>
-      <div className="flex gap-2">
-        <button type="button" className="h-10 rounded-lg bg-secondary px-3 text-sm" onClick={() => setArmed(false)}>
-          Tetap di sini
-        </button>
-        <Link
-          to="/watch/$id"
-          params={{ id: next.id }}
-          className="flex h-10 items-center rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground"
-        >
-          Putar sekarang
-        </Link>
-      </div>
-    </div>
-  );
-}
 
 function catalogSearchFromItem(item: VideoDetail): { q: undefined; category: string | undefined } {
   const raw = (item.category || item.creator || "").trim().toLowerCase();
@@ -348,7 +302,7 @@ function WatchPage() {
 
   useEffect(() => {
     if (status !== "success" || !id) return;
-    const SLOT = 15 * 60 * 1000;
+    const SLOT = 5 * 60 * 1000;
     let tid = 0;
     let cancelled = false;
     const arm = () => {
@@ -407,9 +361,6 @@ function WatchPage() {
               );
             })()}
           </div>
-
-          <NextUp next={related[0] ?? null} />
-
           <header className="max-w-3xl space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
               {item.category}
