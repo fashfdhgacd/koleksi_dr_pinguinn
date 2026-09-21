@@ -10,14 +10,22 @@ async function getJson(url, headers = {}) {
 
 function decodeEntities(s = "") {
   return String(s)
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
+    .replace(/&/g, "&")
+    .replace(/</g, "<")
+    .replace(/>/g, ">")
+    .replace(/"/g, '"')
     .replace(/&#039;/g, "'")
-    .replace(/&apos;/g, "'")
+    .replace(/'/g, "'")
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
     .trim();
+}
+
+/** Race a promise against a hard timeout; never hang forever. */
+function withTimeout(promise, ms, fallback = "") {
+  return Promise.race([
+    promise.catch(() => fallback),
+    new Promise((resolve) => setTimeout(() => resolve(fallback), ms)),
+  ]);
 }
 
 /** Ambil judul dari <title> halaman embed Puterin kalau API key kosong. */
@@ -35,7 +43,7 @@ async function scrapePutarinTitle(code) {
           "user-agent": "Mozilla/5.0 (compatible; kdp-bot/1.0)",
         },
         redirect: "follow",
-        signal: AbortSignal.timeout(10000),
+        signal: AbortSignal.timeout(2800),
       });
       if (!res.ok) continue;
       const html = await res.text();
@@ -59,16 +67,24 @@ export async function fetchPutarinTitle(code, env) {
   const key = env.PUTARIN_API_KEY;
   const base = (env.PUTARIN_API_BASE || "https://panel.putarin.com/api/dev").replace(/\/$/, "");
   if (key && code) {
-    const { ok, data } = await getJson(`${base}/video/${encodeURIComponent(code)}`, {
-      "X-API-Key": key,
-      Accept: "application/json",
-    });
-    if (ok && data) {
-      const t = String(data.video?.title || data.title || data.data?.title || "").trim();
-      if (t) return t;
+    try {
+      const { ok, data } = await withTimeout(
+        getJson(`${base}/video/${encodeURIComponent(code)}`, {
+          "X-API-Key": key,
+          Accept: "application/json",
+        }),
+        3000,
+        { ok: false, data: null },
+      );
+      if (ok && data) {
+        const t = String(data.video?.title || data.title || data.data?.title || "").trim();
+        if (t) return t;
+      }
+    } catch {
+      /* fall through to scrape */
     }
   }
-  return scrapePutarinTitle(code);
+  return withTimeout(scrapePutarinTitle(code), 3000, "");
 }
 
 export async function fetchPutarinMeta(code, env) {
@@ -77,19 +93,27 @@ export async function fetchPutarinMeta(code, env) {
   let title = "";
   let thumb = "";
   if (key && code) {
-    const { ok, data } = await getJson(`${base}/video/${encodeURIComponent(code)}`, {
-      "X-API-Key": key,
-      Accept: "application/json",
-    });
-    if (ok && data) {
-      const v = data.video || data.data || data;
-      title = String(v?.title || data.title || "").trim();
-      thumb = String(
-        v?.poster || v?.thumbnail || v?.thumb || v?.image || data.poster || data.thumbnail || "",
-      ).trim();
+    try {
+      const { ok, data } = await withTimeout(
+        getJson(`${base}/video/${encodeURIComponent(code)}`, {
+          "X-API-Key": key,
+          Accept: "application/json",
+        }),
+        3000,
+        { ok: false, data: null },
+      );
+      if (ok && data) {
+        const v = data.video || data.data || data;
+        title = String(v?.title || data.title || "").trim();
+        thumb = String(
+          v?.poster || v?.thumbnail || v?.thumb || v?.image || data.poster || data.thumbnail || "",
+        ).trim();
+      }
+    } catch {
+      /* ignore */
     }
   }
-  if (!title) title = await scrapePutarinTitle(code);
+  if (!title) title = await withTimeout(scrapePutarinTitle(code), 3000, "");
   return { title, thumb };
 }
 
@@ -99,7 +123,7 @@ export async function fetchStreamtapeTitle(fileId, env) {
   const api = (env.STREAMTAPE_API || "https://api.streamtape.com").replace(/\/$/, "");
   if (!login || !key || !fileId) return "";
   const url = `${api}/file/info?file=${encodeURIComponent(fileId)}&login=${encodeURIComponent(login)}&key=${encodeURIComponent(key)}`;
-  const { ok, data } = await getJson(url);
+  const { ok, data } = await withTimeout(getJson(url), 3000, { ok: false, data: null });
   if (!ok || !data || data.status !== 200) return "";
   const info = data.result?.[fileId] || data.result;
   return String(info?.name || info?.title || "").replace(/\.[a-z0-9]+$/i, "").trim();
