@@ -48,6 +48,7 @@ export const Route = createFileRoute("/api/img-proxy")({
             status: 200,
             headers: {
               "content-type": type,
+              "content-length": String(buf.byteLength),
               "cache-control": "public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000",
               "x-proxy": "embedan",
             },

@@ -60,6 +60,25 @@ export function isIndoAvUrl(url: string): boolean {
   return /indoav/i.test(url);
 }
 
+export function isUserBokepUrl(url: string): boolean {
+  return /userbokep/i.test(url);
+}
+
+/** Same embed code on tv1.indoav.app and tv1.userbokep.com. */
+export function pairRevenueUrls(url: string): string[] {
+  try {
+    const u = new URL(url);
+    if (!/indoav|userbokep/i.test(u.hostname)) return [url];
+    const parts = u.pathname.split("/").filter(Boolean);
+    const idx = parts.findIndex((p) => /^(e|v|d|embed)$/i.test(p));
+    const code = idx >= 0 ? parts[idx + 1] : parts[parts.length - 1];
+    if (!code || !/^[A-Za-z0-9_-]{4,64}$/.test(code)) return [url];
+    return [`https://tv1.indoav.app/e/${code}`, `https://tv1.userbokep.com/e/${code}`];
+  } catch {
+    return [url];
+  }
+}
+
 function isFile(url: string): boolean {
   return /\.(mp4|mov|webm)($|\?)/i.test(url);
 }
@@ -85,7 +104,6 @@ export function resolveSource(raw: string | null | undefined): ResolvedSource | 
 
   const id = videyId(url);
   if (id && /videy/i.test(url)) {
-    // Play CDN mp4/mov in <video>, never iframe the videy.co page UI.
     const cdns = videyCdns(id);
     return {
       mode: "video",
