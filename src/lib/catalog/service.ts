@@ -10,6 +10,32 @@ import {
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./types";
 import type { CatalogError, CatalogResponse, CatalogType, VideoCard } from "./types";
 
+/** Featured/hero: only keep thumbs that are known real art (not brand / speculative *-thumb). */
+function isRealFeaturedThumb(url: string | null | undefined): boolean {
+  const u = (url || "").trim();
+  if (!u || /brand-poster/i.test(u)) return false;
+  if (/\/api\/embed-thumb\?/i.test(u)) return false;
+  if (/\/api\/(tape|puterin)-thumb\?/i.test(u)) return false;
+  if (/\/api\/img-proxy\?/i.test(u)) return true;
+  if (/cdn\.videy\.co\//i.test(u)) return true;
+  if (/^https?:\/\//i.test(u)) return true;
+  return false;
+}
+
+async function listFeaturedWithArt(page = 1, limit = 8, signal?: AbortSignal) {
+  const want = Math.max(1, limit);
+  // Over-fetch so we can drop speculative embed-thumb leftovers and still fill `limit`.
+  const raw = await listFeatured(page, Math.max(want * 8, 64), signal);
+  const items = raw.items.filter((x) => isRealFeaturedThumb(x.thumbnail)).slice(0, want);
+  return {
+    ...raw,
+    limit: want,
+    total: items.length,
+    hasMore: false,
+    items,
+  };
+}
+
 export type CatalogQuery = {
   type?: string | null;
   page?: string | number | null;
@@ -69,7 +95,7 @@ export async function queryCatalog(query: CatalogQuery, signal?: AbortSignal): P
         return { ok: true, type, ...data };
       }
       case "featured": {
-        const data = await listFeatured(page, limit ?? 1, signal);
+        const data = await listFeaturedWithArt(page, limit ?? 1, signal);
         return { ok: true, type, ...data };
       }
       case "category": {
@@ -101,9 +127,9 @@ export async function queryCatalog(query: CatalogQuery, signal?: AbortSignal): P
         return { ok: true, type, item, related: related.items };
       }
       case "home": {
-        // Featured: 8 item time-slot agar Hero bisa rotate tiap 5 menit
+        // Featured: 8 item time-slot agar Hero bisa rotate tiap 5 menit (hanya thumb nyata)
         const [featured, latest] = await Promise.all([
-          listFeatured(1, 8, signal),
+          listFeaturedWithArt(1, 8, signal),
           listLatest(page ?? 1, limit ?? DEFAULT_PAGE_SIZE, signal),
         ]);
         return {
