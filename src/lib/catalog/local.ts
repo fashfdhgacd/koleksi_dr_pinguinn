@@ -20,8 +20,6 @@ const BOT_FEEDS = [
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/videos-latest.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/latest-posters.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin-latest.json",
-  // Arsip Putarin penuh (koleksi_dr_pinguin, 1 n) — cold-start Jav tetap aman meski putarin.json bundel kosong
-  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguin/main/data/putarin.json",
 ];
 
 type RawItem = {
@@ -228,7 +226,7 @@ function toCard(item: RawItem, posters: Record<string, string>, videyNo?: Map<st
     description: "",
     category: slugOf(item),
     duration: typeof item.duration === "number" ? item.duration : null,
-    durationLabel: "\u2014",
+    durationLabel: "—",
     quality,
     year: null,
     creator: sourceLabel(item),
@@ -465,9 +463,18 @@ export async function listCategory(
   const { items, posters, videyNo, bySlug, mainSorted } = await loadItems();
   const s = category.toLowerCase().trim();
   let pool: RawItem[];
-  if (s === "jav") pool = bySlug.get("jav") || items.filter(isPutarin);
-  else if (s === "ai-plus" || s === "streamtape") pool = bySlug.get("ai-plus") || items.filter(isStreamtape);
-  else if (s === "videy") pool = bySlug.get("videy") || items.filter(isVidey);
+  if (s === "jav") {
+    const hit = bySlug.get("jav");
+    pool = hit && hit.length ? hit : items.filter(isPutarin);
+  }
+  else if (s === "ai-plus" || s === "streamtape") {
+    const hit = bySlug.get("ai-plus");
+    pool = hit && hit.length ? hit : items.filter(isStreamtape);
+  }
+  else if (s === "videy") {
+    const hit = bySlug.get("videy");
+    pool = hit && hit.length ? hit : items.filter(isVidey);
+  }
   else pool = bySlug.get(s) || mainSorted.filter((x) => slugOf(x) === s);
   return pageOf(pool, page, limit, posters, videyNo);
 }
