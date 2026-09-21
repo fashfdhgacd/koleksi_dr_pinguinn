@@ -1,21 +1,18 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ExternalLink, LoaderCircle, Play } from "lucide-react";
+import { AlertTriangle, LoaderCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { VideoDetail, VideoQuality } from "@/lib/catalog/types";
+import type { VideoDetail } from "@/lib/catalog/types";
 import {
-  hostLabel,
   hostPriority,
-  isIndoAvUrl,
   pairRevenueUrls,
   resolveSource,
   type ResolvedSource,
 } from "@/lib/catalog/embed";
+import { VideoThumb } from "./thumb";
 
 function isEmbedHostUrl(url: string): boolean {
   return /indoav|userbokep|puterin|putarin|streamtape|strcloud|lulu/i.test(url);
 }
-import { VideoThumb } from "./thumb";
-import { cn } from "@/lib/utils";
 
 function sourcesFromItem(item: VideoDetail): ResolvedSource[] {
   const raw = [item.video_url, ...item.qualities.map((q) => q.url)].filter((u): u is string => Boolean(u));
@@ -42,7 +39,6 @@ function sourcesFromItem(item: VideoDetail): ResolvedSource[] {
     out.push(resolved);
   }
   out.sort((a, b) => hostPriority(`${a.host} ${a.url}`) - hostPriority(`${b.host} ${b.url}`));
-  // Jangan auto-play IndoAV hasil tebakan kalau katalog cuma UserBokep (bisa 404 = player blank).
   if (!catalogHasIndo) {
     const ub = out.findIndex((s) => /userbokep/i.test(s.url));
     if (ub > 0) {
@@ -87,7 +83,6 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const rawPlay = current?.fallbacks[fallbackAt] ?? current?.url ?? null;
   const playUrl = rawPlay && current ? normalizePlayUrl(rawPlay, current.host) : rawPlay;
   const useVideo = isFileUrl(playUrl);
-  const indoFirst = Boolean(current && isIndoAvUrl(current.url));
 
   useEffect(() => {
     setActive(0);
@@ -119,15 +114,14 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     setBuffering(isFileUrl(list[index]?.url ?? null));
   }
 
-  function changeQuality(next: VideoQuality) {
-    const resolved = resolveSource(next.url);
-    if (!resolved) return;
-    const idx = list.findIndex((s) => s.url === resolved.url);
-    pickSource(idx >= 0 ? idx : 0);
-  }
-
-  function openExternal() {
-    if (playUrl) window.open(playUrl, "_blank", "noopener,noreferrer");
+  function retryQuiet() {
+    if (active + 1 < list.length) {
+      pickSource(active + 1);
+      return;
+    }
+    setFailed(false);
+    setFallbackAt(0);
+    start();
   }
 
   return (
@@ -203,80 +197,17 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
         {failed ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/85 px-6 text-center">
             <AlertTriangle className="size-7 text-destructive" />
-            <p className="max-w-sm text-sm text-muted">
-              Sumber gagal dimuat. Coba host lain atau ulangi.
-            </p>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <Button
-                onClick={() => {
-                  setFailed(false);
-                  setFallbackAt(0);
-                  start();
-                }}
-              >
-                Coba lagi
-              </Button>
-              {playUrl ? (
-                <Button variant="secondary" onClick={openExternal}>
-                  <ExternalLink className="mr-1.5 size-4" />
-                  Buka sumber
-                </Button>
-              ) : null}
-            </div>
+            <p className="max-w-sm text-sm text-muted">Video gagal dimuat. Coba ulangi.</p>
+            <Button onClick={retryQuiet}>Coba lagi</Button>
           </div>
         ) : null}
 
         {!current && !started ? (
           <div className="absolute inset-x-0 bottom-0 p-4 text-center text-sm text-muted">
-            File putar tidak tersedia untuk judul ini.
+            Video tidak tersedia untuk judul ini.
           </div>
         ) : null}
       </div>
-
-      {list.length > 1 ? (
-        <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
-          <span className="text-xs text-muted">Host</span>
-          {list.map((src, i) => (
-            <button
-              key={src.url}
-              type="button"
-              onClick={() => pickSource(i)}
-              className={cn(
-                "h-8 rounded-md px-2.5 text-xs font-medium transition-colors duration-150",
-                i === active ? "bg-primary text-primary-foreground" : "bg-secondary text-muted",
-              )}
-            >
-              {src.host}
-              {isIndoAvUrl(src.url) ? " · prioritas" : ""}
-            </button>
-          ))}
-        </div>
-      ) : item.qualities.filter((q) => !/^direct$/i.test(q.label || "")).length > 1 ? (
-        <div className="flex flex-wrap items-center gap-2 border-t border-border px-4 py-3">
-          <span className="text-xs text-muted">Sumber</span>
-          {item.qualities
-            .filter((q) => !/^direct$/i.test(q.label || ""))
-            .map((q) => (
-            <button
-              key={q.url}
-              type="button"
-              onClick={() => changeQuality(q)}
-              className={cn(
-                "h-8 rounded-md px-2.5 text-xs font-medium transition-colors duration-150",
-                resolveSource(q.url)?.url === current?.url
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-muted",
-              )}
-            >
-              {q.label || hostLabel(q.url)}
-            </button>
-          ))}
-        </div>
-      ) : current ? (
-        <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-2 text-xs text-muted">
-          <span>Sumber: {current.host}{indoFirst ? " · DR. PINGUIN 18+" : ""}</span>
-        </div>
-      ) : null}
     </div>
   );
 }
