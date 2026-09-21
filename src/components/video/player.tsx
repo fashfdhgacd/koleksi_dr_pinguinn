@@ -2,7 +2,14 @@ import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, ExternalLink, LoaderCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { VideoDetail, VideoQuality } from "@/lib/catalog/types";
-import { hostLabel, hostPriority, isIndoAvUrl, resolveSource, type ResolvedSource } from "@/lib/catalog/embed";
+import {
+  hostLabel,
+  hostPriority,
+  isIndoAvUrl,
+  pairRevenueUrls,
+  resolveSource,
+  type ResolvedSource,
+} from "@/lib/catalog/embed";
 
 function isEmbedHostUrl(url: string): boolean {
   return /indoav|userbokep|puterin|putarin|streamtape|strcloud|lulu/i.test(url);
@@ -12,16 +19,37 @@ import { cn } from "@/lib/utils";
 
 function sourcesFromItem(item: VideoDetail): ResolvedSource[] {
   const raw = [item.video_url, ...item.qualities.map((q) => q.url)].filter((u): u is string => Boolean(u));
+  const catalogHasIndo = raw.some((u) => /indoav/i.test(u));
+  const urls: string[] = [];
+  const seenUrl = new Set<string>();
+  for (const url of raw) {
+    for (const next of pairRevenueUrls(url)) {
+      if (seenUrl.has(next)) continue;
+      seenUrl.add(next);
+      urls.push(next);
+    }
+    if (!seenUrl.has(url)) {
+      seenUrl.add(url);
+      urls.push(url);
+    }
+  }
   const seen = new Set<string>();
   const out: ResolvedSource[] = [];
-  for (const url of raw) {
+  for (const url of urls) {
     const resolved = resolveSource(url);
     if (!resolved || seen.has(resolved.url)) continue;
     seen.add(resolved.url);
     out.push(resolved);
   }
-  // IndoAV first so viewer bonus can fire. Direct files are fallback only.
   out.sort((a, b) => hostPriority(`${a.host} ${a.url}`) - hostPriority(`${b.host} ${b.url}`));
+  // Jangan auto-play IndoAV hasil tebakan kalau katalog cuma UserBokep (bisa 404 = player blank).
+  if (!catalogHasIndo) {
+    const ub = out.findIndex((s) => /userbokep/i.test(s.url));
+    if (ub > 0) {
+      const [hit] = out.splice(ub, 1);
+      out.unshift(hit);
+    }
+  }
   return out;
 }
 
@@ -47,7 +75,6 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const list = useMemo(() => sourcesFromItem(item), [item]);
   const [active, setActive] = useState(0);
-  // SSR + first paint: embed iframe must exist in HTML for Google Video indexing.
   const [started, setStarted] = useState(() => {
     const first = sourcesFromItem(item)[0];
     return Boolean(first && !isFileUrl(first.url) && isEmbedHostUrl(first.url));
@@ -67,7 +94,6 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     setFailed(false);
     setFallbackAt(0);
     setBuffering(false);
-    // Auto-start iframe embeds (IndoAV bonus + Puterin/Streamtape) — jangan stuck di poster.
     const first = list[0];
     const auto = Boolean(first && !isFileUrl(first.url) && isEmbedHostUrl(first.url));
     setStarted(auto);
