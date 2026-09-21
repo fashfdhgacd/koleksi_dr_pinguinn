@@ -120,21 +120,22 @@ function cleanTitle(t: string): string {
 }
 function classify(title: string): string {
   const t = title.toLowerCase();
-  if (/jilbab|hijab|tudung/.test(t)) return "jilbab";
-  if (/tante|milf/.test(t)) return "tante";
+  if (/jilbab|hijab|tudung|kerudung/.test(t)) return "jilbab";
+  if (/tante|milf|janda/.test(t)) return "tante";
   if (/istri|suami|selingkuh/.test(t)) return "istri";
   if (/kosan|kontrakan|indekos/.test(t)) return "kosan";
-  if (/amatir|reallife|real ?couple/.test(t)) return "amatir";
   if (/viral/.test(t)) return "viral";
   if (/\blive\b|bokep live/.test(t)) return "live";
-  if (/abg|\bsma\b|\bsmk\b|mahasisw/.test(t)) return "abg";
+  if (/abg|\bsma\b|\bsmk\b|mahasisw|tocil|remaja/.test(t)) return "abg";
   if (/colmek|\bcoli\b/.test(t)) return "colmek";
-  if (/doggy/.test(t)) return "doggy";
-  if (/open\s*bo|openbo/.test(t)) return "open-bo";
+  if (/doggy|doggy/.test(t)) return "doggy";
+  if (/open\s*bo|openbo|\bstw\b|\blc\b|karaoke/.test(t)) return "open-bo";
   if (/malaysia|\bmalay\b/.test(t)) return "malaysia";
   if (/chindo|cina indo/.test(t)) return "chindo";
-  if (/gangbang|threesome|\bgroup\b/.test(t)) return "gangbang";
-  if (/percakapan|obrolan/.test(t)) return "percakapan";
+  if (/gangbang|threesome|\bgroup\b|lesbian/.test(t)) return "gangbang";
+  if (/percakapan|obrolan|ngobrol/.test(t)) return "percakapan";
+  if (/amatir|reallife|real ?couple|tobrut|toket|montok|semok|bondol|ngewe|ngentot|sange|sepong|suster|pacar|mantan|mesum|binor|pembantu|om\b|tete|payudara/.test(t))
+    return "amatir";
   return "lainnya";
 }
 function slugOf(item: RawItem): string {
@@ -144,7 +145,11 @@ function slugOf(item: RawItem): string {
   const raw = (item.category || "").toLowerCase().trim();
   const mapped = raw && raw !== "lainnya" ? findCategory(raw) : undefined;
   if (mapped && mapped.slug !== "lainnya") return mapped.slug;
-  return classify(item.title || "");
+  const hit = classify(item.title || "");
+  if (hit !== "lainnya") return hit;
+  // IndoAV / UserBokep tanpa keyword → amatir (biar Lainnya gak ngebludak)
+  if (isIndoAv(item) || isUserBokep(item)) return "amatir";
+  return "lainnya";
 }
 function sourceLabel(item: RawItem): string {
   if (isIndoAv(item)) return "IndoAV";
@@ -202,7 +207,7 @@ function isUsable(item: RawItem): boolean {
   if (item.id.length < 3) return false;
   const play = String(item.embed || item.direct || "").trim();
   if (!play) return false;
-  if (/^https?:\/\//i.test(play) || play.startsWith("/")) return true;
+  if (/^https?:\/\/\/i.test(play) || play.startsWith("/")) return true;
   return play.length >= 6;
 }
 
@@ -348,16 +353,99 @@ export async function loadItems(): Promise<CatalogCache> {
   return cache;
 }
 
+
+const SLOT_MS = 5 * 60 * 1000;
+
+function slotIndex(salt = 0): number {
+  return Math.floor(Date.now() / SLOT_MS) + salt;
+}
+
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function hashId(id: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function shuffleSlot<T>(arr: T[], seed: number): T[] {
+  const out = arr.slice();
+  const rnd = mulberry32(seed >>> 0);
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(rnd() * (i + 1));
+    const tmp = out[i]!;
+    out[i] = out[j]!;
+    out[j] = tmp;
+  }
+  return out;
+}
+
+/** ~85% IndoAV + ~15% UserBokep, acak per slot 5 menit. */
+function mixIndoHeavy(items: RawItem[], excludeId: string, limit: number, seed: number): RawItem[] {
+  const indo = shuffleSlot(
+    items.filter((x) => isIndoAv(x) && x.id !== excludeId),
+    seed,
+  );
+  const user = shuffleSlot(
+    items.filter((x) => isUserBokep(x) && x.id !== excludeId),
+    seed + 17,
+  );
+  if (!indo.length && !user.length) {
+    return shuffleSlot(
+      items.filter((x) => x.id !== excludeId && !isVidey(x) && !isPutarin(x) && !isStreamtape(x)),
+      seed + 31,
+    ).slice(0, limit);
+  }
+  const nUser = Math.min(user.length, Math.max(0, Math.round(limit * 0.15)));
+  const nIndo = Math.min(indo.length, Math.max(0, limit - nUser));
+  const fillUser = Math.min(user.length, limit - nIndo);
+  const picked = [...indo.slice(0, nIndo), ...user.slice(0, fillUser)];
+  if (picked.length < limit) {
+    const seen = new Set(picked.map((x) => x.id));
+    for (const x of shuffleSlot(items, seed + 53)) {
+      if (x.id === excludeId || seen.has(x.id)) continue;
+      if (isVidey(x) || isPutarin(x) || isStreamtape(x)) continue;
+      picked.push(x);
+      seen.add(x.id);
+      if (picked.length >= limit) break;
+    }
+  }
+  return shuffleSlot(picked, seed + 71).slice(0, limit);
+}
+
 export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
   const { mainSorted, posters, videyNo } = await loadItems();
   return pageOf(mainSorted, page, limit, posters, videyNo);
 }
 
 export async function listFeatured(page = 1, limit = 8, _signal?: AbortSignal): Promise<PagedVideos> {
-  const { mainSorted, posters, videyNo } = await loadItems();
-  const withArt = mainSorted.filter((x) => Boolean(thumbOf(x, posters)));
-  const pool = withArt.length >= limit ? withArt : mainSorted;
-  return pageOf(pool, page, limit, posters, videyNo);
+  const { items, posters, videyNo } = await loadItems();
+  const seed = slotIndex(0);
+  // Hero pool: IndoAV-heavy, berubah tiap 5 menit (bukan urutan katalog tetap).
+  let pool = mixIndoHeavy(items, "", Math.max(limit * 6, 48), seed);
+  const withArt = pool.filter((x) => Boolean(thumbOf(x, posters)));
+  if (withArt.length >= limit) pool = withArt;
+  const start = Math.max(0, (Math.max(1, page) - 1) * limit);
+  const slice = pool.slice(start, start + limit);
+  return {
+    page: Math.max(1, page),
+    limit,
+    total: pool.length,
+    hasMore: start + limit < pool.length,
+    items: slice.map((x) => toCard(x, posters, videyNo)),
+  };
 }
 
 export async function listHome(limit = DEFAULT_PAGE_SIZE): Promise<{ featured: VideoCard[]; latest: PagedVideos }> {
@@ -421,23 +509,25 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
 }
 
 export async function listRelated(id: string, limit = 12, _signal?: AbortSignal): Promise<PagedVideos> {
-  const { items, posters, videyNo, bySlug, mainSorted } = await loadItems();
+  const { items, posters, videyNo } = await loadItems();
   const current = items.find((x) => x.id === id) || null;
-  if (!current) {
-    return pageOf(mainSorted.filter((x) => x.id !== id), 1, limit, posters, videyNo);
+  const seed = slotIndex(hashId(id) % 997);
+  let pool: RawItem[];
+
+  if (current && isVidey(current)) {
+    // Videy: wajib ~½ rekomendasi dari IndoAV
+    const half = Math.max(1, Math.ceil(limit / 2));
+    const indo = mixIndoHeavy(items, id, half, seed);
+    const videy = shuffleSlot(
+      items.filter((x) => isVidey(x) && x.id !== id),
+      seed + 101,
+    ).slice(0, Math.max(0, limit - indo.length));
+    pool = shuffleSlot([...indo, ...videy], seed + 131).slice(0, limit);
+  } else {
+    // Non-Videy: IndoAV-heavy random per 5 menit (bukan se-kategori Lainnya yang nempel)
+    pool = mixIndoHeavy(items, id, limit, seed);
   }
-  const slug = slugOf(current);
-  let pool = (bySlug.get(slug) || []).filter((x) => x.id !== id);
-  if (pool.length < limit) {
-    const extra = mainSorted.filter((x) => x.id !== id && slugOf(x) !== slug);
-    const seen = new Set(pool.map((x) => x.id));
-    for (const x of extra) {
-      if (seen.has(x.id)) continue;
-      pool.push(x);
-      if (pool.length >= limit * 2) break;
-    }
-  }
-  pool = pool.slice(0, limit);
+
   return {
     page: 1,
     limit,
