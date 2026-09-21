@@ -35,13 +35,9 @@ export const Route = createFileRoute("/watch/$id")({
         ? item.description.trim().slice(0, 160)
         : videoSeoDescription(item.title, item.category, { creator: item.creator })
       : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
-    const thumb = (item?.thumbnail || "").trim();
-    let image = DEFAULT_OG;
-    if (/^https?:\/\//i.test(thumb)) {
-      image = thumb;
-    } else if (thumb.startsWith("/")) {
-      image = `${SITE_ORIGIN}${thumb}`;
-    }
+    const image = item
+      ? `${SITE_ORIGIN}/api/og?id=${encodeURIComponent(item.id)}&v=${SHARE_CARD_VERSION}`
+      : DEFAULT_OG;
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
     const embedUrl = item
       ? (item.video_url || item.qualities?.[0]?.url || "").trim() || null
@@ -75,6 +71,7 @@ export const Route = createFileRoute("/watch/$id")({
         { property: "og:description", content: description },
         { property: "og:url", content: url },
         { property: "og:image", content: image },
+        { property: "og:image:type", content: "image/jpeg" },
         { property: "og:image:width", content: "1200" },
         { property: "og:image:height", content: "630" },
         { name: "twitter:card", content: "summary_large_image" },
