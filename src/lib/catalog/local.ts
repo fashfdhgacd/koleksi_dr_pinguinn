@@ -128,7 +128,7 @@ function classify(title: string): string {
   if (/\blive\b|bokep live/.test(t)) return "live";
   if (/abg|\bsma\b|\bsmk\b|mahasisw|tocil|remaja/.test(t)) return "abg";
   if (/colmek|\bcoli\b/.test(t)) return "colmek";
-  if (/doggy|doggy/.test(t)) return "doggy";
+  if (/doggy/.test(t)) return "doggy";
   if (/open\s*bo|openbo|\bstw\b|\blc\b|karaoke/.test(t)) return "open-bo";
   if (/malaysia|\bmalay\b/.test(t)) return "malaysia";
   if (/chindo|cina indo/.test(t)) return "chindo";
