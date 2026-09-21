@@ -12,9 +12,9 @@ const TRANSPARENT_GIF = Buffer.from(
 
 function decodeEntities(s: string): string {
   return s
-    .replace(/&/g, "&")
-    .replace(/&#039;/g, "'")
-    .replace(/"/g, '"')
+    .replace(/\u0026amp;/g, "\u0026")
+    .replace(/\u0026#039;/g, "'")
+    .replace(/\u0026quot;/g, '"')
     .trim();
 }
 
