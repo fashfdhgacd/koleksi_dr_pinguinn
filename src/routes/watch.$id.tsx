@@ -208,7 +208,6 @@ function ShareSheet({
   );
 }
 
-
 function catalogSearchFromItem(item: VideoDetail): { q: undefined; category: string | undefined } {
   const raw = (item.category || item.creator || "").trim().toLowerCase();
   if (/videy/.test(raw)) return { q: undefined, category: undefined };
@@ -377,17 +376,6 @@ function WatchPage() {
                 onClick={() => setShareOpen(true)}
               >
                 Bagikan
-              </button>
-              <button
-                type="button"
-                className="h-12 min-w-[140px] rounded-xl bg-secondary px-5 text-base font-medium text-foreground active:scale-[0.98] disabled:opacity-50"
-                disabled={!item.video_url && !(item.qualities[0]?.url)}
-                onClick={() => {
-                  const src = (item.video_url || item.qualities[0]?.url || "").trim();
-                  if (src) window.open(src, "_blank", "noopener,noreferrer");
-                }}
-              >
-                Buka Sumber
               </button>
               <Link
                 to="/"
