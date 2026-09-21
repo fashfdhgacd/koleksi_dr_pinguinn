@@ -211,7 +211,6 @@ function ShareSheet({
 
 function catalogSearchFromItem(item: VideoDetail): { q: undefined; category: string | undefined } {
   const raw = (item.category || item.creator || "").trim().toLowerCase();
-  // Videy category hidden — fall through to home (no category).
   if (/videy/.test(raw)) return { q: undefined, category: undefined };
   if (/jav|putarin|puterin/.test(raw)) return { q: undefined, category: "jav" };
   if (/ai\+|ai-plus|streamtape/.test(raw)) return { q: undefined, category: "ai-plus" };
@@ -266,11 +265,9 @@ function WatchPage() {
     }
 
     const controller = new AbortController();
-    // Soft navigation: keep previous related thumbs until new detail arrives
-    // so "Tonton juga" does not flash empty/blank on every video switch.
     setStatus("loading");
     setError(null);
-    setItem(null);
+    setItem((prev) => (prev && prev.id === id ? prev : null));
 
     void (async () => {
       try {
@@ -347,7 +344,6 @@ function WatchPage() {
         <article className="space-y-8">
           {item ? (
             <>
-
           <div className="-mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0">
             <VideoPlayer key={item.id} item={item} />
             {(() => {
@@ -418,7 +414,6 @@ function WatchPage() {
           ) : item ? null : (
             <VideoGridSkeleton count={6} />
           )}
-
           {item ? (
             <ShareSheet open={shareOpen} title={item.title} id={item.id} onClose={closeShare} />
           ) : null}
