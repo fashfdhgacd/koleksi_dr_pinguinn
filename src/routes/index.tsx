@@ -96,7 +96,7 @@ function HomePage() {
                 }
               />
             ) : (
-              <VideoGrid items={gridItems} eagerCount={heroVideos.length ? 0 : 4} />
+              <VideoGrid items={gridItems} eagerCount={heroVideos.length ? 6 : 8} />
             )}
 
             {feed.error && feed.items.length ? (
