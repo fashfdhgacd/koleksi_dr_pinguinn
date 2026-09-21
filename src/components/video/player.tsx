@@ -2,12 +2,7 @@ import { startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, LoaderCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { VideoDetail } from "@/lib/catalog/types";
-import {
-  hostPriority,
-  pairRevenueUrls,
-  resolveSource,
-  type ResolvedSource,
-} from "@/lib/catalog/embed";
+import { hostPriority, resolveSource, type ResolvedSource } from "@/lib/catalog/embed";
 import { VideoThumb } from "./thumb";
 
 function isEmbedHostUrl(url: string): boolean {
@@ -16,36 +11,16 @@ function isEmbedHostUrl(url: string): boolean {
 
 function sourcesFromItem(item: VideoDetail): ResolvedSource[] {
   const raw = [item.video_url, ...item.qualities.map((q) => q.url)].filter((u): u is string => Boolean(u));
-  const catalogHasIndo = raw.some((u) => /indoav/i.test(u));
-  const urls: string[] = [];
-  const seenUrl = new Set<string>();
-  for (const url of raw) {
-    for (const next of pairRevenueUrls(url)) {
-      if (seenUrl.has(next)) continue;
-      seenUrl.add(next);
-      urls.push(next);
-    }
-    if (!seenUrl.has(url)) {
-      seenUrl.add(url);
-      urls.push(url);
-    }
-  }
   const seen = new Set<string>();
   const out: ResolvedSource[] = [];
-  for (const url of urls) {
+  for (const url of raw) {
     const resolved = resolveSource(url);
     if (!resolved || seen.has(resolved.url)) continue;
     seen.add(resolved.url);
     out.push(resolved);
   }
+  // Hanya urut URL yang BENAR-BENAR ada di item. Jangan buat URL web lain.
   out.sort((a, b) => hostPriority(`${a.host} ${a.url}`) - hostPriority(`${b.host} ${b.url}`));
-  if (!catalogHasIndo) {
-    const ub = out.findIndex((s) => /userbokep/i.test(s.url));
-    if (ub > 0) {
-      const [hit] = out.splice(ub, 1);
-      out.unshift(hit);
-    }
-  }
   return out;
 }
 
