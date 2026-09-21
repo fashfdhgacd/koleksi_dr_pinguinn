@@ -1,15 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { collectSharePool } from "@/lib/bot/share-pool";
 import { loadShareUsed, saveShareUsed } from "@/lib/bot/share-used";
-import { parseMessage, detectCategory, cleanTitle } from "@/lib/bot/parse.js";
-import { toRecord } from "@/lib/bot/store.js";
-import { fetchPutarinTitle, fetchStreamtapeTitle, expandPutarinFolder } from "@/lib/bot/providers.js";
-import { upsertVideoToGithub } from "@/lib/bot/github.js";
+import { processUploadBatch } from "@/lib/bot/upload-handler.js";
+
+export const maxDuration = 60;
 
 const HOST = "https://koleksidrpinguin.com";
 
-
-/** Reply keyboard mirip bot lama + Streamtape */
 const MAIN_KEYBOARD = {
   keyboard: [
     [{ text: "Minta 10" }, { text: "Minta 25" }],
@@ -23,9 +20,7 @@ const MAIN_KEYBOARD = {
 };
 
 function envToken(): string {
-  return String(
-    process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || ""
-  ).trim();
+  return String(process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || "").trim();
 }
 
 function envAdminIds(): Set<string> {
@@ -44,6 +39,28 @@ function envAdminIds(): Set<string> {
 
 function envBag(): NodeJS.ProcessEnv {
   return process.env;
+}
+
+async function deferWork(promise: Promise<unknown>): Promise<boolean> {
+  try {
+    const g = globalThis as { waitUntil?: (p: Promise<unknown>) => void };
+    if (typeof g.waitUntil === "function") {
+      g.waitUntil(promise);
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  try {
+    const mod = await import("@vercel/functions");
+    if (typeof (mod as { waitUntil?: (p: Promise<unknown>) => void }).waitUntil === "function") {
+      (mod as { waitUntil: (p: Promise<unknown>) => void }).waitUntil(promise);
+      return true;
+    }
+  } catch {
+    /* optional */
+  }
+  return false;
 }
 
 async function tgSend(
@@ -70,7 +87,6 @@ async function tgSend(
   }
 }
 
-/** Telegram max ~4096; kirim potongan biar batch besar tetap kebalas. */
 async function tgSendChunks(
   token: string,
   chatId: string | number,
@@ -163,11 +179,7 @@ function isMenuText(text: string): boolean {
   );
 }
 
-async function handleShare(
-  token: string,
-  chatId: string | number,
-  text: string
-) {
+async function handleShare(token: string, chatId: string | number, text: string) {
   const usedFile = await loadShareUsed();
   const raw = text.trim();
   const isLagi = /^lagi$/i.test(raw);
@@ -208,132 +220,8 @@ async function handleShare(
   const note = picked.reset
     ? `\n\n(Pool ${picked.poolSize} habis dipakai — acak ulang dari awal)`
     : `\n\nSisa belum dipakai: ${Math.max(0, picked.freshSize - take.length)} / ${picked.poolSize}`;
-  const body =
-    take.map((v) => `▶ ${v.title}\n${HOST}/v/${v.id}`).join("\n\n") + note;
+  const body = take.map((v) => `▶ ${v.title}\n${HOST}/v/${v.id}`).join("\n\n") + note;
   await tgSendChunks(token, chatId, body, { reply_markup: MAIN_KEYBOARD });
-}
-
-async function resolveTitle(
-  parsed: { host: string; id: string },
-  givenTitle: string
-): Promise<string> {
-  if (givenTitle && givenTitle !== "Video") return givenTitle;
-  const env = envBag();
-  if (parsed.host === "putarin") {
-    const t = await fetchPutarinTitle(parsed.id, env);
-    if (t) return cleanTitle(t);
-  }
-  if (parsed.host === "streamtape") {
-    const t = await fetchStreamtapeTitle(parsed.id, env);
-    if (t) return cleanTitle(t);
-  }
-  return givenTitle || "Video";
-}
-
-async function handleUpload(
-  token: string,
-  chatId: string | number,
-  text: string
-) {
-  const parsedMsg = parseMessage(text);
-  if (!parsedMsg.videos.length) {
-    await tgSend(
-      token,
-      chatId,
-      "❌ Tidak ada link IndoAV / UserBokep / Puterin / Streamtape / Lulu / Videy yang valid.\n\nKirim link lengkap, atau pakai tombol menu.",
-      { reply_markup: MAIN_KEYBOARD }
-    );
-    return;
-  }
-
-  await tgSend(
-    token,
-    chatId,
-    `⏳ Menerima ${parsedMsg.videos.length} link. Sedang diproses…`,
-  );
-
-  const env = envBag();
-  const lines: string[] = [];
-
-  // Expand Puterin /f/ folders into individual /v/ videos before upsert.
-  const queue: Array<(typeof parsedMsg.videos)[number] & { title?: string }> = [];
-  for (const video of parsedMsg.videos) {
-    const folderTitle = cleanTitle(
-      String((video as { title?: string }).title || parsedMsg.title || ""),
-    );
-    if (video.host === "putarin-folder" || (video as { folder?: boolean }).folder) {
-      try {
-        const kids = await expandPutarinFolder(video.id, folderTitle);
-        if (!kids.length) {
-          lines.push(`⚠️ Folder kosong / gagal dibaca: ${video.id}`);
-          continue;
-        }
-        lines.push(`📁 Folder ${video.id}: ${kids.length} video`);
-        for (const kid of kids) queue.push(kid);
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        lines.push(`⚠️ Gagal baca folder ${video.id}: ${msg}`);
-      }
-      continue;
-    }
-    queue.push(
-      folderTitle && folderTitle !== "Video"
-        ? { ...video, title: folderTitle }
-        : video,
-    );
-  }
-
-  for (const video of queue) {
-    const given = cleanTitle(String((video as { title?: string }).title || parsedMsg.title || ""));
-    const title = await resolveTitle(video, given);
-    const category =
-      parsedMsg.category ||
-      (video.host === "putarin" || video.host === "putarin-folder"
-        ? "jav"
-        : video.host === "streamtape"
-          ? "ai-plus"
-          : detectCategory(title));
-    const record = toRecord({ parsed: video, title, category });
-    const fileName = video.file;
-
-    try {
-      const result = await upsertVideoToGithub(env, fileName, record);
-      if (!result.ok) {
-        lines.push(`⚠️ Gagal upload: ${result.reason || "unknown"}`);
-        continue;
-      }
-      const mark =
-        result.action === "created" ? "✅" : result.action === "skipped" ? "⏭️" : "♻️";
-      const label =
-        result.action === "created"
-          ? "BERHASIL diupload"
-          : result.action === "skipped"
-            ? "SKIP (link/ID sudah ada)"
-            : "DIUPDATE";
-      const extra = result.rotated ? `\nArsip penuh → data/${result.rotated}` : "";
-      lines.push(
-        [
-          `${mark} ${label}`,
-          `Judul: ${record.title}`,
-          `ID: ${record.id}`,
-          `Source: ${record.source}`,
-          `Kategori: ${record.category}`,
-          `JSON: data/${result.file}`,
-          `Total di chunk: ${result.total}`,
-        ].join("\n") + extra
-      );
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      lines.push(`⚠️ Gagal push GitHub: ${msg}`);
-    }
-  }
-
-  await tgSendChunks(
-    token,
-    chatId,
-    lines.join("\n\n") || "Tidak ada yang diproses.",
-    { reply_markup: MAIN_KEYBOARD }
-  );
 }
 
 async function handlePost(request: Request): Promise<Response> {
@@ -347,12 +235,7 @@ async function handlePost(request: Request): Promise<Response> {
   }
 
   const msg = (update.message || update.channel_post) as
-    | {
-        text?: string;
-        caption?: string;
-        chat?: { id?: number };
-        from?: { id?: number };
-      }
+    | { text?: string; caption?: string; chat?: { id?: number }; from?: { id?: number } }
     | undefined;
 
   if (!msg || !token) return Response.json({ ok: true });
@@ -393,7 +276,18 @@ async function handlePost(request: Request): Promise<Response> {
     );
 
   if (hasUploadLink) {
-    await handleUpload(token, chatId, text);
+    const work = processUploadBatch({
+      token,
+      chatId,
+      text,
+      env: envBag(),
+      tgSend,
+      tgSendChunks,
+      MAIN_KEYBOARD,
+    }).catch((err) => console.error("handleUpload", err));
+    if (!(await deferWork(work))) {
+      await work;
+    }
     return Response.json({ ok: true });
   }
 
@@ -402,12 +296,9 @@ async function handlePost(request: Request): Promise<Response> {
     return Response.json({ ok: true });
   }
 
-  await tgSend(
-    token,
-    chatId,
-    "Kirim link untuk upload, atau tekan tombol menu.",
-    { reply_markup: MAIN_KEYBOARD }
-  );
+  await tgSend(token, chatId, "Kirim link untuk upload, atau tekan tombol menu.", {
+    reply_markup: MAIN_KEYBOARD,
+  });
   return Response.json({ ok: true });
 }
 
@@ -425,16 +316,13 @@ export const Route = createFileRoute("/api/telegram")({
         let ghPrivate: boolean | null = null;
         if (token && ghOwner && ghRepo) {
           try {
-            const r = await fetch(
-              `https://api.github.com/repos/${ghOwner}/${ghRepo}`,
-              {
-                headers: {
-                  Authorization: `Bearer ${token}`,
-                  Accept: "application/vnd.github+json",
-                  "User-Agent": "kdp-bot-diag",
-                },
-              }
-            );
+            const r = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+                Accept: "application/vnd.github+json",
+                "User-Agent": "kdp-bot-diag",
+              },
+            });
             if (r.status === 200) {
               const body = (await r.json()) as { private?: boolean; permissions?: { push?: boolean } };
               ghPrivate = Boolean(body.private);
