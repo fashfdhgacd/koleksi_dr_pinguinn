@@ -1,1 +1,1 @@
-__LOAD_FROM_DISK__
+import { DEFAULT_PAGE_SIZE } from "./types";
