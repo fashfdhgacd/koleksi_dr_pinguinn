@@ -104,6 +104,19 @@ function xIntentUrl(title: string, url: string): string {
   return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
 }
 
+function catalogPlayUrl(item: VideoDetail): string {
+  const raw = [item.video_url, ...item.qualities.map((q) => q.url)].filter((u): u is string => Boolean(u));
+  const indo = raw.find((u) => /indoav/i.test(u));
+  const src = (indo || raw[0] || "").trim();
+  try {
+    const u = new URL(src);
+    u.pathname = u.pathname.replace(/\/(?:v|d|watch)\//, "/e/");
+    return u.toString();
+  } catch {
+    return src;
+  }
+}
+
 function ShareSheet({
   open,
   title,
@@ -346,12 +359,12 @@ function WatchPage() {
           <div className="-mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0">
             <VideoPlayer key={item.id} item={item} />
             {(() => {
-              const src = (item.video_url || item.qualities[0]?.url || "").trim();
+              const src = catalogPlayUrl(item);
               if (!src || /\.(mp4|webm|mov)($|\?)/i.test(src)) return null;
               return (
                 <noscript>
                   <iframe
-                    src={src.replace(/\/(?:v|d|watch)\//, "/e/")}
+                    src={src}
                     title={item.title}
                     width="640"
                     height="360"
@@ -376,6 +389,17 @@ function WatchPage() {
                 onClick={() => setShareOpen(true)}
               >
                 Bagikan
+              </button>
+              <button
+                type="button"
+                className="h-12 min-w-[140px] rounded-xl bg-secondary px-5 text-base font-medium text-foreground active:scale-[0.98] disabled:opacity-50"
+                disabled={!catalogPlayUrl(item)}
+                onClick={() => {
+                  const src = catalogPlayUrl(item);
+                  if (src) window.open(src, "_blank", "noopener,noreferrer");
+                }}
+              >
+                Buka Sumber
               </button>
               <Link
                 to="/"
