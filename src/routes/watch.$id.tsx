@@ -268,10 +268,11 @@ function WatchPage() {
     }
 
     const controller = new AbortController();
+    // Soft navigation: keep previous related thumbs until new detail arrives
+    // so "Tonton juga" does not flash empty/blank on every video switch.
     setStatus("loading");
     setError(null);
     setItem(null);
-    setRelated([]);
 
     void (async () => {
       try {
@@ -328,21 +329,27 @@ function WatchPage() {
     };
   }, [id, status]);
 
+  const softLoading = status === "loading" && related.length > 0;
+  const coldLoading = status === "loading" && related.length === 0;
+
   return (
     <Shell>
-      {status === "loading" ? (
+      {coldLoading ? (
         <div className="space-y-8">
           <Skeleton className="aspect-video rounded-2xl" />
           <Skeleton className="h-10 w-2/3 rounded-md" />
           <Skeleton className="h-20 w-full rounded-md" />
           <VideoGridSkeleton count={6} />
         </div>
-      ) : status === "error" ? (
+      ) : status === "error" && !item ? (
         <ErrorState message={error ?? "Gagal memuat video."} onRetry={retry} />
-      ) : status === "empty" || !item ? (
+      ) : status === "empty" || (!item && !softLoading) ? (
         <EmptyState title="Video tidak ditemukan" description="Judul ini tidak ada di katalog atau sudah dihapus." />
       ) : (
         <article className="space-y-8">
+          {item ? (
+            <>
+
           <div className="-mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0">
             <VideoPlayer key={item.id} item={item} />
             {(() => {
@@ -397,15 +404,26 @@ function WatchPage() {
               </Link>
             </div>
           </header>
-
-          {related.length ? (
+            </>
+          ) : (
+            <div className="space-y-8">
+              <Skeleton className="aspect-video rounded-2xl" />
+              <Skeleton className="h-10 w-2/3 rounded-md" />
+              <Skeleton className="h-20 w-full rounded-md" />
+            </div>
+          )}
+{related.length ? (
             <section>
               <h2 className="mb-5 font-display text-3xl text-foreground">Tonton juga</h2>
-              <VideoGrid items={related} eagerCount={4} />
+              <VideoGrid items={related} eagerCount={12} />
             </section>
-          ) : null}
+          ) : item ? null : (
+            <VideoGridSkeleton count={6} />
+          )}
 
-          <ShareSheet open={shareOpen} title={item.title} id={item.id} onClose={closeShare} />
+          {item ? (
+            <ShareSheet open={shareOpen} title={item.title} id={item.id} onClose={closeShare} />
+          ) : null}
         </article>
       )}
     </Shell>
