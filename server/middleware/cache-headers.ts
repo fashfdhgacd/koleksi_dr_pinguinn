@@ -1,7 +1,6 @@
 /**
- * Cache-Control untuk aset statis + HTML.
- * Browser yang patuh tidak nembak Worker lagi — itu yang hemat kuota.
- * Cache API di dalam Worker TETAP dihitung request.
+ * Cache-Control + CDN-Cache-Control.
+ * Browser/CDN yang patuh tidak nembak Worker lagi.
  */
 
 interface CacheEvent {
@@ -17,6 +16,17 @@ function isHashedAsset(path: string): boolean {
   return path.startsWith("/assets/") && /\.(?:js|css|woff2?)$/i.test(path);
 }
 
+function withCache(res: Response, value: string): Response {
+  const headers = new Headers(res.headers);
+  headers.set("cache-control", value);
+  headers.set("cdn-cache-control", value);
+  return new Response(res.body, {
+    status: res.status,
+    statusText: res.statusText,
+    headers,
+  });
+}
+
 export default async function cacheHeadersMiddleware(
   event: CacheEvent,
   next: () => unknown | Promise<unknown>,
@@ -26,21 +36,18 @@ export default async function cacheHeadersMiddleware(
 
   const path = event.url.pathname;
   const type = result.headers.get("content-type") || "";
-  const headers = new Headers(result.headers);
 
   if (isHashedAsset(path)) {
-    headers.set("cache-control", "public, max-age=31536000, immutable");
-  } else if (isStaticMedia(path)) {
-    headers.set("cache-control", "public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000");
-  } else if (type.includes("text/html") && !headers.get("cache-control")) {
-    headers.set("cache-control", "public, max-age=60, s-maxage=120, stale-while-revalidate=600");
-  } else {
-    return result;
+    return withCache(result, "public, max-age=31536000, immutable");
   }
-
-  return new Response(result.body, {
-    status: result.status,
-    statusText: result.statusText,
-    headers,
-  });
+  if (isStaticMedia(path)) {
+    return withCache(
+      result,
+      "public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000",
+    );
+  }
+  if (type.includes("text/html") && !result.headers.get("cache-control")) {
+    return withCache(result, "public, max-age=60, s-maxage=120, stale-while-revalidate=600");
+  }
+  return result;
 }
