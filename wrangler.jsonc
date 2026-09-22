@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "koleksi-dr-pinguinn",
+  "compatibility_date": "2026-09-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": ".output/server/index.mjs",
+  "observability": {
+    "enabled": true
+  },
+  "assets": {
+    "directory": ".output/public"
+  }
+}
