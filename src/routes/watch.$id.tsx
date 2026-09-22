@@ -18,7 +18,7 @@ import {
 } from "@/lib/seo";
 import { watchDescription } from "@/lib/catalog/watch-description";
 
-const SHARE_CARD_VERSION = "10";
+const SHARE_CARD_VERSION = "11";
 
 export const Route = createFileRoute("/watch/$id")({
   loader: async ({ params }) => {
@@ -35,8 +35,9 @@ export const Route = createFileRoute("/watch/$id")({
         ? item.description.trim().slice(0, 160)
         : videoSeoDescription(item.title, item.category, { creator: item.creator })
       : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
-    // X menolak poster embedan/API. Kartu share = logo statis /og.jpg.
-    const image = DEFAULT_OG;
+    const image = item
+      ? `${SITE_ORIGIN}/api/og?id=${encodeURIComponent(item.id)}&v=${SHARE_CARD_VERSION}`
+      : DEFAULT_OG;
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
     const embedUrl = item
       ? (item.video_url || item.qualities?.[0]?.url || "").trim() || null
@@ -203,7 +204,7 @@ function ShareSheet({
             onClick={() => void copyLink()}
             className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-secondary px-4 text-base font-medium text-foreground active:scale-[0.98]"
           >
-            {copied ? "\u2713 Link disalin" : "Salin link"}
+            {copied ? "✓ Link disalin" : "Salin link"}
           </button>
           {typeof navigator !== "undefined" && typeof navigator.share === "function" ? (
             <button
@@ -377,8 +378,8 @@ function WatchPage() {
           <header className="max-w-3xl space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
               {item.category}
-              {item.year ? ` \u00b7 ${item.year}` : ""}
-              {item.creator ? ` \u00b7 ${item.creator}` : ""}
+              {item.year ? ` · ${item.year}` : ""}
+              {item.creator ? ` · ${item.creator}` : ""}
             </p>
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>
             <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>
