@@ -19,7 +19,7 @@ const ALLOWED_HOSTS = new Set([
 ]);
 
 const RATE_WINDOW_MS = 60_000;
-const RATE_MAX = 90;
+const RATE_MAX = 400;
 const hits = new Map<string, { n: number; t: number }>();
 
 function clientIp(request: Request): string {
