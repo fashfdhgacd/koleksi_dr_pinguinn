@@ -64,6 +64,8 @@ function CategorySlugPage() {
             enabled={feed.status === "success" && feed.hasMore && !feed.loadingMore}
             loading={feed.loadingMore}
             onLoadMore={feed.loadMore}
+            shown={feed.items.length}
+            total={feed.total}
           />
         </section>
       )}
