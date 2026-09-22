@@ -9,8 +9,7 @@ const HOST_SITE = "https://www.koleksidrpinguin.site";
 const HOST_COM = "https://koleksidrpinguin.com";
 
 function pickHost(): string {
-  // .com Cloudflare masih 1027 sampai reset harian — prioritas .site.
-  return HOST_SITE;
+  return Math.random() < 0.5 ? HOST_SITE : HOST_COM;
 }
 
 const MAIN_KEYBOARD = {
