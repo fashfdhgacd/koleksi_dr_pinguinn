@@ -1,5 +1,4 @@
 const COM_HOST = "koleksidrpinguin.com";
-const SITE_HOST = "koleksidrpinguin.site";
 
 interface HostEvent {
   url: URL;
@@ -14,21 +13,17 @@ function requestHost(event: HostEvent): string {
   return raw.split(":")[0].toLowerCase();
 }
 
-function redirect(host: string, event: HostEvent): Response {
-  return new Response(null, {
-    status: 301,
-    headers: {
-      location: `https://${host}${event.url.pathname}${event.url.search}`,
-    },
-  });
-}
-
 export default function canonicalHostMiddleware(
   event: HostEvent,
   next: () => unknown | Promise<unknown>,
 ): unknown | Promise<unknown> {
   const host = requestHost(event);
-  if (host === `www.${COM_HOST}`) return redirect(COM_HOST, event);
-  if (host === `www.${SITE_HOST}`) return redirect(SITE_HOST, event);
-  return next();
+  // Hanya rapikan www pada .com. Domain .site diurus Vercel — jangan diutak-atik.
+  if (host !== `www.${COM_HOST}`) return next();
+  return new Response(null, {
+    status: 301,
+    headers: {
+      location: `https://${COM_HOST}${event.url.pathname}${event.url.search}`,
+    },
+  });
 }
