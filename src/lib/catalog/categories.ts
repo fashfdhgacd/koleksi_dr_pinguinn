@@ -14,7 +14,7 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "percakapan", label: "Percakapan", query: "percakapan" },
   { slug: "kosan", label: "Kosan", query: "kosan" },
   { slug: "colmek", label: "Colmek", query: "colmek" },
-  { slug: "abg", label: "ABG", query: "abg" },
+  { slug: "abg", label: "Muda 18+", query: "abg" },
   { slug: "istri", label: "Istri", query: "istri" },
   { slug: "live", label: "Live", query: "live" },
   { slug: "doggy", label: "Doggy", query: "doggy" },
@@ -63,6 +63,5 @@ export function findCategory(slug: string | null | undefined): CategoryDef | und
   if (key === "streamtape" || key === "streampie") {
     return CATEGORIES.find((c) => c.slug === "ai-plus");
   }
-  // Videy removed from site — do not map videy.co aliases to a category.
   return CATEGORIES.find((c) => c.slug === key);
 }
