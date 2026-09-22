@@ -5,7 +5,13 @@ import { processUploadBatch } from "@/lib/bot/upload-handler.js";
 
 export const maxDuration = 60;
 
-const HOST = "https://koleksidrpinguin.com";
+const HOST_SITE = "https://www.koleksidrpinguin.site";
+const HOST_COM = "https://koleksidrpinguin.com";
+
+function pickHost(): string {
+  // .com Cloudflare masih 1027 sampai reset harian — prioritas .site.
+  return HOST_SITE;
+}
 
 const MAIN_KEYBOARD = {
   keyboard: [
@@ -33,7 +39,7 @@ function envAdminIds(): Set<string> {
     String(raw)
       .split(/[,\s]+/)
       .map((s) => s.trim())
-      .filter(Boolean)
+      .filter(Boolean),
   );
 }
 
@@ -67,7 +73,7 @@ async function tgSend(
   token: string,
   chatId: string | number,
   text: string,
-  extra: Record<string, unknown> = {}
+  extra: Record<string, unknown> = {},
 ): Promise<boolean> {
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
@@ -220,7 +226,8 @@ async function handleShare(token: string, chatId: string | number, text: string)
   const note = picked.reset
     ? `\n\n(Pool ${picked.poolSize} habis dipakai — acak ulang dari awal)`
     : `\n\nSisa belum dipakai: ${Math.max(0, picked.freshSize - take.length)} / ${picked.poolSize}`;
-  const body = take.map((v) => `▶ ${v.title}\n${HOST}/v/${v.id}`).join("\n\n") + note;
+  const body =
+    take.map((v) => `\u25b6 ${v.title}\n${pickHost()}/watch/${v.id}`).join("\n\n") + note;
   await tgSendChunks(token, chatId, body, { reply_markup: MAIN_KEYBOARD });
 }
 
@@ -245,7 +252,7 @@ async function handlePost(request: Request): Promise<Response> {
   if (!chatId) return Response.json({ ok: true });
 
   if (allowed.size > 0 && !allowed.has(fromId) && !allowed.has(String(chatId))) {
-    await tgSend(token, chatId, "❌ Tidak diizinkan.");
+    await tgSend(token, chatId, "\u274c Tidak diizinkan.");
     return Response.json({ ok: true });
   }
 
@@ -261,10 +268,10 @@ async function handlePost(request: Request): Promise<Response> {
       [
         "Bot aktif.",
         "",
-        "📤 Upload: IndoAV / UserBokep / Puterin / Streamtape / Lulu / Videy",
-        "📥 Minta: tekan tombol di bawah",
+        "\ud83d\udce4 Upload: IndoAV / UserBokep / Puterin / Streamtape / Lulu / Videy",
+        "\ud83d\udce5 Minta: tekan tombol di bawah",
       ].join("\n"),
-      { reply_markup: MAIN_KEYBOARD }
+      { reply_markup: MAIN_KEYBOARD },
     );
     return Response.json({ ok: true });
   }
@@ -272,7 +279,7 @@ async function handlePost(request: Request): Promise<Response> {
   const hasUploadLink =
     /https?:\/\//i.test(text) &&
     /streamtape\.com|strcloud|putarin\.com|puterin\.|panel\.putarin|luluvdo|lulustream|luluvid|lulu\.st|indoav\.|userbokep|videy\.co/i.test(
-      text
+      text,
     );
 
   if (hasUploadLink) {
@@ -343,7 +350,8 @@ export const Route = createFileRoute("/api/telegram")({
         return Response.json({
           ok: true,
           service: "telegram-webhook",
-          host: HOST,
+          host: pickHost(),
+          hosts: { site: HOST_SITE, com: HOST_COM },
           modes: ["upload", "share", "keyboard"],
           ready: Boolean(envToken()),
           upload: {
