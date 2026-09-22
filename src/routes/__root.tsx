@@ -7,22 +7,28 @@ import appCss from "../styles.css?url";
 const UMAMI_WEBSITE_ID = "b952a905-cb5b-419d-8aa4-534435e5cc8b";
 const CANONICAL_HOST = "koleksidrpinguin.com";
 
-async function redirectWwwToApex() {
+function shouldRedirectHost(host: string) {
+  const h = host.split(":")[0].toLowerCase();
+  if (!h || h === CANONICAL_HOST) return false;
+  if (h === `www.${CANONICAL_HOST}`) return true;
+  if (h === "koleksidrpinguin.site" || h === "www.koleksidrpinguin.site") return true;
+  return false;
+}
+
+async function redirectToCanonicalHost() {
   if (typeof window !== "undefined") {
-    if (window.location.hostname === `www.${CANONICAL_HOST}`) {
-      throw redirect({
-        href: `https://${CANONICAL_HOST}${window.location.pathname}${window.location.search}`,
-        statusCode: 301,
-      });
-    }
-    return;
+    if (!shouldRedirectHost(window.location.hostname)) return;
+    throw redirect({
+      href: `https://${CANONICAL_HOST}${window.location.pathname}${window.location.search}`,
+      statusCode: 301,
+    });
   }
 
   try {
     const { getRequest } = await import("@tanstack/react-start/server");
     const req = getRequest();
-    const host = (req.headers.get("host") || "").split(":")[0].toLowerCase();
-    if (host !== `www.${CANONICAL_HOST}`) return;
+    const host = req.headers.get("host") || "";
+    if (!shouldRedirectHost(host)) return;
     const url = new URL(req.url);
     throw redirect({
       href: `https://${CANONICAL_HOST}${url.pathname}${url.search}`,
@@ -36,7 +42,7 @@ async function redirectWwwToApex() {
 }
 
 export const Route = createRootRoute({
-  beforeLoad: () => redirectWwwToApex(),
+  beforeLoad: () => redirectToCanonicalHost(),
   head: () => ({
     meta: [
       { charSet: "utf-8" },
