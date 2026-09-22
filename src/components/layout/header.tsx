@@ -39,9 +39,9 @@ export function Header({
     if (next.length === 1) return;
     void navigate({
       to: "/",
-      search: next ? { q: next, category: undefined } : { q: undefined, category },
+      search: next ? { q: next, category: undefined } : { q: undefined, category: undefined },
     });
-  }, [category, debounced, navigate, query]);
+  }, [debounced, navigate, query]);
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background">
@@ -69,7 +69,7 @@ export function Header({
             const next = draft.trim();
             void navigate({
               to: "/",
-              search: next ? { q: next, category: undefined } : { q: undefined, category },
+              search: next ? { q: next, category: undefined } : { q: undefined, category: undefined },
             });
           }}
         >
@@ -117,8 +117,8 @@ export function Header({
           {QUICK_CATS.map((cat) => (
             <li key={cat.slug}>
               <Link
-                to="/"
-                search={{ q: undefined, category: cat.slug }}
+                to="/kategori/$slug"
+                params={{ slug: cat.slug }}
                 className={chipClass(category === cat.slug && !query)}
                 onMouseEnter={() =>
                   prefetchCatalog({
@@ -144,7 +144,7 @@ export function Header({
           <li>
             <Link
               to="/kategori"
-              className={chipClass(onCategoriesPage || Boolean(category && !quickActive))}
+              className={chipClass(onCategoriesPage && !quickActive)}
             >
               Kategori
             </Link>

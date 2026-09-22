@@ -6,7 +6,7 @@ export const SITE_NAME = "Dr. Pinguin";
 export const DEFAULT_OG = `${SITE_ORIGIN}/og.jpg?v=12`;
 
 const HOME_DESCRIPTION =
-  "Koleksi Dr. Pinguin Bokep (M.S.B.) — nonton bokep Indo terbaru di Dr. Pinguin. Amatir, jilbab, tante, viral. Konten 18+.";
+  "Katalog video dewasa 18+ Dr. Pinguin. Streaming embed koleksi Indo, update berkala.";
 
 function categoryLabel(slugOrLabel?: string | null): string {
   const key = (slugOrLabel || "").trim().toLowerCase();
@@ -17,13 +17,13 @@ function categoryLabel(slugOrLabel?: string | null): string {
 
 export function categoryKeywords(slugOrLabel?: string | null): string {
   const label = categoryLabel(slugOrLabel);
-  return `bokep indo, bokep ${label.toLowerCase()}, ${label.toLowerCase()} viral, koleksi dr pinguin, m.s.b, dr pinguin`;
+  return `${label}, Dr. Pinguin, katalog 18+`;
 }
 
 export function pageTitle(parts: Array<string | null | undefined>): string {
   const clean = parts.map((p) => (p || "").trim()).filter(Boolean);
   const unique = clean.filter((p, i) => clean.findIndex((x) => x.toLowerCase() === p.toLowerCase()) === i);
-  if (!unique.length) return `${SITE_NAME} — Bokep Indo`;
+  if (!unique.length) return SITE_NAME;
   if (unique[unique.length - 1]?.toLowerCase() === SITE_NAME.toLowerCase()) {
     return unique.join(" | ");
   }
@@ -31,7 +31,7 @@ export function pageTitle(parts: Array<string | null | undefined>): string {
 }
 
 export function videoSeoTitle(title: string, category?: string | null): string {
-  const base = (title || "Video Bokep Indo").trim().replace(/\s+/g, " ");
+  const base = (title || "Video").trim().replace(/\s+/g, " ");
   const label = categoryLabel(category);
   const hasLabel = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(base);
   const head = hasLabel || !label ? base : `${base} — ${label}`;
@@ -44,12 +44,12 @@ export function videoSeoDescription(
   category?: string | null,
   extra?: { creator?: string | null; source?: string | null },
 ): string {
-  const t = (title || "video bokep Indo").trim().replace(/\s+/g, " ");
+  const t = (title || "video").trim().replace(/\s+/g, " ");
   const label = categoryLabel(category);
   const src = (extra?.creator || extra?.source || "").trim();
   const shortTitle = t.length > 70 ? `${t.slice(0, 67).trimEnd()}…` : t;
-  const from = src ? ` dari ${src}` : "";
-  const body = `Tonton ${shortTitle} — ${label}${from} di ${SITE_NAME}. Streaming langsung, update koleksi Indo. Konten 18+.`;
+  const from = src ? ` · ${src}` : "";
+  const body = `${shortTitle} — ${label}${from}. Tonton di ${SITE_NAME}. Konten 18+.` ;
   return body.slice(0, 160);
 }
 
@@ -64,24 +64,23 @@ export function absoluteThumb(thumbnail?: string | null): string {
 export function homeSeo(q?: string, category?: string) {
   if (q) {
     return {
-      title: pageTitle([`Cari “${q}”`, "Bokep Indo"]),
-      description: `Hasil pencarian “${q}” di koleksi bokep Indo ${SITE_NAME}. Konten 18+.`,
-      keywords: `${q}, bokep indo, ${q} viral, dr pinguin`,
+      title: pageTitle([`Cari “${q}”`]),
+      description: `Hasil pencarian “${q}” di ${SITE_NAME}. Konten 18+.`,
+      keywords: `${q}, ${SITE_NAME}`,
     };
   }
   const cat = findCategory(category);
   if (cat) {
     return {
-      title: pageTitle([`Bokep Indo ${cat.label}`, cat.label]),
-      description: `Kumpulan bokep Indo ${cat.label.toLowerCase()} terbaru di ${SITE_NAME}. Streaming gratis, update setiap hari. Konten 18+.`,
+      title: pageTitle([cat.label]),
+      description: `Kategori ${cat.label} di ${SITE_NAME}. Konten 18+.`,
       keywords: categoryKeywords(cat.slug),
     };
   }
   return {
-    title: pageTitle(["Koleksi Dr. Pinguin Bokep", "M.S.B."]),
+    title: pageTitle(["Koleksi Dr. Pinguin", "M.S.B."]),
     description: HOME_DESCRIPTION,
-    keywords:
-      "koleksi dr pinguin bokep, m.s.b, msb, dr pinguin bokep, bokep dr pinguin, koleksi dr pinguin, bokep indo, bokep indo terbaru, dr pinguin",
+    keywords: "Dr. Pinguin, koleksi, M.S.B., 18+",
   };
 }
 
@@ -127,7 +126,7 @@ export function videoJsonLd(input: {
     "@type": "VideoObject",
     name: (input.title || "Video").trim(),
     description: (input.description || "").trim().slice(0, 300),
-    thumbnailUrl: [DEFAULT_OG, thumb],
+    thumbnailUrl: thumb,
     uploadDate: uploadDateFromId(input.id),
     inLanguage: "id",
     publisher: {
@@ -160,7 +159,7 @@ export function websiteJsonLd() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: SITE_NAME,
-    alternateName: ["Koleksi Dr. Pinguin", "Koleksi Dr. Pinguin Bokep", "M.S.B.", "MSB"],
+    alternateName: ["Koleksi Dr. Pinguin", "M.S.B."],
     url: SITE_ORIGIN,
     description: HOME_DESCRIPTION,
     potentialAction: {
