@@ -9,40 +9,22 @@ const CANONICAL_HOST = "koleksidrpinguin.com";
 
 function shouldRedirectHost(host: string) {
   const h = host.split(":")[0].toLowerCase();
-  if (!h || h === CANONICAL_HOST) return false;
-  if (h === `www.${CANONICAL_HOST}`) return true;
-  if (h === "koleksidrpinguin.site" || h === "www.koleksidrpinguin.site") return true;
-  return false;
+  return (
+    h === `www.${CANONICAL_HOST}` ||
+    h === "koleksidrpinguin.site" ||
+    h === "www.koleksidrpinguin.site"
+  );
 }
 
-async function redirectToCanonicalHost() {
-  if (typeof window !== "undefined") {
+export const Route = createRootRoute({
+  beforeLoad: () => {
+    if (typeof window === "undefined") return;
     if (!shouldRedirectHost(window.location.hostname)) return;
     throw redirect({
       href: `https://${CANONICAL_HOST}${window.location.pathname}${window.location.search}`,
       statusCode: 301,
     });
-  }
-
-  try {
-    const { getRequest } = await import("@tanstack/react-start/server");
-    const req = getRequest();
-    const host = req.headers.get("host") || "";
-    if (!shouldRedirectHost(host)) return;
-    const url = new URL(req.url);
-    throw redirect({
-      href: `https://${CANONICAL_HOST}${url.pathname}${url.search}`,
-      statusCode: 301,
-    });
-  } catch (error) {
-    if (error && typeof error === "object" && "options" in error) throw error;
-    if (error && typeof error === "object" && "to" in error) throw error;
-    if (error && typeof error === "object" && "href" in error) throw error;
-  }
-}
-
-export const Route = createRootRoute({
-  beforeLoad: () => redirectToCanonicalHost(),
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
