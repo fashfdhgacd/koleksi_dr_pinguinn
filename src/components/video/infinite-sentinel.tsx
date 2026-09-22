@@ -6,10 +6,14 @@ export function InfiniteSentinel({
   enabled,
   loading,
   onLoadMore,
+  shown,
+  total,
 }: {
   enabled: boolean;
   loading: boolean;
   onLoadMore: () => void;
+  shown?: number;
+  total?: number;
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -20,14 +24,19 @@ export function InfiniteSentinel({
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) onLoadMore();
       },
-      { rootMargin: "800px 0px" },
+      { rootMargin: "1200px 0px" },
     );
     observer.observe(node);
     return () => observer.disconnect();
   }, [enabled, onLoadMore]);
 
+  const count =
+    typeof shown === "number" && typeof total === "number" && total > 0
+      ? `${shown.toLocaleString("id-ID")} / ${total.toLocaleString("id-ID")} judul`
+      : null;
+
   return (
-    <div ref={ref} className="mt-6">
+    <div ref={ref} className="mt-8 min-h-16">
       {loading ? (
         <>
           <div className="mb-4 flex items-center justify-center gap-2 text-sm text-muted">
@@ -36,6 +45,19 @@ export function InfiniteSentinel({
           </div>
           <VideoGridSkeleton count={6} />
         </>
+      ) : enabled ? (
+        <div className="flex flex-col items-center gap-2">
+          {count ? <p className="text-xs text-muted">{count}</p> : null}
+          <button
+            type="button"
+            onClick={onLoadMore}
+            className="rounded-full bg-secondary px-4 py-2 text-sm text-foreground hover:bg-secondary/80"
+          >
+            Tampilkan lagi
+          </button>
+        </div>
+      ) : count ? (
+        <p className="text-center text-xs text-muted">{count}</p>
       ) : null}
     </div>
   );
