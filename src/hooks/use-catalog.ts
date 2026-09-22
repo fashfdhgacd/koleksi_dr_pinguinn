@@ -236,7 +236,7 @@ export function useCatalogFeed(params: BrowseParams) {
     if (typeof ric === "function") {
       const id = ric(run, { timeout: 2500 });
       return () => {
-        const cancel = (window as Window & { cancelIdleCallback?: (id: number }) => void }).cancelIdleCallback;
+        const cancel = (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback;
         cancel?.(id);
       };
     }
