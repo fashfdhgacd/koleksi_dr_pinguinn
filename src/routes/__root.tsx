@@ -1,5 +1,4 @@
 import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
-import { Analytics } from "@vercel/analytics/react";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { DEFAULT_OG } from "@/lib/seo";
@@ -12,15 +11,10 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Koleksi Dr. Pinguin Bokep (M.S.B.) | DR. PINGUIN" },
+      { title: "Koleksi Dr. Pinguin | DR. PINGUIN" },
       {
         name: "description",
-        content:
-          "Koleksi Dr. Pinguin Bokep (M.S.B.) — nonton bokep Indo terbaru di Dr. Pinguin. Amatir, jilbab, tante, viral. Konten 18+.",
-      },
-      {
-        name: "keywords",
-        content: "koleksi dr pinguin bokep, m.s.b, msb, dr pinguin bokep, bokep dr pinguin, bokep indo, dr pinguin",
+        content: "Katalog video dewasa 18+ Dr. Pinguin. Streaming embed, update koleksi Indo.",
       },
       { name: "theme-color", content: "#09090b" },
       { name: "robots", content: "index,follow,max-image-preview:large" },
@@ -74,7 +68,6 @@ function RootComponent() {
           <Outlet />
         </AuthProvider>
         <Scripts />
-        <Analytics />
       </body>
     </html>
   );

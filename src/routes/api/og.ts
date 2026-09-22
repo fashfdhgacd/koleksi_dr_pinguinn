@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import postersMap from "../../lib/catalog/posters.json";
 import { queryCatalog } from "@/lib/catalog/service";
 
-const EXTERNAL_IMAGE_ALLOW = /^(https?:\/\/)?([a-z0-9.-]*\.)?(embedan\.com)\//i;
+const EXTERNAL_IMAGE_ALLOW =
+  /^(https?:\/\/)?([a-z0-9.-]*\.)?(embedan\.com|indoav\.app|userbokep\.com|streamtape\.com)\//i;
 const SAME_ORIGIN_THUMB_PATHS = new Set([
   "/api/embed-thumb",
   "/api/puterin-thumb",
@@ -108,7 +109,8 @@ export const Route = createFileRoute("/api/og")({
     handlers: {
       GET: async ({ request }) => {
         const id = new URL(request.url).searchParams.get("id")?.trim() || "";
-        if (!id || !/^[A-Za-z0-9_-]{3,64}$/.test(id)) return fail();
+        if (!id) return fallbackOg(request.url);
+        if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return fail();
 
         const mapped = POSTERS[id];
         if (typeof mapped === "string") {
