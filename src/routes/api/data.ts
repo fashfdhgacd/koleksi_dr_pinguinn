@@ -11,13 +11,12 @@ function statusFor(code: string | undefined, ok: boolean): number {
 function cacheControl(ok: boolean, type: string | null): string {
   if (!ok) return "private, no-store";
   if (type === "detail" || type === "related") {
-    return "public, s-maxage=600, stale-while-revalidate=86400";
+    return "public, max-age=30, s-maxage=120, stale-while-revalidate=86400";
   }
   if (type === "categories") {
     return "public, s-maxage=86400, stale-while-revalidate=604800";
   }
-  // home / latest / featured / search / category — browser 60s, edge 5 menit
-  return "public, max-age=60, s-maxage=300, stale-while-revalidate=3600";
+  return "public, max-age=15, s-maxage=60, stale-while-revalidate=300";
 }
 
 async function handle(request: Request): Promise<Response> {
