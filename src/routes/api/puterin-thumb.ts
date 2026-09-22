@@ -2,13 +2,17 @@ import { createFileRoute } from "@tanstack/react-router";
 
 /**
  * Proxy poster Puterin/Putarin tanpa PUTARIN_API_KEY.
- * Dekripsi config player (AES-GCM) dari halaman embed, lalu redirect ke image.
+ * Dekripsi config player, ambil JPEG, kirim byte — jangan 302 ke anipop
+ * (hotlink/CF 403 di browser).
  */
 
 const TRANSPARENT_GIF = Buffer.from(
   "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
   "base64",
 );
+
+const UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
 
 function decodeEntities(s: string): string {
   return s
@@ -27,11 +31,8 @@ async function fetchPuterinPoster(code: string): Promise<string | null> {
   for (const embedUrl of embedUrls) {
     try {
       const page = await fetch(embedUrl, {
-        headers: {
-          accept: "text/html",
-          "user-agent": "Mozilla/5.0 (compatible; kdp-thumb/1.0)",
-        },
-        signal: AbortSignal.timeout(4000),
+        headers: { accept: "text/html", "user-agent": UA },
+        signal: AbortSignal.timeout(5000),
         redirect: "follow",
       });
       if (!page.ok) continue;
@@ -44,11 +45,8 @@ async function fetchPuterinPoster(code: string): Promise<string | null> {
       const pkRes = await fetch(
         new URL(`/api/pk?n=${encodeURIComponent(px.n)}`, embedUrl).toString(),
         {
-          headers: {
-            "user-agent": "Mozilla/5.0 (compatible; kdp-thumb/1.0)",
-            referer: embedUrl,
-          },
-          signal: AbortSignal.timeout(3000),
+          headers: { "user-agent": UA, referer: embedUrl },
+          signal: AbortSignal.timeout(4000),
         },
       );
       if (!pkRes.ok) continue;
@@ -78,6 +76,28 @@ async function fetchPuterinPoster(code: string): Promise<string | null> {
   return null;
 }
 
+async function fetchPosterBytes(poster: string, referer: string): Promise<{ buf: ArrayBuffer; type: string } | null> {
+  try {
+    const res = await fetch(poster, {
+      headers: {
+        accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+        referer,
+        "user-agent": UA,
+      },
+      signal: AbortSignal.timeout(8000),
+      redirect: "follow",
+    });
+    if (!res.ok) return null;
+    const type = (res.headers.get("content-type") || "image/jpeg").split(";")[0].trim();
+    if (!type.startsWith("image/")) return null;
+    const buf = await res.arrayBuffer();
+    if (!buf.byteLength || buf.byteLength < 2000) return null;
+    return { buf, type };
+  } catch {
+    return null;
+  }
+}
+
 export const Route = createFileRoute("/api/puterin-thumb")({
   server: {
     handlers: {
@@ -95,21 +115,27 @@ export const Route = createFileRoute("/api/puterin-thumb")({
 
         const poster = await fetchPuterinPoster(id);
         if (poster) {
-          return new Response(null, {
-            status: 302,
-            headers: {
-              location: poster,
-              "cache-control": "public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000",
-            },
-          });
+          const img =
+            (await fetchPosterBytes(poster, "https://puterin.biz/")) ||
+            (await fetchPosterBytes(poster, "https://panel.putarin.com/"));
+          if (img) {
+            return new Response(img.buf, {
+              status: 200,
+              headers: {
+                "content-type": img.type,
+                "content-length": String(img.buf.byteLength),
+                "cache-control":
+                  "public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000",
+              },
+            });
+          }
         }
 
-        // Placeholder gagal decrypt — cache 1 jam biar tidak spam function invocations
         return new Response(TRANSPARENT_GIF, {
           status: 200,
           headers: {
             "content-type": "image/gif",
-            "cache-control": "public, max-age=3600, stale-while-revalidate=86400",
+            "cache-control": "public, max-age=300, stale-while-revalidate=3600",
           },
         });
       },
