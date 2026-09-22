@@ -1,12 +1,42 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, Scripts, redirect } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { DEFAULT_OG } from "@/lib/seo";
 import appCss from "../styles.css?url";
 
 const UMAMI_WEBSITE_ID = "b952a905-cb5b-419d-8aa4-534435e5cc8b";
+const CANONICAL_HOST = "koleksidrpinguin.com";
+
+async function redirectWwwToApex() {
+  if (typeof window !== "undefined") {
+    if (window.location.hostname === `www.${CANONICAL_HOST}`) {
+      throw redirect({
+        href: `https://${CANONICAL_HOST}${window.location.pathname}${window.location.search}`,
+        statusCode: 301,
+      });
+    }
+    return;
+  }
+
+  try {
+    const { getRequest } = await import("@tanstack/react-start/server");
+    const req = getRequest();
+    const host = (req.headers.get("host") || "").split(":")[0].toLowerCase();
+    if (host !== `www.${CANONICAL_HOST}`) return;
+    const url = new URL(req.url);
+    throw redirect({
+      href: `https://${CANONICAL_HOST}${url.pathname}${url.search}`,
+      statusCode: 301,
+    });
+  } catch (error) {
+    if (error && typeof error === "object" && "options" in error) throw error;
+    if (error && typeof error === "object" && "to" in error) throw error;
+    if (error && typeof error === "object" && "href" in error) throw error;
+  }
+}
 
 export const Route = createRootRoute({
+  beforeLoad: () => redirectWwwToApex(),
   head: () => ({
     meta: [
       { charSet: "utf-8" },
