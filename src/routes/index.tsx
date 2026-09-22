@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { Hero } from "@/components/video/hero";
@@ -21,21 +21,26 @@ export const Route = createFileRoute("/")({
         ? search.category.trim()
         : undefined,
   }),
+  beforeLoad: ({ search }) => {
+    const cat = findCategory(search.category);
+    if (cat && !search.q) {
+      throw redirect({
+        to: "/kategori/$slug",
+        params: { slug: cat.slug },
+        replace: true,
+        statusCode: 301,
+      });
+    }
+  },
   head: ({ match }) => {
     const q = typeof match.search.q === "string" ? match.search.q : undefined;
-    const category = typeof match.search.category === "string" ? match.search.category : undefined;
-    const seo = homeSeo(q, category);
-    const url = q
-      ? `${SITE_ORIGIN}/?q=${encodeURIComponent(q)}`
-      : category
-        ? `${SITE_ORIGIN}/?category=${encodeURIComponent(category)}`
-        : SITE_ORIGIN;
-    const jsonLd = !q && !category ? websiteJsonLd() : null;
+    const seo = homeSeo(q);
+    const url = q ? `${SITE_ORIGIN}/?q=${encodeURIComponent(q)}` : SITE_ORIGIN;
+    const jsonLd = !q ? websiteJsonLd() : null;
     return {
       meta: [
         { title: seo.title },
         { name: "description", content: seo.description },
-        { name: "keywords", content: seo.keywords },
         { property: "og:title", content: seo.title },
         { property: "og:description", content: seo.description },
         { property: "og:url", content: url },
@@ -68,7 +73,7 @@ function HomePage() {
     ? feed.items.filter((item) => !heroIds.has(item.id))
     : feed.items;
 
-  const title = q ? `Hasil untuk “${q}”` : cat ? `Bokep Indo ${cat.label}` : "Koleksi Dr. Pinguin Bokep";
+  const title = q ? `Hasil untuk “${q}”` : cat ? cat.label : "Koleksi Dr. Pinguin";
   const subtitle = feed.total ? `${feed.total.toLocaleString("id-ID")} judul · M.S.B.` : "M.S.B. — Koleksi Dr. Pinguin";
 
   return (

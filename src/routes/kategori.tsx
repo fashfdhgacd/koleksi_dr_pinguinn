@@ -5,8 +5,8 @@ import { SITE_ORIGIN } from "@/lib/seo";
 
 export const Route = createFileRoute("/kategori")({
   head: () => {
-    const title = "Kategori Bokep Indo — Dr. Pinguin";
-    const description = "Pilih kategori bokep Indo di Dr. Pinguin: Jav, AI+, Jilbab, Tante, dan lainnya.";
+    const title = "Kategori | Dr. Pinguin";
+    const description = "Pilih kategori di Dr. Pinguin: Jav, AI+, Jilbab, Tante, dan lainnya.";
     const url = `${SITE_ORIGIN}/kategori`;
     return {
       meta: [
@@ -46,8 +46,8 @@ function CategoriesPage() {
           {CATEGORY_LIST.map((cat) => (
             <li key={cat.slug}>
               <Link
-                to="/"
-                search={{ q: undefined, category: cat.slug }}
+                to="/kategori/$slug"
+                params={{ slug: cat.slug }}
                 className="flex h-14 items-center justify-center rounded-xl border border-border bg-secondary/40 px-3 text-center text-sm font-medium text-foreground active:scale-[0.98]"
               >
                 {cat.label}
