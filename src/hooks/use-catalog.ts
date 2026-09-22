@@ -83,7 +83,9 @@ export function useCatalogFeed(params: BrowseParams) {
   const pageRef = useRef(1);
   const hasMoreRef = useRef(true);
   const itemsRef = useRef<VideoCard[]>(items);
+  const totalRef = useRef(total);
   itemsRef.current = items;
+  totalRef.current = total;
 
   const load = useCallback(
     async (nextPage: number, reason: "reset" | "more" | "retry" | "silent") => {
@@ -138,14 +140,19 @@ export function useCatalogFeed(params: BrowseParams) {
         pageRef.current = resolvedPage;
         setHasMore(pageData.hasMore);
         hasMoreRef.current = pageData.hasMore;
-        setTotal(pageData.total);
+        const nextTotal =
+          reason === "silent" && totalRef.current > pageData.total && pageData.total > 0
+            ? totalRef.current
+            : pageData.total;
+        setTotal(nextTotal);
+        totalRef.current = nextTotal;
         if (nextPage === 1) {
           feedCache.set(feedKey(params, 1), {
             items: merged,
             featured: nextFeatured ?? [],
             page: resolvedPage,
             hasMore: pageData.hasMore,
-            total: pageData.total,
+            total: nextTotal,
             at: Date.now(),
           });
         }
@@ -179,6 +186,7 @@ export function useCatalogFeed(params: BrowseParams) {
       setHasMore(snap.hasMore);
       hasMoreRef.current = snap.hasMore;
       setTotal(snap.total);
+      totalRef.current = snap.total;
       setStatus(snap.items.length ? "success" : "empty");
       void load(1, "silent");
     } else {
@@ -188,7 +196,6 @@ export function useCatalogFeed(params: BrowseParams) {
       genRef.current += 1;
       inflightRef.current = false;
     };
-    // paramsKey drives category/home/search switches
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load, paramsKey]);
 
@@ -229,7 +236,7 @@ export function useCatalogFeed(params: BrowseParams) {
     if (typeof ric === "function") {
       const id = ric(run, { timeout: 2500 });
       return () => {
-        const cancel = (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback;
+        const cancel = (window as Window & { cancelIdleCallback?: (id: number }) => void }).cancelIdleCallback;
         cancel?.(id);
       };
     }
