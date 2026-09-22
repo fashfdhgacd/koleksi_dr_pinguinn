@@ -2,9 +2,9 @@ import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-r
 import { Analytics } from "@vercel/analytics/react";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
+import { DEFAULT_OG } from "@/lib/seo";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "DR. PINGUIN";
 const UMAMI_WEBSITE_ID = "b952a905-cb5b-419d-8aa4-534435e5cc8b";
 
 export const Route = createRootRoute({
@@ -25,9 +25,18 @@ export const Route = createRootRoute({
       { name: "theme-color", content: "#09090b" },
       { name: "robots", content: "index,follow,max-image-preview:large" },
       { name: "rating", content: "adult" },
+      { property: "og:site_name", content: "DR. PINGUIN" },
+      { property: "og:image", content: DEFAULT_OG },
+      { property: "og:image:secure_url", content: DEFAULT_OG },
+      { property: "og:image:type", content: "image/jpeg" },
+      { property: "og:image:width", content: "1280" },
+      { property: "og:image:height", content: "720" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: DEFAULT_OG },
     ],
     links: [
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "image_src", href: DEFAULT_OG },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "preconnect", href: "https://tv1.indoav.app" },

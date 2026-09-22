@@ -6,7 +6,7 @@ import { InfiniteSentinel } from "@/components/video/infinite-sentinel";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { findCategory } from "@/lib/catalog/categories";
 import { useCatalogFeed } from "@/hooks/use-catalog";
-import { SITE_ORIGIN, homeSeo, websiteJsonLd } from "@/lib/seo";
+import { DEFAULT_OG, SITE_ORIGIN, homeSeo, websiteJsonLd } from "@/lib/seo";
 
 type HomeSearch = {
   q?: string;
@@ -40,6 +40,12 @@ export const Route = createFileRoute("/")({
         { property: "og:description", content: seo.description },
         { property: "og:url", content: url },
         { property: "og:type", content: "website" },
+        { property: "og:image", content: DEFAULT_OG },
+        { property: "og:image:type", content: "image/jpeg" },
+        { property: "og:image:width", content: "1280" },
+        { property: "og:image:height", content: "720" },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:image", content: DEFAULT_OG },
         { name: "robots", content: "index,follow" },
       ],
       links: [{ rel: "canonical", href: url }],

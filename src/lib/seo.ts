@@ -2,8 +2,8 @@ import { findCategory } from "@/lib/catalog/categories";
 
 export const SITE_ORIGIN = "https://koleksidrpinguin.com";
 export const SITE_NAME = "Dr. Pinguin";
-/** Google Video: JPEG/PNG/WebP — jangan SVG */
-export const DEFAULT_OG = `${SITE_ORIGIN}/og.jpg`;
+/** Kartu share: logo situs. Query v= bust cache Telegram/X. */
+export const DEFAULT_OG = `${SITE_ORIGIN}/og.jpg?v=12`;
 
 const HOME_DESCRIPTION =
   "Koleksi Dr. Pinguin Bokep (M.S.B.) — nonton bokep Indo terbaru di Dr. Pinguin. Amatir, jilbab, tante, viral. Konten 18+.";
@@ -30,18 +30,15 @@ export function pageTitle(parts: Array<string | null | undefined>): string {
   return `${unique.join(" | ")} | ${SITE_NAME}`;
 }
 
-/** Title SERP/share: judul asli + label kategori (bukan slug) + brand. Max ~70 char ideal. */
 export function videoSeoTitle(title: string, category?: string | null): string {
   const base = (title || "Video Bokep Indo").trim().replace(/\s+/g, " ");
   const label = categoryLabel(category);
   const hasLabel = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(base);
   const head = hasLabel || !label ? base : `${base} — ${label}`;
-  // Potong biar tidak kepanjangan di tab/share
   const clipped = head.length > 58 ? `${head.slice(0, 55).trimEnd()}…` : head;
   return pageTitle([clipped]);
 }
 
-/** Meta description unik: 1x judul, kategori, CTA. Tanpa spam keyword. */
 export function videoSeoDescription(
   title: string,
   category?: string | null,
@@ -56,7 +53,6 @@ export function videoSeoDescription(
   return body.slice(0, 160);
 }
 
-/** Absolute thumbnail untuk OG / Twitter / JSON-LD (wajib URL penuh). */
 export function absoluteThumb(thumbnail?: string | null): string {
   const raw = (thumbnail || "").trim();
   if (!raw) return DEFAULT_OG;
@@ -101,7 +97,6 @@ function normalizeEmbedUrl(url: string): string {
   }
 }
 
-/** uploadDate stabil dari id (bukan hardcoded 2026-01-01) */
 function uploadDateFromId(id: string): string {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
@@ -132,7 +127,7 @@ export function videoJsonLd(input: {
     "@type": "VideoObject",
     name: (input.title || "Video").trim(),
     description: (input.description || "").trim().slice(0, 300),
-    thumbnailUrl: [thumb],
+    thumbnailUrl: [DEFAULT_OG, thumb],
     uploadDate: uploadDateFromId(input.id),
     inLanguage: "id",
     publisher: {
@@ -141,7 +136,7 @@ export function videoJsonLd(input: {
       url: SITE_ORIGIN,
       logo: {
         "@type": "ImageObject",
-        url: DEFAULT_OG,
+        url: DEFAULT_OG.split("?")[0],
       },
     },
     genre: label,
