@@ -7,6 +7,11 @@ function isVideoSrc(src: string): boolean {
   return /\.(mp4|mov|webm)(\?|$)/i.test(src) || /cdn\.videy\.co\//i.test(src);
 }
 
+function withRetryParam(src: string): string {
+  const join = src.includes("?") ? "&" : "?";
+  return `${src}${join}r=1`;
+}
+
 function BrandFallback({ className, alt }: { className?: string; alt?: string }) {
   return (
     <img
@@ -33,11 +38,15 @@ export function VideoThumb({
   onUnavailable?: () => void;
 }) {
   const [failed, setFailed] = useState(false);
+  const [retried, setRetried] = useState(false);
+  const [currentSrc, setCurrentSrc] = useState(src);
   const brandOrEmpty =
     !src || src === BRAND_POSTER || /brand-poster/i.test(src) || isVideoSrc(src);
 
   useEffect(() => {
     setFailed(false);
+    setRetried(false);
+    setCurrentSrc(src);
   }, [src]);
 
   useEffect(() => {
@@ -53,14 +62,21 @@ export function VideoThumb({
   return (
     <div className="relative size-full overflow-hidden bg-zinc-900">
       <img
-        src={src}
+        src={currentSrc}
         alt={alt}
         loading={eager ? "eager" : "lazy"}
         decoding="async"
         fetchPriority={eager ? "high" : "low"}
         referrerPolicy="no-referrer"
         className={cn("media-thumb relative size-full object-cover", className)}
-        onError={() => setFailed(true)}
+        onError={() => {
+          if (!retried && src && !/r=1/.test(src)) {
+            setRetried(true);
+            setCurrentSrc(withRetryParam(src));
+            return;
+          }
+          setFailed(true);
+        }}
         onLoad={(e) => {
           const img = e.currentTarget;
           if (img.naturalWidth <= 2 && img.naturalHeight <= 2) setFailed(true);

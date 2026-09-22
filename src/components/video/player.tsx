@@ -19,7 +19,6 @@ function sourcesFromItem(item: VideoDetail): ResolvedSource[] {
     seen.add(resolved.url);
     out.push(resolved);
   }
-  // Hanya urut URL yang BENAR-BENAR ada di item. Jangan buat URL web lain.
   out.sort((a, b) => hostPriority(`${a.host} ${a.url}`) - hostPriority(`${b.host} ${b.url}`));
   return out;
 }
@@ -51,6 +50,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     return Boolean(first && !isFileUrl(first.url) && isEmbedHostUrl(first.url));
   });
   const [buffering, setBuffering] = useState(false);
+  const [embedReady, setEmbedReady] = useState(false);
   const [failed, setFailed] = useState(false);
   const [fallbackAt, setFallbackAt] = useState(0);
 
@@ -64,6 +64,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     setFailed(false);
     setFallbackAt(0);
     setBuffering(false);
+    setEmbedReady(false);
     const first = list[0];
     const auto = Boolean(first && !isFileUrl(first.url) && isEmbedHostUrl(first.url));
     setStarted(auto);
@@ -77,6 +78,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     startTransition(() => {
       setFailed(false);
       setStarted(true);
+      setEmbedReady(false);
       setBuffering(useVideo);
     });
   }
@@ -86,6 +88,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     setFallbackAt(0);
     setFailed(false);
     setStarted(true);
+    setEmbedReady(false);
     setBuffering(isFileUrl(list[index]?.url ?? null));
   }
 
@@ -119,16 +122,24 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
             </button>
           </>
         ) : !useVideo && playUrl ? (
-          <iframe
-            key={playUrl}
-            src={playUrl}
-            title={item.title}
-            className="absolute inset-0 size-full border-0 bg-background"
-            allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write"
-            referrerPolicy="origin-when-cross-origin"
-            allowFullScreen
-            loading="eager"
-          />
+          <>
+            <iframe
+              key={playUrl}
+              src={playUrl}
+              title={item.title}
+              className="absolute inset-0 size-full border-0 bg-background"
+              allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write"
+              referrerPolicy="origin-when-cross-origin"
+              allowFullScreen
+              loading="eager"
+              onLoad={() => setEmbedReady(true)}
+            />
+            {!embedReady ? (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/40">
+                <LoaderCircle className="size-8 animate-spin text-foreground" />
+              </div>
+            ) : null}
+          </>
         ) : (
           <video
             key={playUrl ?? item.id}
