@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import {
-  countOnline,
   getOwnerStats,
   maybeTelegramAlert,
   recordHit,
@@ -8,15 +7,9 @@ import {
 } from "@/lib/owner-analytics";
 
 function viewSecret(): string {
-  // Cloudflare Workers + Nitro + Vercel all surface as process.env when bound
   const a = (process.env.ONLINE_VIEW_SECRET || "").trim();
   if (a) return a;
-  // fallback aliases if user set alternate name
-  return (
-    process.env.OWNER_SECRET ||
-    process.env.PEMILIK_SECRET ||
-    ""
-  ).trim();
+  return (process.env.OWNER_SECRET || process.env.PEMILIK_SECRET || "").trim();
 }
 
 function isOwnerKey(key: string | null | undefined): boolean {
@@ -77,10 +70,10 @@ async function handlePost(request: Request): Promise<Response> {
   }
 
   const ua = request.headers.get("user-agent") || "";
-  const count = touchOnline(id);
+  const count = await touchOnline(id);
 
   if (path) {
-    recordHit({
+    await recordHit({
       path,
       ref: ref || request.headers.get("referer") || "",
       ua,
@@ -93,10 +86,10 @@ async function handlePost(request: Request): Promise<Response> {
   if (!isOwnerKey(extractKey(request, bodyKey))) {
     return json({ ok: true });
   }
-  return json({ ok: true, owner: true, ...getOwnerStats() });
+  return json({ ok: true, owner: true, ...(await getOwnerStats()) });
 }
 
-function handleGet(request: Request): Response {
+async function handleGet(request: Request): Promise<Response> {
   const secret = viewSecret();
   if (!secret) {
     return json(
@@ -111,8 +104,7 @@ function handleGet(request: Request): Response {
   if (!isOwnerKey(extractKey(request))) {
     return json({ ok: false, error: "forbidden" }, 403);
   }
-  countOnline();
-  return json({ ok: true, owner: true, ...getOwnerStats() });
+  return json({ ok: true, owner: true, ...(await getOwnerStats()) });
 }
 
 export const Route = createFileRoute("/api/online")({
