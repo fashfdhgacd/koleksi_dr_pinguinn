@@ -8,7 +8,15 @@ import {
 } from "@/lib/owner-analytics";
 
 function viewSecret(): string {
-  return (process.env.ONLINE_VIEW_SECRET || "").trim();
+  // Cloudflare Workers + Nitro + Vercel all surface as process.env when bound
+  const a = (process.env.ONLINE_VIEW_SECRET || "").trim();
+  if (a) return a;
+  // fallback aliases if user set alternate name
+  return (
+    process.env.OWNER_SECRET ||
+    process.env.PEMILIK_SECRET ||
+    ""
+  ).trim();
 }
 
 function isOwnerKey(key: string | null | undefined): boolean {
@@ -80,7 +88,6 @@ async function handlePost(request: Request): Promise<Response> {
     });
   }
 
-  // fire-and-forget alert
   void maybeTelegramAlert(count);
 
   if (!isOwnerKey(extractKey(request, bodyKey))) {
@@ -90,10 +97,20 @@ async function handlePost(request: Request): Promise<Response> {
 }
 
 function handleGet(request: Request): Response {
+  const secret = viewSecret();
+  if (!secret) {
+    return json(
+      {
+        ok: false,
+        error: "not_configured",
+        hint: "Set ONLINE_VIEW_SECRET di Cloudflare (domain .com) lalu redeploy.",
+      },
+      503,
+    );
+  }
   if (!isOwnerKey(extractKey(request))) {
     return json({ ok: false, error: "forbidden" }, 403);
   }
-  // touch prune
   countOnline();
   return json({ ok: true, owner: true, ...getOwnerStats() });
 }
