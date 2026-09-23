@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { AgeGate } from "@/components/age-gate";
-import { OnlineBadge } from "@/components/online-badge";
+import { PresencePing } from "@/components/presence-ping";
 import { Header } from "./header";
 
 export function Shell({
@@ -44,7 +44,7 @@ export function Shell({
             <p>Katalog embed. Bukan arsip file video.</p>
           </div>
         </footer>
-        <OnlineBadge />
+        <PresencePing />
       </div>
     </AgeGate>
   );
