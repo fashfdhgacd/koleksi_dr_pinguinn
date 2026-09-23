@@ -23,6 +23,7 @@ type OwnerStats = {
   ok?: boolean;
   owner?: boolean;
   error?: string;
+  hint?: string;
   online?: number;
   peakToday?: number;
   peakDay?: string;
@@ -69,13 +70,7 @@ function BarChart({ data }: { data: { hour: string; views: number }[] }) {
   );
 }
 
-function RankList({
-  items,
-  labelKey,
-}: {
-  items: { label: string; views: number }[];
-  labelKey?: string;
-}) {
+function RankList({ items }: { items: { label: string; views: number }[] }) {
   if (!items.length) {
     return <p className="text-xs text-muted">Belum ada data (tunggu traffic).</p>;
   }
@@ -133,7 +128,16 @@ export function OwnerDashboard() {
       if (!res.ok || !data.ok) {
         setAuthed(false);
         setStats(null);
-        setError(data.error === "forbidden" ? "Kunci salah atau belum di-set di server." : "Gagal ambil data.");
+        if (data.error === "not_configured") {
+          setError(
+            data.hint ||
+              "ONLINE_VIEW_SECRET belum di-set di server (.com = Cloudflare). Set env lalu redeploy.",
+          );
+        } else if (data.error === "forbidden") {
+          setError("Kunci salah. Pastikan sama persis dengan yang di Cloudflare/Vercel.");
+        } else {
+          setError("Gagal ambil data.");
+        }
         saveSecret("");
         setSecret("");
         return;
@@ -208,14 +212,14 @@ export function OwnerDashboard() {
               Kunci pemilik
             </label>
             <p className="mb-4 text-xs text-muted">
-              Sama dengan <code className="rounded bg-secondary px-1">ONLINE_VIEW_SECRET</code> di
-              Vercel & Cloudflare.
+              Domain <strong>.com</strong> = Cloudflare · <strong>.site</strong> = Vercel. Env harus diisi di
+              keduanya.
             </p>
             <Input
               id="owner-key"
               type="password"
               autoComplete="off"
-              placeholder="Tempel kunci rahasia…"
+              placeholder="Tempel ONLINE_VIEW_SECRET…"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               className="mb-3"
@@ -246,7 +250,6 @@ export function OwnerDashboard() {
               </Button>
             </div>
 
-            {/* KPI row */}
             <div className="grid gap-3 sm:grid-cols-3">
               <div className="rounded-2xl border border-border bg-surface p-5">
                 <div className="flex items-center gap-2 text-xs text-muted">
@@ -279,7 +282,6 @@ export function OwnerDashboard() {
               </div>
             </div>
 
-            {/* Chart */}
             <div className="rounded-2xl border border-border bg-surface p-5">
               <div className="mb-4 flex items-center gap-2 text-sm font-medium">
                 <Activity className="size-4" />
@@ -342,9 +344,8 @@ export function OwnerDashboard() {
 
             <div className="rounded-2xl border border-border bg-surface p-4 text-[11px] leading-relaxed text-muted">
               <strong className="text-foreground">Catatan:</strong> data in-memory per edge
-              isolate — akurat untuk live, bisa reset saat worker dingin. Set{" "}
-              <code className="rounded bg-secondary px-1">ONLINE_ALERT_THRESHOLD</code> + bot
-              Telegram untuk notifikasi peak online.
+              isolate. Set <code className="rounded bg-secondary px-1">ONLINE_ALERT_THRESHOLD</code>+
+              bot Telegram untuk notifikasi peak.
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
