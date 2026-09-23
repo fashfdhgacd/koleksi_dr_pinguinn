@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 const ID_KEY = "drp_online_id";
-const SHOW_KEY = "drp_show_online";
+const SECRET_KEY = "drp_online_secret";
 const HEARTBEAT_MS = 20_000;
 
 function getOrCreateId(): string {
@@ -21,48 +21,57 @@ function getOrCreateId(): string {
   }
 }
 
-function readUnlocked(): boolean {
+/** Ambil kunci pemilik dari URL (?k= / ?key=) atau sessionStorage. */
+function resolveOwnerSecret(): string | null {
   try {
-    if (typeof window === "undefined") return false;
     const q = new URLSearchParams(window.location.search);
-    if (q.get("live") === "1" || q.get("online") === "1") {
-      localStorage.setItem(SHOW_KEY, "1");
-      return true;
+    const fromUrl = (q.get("k") || q.get("key") || "").trim();
+    if (fromUrl === "0" || fromUrl === "off") {
+      sessionStorage.removeItem(SECRET_KEY);
+      return null;
     }
-    if (q.get("live") === "0" || q.get("online") === "0") {
-      localStorage.removeItem(SHOW_KEY);
-      return false;
+    if (fromUrl.length >= 8) {
+      sessionStorage.setItem(SECRET_KEY, fromUrl);
+      return fromUrl;
     }
-    return localStorage.getItem(SHOW_KEY) === "1";
+    return sessionStorage.getItem(SECRET_KEY);
   } catch {
-    return false;
+    return null;
   }
 }
 
 export function OnlineBadge() {
   const [count, setCount] = useState<number | null>(null);
-  const [visible, setVisible] = useState(false);
+  const [owner, setOwner] = useState(false);
 
-  // Heartbeat tetap jalan (count akurat), badge hanya tampil kalau unlocked
   useEffect(() => {
-    setVisible(readUnlocked());
-
     let cancelled = false;
     const id = getOrCreateId();
 
     async function beat() {
+      const secret = resolveOwnerSecret();
+      const isOwner = Boolean(secret);
+      if (!cancelled) setOwner(isOwner);
+
       try {
+        // Publik: heartbeat tanpa angka. Pemilik: kirim key → dapat count.
         const res = await fetch("/api/online", {
           method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ id }),
+          headers: {
+            "content-type": "application/json",
+            ...(secret ? { "x-online-key": secret } : {}),
+          },
+          body: JSON.stringify(secret ? { id, key: secret } : { id }),
           credentials: "same-origin",
           cache: "no-store",
         });
         if (!res.ok) return;
-        const data = (await res.json()) as { count?: number };
-        if (!cancelled && typeof data.count === "number") {
-          setCount(Math.max(1, data.count));
+        const data = (await res.json()) as { count?: number; owner?: boolean };
+        if (cancelled) return;
+        if (data.owner && typeof data.count === "number") {
+          setCount(Math.max(0, data.count));
+        } else {
+          setCount(null);
         }
       } catch {
         // silent
@@ -77,37 +86,21 @@ export function OnlineBadge() {
     };
     document.addEventListener("visibilitychange", onVisible);
 
-    // Toggle rahasia: Ctrl + Shift + O
-    const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.shiftKey && (e.key === "O" || e.key === "o")) {
-        e.preventDefault();
-        try {
-          const next = localStorage.getItem(SHOW_KEY) !== "1";
-          if (next) localStorage.setItem(SHOW_KEY, "1");
-          else localStorage.removeItem(SHOW_KEY);
-          setVisible(next);
-        } catch {
-          setVisible((v) => !v);
-        }
-      }
-    };
-    window.addEventListener("keydown", onKey);
-
     return () => {
       cancelled = true;
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("keydown", onKey);
     };
   }, []);
 
-  if (!visible || count === null) return null;
+  // Hanya pemilik + kunci count valid
+  if (!owner || count === null) return null;
 
   return (
     <div
       className="pointer-events-none fixed bottom-4 left-4 z-50 select-none"
       aria-live="polite"
-      title="Online sekarang (rahasia — Ctrl+Shift+O untuk tutup)"
+      title="Hanya pemilik — tambah ?k=0 di URL untuk sembunyikan"
     >
       <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-border/80 bg-background/90 px-3 py-1.5 text-xs shadow-lg backdrop-blur-md">
         <span className="relative flex size-2.5">
