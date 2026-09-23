@@ -1,9 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 /**
- * Approximate live presence.
- * In-memory per isolate (Cloudflare/Vercel) — cukup akurat untuk badge UI.
- * Session dianggap online selama ~45 detik sejak heartbeat terakhir.
+ * Live presence — count HANYA untuk pemilik.
+ * - POST tanpa key: catat heartbeat saja (tanpa angka)
+ * - POST/GET dengan key = ONLINE_VIEW_SECRET: dapat { count }
  */
 
 type Store = Map<string, number>;
@@ -35,6 +35,29 @@ function countOnline(): number {
   return store().size;
 }
 
+function viewSecret(): string {
+  return (process.env.ONLINE_VIEW_SECRET || "").trim();
+}
+
+function isOwnerKey(key: string | null | undefined): boolean {
+  const secret = viewSecret();
+  if (!secret || !key) return false;
+  return key.trim() === secret;
+}
+
+function extractKey(request: Request, bodyKey?: string): string {
+  const header = request.headers.get("x-online-key") || "";
+  if (header) return header;
+  try {
+    const url = new URL(request.url);
+    const q = url.searchParams.get("key") || url.searchParams.get("k") || "";
+    if (q) return q;
+  } catch {
+    /* ignore */
+  }
+  return bodyKey || "";
+}
+
 function json(data: unknown, status = 200): Response {
   return Response.json(data, {
     status,
@@ -42,31 +65,42 @@ function json(data: unknown, status = 200): Response {
       "cache-control": "no-store",
       "access-control-allow-origin": "*",
       "access-control-allow-methods": "GET, POST, OPTIONS",
-      "access-control-allow-headers": "content-type",
+      "access-control-allow-headers": "content-type, x-online-key",
     },
   });
 }
 
 async function handlePost(request: Request): Promise<Response> {
   let id = "";
+  let bodyKey = "";
   try {
-    const body = (await request.json()) as { id?: string };
+    const body = (await request.json()) as { id?: string; key?: string };
     id = typeof body?.id === "string" ? body.id.trim().slice(0, 64) : "";
+    bodyKey = typeof body?.key === "string" ? body.key : "";
   } catch {
     return json({ ok: false, error: "bad_json" }, 400);
   }
   if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
     return json({ ok: false, error: "bad_id" }, 400);
   }
+
   const now = Date.now();
   const s = store();
   s.set(id, now);
   prune(now);
-  return json({ ok: true, count: s.size });
+
+  // Publik: cuma acknowledge, TANPA angka
+  if (!isOwnerKey(extractKey(request, bodyKey))) {
+    return json({ ok: true });
+  }
+  return json({ ok: true, count: s.size, owner: true });
 }
 
-function handleGet(): Response {
-  return json({ ok: true, count: countOnline() });
+function handleGet(request: Request): Response {
+  if (!isOwnerKey(extractKey(request))) {
+    return json({ ok: false, error: "forbidden" }, 403);
+  }
+  return json({ ok: true, count: countOnline(), owner: true });
 }
 
 export const Route = createFileRoute("/api/online")({
@@ -78,10 +112,10 @@ export const Route = createFileRoute("/api/online")({
           headers: {
             "access-control-allow-origin": "*",
             "access-control-allow-methods": "GET, POST, OPTIONS",
-            "access-control-allow-headers": "content-type",
+            "access-control-allow-headers": "content-type, x-online-key",
           },
         }),
-      GET: async () => handleGet(),
+      GET: async ({ request }) => handleGet(request),
       POST: async ({ request }) => handlePost(request),
     },
   },
