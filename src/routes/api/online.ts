@@ -1,39 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
-
-/**
- * Live presence — count HANYA untuk pemilik.
- * - POST tanpa key: catat heartbeat saja (tanpa angka)
- * - POST/GET dengan key = ONLINE_VIEW_SECRET: dapat { count }
- */
-
-type Store = Map<string, number>;
-
-declare global {
-  // eslint-disable-next-line no-var
-  var __drPinguinOnline: Store | undefined;
-}
-
-const TTL_MS = 45_000;
-
-function store(): Store {
-  if (!globalThis.__drPinguinOnline) {
-    globalThis.__drPinguinOnline = new Map();
-  }
-  return globalThis.__drPinguinOnline;
-}
-
-function prune(now: number) {
-  const s = store();
-  for (const [id, ts] of s) {
-    if (now - ts > TTL_MS) s.delete(id);
-  }
-}
-
-function countOnline(): number {
-  const now = Date.now();
-  prune(now);
-  return store().size;
-}
+import {
+  countOnline,
+  getOwnerStats,
+  maybeTelegramAlert,
+  recordHit,
+  touchOnline,
+} from "@/lib/owner-analytics";
 
 function viewSecret(): string {
   return (process.env.ONLINE_VIEW_SECRET || "").trim();
@@ -73,10 +45,22 @@ function json(data: unknown, status = 200): Response {
 async function handlePost(request: Request): Promise<Response> {
   let id = "";
   let bodyKey = "";
+  let path = "";
+  let ref = "";
+  let host = "";
   try {
-    const body = (await request.json()) as { id?: string; key?: string };
+    const body = (await request.json()) as {
+      id?: string;
+      key?: string;
+      path?: string;
+      ref?: string;
+      host?: string;
+    };
     id = typeof body?.id === "string" ? body.id.trim().slice(0, 64) : "";
     bodyKey = typeof body?.key === "string" ? body.key : "";
+    path = typeof body?.path === "string" ? body.path : "";
+    ref = typeof body?.ref === "string" ? body.ref : "";
+    host = typeof body?.host === "string" ? body.host : "";
   } catch {
     return json({ ok: false, error: "bad_json" }, 400);
   }
@@ -84,23 +68,34 @@ async function handlePost(request: Request): Promise<Response> {
     return json({ ok: false, error: "bad_id" }, 400);
   }
 
-  const now = Date.now();
-  const s = store();
-  s.set(id, now);
-  prune(now);
+  const ua = request.headers.get("user-agent") || "";
+  const count = touchOnline(id);
 
-  // Publik: cuma acknowledge, TANPA angka
+  if (path) {
+    recordHit({
+      path,
+      ref: ref || request.headers.get("referer") || "",
+      ua,
+      host: host || request.headers.get("host") || "",
+    });
+  }
+
+  // fire-and-forget alert
+  void maybeTelegramAlert(count);
+
   if (!isOwnerKey(extractKey(request, bodyKey))) {
     return json({ ok: true });
   }
-  return json({ ok: true, count: s.size, owner: true });
+  return json({ ok: true, owner: true, ...getOwnerStats() });
 }
 
 function handleGet(request: Request): Response {
   if (!isOwnerKey(extractKey(request))) {
     return json({ ok: false, error: "forbidden" }, 403);
   }
-  return json({ ok: true, count: countOnline(), owner: true });
+  // touch prune
+  countOnline();
+  return json({ ok: true, owner: true, ...getOwnerStats() });
 }
 
 export const Route = createFileRoute("/api/online")({
