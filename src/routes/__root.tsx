@@ -1,4 +1,5 @@
 import { createRootRoute, HeadContent, Outlet, Scripts, redirect } from "@tanstack/react-router";
+import { Analytics } from "@vercel/analytics/react";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PresencePing } from "@/components/presence-ping";
@@ -90,6 +91,7 @@ function RootComponent() {
           <Outlet />
         </AuthProvider>
         <Scripts />
+        <Analytics />
       </body>
     </html>
   );
