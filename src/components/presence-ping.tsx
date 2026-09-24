@@ -4,7 +4,10 @@ import { useEffect, useRef } from "react";
 import { useRouterState } from "@tanstack/react-router";
 
 const ID_KEY = "drp_online_id";
-const HEARTBEAT_MS = 20_000;
+const HEARTBEAT_MS = 60_000;
+const MIN_GAP_MS = 20_000;
+const BOT_RE =
+  /bot|crawl|spider|slurp|headless|webdriver|puppeteer|playwright|phantom|scrapy|httpclient|curl\/|wget|python-requests|axios\/|node-fetch|bytespider|gptbot|claudebot|ccbot|semrush|ahrefs|dataforseo|petalbot/i;
 
 function getOrCreateId(): string {
   try {
@@ -21,15 +24,40 @@ function getOrCreateId(): string {
   }
 }
 
-/** Heartbeat + pageview beacon (tanpa UI). */
+function isAutomated(): boolean {
+  if (typeof navigator === "undefined") return true;
+  const ua = navigator.userAgent || "";
+  if (!ua || BOT_RE.test(ua)) return true;
+  const w = window as unknown as { __webdriver?: unknown; webdriver?: boolean };
+  if (navigator.webdriver || w.webdriver || w.__webdriver) return true;
+  return false;
+}
+
+function hasAgeConsent(): boolean {
+  try {
+    if (window.localStorage.getItem("dp_age_ok") === "1") return true;
+  } catch {
+    /* ignore */
+  }
+  return document.cookie.split(";").some((c) => c.trim().startsWith("dp_age_ok="));
+}
+
 export function PresencePing() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const lastPath = useRef("");
+  const lastBeat = useRef(0);
 
   useEffect(() => {
+    if (isAutomated()) return;
+    if (pathname !== "/pemilik" && !hasAgeConsent()) return;
+
     const id = getOrCreateId();
 
     async function beat(recordPage: boolean) {
+      if (document.visibilityState === "hidden") return;
+      const now = Date.now();
+      if (!recordPage && now - lastBeat.current < MIN_GAP_MS) return;
+      lastBeat.current = now;
       try {
         const body: Record<string, string> = { id };
         if (recordPage) {
@@ -43,9 +71,10 @@ export function PresencePing() {
           body: JSON.stringify(body),
           credentials: "same-origin",
           cache: "no-store",
+          keepalive: true,
         });
       } catch {
-        // silent
+        /* silent */
       }
     }
 
@@ -58,7 +87,6 @@ export function PresencePing() {
       if (document.visibilityState === "visible") void beat(false);
     };
     document.addEventListener("visibilitychange", onVisible);
-
     return () => {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", onVisible);
