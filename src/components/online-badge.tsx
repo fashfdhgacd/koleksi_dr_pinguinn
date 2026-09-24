@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 
 const ID_KEY = "drp_online_id";
-const SECRET_KEY = "drp_online_secret";
+const SECRET_KEY = "drp_owner_secret";
+const SECRET_KEY_LEGACY = "drp_online_secret";
 const HEARTBEAT_MS = 20_000;
 
 function getOrCreateId(): string {
@@ -34,7 +35,7 @@ function resolveOwnerSecret(): string | null {
       sessionStorage.setItem(SECRET_KEY, fromUrl);
       return fromUrl;
     }
-    return sessionStorage.getItem(SECRET_KEY);
+    return sessionStorage.getItem(SECRET_KEY) || sessionStorage.getItem(SECRET_KEY_LEGACY);
   } catch {
     return null;
   }
@@ -54,7 +55,6 @@ export function OnlineBadge() {
       if (!cancelled) setOwner(isOwner);
 
       try {
-        // Publik: heartbeat tanpa angka. Pemilik: kirim key → dapat count.
         const res = await fetch("/api/online", {
           method: "POST",
           headers: {
@@ -66,10 +66,11 @@ export function OnlineBadge() {
           cache: "no-store",
         });
         if (!res.ok) return;
-        const data = (await res.json()) as { count?: number; owner?: boolean };
+        const data = (await res.json()) as { count?: number; online?: number; owner?: boolean };
         if (cancelled) return;
-        if (data.owner && typeof data.count === "number") {
-          setCount(Math.max(0, data.count));
+        const n = typeof data.count === "number" ? data.count : data.online;
+        if (data.owner && typeof n === "number") {
+          setCount(Math.max(0, n));
         } else {
           setCount(null);
         }
@@ -93,7 +94,6 @@ export function OnlineBadge() {
     };
   }, []);
 
-  // Hanya pemilik + kunci count valid
   if (!owner || count === null) return null;
 
   return (
