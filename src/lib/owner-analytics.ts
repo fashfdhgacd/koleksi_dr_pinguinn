@@ -1,7 +1,9 @@
 /**
- * Owner analytics — PostgreSQL (Neon / PGLite) is the source of truth.
- * ANALYTICS_KV is optional write-through cache only. If KV is missing,
- * analytics still works.
+ * Owner analytics — online counter uses hybrid presence:
+ *   1) in-memory Map (warm isolate)
+ *   2) Cloudflare KV (shared across isolates) when bound
+ *   3) Postgres sessions table when DATABASE_URL works
+ * Postgres remains source of truth for historical pageviews.
  */
 
 import { dbSource, getSql } from "@/lib/db";
@@ -37,14 +39,20 @@ export type OwnerStats = {
   database: "connected" | "error";
   analytics: "operational" | "unavailable";
   updatedAt: string;
+  presence?: "memory" | "kv" | "postgres" | "hybrid";
   hint?: string;
 };
 
-const HIT_TTL_MS = 24 * 60 * 60 * 1000;
+/** Active window — UI says ±2 menit */
+const ONLINE_WINDOW_MS = 2 * 60 * 1000;
+const ONLINE_KV_PREFIX = "online:";
+const ONLINE_KV_TTL_SEC = 180; // 3 min TTL on KV keys
 
 type MemState = {
   lastTelegramAlertAt: number;
   lastTelegramPeak: number;
+  /** sessionId → lastSeen ms */
+  presence: Map<string, number>;
 };
 
 declare global {
@@ -57,7 +65,11 @@ function mem(): MemState {
     globalThis.__drPinguinAnalyticsMem = {
       lastTelegramAlertAt: 0,
       lastTelegramPeak: 0,
+      presence: new Map(),
     };
+  }
+  if (!globalThis.__drPinguinAnalyticsMem.presence) {
+    globalThis.__drPinguinAnalyticsMem.presence = new Map();
   }
   return globalThis.__drPinguinAnalyticsMem;
 }
@@ -169,6 +181,73 @@ export async function getKV() {
   }
 }
 
+/** Prune expired entries from in-memory presence map; return active count. */
+function countMemoryOnline(now = Date.now()): number {
+  const m = mem().presence;
+  let n = 0;
+  for (const [id, ts] of m) {
+    if (now - ts > ONLINE_WINDOW_MS) m.delete(id);
+    else n += 1;
+  }
+  return n;
+}
+
+function touchMemory(id: string, now = Date.now()): number {
+  mem().presence.set(id, now);
+  return countMemoryOnline(now);
+}
+
+/** List active online:* keys from KV (shared across Workers isolates). */
+async function countKvOnline(now = Date.now()): Promise<number> {
+  try {
+    const kv = await getKV();
+    if (!kv) return 0;
+    let cursor: string | undefined;
+    let total = 0;
+    for (let page = 0; page < 10; page++) {
+      const listed = await kv.list({
+        prefix: ONLINE_KV_PREFIX,
+        limit: 1000,
+        cursor,
+      });
+      for (const k of listed.keys) {
+        // Prefer TTL on keys; also verify value timestamp if present
+        const raw = await kv.get(k.name);
+        if (!raw) continue;
+        const ts = Number(raw);
+        if (Number.isFinite(ts) && now - ts > ONLINE_WINDOW_MS) continue;
+        total += 1;
+      }
+      if (listed.list_complete) break;
+      cursor = listed.cursor;
+      if (!cursor) break;
+    }
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
+async function countDbOnline(): Promise<number> {
+  try {
+    const sql = await getSql();
+    const rows = await sql.query<{ n: number }>(
+      `select count(*)::int as n from analytics_sessions
+       where last_seen_at >= now() - interval '2 minutes'`,
+    );
+    return Number(rows[0]?.n || 0);
+  } catch {
+    return 0;
+  }
+}
+
+/** Best available online count across layers. */
+export async function countOnline(): Promise<number> {
+  const memN = countMemoryOnline();
+  const [kvN, dbN] = await Promise.all([countKvOnline(), countDbOnline()]);
+  return Math.max(memN, kvN, dbN);
+}
+
 export async function analyticsHealth(): Promise<{
   database: "connected" | "error";
   analytics: "operational" | "unavailable";
@@ -198,6 +277,14 @@ export async function touchOnline(id: string): Promise<number> {
   const sid = safeId(id);
   if (!sid) return 0;
   const now = Date.now();
+
+  // 1) Always update memory (works even if DB/KV down)
+  touchMemory(sid, now);
+
+  // 2) KV write-through (shared)
+  void optionalKvPut(`${ONLINE_KV_PREFIX}${sid}`, String(now), ONLINE_KV_TTL_SEC);
+
+  // 3) Postgres when available
   try {
     const sql = await getSql();
     await sql.query(
@@ -208,36 +295,23 @@ export async function touchOnline(id: string): Promise<number> {
     );
     const rows = await sql.query<{ n: number }>(
       `select count(*)::int as n from analytics_sessions
-       where last_seen_at >= now() - interval '5 minutes'`,
+       where last_seen_at >= now() - interval '2 minutes'`,
     );
-    const count = Number(rows[0]?.n || 0);
+    const dbCount = Number(rows[0]?.n || 0);
     const dk = dayKey(now);
+    const best = Math.max(dbCount, countMemoryOnline(now));
     await sql.query(
       `insert into analytics_daily_peak (day_wib, peak, updated_at)
        values ($1::date, $2, now())
        on conflict (day_wib) do update
        set peak = greatest(analytics_daily_peak.peak, excluded.peak),
            updated_at = now()`,
-      [dk, count],
+      [dk, best],
     );
-    void optionalKvPut(`online:${sid}`, String(now), 300);
-    return count;
+    return Math.max(best, await countKvOnline(now));
   } catch (err) {
-    console.error("[analytics] touchOnline failed", err);
-    return 0;
-  }
-}
-
-export async function countOnline(): Promise<number> {
-  try {
-    const sql = await getSql();
-    const rows = await sql.query<{ n: number }>(
-      `select count(*)::int as n from analytics_sessions
-       where last_seen_at >= now() - interval '5 minutes'`,
-    );
-    return Number(rows[0]?.n || 0);
-  } catch {
-    return 0;
+    console.error("[analytics] touchOnline db failed — using memory/KV", err);
+    return Math.max(countMemoryOnline(now), await countKvOnline(now));
   }
 }
 
@@ -264,6 +338,12 @@ export async function recordHit(input: {
     `${now.toString(36)}${Math.random().toString(36).slice(2, 10)}`;
   const eventType = (input.eventType || "pageview").slice(0, 32);
 
+  // Keep presence warm on pageview too
+  if (sessionId) {
+    touchMemory(sessionId, now);
+    void optionalKvPut(`${ONLINE_KV_PREFIX}${sessionId}`, String(now), ONLINE_KV_TTL_SEC);
+  }
+
   try {
     const sql = await getSql();
     await sql.query(
@@ -271,7 +351,19 @@ export async function recordHit(input: {
         (id, event_type, visitor_id, session_id, page, path, referrer, user_agent, device_type, browser, host, created_at)
        values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
        on conflict (id) do nothing`,
-      [eventId, eventType, visitorId || null, sessionId || null, path, path, ref, (input.ua || "").slice(0, 300), device, browser, host],
+      [
+        eventId,
+        eventType,
+        visitorId || null,
+        sessionId || null,
+        path,
+        path,
+        ref,
+        (input.ua || "").slice(0, 300),
+        device,
+        browser,
+        host,
+      ],
     );
     const bucket = hourUtcBucket(now);
     await sql.query(
@@ -281,7 +373,11 @@ export async function recordHit(input: {
        set page_views = analytics_hourly.page_views + 1`,
       [bucket.toISOString()],
     );
-    void optionalKvPut(`hit:${now}:${eventId.slice(0, 8)}`, JSON.stringify({ path, ref, device, host, ts: now }), 86400);
+    void optionalKvPut(
+      `hit:${now}:${eventId.slice(0, 8)}`,
+      JSON.stringify({ path, ref, device, host, ts: now }),
+      86400,
+    );
   } catch (err) {
     console.error("[analytics] recordHit failed", err);
   }
@@ -295,62 +391,88 @@ function n(v: unknown): number {
 export async function getOwnerStats(): Promise<OwnerStats> {
   const now = Date.now();
   const dk = dayKey(now);
+
+  // Online: always try hybrid first so UI is never stuck at 0 when pings work
+  const memN = countMemoryOnline(now);
+  let kvN = 0;
+  let dbOnline = 0;
+  try {
+    kvN = await countKvOnline(now);
+  } catch {
+    /* ignore */
+  }
+
   try {
     const sql = await getSql();
-    const [onlineRows, peakRows, views24, viewsToday, uniqueToday, views7d, views30d, hourlyRows, pathRows, refRows, deviceRows, hostRows] =
-      await Promise.all([
-        sql.query<{ n: number }>(
-          `select count(*)::int as n from analytics_sessions where last_seen_at >= now() - interval '5 minutes'`,
-        ),
-        sql.query<{ peak: number }>(`select peak from analytics_daily_peak where day_wib = $1::date`, [dk]),
-        sql.query<{ n: number }>(
-          `select count(*)::int as n from analytics_events where created_at >= now() - interval '24 hours' and event_type = 'pageview'`,
-        ),
-        sql.query<{ n: number }>(
-          `select count(*)::int as n from analytics_events
-           where created_at >= ($1::date)::timestamp - interval '7 hours'
-             and created_at < ($1::date)::timestamp - interval '7 hours' + interval '1 day'
-             and event_type = 'pageview'`,
-          [dk],
-        ),
-        sql.query<{ n: number }>(
-          `select count(distinct visitor_id)::int as n from analytics_events
-           where created_at >= ($1::date)::timestamp - interval '7 hours'
-             and created_at < ($1::date)::timestamp - interval '7 hours' + interval '1 day'
-             and event_type = 'pageview'`,
-          [dk],
-        ),
-        sql.query<{ n: number }>(
-          `select count(*)::int as n from analytics_events where created_at >= now() - interval '7 days' and event_type = 'pageview'`,
-        ),
-        sql.query<{ n: number }>(
-          `select count(*)::int as n from analytics_events where created_at >= now() - interval '30 days' and event_type = 'pageview'`,
-        ),
-        sql.query<{ hour_utc: string | Date; page_views: number }>(
-          `select hour_utc, page_views from analytics_hourly
-           where hour_utc >= now() - interval '24 hours'`,
-        ),
-        sql.query<{ path: string; views: number }>(
-          `select path, count(*)::int as views from analytics_events
-           where created_at >= now() - interval '24 hours' and event_type = 'pageview'
-           group by path order by views desc limit 15`,
-        ),
-        sql.query<{ ref: string; views: number }>(
-          `select coalesce(referrer,'(direct)') as ref, count(*)::int as views from analytics_events
-           where created_at >= now() - interval '24 hours' and event_type = 'pageview'
-           group by 1 order by views desc limit 12`,
-        ),
-        sql.query<{ device: DeviceKind; views: number }>(
-          `select coalesce(device_type,'other') as device, count(*)::int as views from analytics_events
-           where created_at >= now() - interval '24 hours' and event_type = 'pageview'
-           group by 1`,
-        ),
-        sql.query<{ host: string; views: number }>(
-          `select coalesce(host,'(unknown)') as host, count(*)::int as views from analytics_events
-           where created_at >= now() - interval '24 hours' and event_type = 'pageview'
-           group by 1 order by views desc limit 6`,
-        ),
-      ]);
+    const [
+      onlineRows,
+      peakRows,
+      views24,
+      viewsToday,
+      uniqueToday,
+      views7d,
+      views30d,
+      hourlyRows,
+      pathRows,
+      refRows,
+      deviceRows,
+      hostRows,
+    ] = await Promise.all([
+      sql.query<{ n: number }>(
+        `select count(*)::int as n from analytics_sessions where last_seen_at >= now() - interval '2 minutes'`,
+      ),
+      sql.query<{ peak: number }>(`select peak from analytics_daily_peak where day_wib = $1::date`, [dk]),
+      sql.query<{ n: number }>(
+        `select count(*)::int as n from analytics_events where created_at >= now() - interval '24 hours' and event_type = 'pageview'`,
+      ),
+      sql.query<{ n: number }>(
+        `select count(*)::int as n from analytics_events
+         where created_at >= ($1::date)::timestamp - interval '7 hours'
+           and created_at < ($1::date)::timestamp - interval '7 hours' + interval '1 day'
+           and event_type = 'pageview'`,
+        [dk],
+      ),
+      sql.query<{ n: number }>(
+        `select count(distinct visitor_id)::int as n from analytics_events
+         where created_at >= ($1::date)::timestamp - interval '7 hours'
+           and created_at < ($1::date)::timestamp - interval '7 hours' + interval '1 day'
+           and event_type = 'pageview'`,
+        [dk],
+      ),
+      sql.query<{ n: number }>(
+        `select count(*)::int as n from analytics_events where created_at >= now() - interval '7 days' and event_type = 'pageview'`,
+      ),
+      sql.query<{ n: number }>(
+        `select count(*)::int as n from analytics_events where created_at >= now() - interval '30 days' and event_type = 'pageview'`,
+      ),
+      sql.query<{ hour_utc: string | Date; page_views: number }>(
+        `select hour_utc, page_views from analytics_hourly
+         where hour_utc >= now() - interval '24 hours'`,
+      ),
+      sql.query<{ path: string; views: number }>(
+        `select path, count(*)::int as views from analytics_events
+         where created_at >= now() - interval '24 hours' and event_type = 'pageview'
+         group by path order by views desc limit 15`,
+      ),
+      sql.query<{ ref: string; views: number }>(
+        `select coalesce(referrer,'(direct)') as ref, count(*)::int as views from analytics_events
+         where created_at >= now() - interval '24 hours' and event_type = 'pageview'
+         group by 1 order by views desc limit 12`,
+      ),
+      sql.query<{ device: DeviceKind; views: number }>(
+        `select coalesce(device_type,'other') as device, count(*)::int as views from analytics_events
+         where created_at >= now() - interval '24 hours' and event_type = 'pageview'
+         group by 1`,
+      ),
+      sql.query<{ host: string; views: number }>(
+        `select coalesce(host,'(unknown)') as host, count(*)::int as views from analytics_events
+         where created_at >= now() - interval '24 hours' and event_type = 'pageview'
+         group by 1 order by views desc limit 6`,
+      ),
+    ]);
+
+    dbOnline = n(onlineRows[0]?.n);
+    const online = Math.max(memN, kvN, dbOnline);
 
     const hourMap = new Map<string, number>();
     for (const row of hourlyRows) {
@@ -363,12 +485,20 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       views: hourMap.get(slot.hour) || 0,
     }));
 
-    const online = n(onlineRows[0]?.n);
     const persistOk = dbSource === "neon";
+    const presence: OwnerStats["presence"] =
+      dbOnline > 0 && (memN > 0 || kvN > 0)
+        ? "hybrid"
+        : dbOnline > 0
+          ? "postgres"
+          : kvN > 0
+            ? "kv"
+            : "memory";
+
     return emptyStats({
       online,
       count: online,
-      peakToday: n(peakRows[0]?.peak),
+      peakToday: Math.max(n(peakRows[0]?.peak), online),
       peakDay: dk,
       views24h: n(views24[0]?.n),
       viewsToday: n(viewsToday[0]?.n),
@@ -384,18 +514,26 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       persistOk,
       database: "connected",
       analytics: "operational",
+      presence,
       hint: persistOk
         ? undefined
-        : "DATABASE_URL belum di-set. Analytics jalan di PGLite (ephemeral). Isi Neon/Postgres URL agar data tahan redeploy.",
+        : "DATABASE_URL belum di-set. Online pakai memory/KV; isi Neon URL agar history tahan redeploy.",
     });
   } catch (err) {
     console.error("[analytics] getOwnerStats failed", err);
+    const online = Math.max(memN, kvN);
     return emptyStats({
-      storage: "error",
+      online,
+      count: online,
+      storage: kvN > 0 ? "kv" : "memory",
       persistOk: false,
       database: "error",
-      analytics: "unavailable",
-      hint: "Database sementara tidak tersedia. Website tetap berjalan.",
+      analytics: online > 0 ? "operational" : "unavailable",
+      presence: kvN > 0 ? "kv" : "memory",
+      hint:
+        online > 0
+          ? "DB offline — angka online dari memory/KV."
+          : "Database tidak tersedia dan belum ada heartbeat. Buka katalog di tab lain (setelah age gate) lalu Refresh.",
     });
   }
 }
@@ -433,7 +571,7 @@ export async function maybeTelegramAlert(online: number): Promise<void> {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         chat_id: chat,
-        text: `\ud83d\udfe2 Dr. Pinguin online: *${online}* (threshold ${threshold})`,
+        text: `🟢 Dr. Pinguin online: *${online}* (threshold ${threshold})`,
         parse_mode: "Markdown",
         disable_web_page_preview: true,
       }),
@@ -443,5 +581,3 @@ export async function maybeTelegramAlert(online: number): Promise<void> {
     /* silent */
   }
 }
-
-void HIT_TTL_MS;
