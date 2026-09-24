@@ -104,6 +104,7 @@ async function handlePost(request: Request): Promise<Response> {
   let path = "";
   let ref = "";
   let host = "";
+  let eventId = "";
   try {
     const body = (await request.json()) as {
       id?: string;
@@ -111,12 +112,14 @@ async function handlePost(request: Request): Promise<Response> {
       path?: string;
       ref?: string;
       host?: string;
+      eventId?: string;
     };
     id = typeof body?.id === "string" ? body.id.trim().slice(0, 64) : "";
     bodyKey = typeof body?.key === "string" ? body.key : "";
     path = typeof body?.path === "string" ? body.path : "";
     ref = typeof body?.ref === "string" ? body.ref : "";
     host = typeof body?.host === "string" ? body.host : "";
+    eventId = typeof body?.eventId === "string" ? body.eventId : "";
   } catch {
     return json(request, { ok: false, error: "bad_json" }, 400);
   }
@@ -147,6 +150,9 @@ async function handlePost(request: Request): Promise<Response> {
         ref: ref || request.headers.get("referer") || "",
         ua,
         host: host || request.headers.get("host") || "",
+        sessionId: id,
+        visitorId: id,
+        eventId,
       });
     }
     void maybeTelegramAlert(count);
