@@ -1,8 +1,10 @@
 /**
- * Owner analytics — Cloudflare KV binding / REST + memory fallback.
- * Binding: ANALYTICS_KV → namespace dr-pinguin-analytics
+ * Owner analytics — PostgreSQL (Neon / PGLite) is the source of truth.
+ * ANALYTICS_KV is optional write-through cache only. If KV is missing,
+ * analytics still works.
  */
 
+import { dbSource, getSql } from "@/lib/db";
 import { resolveAnalyticsKV } from "@/lib/analytics-kv";
 
 export type DeviceKind = "mobile" | "desktop" | "tablet" | "bot" | "other";
@@ -21,78 +23,53 @@ export type OwnerStats = {
   peakToday: number;
   peakDay: string;
   views24h: number;
+  viewsToday: number;
+  uniqueToday: number;
+  views7d: number;
+  views30d: number;
   hourly: { hour: string; views: number }[];
   topPaths: { path: string; views: number }[];
   topRefs: { ref: string; views: number }[];
   devices: { device: DeviceKind; views: number }[];
   hosts: { host: string; views: number }[];
-  storage: "kv" | "kv-rest" | "memory";
+  storage: "postgres" | "pglite" | "kv" | "kv-rest" | "memory" | "error";
   persistOk: boolean;
+  database: "connected" | "error";
+  analytics: "operational" | "unavailable";
+  updatedAt: string;
   hint?: string;
 };
 
-type KVNamespaceLike = {
-  get(key: string): Promise<string | null>;
-  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
-  list(options?: { prefix?: string; limit?: number; cursor?: string }): Promise<{
-    keys: { name: string }[];
-    list_complete: boolean;
-    cursor?: string;
-  }>;
-};
+const HIT_TTL_MS = 24 * 60 * 60 * 1000;
 
 type MemState = {
-  online: Map<string, number>;
-  hits: PageHit[];
-  peakToday: number;
-  peakDay: string;
-  hourly: Map<string, number>;
   lastTelegramAlertAt: number;
   lastTelegramPeak: number;
 };
 
 declare global {
   // eslint-disable-next-line no-var
-  var __drPinguinAnalytics: MemState | undefined;
+  var __drPinguinAnalyticsMem: MemState | undefined;
 }
 
-const ONLINE_TTL_SEC = 60;
-const ONLINE_TTL_MS = ONLINE_TTL_SEC * 1000;
-const HIT_TTL_SEC = 24 * 60 * 60;
-const HIT_TTL_MS = HIT_TTL_SEC * 1000;
-const MAX_HITS_MEM = 8_000;
+function mem(): MemState {
+  if (!globalThis.__drPinguinAnalyticsMem) {
+    globalThis.__drPinguinAnalyticsMem = {
+      lastTelegramAlertAt: 0,
+      lastTelegramPeak: 0,
+    };
+  }
+  return globalThis.__drPinguinAnalyticsMem;
+}
 
 function dayKey(ts = Date.now()): string {
   return new Date(ts + 7 * 3600_000).toISOString().slice(0, 10);
 }
 
-function hourKey(ts = Date.now()): string {
-  return new Date(ts + 7 * 3600_000).toISOString().slice(0, 13);
-}
-
-function mem(): MemState {
-  if (!globalThis.__drPinguinAnalytics) {
-    globalThis.__drPinguinAnalytics = {
-      online: new Map(),
-      hits: [],
-      peakToday: 0,
-      peakDay: dayKey(),
-      hourly: new Map(),
-      lastTelegramAlertAt: 0,
-      lastTelegramPeak: 0,
-    };
-  }
-  return globalThis.__drPinguinAnalytics;
-}
-
-export async function getKV(): Promise<KVNamespaceLike | null> {
-  const handle = await resolveAnalyticsKV();
-  return handle?.kv || null;
-}
-
-async function storageKind(): Promise<"kv" | "kv-rest" | "memory"> {
-  const handle = await resolveAnalyticsKV();
-  return handle?.storage || "memory";
+function hourUtcBucket(ts = Date.now()): Date {
+  const d = new Date(ts);
+  d.setUTCMinutes(0, 0, 0);
+  return d;
 }
 
 export function classifyDevice(ua: string): DeviceKind {
@@ -102,6 +79,16 @@ export function classifyDevice(ua: string): DeviceKind {
   if (/ipad|tablet|kindle|playbook/i.test(u)) return "tablet";
   if (/mobi|android|iphone|ipod|phone/i.test(u)) return "mobile";
   if (/windows|macintosh|linux|cros/i.test(u)) return "desktop";
+  return "other";
+}
+
+function classifyBrowser(ua: string): string {
+  const u = ua.toLowerCase();
+  if (/edg\//.test(u)) return "edge";
+  if (/chrome|crios/.test(u)) return "chrome";
+  if (/safari/.test(u) && !/chrome|crios/.test(u)) return "safari";
+  if (/firefox|fxios/.test(u)) return "firefox";
+  if (/opr\//.test(u)) return "opera";
   return "other";
 }
 
@@ -127,27 +114,83 @@ function safeId(id: string): string {
   return id.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
 }
 
-async function listAll(
-  kv: KVNamespaceLike,
-  prefix: string,
-  limit = 1000,
-): Promise<string[]> {
-  const names: string[] = [];
-  let cursor: string | undefined;
-  do {
-    const page = await kv.list({ prefix, limit: Math.min(1000, limit - names.length), cursor });
-    for (const k of page.keys) names.push(k.name);
-    cursor = page.list_complete ? undefined : page.cursor;
-  } while (cursor && names.length < limit);
-  return names;
+function emptyHourly(now = Date.now()): { hour: string; views: number }[] {
+  const hourly: { hour: string; views: number }[] = [];
+  for (let i = 23; i >= 0; i--) {
+    const t = now - i * 3600_000;
+    const label = new Date(t + 7 * 3600_000).toISOString().slice(11, 13);
+    hourly.push({ hour: label, views: 0 });
+  }
+  return hourly;
 }
 
-async function bumpPeak(kv: KVNamespaceLike, count: number): Promise<void> {
+function emptyStats(partial: Partial<OwnerStats> = {}): OwnerStats {
   const dk = dayKey();
-  const key = `peak:${dk}`;
-  const cur = Number((await kv.get(key)) || "0") || 0;
-  if (count > cur) {
-    await kv.put(key, String(count), { expirationTtl: 48 * 3600 });
+  return {
+    online: 0,
+    count: 0,
+    peakToday: 0,
+    peakDay: dk,
+    views24h: 0,
+    viewsToday: 0,
+    uniqueToday: 0,
+    views7d: 0,
+    views30d: 0,
+    hourly: emptyHourly(),
+    topPaths: [],
+    topRefs: [],
+    devices: [],
+    hosts: [],
+    storage: dbSource === "neon" ? "postgres" : "pglite",
+    persistOk: dbSource === "neon",
+    database: "connected",
+    analytics: "operational",
+    updatedAt: new Date().toISOString(),
+    ...partial,
+  };
+}
+
+async function optionalKvPut(key: string, value: string, ttl?: number): Promise<void> {
+  try {
+    const handle = await resolveAnalyticsKV();
+    if (!handle?.kv) return;
+    await handle.kv.put(key, value, ttl ? { expirationTtl: ttl } : undefined);
+  } catch {
+    /* KV is optional */
+  }
+}
+
+export async function getKV() {
+  try {
+    const handle = await resolveAnalyticsKV();
+    return handle?.kv || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function analyticsHealth(): Promise<{
+  database: "connected" | "error";
+  analytics: "operational" | "unavailable";
+  storage: OwnerStats["storage"];
+  timestamp: string;
+}> {
+  try {
+    const sql = await getSql();
+    await sql.query("select 1 as ok");
+    return {
+      database: "connected",
+      analytics: "operational",
+      storage: dbSource === "neon" ? "postgres" : "pglite",
+      timestamp: new Date().toISOString(),
+    };
+  } catch {
+    return {
+      database: "error",
+      analytics: "unavailable",
+      storage: "error",
+      timestamp: new Date().toISOString(),
+    };
   }
 }
 
@@ -155,42 +198,47 @@ export async function touchOnline(id: string): Promise<number> {
   const sid = safeId(id);
   if (!sid) return 0;
   const now = Date.now();
-  const kv = await getKV();
-  if (kv) {
-    await kv.put(`online:${sid}`, String(now), { expirationTtl: ONLINE_TTL_SEC });
-    const keys = await listAll(kv, "online:", 2000);
-    const count = keys.length;
-    await bumpPeak(kv, count);
+  try {
+    const sql = await getSql();
+    await sql.query(
+      `insert into analytics_sessions (session_id, visitor_id, last_seen_at)
+       values ($1, $2, now())
+       on conflict (session_id) do update set last_seen_at = now()`,
+      [sid, sid],
+    );
+    const rows = await sql.query<{ n: number }>(
+      `select count(*)::int as n from analytics_sessions
+       where last_seen_at >= now() - interval '5 minutes'`,
+    );
+    const count = Number(rows[0]?.n || 0);
+    const dk = dayKey(now);
+    await sql.query(
+      `insert into analytics_daily_peak (day_wib, peak, updated_at)
+       values ($1::date, $2, now())
+       on conflict (day_wib) do update
+       set peak = greatest(analytics_daily_peak.peak, excluded.peak),
+           updated_at = now()`,
+      [dk, count],
+    );
+    void optionalKvPut(`online:${sid}`, String(now), 300);
     return count;
+  } catch (err) {
+    console.error("[analytics] touchOnline failed", err);
+    return 0;
   }
-  const s = mem();
-  s.online.set(sid, now);
-  for (const [k, ts] of s.online) {
-    if (now - ts > ONLINE_TTL_MS) s.online.delete(k);
-  }
-  const count = s.online.size;
-  const dk = dayKey(now);
-  if (s.peakDay !== dk) {
-    s.peakDay = dk;
-    s.peakToday = count;
-  } else if (count > s.peakToday) {
-    s.peakToday = count;
-  }
-  return count;
 }
 
 export async function countOnline(): Promise<number> {
-  const kv = await getKV();
-  if (kv) {
-    const keys = await listAll(kv, "online:", 2000);
-    return keys.length;
+  try {
+    const sql = await getSql();
+    const rows = await sql.query<{ n: number }>(
+      `select count(*)::int as n from analytics_sessions
+       where last_seen_at >= now() - interval '5 minutes'`,
+    );
+    return Number(rows[0]?.n || 0);
+  } catch {
+    return 0;
   }
-  const now = Date.now();
-  const s = mem();
-  for (const [k, ts] of s.online) {
-    if (now - ts > ONLINE_TTL_MS) s.online.delete(k);
-  }
-  return s.online.size;
 }
 
 export async function recordHit(input: {
@@ -198,134 +246,170 @@ export async function recordHit(input: {
   ref?: string;
   ua?: string;
   host?: string;
+  visitorId?: string;
+  sessionId?: string;
+  eventId?: string;
+  eventType?: string;
 }): Promise<void> {
   const now = Date.now();
-  const hit: PageHit = {
-    path: normalizePath(input.path),
-    ref: normalizeRef(input.ref || ""),
-    device: classifyDevice(input.ua || ""),
-    host: (input.host || "").replace(/^www\./, "").slice(0, 80) || "(unknown)",
-    ts: now,
-  };
-  const kv = await getKV();
-  if (kv) {
-    const rand = Math.random().toString(36).slice(2, 8);
-    await kv.put(`hit:${now}:${rand}`, JSON.stringify(hit), { expirationTtl: HIT_TTL_SEC });
-    const hk = `hour:${hourKey(now)}`;
-    const prev = Number((await kv.get(hk)) || "0") || 0;
-    await kv.put(hk, String(prev + 1), { expirationTtl: 48 * 3600 });
-    return;
+  const path = normalizePath(input.path);
+  const ref = normalizeRef(input.ref || "");
+  const device = classifyDevice(input.ua || "");
+  const browser = classifyBrowser(input.ua || "");
+  const host = (input.host || "").replace(/^www\./, "").slice(0, 80) || "(unknown)";
+  const sessionId = safeId(input.sessionId || input.visitorId || "");
+  const visitorId = safeId(input.visitorId || sessionId);
+  const eventId =
+    safeId(input.eventId || "") ||
+    `${now.toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  const eventType = (input.eventType || "pageview").slice(0, 32);
+
+  try {
+    const sql = await getSql();
+    await sql.query(
+      `insert into analytics_events
+        (id, event_type, visitor_id, session_id, page, path, referrer, user_agent, device_type, browser, host, created_at)
+       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
+       on conflict (id) do nothing`,
+      [eventId, eventType, visitorId || null, sessionId || null, path, path, ref, (input.ua || "").slice(0, 300), device, browser, host],
+    );
+    const bucket = hourUtcBucket(now);
+    await sql.query(
+      `insert into analytics_hourly (hour_utc, page_views, unique_visitors, sessions)
+       values ($1, 1, 0, 0)
+       on conflict (hour_utc) do update
+       set page_views = analytics_hourly.page_views + 1`,
+      [bucket.toISOString()],
+    );
+    void optionalKvPut(`hit:${now}:${eventId.slice(0, 8)}`, JSON.stringify({ path, ref, device, host, ts: now }), 86400);
+  } catch (err) {
+    console.error("[analytics] recordHit failed", err);
   }
-  const s = mem();
-  s.hits.push(hit);
-  const cutoff = now - HIT_TTL_MS;
-  s.hits = s.hits.filter((h) => h.ts >= cutoff);
-  if (s.hits.length > MAX_HITS_MEM) s.hits = s.hits.slice(-MAX_HITS_MEM);
-  s.hourly.set(hourKey(now), (s.hourly.get(hourKey(now)) || 0) + 1);
 }
 
-function topN(map: Map<string, number>, n: number) {
-  return [...map.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, n)
-    .map(([key, views]) => ({ key, views }));
+function n(v: unknown): number {
+  const x = Number(v);
+  return Number.isFinite(x) && x > 0 ? x : 0;
 }
 
 export async function getOwnerStats(): Promise<OwnerStats> {
   const now = Date.now();
-  const kv = await getKV();
-  if (kv) {
-    const onlineKeys = await listAll(kv, "online:", 2000);
-    const online = onlineKeys.length;
-    const dk = dayKey(now);
-    const peakToday = Number((await kv.get(`peak:${dk}`)) || "0") || 0;
-    const hitKeys = await listAll(kv, "hit:", 3000);
-    const pathMap = new Map<string, number>();
-    const refMap = new Map<string, number>();
-    const deviceMap = new Map<DeviceKind, number>();
-    const hostMap = new Map<string, number>();
-    let views24h = 0;
-    const sample = hitKeys.slice(-500);
-    for (const name of sample) {
-      try {
-        const raw = await kv.get(name);
-        if (!raw) continue;
-        const h = JSON.parse(raw) as PageHit;
-        if (!h?.path || now - (h.ts || 0) > HIT_TTL_MS) continue;
-        views24h++;
-        pathMap.set(h.path, (pathMap.get(h.path) || 0) + 1);
-        refMap.set(h.ref || "(direct)", (refMap.get(h.ref || "(direct)") || 0) + 1);
-        deviceMap.set(h.device || "other", (deviceMap.get(h.device || "other") || 0) + 1);
-        hostMap.set(h.host || "(unknown)", (hostMap.get(h.host || "(unknown)") || 0) + 1);
-      } catch {
-        /* skip */
-      }
+  const dk = dayKey(now);
+  try {
+    const sql = await getSql();
+    const [onlineRows, peakRows, views24, viewsToday, uniqueToday, views7d, views30d, hourlyRows, pathRows, refRows, deviceRows, hostRows] =
+      await Promise.all([
+        sql.query<{ n: number }>(
+          `select count(*)::int as n from analytics_sessions where last_seen_at >= now() - interval '5 minutes'`,
+        ),
+        sql.query<{ peak: number }>(`select peak from analytics_daily_peak where day_wib = $1::date`, [dk]),
+        sql.query<{ n: number }>(
+          `select count(*)::int as n from analytics_events where created_at >= now() - interval '24 hours' and event_type = 'pageview'`,
+        ),
+        sql.query<{ n: number }>(
+          `select count(*)::int as n from analytics_events
+           where created_at >= ($1::date)::timestamp - interval '7 hours'
+             and created_at < ($1::date)::timestamp - interval '7 hours' + interval '1 day'
+             and event_type = 'pageview'`,
+          [dk],
+        ),
+        sql.query<{ n: number }>(
+          `select count(distinct visitor_id)::int as n from analytics_events
+           where created_at >= ($1::date)::timestamp - interval '7 hours'
+             and created_at < ($1::date)::timestamp - interval '7 hours' + interval '1 day'
+             and event_type = 'pageview'`,
+          [dk],
+        ),
+        sql.query<{ n: number }>(
+          `select count(*)::int as n from analytics_events where created_at >= now() - interval '7 days' and event_type = 'pageview'`,
+        ),
+        sql.query<{ n: number }>(
+          `select count(*)::int as n from analytics_events where created_at >= now() - interval '30 days' and event_type = 'pageview'`,
+        ),
+        sql.query<{ hour_utc: string | Date; page_views: number }>(
+          `select hour_utc, page_views from analytics_hourly
+           where hour_utc >= now() - interval '24 hours'`,
+        ),
+        sql.query<{ path: string; views: number }>(
+          `select path, count(*)::int as views from analytics_events
+           where created_at >= now() - interval '24 hours' and event_type = 'pageview'
+           group by path order by views desc limit 15`,
+        ),
+        sql.query<{ ref: string; views: number }>(
+          `select coalesce(referrer,'(direct)') as ref, count(*)::int as views from analytics_events
+           where created_at >= now() - interval '24 hours' and event_type = 'pageview'
+           group by 1 order by views desc limit 12`,
+        ),
+        sql.query<{ device: DeviceKind; views: number }>(
+          `select coalesce(device_type,'other') as device, count(*)::int as views from analytics_events
+           where created_at >= now() - interval '24 hours' and event_type = 'pageview'
+           group by 1`,
+        ),
+        sql.query<{ host: string; views: number }>(
+          `select coalesce(host,'(unknown)') as host, count(*)::int as views from analytics_events
+           where created_at >= now() - interval '24 hours' and event_type = 'pageview'
+           group by 1 order by views desc limit 6`,
+        ),
+      ]);
+
+    const hourMap = new Map<string, number>();
+    for (const row of hourlyRows) {
+      const t = new Date(row.hour_utc).getTime();
+      const label = new Date(t + 7 * 3600_000).toISOString().slice(11, 13);
+      hourMap.set(label, n(row.page_views));
     }
-    if (hitKeys.length > views24h) views24h = hitKeys.length;
-    const hourly: { hour: string; views: number }[] = [];
-    for (let i = 23; i >= 0; i--) {
-      const t = now - i * 3600_000;
-      const k = hourKey(t);
-      const label = new Date(t + 7 * 3600_000).toISOString().slice(11, 13) + ":00";
-      hourly.push({ hour: label, views: Number((await kv.get(`hour:${k}`)) || "0") || 0 });
-    }
-    const kind = await storageKind();
-    return {
+    const hourly = emptyHourly(now).map((slot) => ({
+      hour: slot.hour,
+      views: hourMap.get(slot.hour) || 0,
+    }));
+
+    const online = n(onlineRows[0]?.n);
+    const persistOk = dbSource === "neon";
+    return emptyStats({
       online,
       count: online,
-      peakToday,
+      peakToday: n(peakRows[0]?.peak),
       peakDay: dk,
-      views24h,
+      views24h: n(views24[0]?.n),
+      viewsToday: n(viewsToday[0]?.n),
+      uniqueToday: n(uniqueToday[0]?.n),
+      views7d: n(views7d[0]?.n),
+      views30d: n(views30d[0]?.n),
       hourly,
-      topPaths: topN(pathMap, 15).map(({ key, views }) => ({ path: key, views })),
-      topRefs: topN(refMap, 12).map(({ key, views }) => ({ ref: key, views })),
-      devices: (["mobile", "desktop", "tablet", "bot", "other"] as DeviceKind[])
-        .map((device) => ({ device, views: deviceMap.get(device) || 0 }))
-        .filter((d) => d.views > 0),
-      hosts: topN(hostMap, 6).map(({ key, views }) => ({ host: key, views })),
-      storage: kind,
-      persistOk: true,
-    };
+      topPaths: pathRows.map((r) => ({ path: r.path || "/", views: n(r.views) })),
+      topRefs: refRows.map((r) => ({ ref: r.ref || "(direct)", views: n(r.views) })),
+      devices: deviceRows.map((r) => ({ device: r.device || "other", views: n(r.views) })),
+      hosts: hostRows.map((r) => ({ host: r.host || "(unknown)", views: n(r.views) })),
+      storage: dbSource === "neon" ? "postgres" : "pglite",
+      persistOk,
+      database: "connected",
+      analytics: "operational",
+      hint: persistOk
+        ? undefined
+        : "DATABASE_URL belum di-set. Analytics jalan di PGLite (ephemeral). Isi Neon/Postgres URL agar data tahan redeploy.",
+    });
+  } catch (err) {
+    console.error("[analytics] getOwnerStats failed", err);
+    return emptyStats({
+      storage: "error",
+      persistOk: false,
+      database: "error",
+      analytics: "unavailable",
+      hint: "Database sementara tidak tersedia. Website tetap berjalan.",
+    });
   }
-  const s = mem();
-  for (const [k, ts] of s.online) {
-    if (now - ts > ONLINE_TTL_MS) s.online.delete(k);
+}
+
+export async function pruneAnalytics(rawDays = 60): Promise<void> {
+  try {
+    const sql = await getSql();
+    await sql.query(`delete from analytics_events where created_at < now() - ($1 || ' days')::interval`, [
+      String(rawDays),
+    ]);
+    await sql.query(`delete from analytics_sessions where last_seen_at < now() - interval '2 days'`);
+  } catch (err) {
+    console.error("[analytics] prune failed", err);
   }
-  const cutoff = now - HIT_TTL_MS;
-  const recent = s.hits.filter((h) => h.ts >= cutoff);
-  const pathMap = new Map<string, number>();
-  const refMap = new Map<string, number>();
-  const deviceMap = new Map<DeviceKind, number>();
-  const hostMap = new Map<string, number>();
-  for (const h of recent) {
-    pathMap.set(h.path, (pathMap.get(h.path) || 0) + 1);
-    refMap.set(h.ref, (refMap.get(h.ref) || 0) + 1);
-    deviceMap.set(h.device, (deviceMap.get(h.device) || 0) + 1);
-    hostMap.set(h.host, (hostMap.get(h.host) || 0) + 1);
-  }
-  const hourly: { hour: string; views: number }[] = [];
-  for (let i = 23; i >= 0; i--) {
-    const t = now - i * 3600_000;
-    const label = new Date(t + 7 * 3600_000).toISOString().slice(11, 13) + ":00";
-    hourly.push({ hour: label, views: s.hourly.get(hourKey(t)) || 0 });
-  }
-  return {
-    online: s.online.size,
-    count: s.online.size,
-    peakToday: s.peakDay === dayKey(now) ? s.peakToday : 0,
-    peakDay: s.peakDay,
-    views24h: recent.length,
-    hourly,
-    topPaths: topN(pathMap, 15).map(({ key, views }) => ({ path: key, views })),
-    topRefs: topN(refMap, 12).map(({ key, views }) => ({ ref: key, views })),
-    devices: (["mobile", "desktop", "tablet", "bot", "other"] as DeviceKind[])
-      .map((device) => ({ device, views: deviceMap.get(device) || 0 }))
-      .filter((d) => d.views > 0),
-    hosts: topN(hostMap, 6).map(({ key, views }) => ({ host: key, views })),
-    storage: "memory",
-    persistOk: false,
-    hint: "Storage memory — bind ANALYTICS_KV atau set CF_ACCOUNT_ID + CF_KV_NAMESPACE_ID + CF_API_TOKEN di Cloudflare .com, lalu redeploy.",
-  };
 }
 
 export async function maybeTelegramAlert(online: number): Promise<void> {
@@ -359,3 +443,5 @@ export async function maybeTelegramAlert(online: number): Promise<void> {
     /* silent */
   }
 }
+
+void HIT_TTL_MS;
