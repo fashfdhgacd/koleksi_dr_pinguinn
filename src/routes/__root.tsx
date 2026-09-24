@@ -1,6 +1,7 @@
 import { createRootRoute, HeadContent, Outlet, Scripts, redirect } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
+import { PresencePing } from "@/components/presence-ping";
 import { DEFAULT_OG } from "@/lib/seo";
 import appCss from "../styles.css?url";
 
@@ -84,6 +85,7 @@ function RootComponent() {
       </head>
       <body className="min-h-dvh bg-background font-sans text-foreground">
         <PreviewHostBridge />
+        <PresencePing />
         <AuthProvider>
           <Outlet />
         </AuthProvider>
