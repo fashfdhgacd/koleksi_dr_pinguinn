@@ -1,0 +1,137 @@
+name: Fix Streamtape titles
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fix-st-titles
+  cancel-in-progress: false
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 30
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Restore videos-latest from last good blob + fetch real titles
+        run: |
+          node --input-type=module <<'SCRIPT'
+          import { execSync } from "node:child_process";
+          import fs from "node:fs";
+
+          const GOOD_VIDEOS = "ac33b0279ee546adfc3805814c8f5a0fb1c1edce";
+          const GOOD_POSTERS = "7143c2edb88da9c27a9ed8666d4380fd6517c7fb";
+          const IDS = [
+            "j4jzkYO72AIzzpr","vzLLMpgjVrFDRa","BA4oX4e8OXCyzXr","dv9qaKoLzrIkLMO",
+            "XxDwl4lDYjIDDda","YDQwWmzRLDuv93p","4qlo0r4094fKaz6","LkLqAD7BPqfRzWo",
+            "A4mGMjjLeGCDpo","dkDkOprq1mFk4y7","xrZPYPLq9YIq2O","WP7pxgZ9V9UeZ4",
+            "LJKezbOa2GS7gO","pxkoADgvvAur4xG","7zvk3ydwKMuxlG","qJQKy0jkpmtY1J",
+            "YOK7wKvpqZTvArm","Kq2koeR71DC0G3j","16k099MjvyUeWkj","8O6136l9XGtjoK",
+            "e0pgv3wmvJhJ6a",
+          ];
+
+          function loadJson(p, fb) {
+            try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return fb; }
+          }
+
+          // Restore from known-good blobs if current files are empty / broken
+          try {
+            const cur = fs.readFileSync("data/videos-latest.json", "utf8");
+            if (!cur || cur.trim().length < 100 || cur.includes("PLACEHOLDER")) {
+              execSync(`git show ${GOOD_VIDEOS}:data/videos-latest.json > data/videos-latest.json`);
+              console.log("Restored videos-latest from", GOOD_VIDEOS);
+            }
+          } catch (e) {
+            execSync(`git show ${GOOD_VIDEOS}:data/videos-latest.json > data/videos-latest.json`);
+            console.log("Restored videos-latest (catch)");
+          }
+          try {
+            const cur = fs.readFileSync("data/latest-posters.json", "utf8");
+            if (!cur || cur.trim().length < 50) {
+              execSync(`git show ${GOOD_POSTERS}:data/latest-posters.json > data/latest-posters.json`);
+              console.log("Restored latest-posters from", GOOD_POSTERS);
+            }
+          } catch {
+            try {
+              execSync(`git show ${GOOD_POSTERS}:data/latest-posters.json > data/latest-posters.json`);
+            } catch {}
+          }
+
+          const latest = loadJson("data/videos-latest.json", []);
+          let posters = loadJson("data/latest-posters.json", {});
+          if (typeof posters !== "object" || Array.isArray(posters)) posters = {};
+
+          async function fetchInfo(fid) {
+            const url = `https://api.streamtape.com/file/info?file=${encodeURIComponent(fid)}`;
+            const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+            const data = await res.json();
+            if (data?.status !== 200) return null;
+            const info = data.result?.[fid] || data.result || {};
+            let name = String(info.name || info.title || "").trim();
+            name = name.replace(/\.[a-z0-9]{2,5}$/i, "").trim();
+            const thumb = String(info.thumb || "").trim();
+            return { title: name, thumb };
+          }
+
+          let ok = 0;
+          for (const fid of IDS) {
+            try {
+              const info = await fetchInfo(fid);
+              if (!info?.title) { console.log("FAIL", fid); continue; }
+              const item = latest.find((x) => x && x.id === fid);
+              if (item) {
+                item.title = info.title;
+                item.source = item.source || "Streamtape";
+                const cat = String(item.category || "").toLowerCase();
+                if (["umum", "lainnya", "", "video"].includes(cat)) item.category = "ai-plus";
+                if (info.thumb?.startsWith("http")) {
+                  item.poster = info.thumb;
+                  item.thumbnail = info.thumb;
+                  posters[fid] = info.thumb;
+                }
+                ok++;
+                console.log("OK", fid, info.title.slice(0, 50));
+              } else {
+                console.log("MISS in latest", fid);
+              }
+            } catch (e) {
+              console.log("ERR", fid, e.message);
+            }
+            await new Promise((r) => setTimeout(r, 200));
+          }
+
+          fs.mkdirSync("data", { recursive: true });
+          fs.writeFileSync("data/videos-latest.json", JSON.stringify(latest, null, 2) + "\n");
+          fs.writeFileSync("data/latest-posters.json", JSON.stringify(posters, null, 2) + "\n");
+          console.log("Done ok=", ok, "videos=", latest.length, "posters=", Object.keys(posters).length);
+          SCRIPT
+
+      - name: Commit
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/videos-latest.json data/latest-posters.json
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "fix: real Streamtape titles + thumbs for 21 batch videos"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main || true
+            if git push origin HEAD:main; then
+              echo "Pushed OK"
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 1
