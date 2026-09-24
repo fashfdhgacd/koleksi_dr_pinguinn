@@ -65,10 +65,19 @@ export function PresencePing() {
           body.ref = document.referrer || "";
           body.host = window.location.hostname;
         }
+        const payload = JSON.stringify({
+          ...body,
+          eventId: `${id}-${pathname || ""}-${Math.floor(Date.now() / 20000)}`,
+        });
+        const blob = new Blob([payload], { type: "application/json" });
+        if (recordPage && typeof navigator.sendBeacon === "function") {
+          const ok = navigator.sendBeacon("/api/online", blob);
+          if (ok) return;
+        }
         await fetch("/api/online", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
+          body: payload,
           credentials: "same-origin",
           cache: "no-store",
           keepalive: true,
