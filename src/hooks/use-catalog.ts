@@ -16,6 +16,7 @@ export type BrowseParams = {
   mode: "home" | "latest" | "category" | "search";
   category?: string;
   q?: string;
+  page?: number;
 };
 
 type FeedSnap = {
@@ -29,6 +30,11 @@ type FeedSnap = {
 
 const FEED_TTL_MS = 5 * 60 * 1000;
 const feedCache = new Map<string, FeedSnap>();
+
+function normPage(value?: number): number {
+  const n = Math.floor(Number(value) || 1);
+  return n < 1 ? 1 : n;
+}
 
 function feedKey(params: BrowseParams, page = 1): string {
   return `${params.mode}:${params.category ?? ""}:${params.q ?? ""}:${page}`;
@@ -64,54 +70,50 @@ function extractPage(res: CatalogResponse): {
 }
 
 export function useCatalogFeed(params: BrowseParams) {
-  const paramsKey = `${params.mode}:${params.category ?? ""}:${params.q ?? ""}`;
-  const cached = feedCache.get(feedKey(params, 1));
+  const wantedPage = normPage(params.page);
+  const paramsKey = `${params.mode}:${params.category ?? ""}:${params.q ?? ""}:${wantedPage}`;
+  const cached = feedCache.get(feedKey(params, wantedPage));
   const warm = Boolean(cached && Date.now() - cached.at < FEED_TTL_MS);
 
   const [items, setItems] = useState<VideoCard[]>(() => (warm && cached ? cached.items : []));
   const [featured, setFeatured] = useState<VideoCard[]>(() => (warm && cached ? cached.featured : []));
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(() => (warm && cached ? cached.hasMore : true));
+  const [page, setPage] = useState(wantedPage);
+  const [hasMore, setHasMore] = useState(() => (warm && cached ? cached.hasMore : wantedPage === 1));
   const [total, setTotal] = useState(() => (warm && cached ? cached.total : 0));
   const [status, setStatus] = useState<CatalogStatus>(() =>
     warm && cached ? (cached.items.length ? "success" : "empty") : "loading",
   );
   const [error, setError] = useState<string | null>(null);
-  const seenRef = useRef(new Set<string>());
   const inflightRef = useRef(false);
   const genRef = useRef(0);
-  const pageRef = useRef(1);
-  const hasMoreRef = useRef(true);
   const itemsRef = useRef<VideoCard[]>(items);
   const totalRef = useRef(total);
   itemsRef.current = items;
   totalRef.current = total;
 
   const load = useCallback(
-    async (nextPage: number, reason: "reset" | "more" | "retry" | "silent") => {
-      if (reason === "more" && (inflightRef.current || !hasMoreRef.current)) return;
+    async (nextPage: number, reason: "reset" | "retry" | "silent") => {
       if ((reason === "silent" || reason === "retry") && inflightRef.current) return;
 
-      const gen = reason === "more" || reason === "silent" ? genRef.current : ++genRef.current;
+      const gen = reason === "silent" ? genRef.current : ++genRef.current;
       inflightRef.current = true;
       if (reason !== "silent") setError(null);
-      if (reason === "more") setStatus("loadingMore");
-      else if (reason === "retry" && !itemsRef.current.length) setStatus("retrying");
+      if (reason === "retry" && !itemsRef.current.length) setStatus("retrying");
       else if (reason === "reset" && !itemsRef.current.length) setStatus("loading");
 
       const query =
         params.mode === "search"
-          ? { type: "search", q: params.q ?? "", page: nextPage, limit: DEFAULT_PAGE_SIZE }
+          ? { type: "search" as const, q: params.q ?? "", page: nextPage, limit: DEFAULT_PAGE_SIZE }
           : params.mode === "category"
             ? {
-                type: "category",
+                type: "category" as const,
                 category: params.category ?? "",
                 page: nextPage,
                 limit: DEFAULT_PAGE_SIZE,
               }
             : nextPage === 1 && params.mode === "home"
-              ? { type: "home", page: 1, limit: DEFAULT_PAGE_SIZE }
-              : { type: "latest", page: nextPage, limit: DEFAULT_PAGE_SIZE };
+              ? { type: "home" as const, page: 1, limit: DEFAULT_PAGE_SIZE }
+              : { type: "latest" as const, page: nextPage, limit: DEFAULT_PAGE_SIZE };
 
       try {
         const res = await fetchCatalog(query);
@@ -123,39 +125,27 @@ export function useCatalogFeed(params: BrowseParams) {
           return;
         }
         const pageData = extractPage(res);
-        if (nextPage === 1) seenRef.current = new Set();
-        const base = nextPage === 1 ? [] : itemsRef.current;
-        const merged: VideoCard[] = [...base];
-        for (const item of pageData.items) {
-          if (!item?.id || seenRef.current.has(item.id)) continue;
-          seenRef.current.add(item.id);
-          merged.push(item);
-        }
+        const merged = pageData.items.filter((item) => item?.id);
         setItems(merged);
         itemsRef.current = merged;
-        const nextFeatured = nextPage === 1 && pageData.featured.length ? pageData.featured : undefined;
-        if (nextFeatured) setFeatured(nextFeatured);
+        if (nextPage === 1 && pageData.featured.length) setFeatured(pageData.featured);
         const resolvedPage = pageData.page || nextPage;
         setPage(resolvedPage);
-        pageRef.current = resolvedPage;
         setHasMore(pageData.hasMore);
-        hasMoreRef.current = pageData.hasMore;
         const nextTotal =
           reason === "silent" && totalRef.current > pageData.total && pageData.total > 0
             ? totalRef.current
             : pageData.total;
         setTotal(nextTotal);
         totalRef.current = nextTotal;
-        if (nextPage === 1) {
-          feedCache.set(feedKey(params, 1), {
-            items: merged,
-            featured: nextFeatured ?? [],
-            page: resolvedPage,
-            hasMore: pageData.hasMore,
-            total: nextTotal,
-            at: Date.now(),
-          });
-        }
+        feedCache.set(feedKey(params, resolvedPage), {
+          items: merged,
+          featured: nextPage === 1 ? pageData.featured : [],
+          page: resolvedPage,
+          hasMore: pageData.hasMore,
+          total: nextTotal,
+          at: Date.now(),
+        });
         if (reason !== "silent") setStatus(merged.length ? "success" : "empty");
         else if (!merged.length) setStatus("empty");
         else setStatus("success");
@@ -173,24 +163,21 @@ export function useCatalogFeed(params: BrowseParams) {
   );
 
   useEffect(() => {
-    pageRef.current = 1;
-    hasMoreRef.current = true;
-    const snap = feedCache.get(feedKey(params, 1));
+    const snap = feedCache.get(feedKey(params, wantedPage));
     if (snap && Date.now() - snap.at < FEED_TTL_MS) {
-      seenRef.current = new Set(snap.items.map((x) => x.id));
       setItems(snap.items);
       itemsRef.current = snap.items;
       setFeatured(snap.featured);
       setPage(snap.page);
-      pageRef.current = snap.page;
       setHasMore(snap.hasMore);
-      hasMoreRef.current = snap.hasMore;
       setTotal(snap.total);
       totalRef.current = snap.total;
       setStatus(snap.items.length ? "success" : "empty");
-      void load(1, "silent");
+      void load(wantedPage, "silent");
     } else {
-      void load(1, "reset");
+      setItems([]);
+      itemsRef.current = [];
+      void load(wantedPage, "reset");
     }
     return () => {
       genRef.current += 1;
@@ -200,7 +187,7 @@ export function useCatalogFeed(params: BrowseParams) {
   }, [load, paramsKey]);
 
   useEffect(() => {
-    if (params.mode !== "home") return;
+    if (params.mode !== "home" || wantedPage !== 1) return;
     const SLOT = 5 * 60 * 1000;
     let tid = 0;
     const arm = () => {
@@ -212,46 +199,11 @@ export function useCatalogFeed(params: BrowseParams) {
     };
     arm();
     return () => window.clearTimeout(tid);
-  }, [load, params.mode]);
-
-  useEffect(() => {
-    if (params.mode !== "home") return;
-    const run = () => {
-      for (const slug of ["jav", "ai-plus"] as const) {
-        void fetchCatalog({ type: "category", category: slug, page: 1, limit: DEFAULT_PAGE_SIZE }).then((res) => {
-          if (!res.ok || res.type !== "category") return;
-          feedCache.set(feedKey({ mode: "category", category: slug }, 1), {
-            items: res.items,
-            featured: [],
-            page: res.page,
-            hasMore: res.hasMore,
-            total: res.total,
-            at: Date.now(),
-          });
-        });
-      }
-    };
-    const ric = (window as Window & { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number })
-      .requestIdleCallback;
-    if (typeof ric === "function") {
-      const id = ric(run, { timeout: 2500 });
-      return () => {
-        const cancel = (window as Window & { cancelIdleCallback?: (id: number) => void }).cancelIdleCallback;
-        cancel?.(id);
-      };
-    }
-    const tid = window.setTimeout(run, 600);
-    return () => window.clearTimeout(tid);
-  }, [params.mode]);
-
-  const loadMore = useCallback(() => {
-    if (inflightRef.current || !hasMoreRef.current) return;
-    void load(pageRef.current + 1, "more");
-  }, [load]);
+  }, [load, params.mode, wantedPage]);
 
   const retry = useCallback(() => {
-    void load(1, "retry");
-  }, [load]);
+    void load(wantedPage, "retry");
+  }, [load, wantedPage]);
 
   return {
     items,
@@ -259,9 +211,9 @@ export function useCatalogFeed(params: BrowseParams) {
     page,
     hasMore,
     total,
+    limit: DEFAULT_PAGE_SIZE,
     status,
     error,
-    loadMore,
     retry,
     loading: status === "loading" || status === "retrying",
     loadingMore: status === "loadingMore",
