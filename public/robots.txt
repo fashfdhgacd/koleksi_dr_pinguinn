@@ -1,10 +1,10 @@
 User-agent: *
 Allow: /
 Allow: /api/og
-Allow: /api/img-proxy
-Allow: /api/tape-thumb
-Allow: /api/embed-thumb
-Allow: /api/puterin-thumb
+Disallow: /api/img-proxy
+Disallow: /api/tape-thumb
+Disallow: /api/embed-thumb
+Disallow: /api/puterin-thumb
 Disallow: /api/
 Disallow: /api/online
 Disallow: /pemilik
@@ -42,14 +42,12 @@ Disallow: /
 User-agent: Twitterbot
 Allow: /
 Allow: /api/og
-Allow: /api/img-proxy
 Allow: /og.jpg
 Allow: /brand-poster.jpg
 
 User-agent: facebookexternalhit
 Allow: /
 Allow: /api/og
-Allow: /api/img-proxy
 
 Sitemap: https://koleksidrpinguin.com/sitemap.xml
 Sitemap: https://koleksidrpinguin.com/sitemap-video.xml

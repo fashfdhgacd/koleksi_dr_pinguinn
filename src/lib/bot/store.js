@@ -7,6 +7,7 @@ function today() {
 
 export function toRecord({ parsed, title, category }) {
   const cat = (category || "umum").toLowerCase();
+  const poster = String(parsed.poster || parsed.thumbnail || "").trim();
   return {
     id: parsed.id,
     title,
@@ -17,6 +18,7 @@ export function toRecord({ parsed, title, category }) {
     tags: [cat, parsed.host, "telegram"],
     date: today(),
     updated_at: new Date().toISOString(),
+    ...(poster.startsWith("http") ? { poster, thumbnail: poster } : {}),
   };
 }
 

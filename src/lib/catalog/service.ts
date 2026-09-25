@@ -19,7 +19,7 @@ function isRealFeaturedThumb(url: string | null | undefined): boolean {
   // Videy removed — never treat CDN / raw video as featured art.
   if (/cdn\.videy\.co\/|videy\.co\//i.test(u)) return false;
   if (/\.(mp4|mov|webm)(\?|$)/i.test(u)) return false;
-  if (/\/api\/img-proxy\?/i.test(u)) return true;
+  if (/\/api\/img-proxy\?/i.test(u)) return false;
   if (/^https?:\/\//i.test(u)) return true;
   return false;
 }
@@ -129,7 +129,6 @@ export async function queryCatalog(query: CatalogQuery, signal?: AbortSignal): P
         return { ok: true, type, item, related: related.items };
       }
       case "home": {
-        // Featured: 8 item time-slot agar Hero bisa rotate tiap 5 menit (hanya thumb nyata)
         const [featured, latest] = await Promise.all([
           listFeaturedWithArt(1, 8, signal),
           listLatest(page ?? 1, limit ?? DEFAULT_PAGE_SIZE, signal),
