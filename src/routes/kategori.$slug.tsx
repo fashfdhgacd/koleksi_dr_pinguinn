@@ -1,9 +1,11 @@
+import { useEffect } from "react";
 import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { CatalogPager } from "@/components/video/catalog-pager";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { findCategory } from "@/lib/catalog/categories";
+import { rememberCatalog } from "@/lib/catalog/last-catalog";
 import { useCatalogFeed } from "@/hooks/use-catalog";
 import { DEFAULT_OG, SITE_ORIGIN, homeSeo } from "@/lib/seo";
 
@@ -58,6 +60,10 @@ function CategorySlugPage() {
   const feed = useCatalogFeed({ mode: "category", category: cat?.slug || slug, page });
   const title = cat?.label || slug;
   const subtitle = feed.total ? `${feed.total.toLocaleString("id-ID")} judul` : "Kategori";
+
+  useEffect(() => {
+    rememberCatalog(`/kategori/${slug}${page > 1 ? `?page=${page}` : ""}`);
+  }, [slug, page]);
 
   function setPage(next: number) {
     void navigate({
