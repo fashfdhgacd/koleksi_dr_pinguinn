@@ -26,16 +26,26 @@ jobs:
         with:
           node-version: "20"
 
-      - name: Scrape posters IndoAV/UserBokep
+      - name: Fill missing/dead posters
         env:
           STREAMTAPE_LOGIN: ${{ secrets.STREAMTAPE_LOGIN }}
           STREAMTAPE_KEY: ${{ secrets.STREAMTAPE_KEY }}
         run: |
           node --input-type=commonjs <<'SCRIPT'
           const fs = require("fs");
+          const DEAD = /cdnhlsplayer\.lat/i;
           function embedId(embed = "") {
             const m = String(embed).match(/\/(?:e|v|d)\/([A-Za-z0-9_-]+)/i) || String(embed).match(/[?&]id=([A-Za-z0-9_-]+)/i);
             return m ? m[1] : "";
+          }
+          function isLivePoster(url) {
+            return typeof url === "string" && url.startsWith("http") && !DEAD.test(url);
+          }
+          function javCoverFromTitle(title = "") {
+            const m = String(title).match(/\b([A-Z]{2,8})[-_ ]?(\d{3,4})\b/i);
+            if (!m) return null;
+            const code = (m[1] + m[2]).toLowerCase();
+            return `https://pics.dmm.co.jp/digital/video/${code}/${code}pl.jpg`;
           }
           async function fetchEmbedPoster(code, src) {
             const hosts = src === "userbokep"
@@ -54,8 +64,8 @@ jobs:
                   html.match(/poster=["'](https?:\/\/[^"']*embedan[^"']+)["']/i) ||
                   html.match(/poster=["'](https?:\/\/[^"']+\.(?:webp|jpg|jpeg|png)[^"']*)["']/i) ||
                   html.match(/property=["']og:image["']\s+content=["'](https?:\/\/[^"']+)["']/i);
-                const url = m?.[1]?.replace(/&amp;/g, "&")?.trim();
-                if (url?.startsWith("http")) return url;
+                const url = m?.[1]?.replace(/&/g, "&")?.trim();
+                if (url?.startsWith("http") && !DEAD.test(url)) return url;
               } catch {}
             }
             return null;
@@ -77,35 +87,43 @@ jobs:
           }
           (async () => {
             const postersPath = "src/lib/catalog/posters.json";
+            const javPath = "src/lib/catalog/jav-posters.json";
             const latestPath = "data/latest-posters.json";
             let posters = loadJson(postersPath, {});
             if (typeof posters !== "object" || Array.isArray(posters)) posters = {};
+            let javMap = loadJson(javPath, {});
+            if (typeof javMap !== "object" || Array.isArray(javMap)) javMap = {};
             const videos = [
               ...loadJson("data/videos-latest.json", []),
+              ...loadJson("data/putarin-latest.json", []),
               ...loadJson("src/lib/catalog/videos.json", []),
               ...loadJson("src/lib/catalog/streamtape.json", []),
+              ...loadJson("src/lib/catalog/putarin.json", []),
             ];
             const seen = new Set();
             const need = [];
             for (const v of videos) {
               if (!v?.id || seen.has(v.id)) continue;
               seen.add(v.id);
-              if (posters[v.id]?.startsWith?.("http")) continue;
-              const blob = `${v.embed||""} ${v.source||""} ${v.direct||""}`;
-              if (/indoav|userbokep|streamtape/i.test(blob)) need.push(v);
+              const have = posters[v.id] || javMap[v.id] || v.poster || v.thumbnail;
+              if (isLivePoster(have)) continue;
+              const blob = `${v.embed||""} ${v.source||""} ${v.direct||""} ${v.category||""}`;
+              if (/indoav|userbokep|streamtape|putarin|puterin|\bjav\b/i.test(blob)) need.push(v);
             }
             console.log("Need posters:", need.length);
             let ok = 0, fail = 0;
             for (let i = 0; i < need.length; i++) {
               const v = need[i];
               const code = embedId(v.embed || v.direct || "") || v.id;
-              const blob = `${v.embed||""} ${v.source||""}`;
+              const blob = `${v.embed||""} ${v.source||""} ${v.category||""}`;
               let url = null;
-              if (/streamtape/i.test(blob)) url = await fetchStreamtape(code);
+              if (/putarin|puterin|\bjav\b/i.test(blob)) url = javCoverFromTitle(v.title || "");
+              else if (/streamtape/i.test(blob)) url = await fetchStreamtape(code);
               else if (/userbokep/i.test(blob)) url = await fetchEmbedPoster(code, "userbokep");
               else url = await fetchEmbedPoster(code, "indoav");
               if (url) {
                 posters[v.id] = url;
+                if (/putarin|puterin|\bjav\b/i.test(blob)) javMap[v.id] = url;
                 if (code !== v.id) posters[code] = url;
                 ok++;
                 console.log(`OK ${v.id}`);
@@ -113,20 +131,26 @@ jobs:
                 fail++;
                 if (fail <= 15) console.log(`FAIL ${v.id}`);
               }
-              await new Promise(r => setTimeout(r, 300));
-              if ((ok + fail) % 25 === 0) fs.writeFileSync(postersPath, JSON.stringify(posters));
+              if (!/putarin|puterin|\bjav\b/i.test(blob)) {
+                await new Promise(r => setTimeout(r, 300));
+              }
+              if ((ok + fail) % 25 === 0) {
+                fs.writeFileSync(postersPath, JSON.stringify(posters));
+                fs.writeFileSync(javPath, JSON.stringify(javMap, null, 2) + "\n");
+              }
             }
             fs.mkdirSync("data", { recursive: true });
             fs.writeFileSync(postersPath, JSON.stringify(posters));
+            fs.writeFileSync(javPath, JSON.stringify(javMap, null, 2) + "\n");
             let latest = loadJson(latestPath, {});
             if (typeof latest !== "object" || Array.isArray(latest)) latest = {};
             for (const v of loadJson("data/videos-latest.json", [])) {
               if (!v?.id) continue;
               const url = posters[v.id];
-              if (typeof url === "string" && url.startsWith("http")) latest[v.id] = url;
+              if (isLivePoster(url)) latest[v.id] = url;
             }
             fs.writeFileSync(latestPath, JSON.stringify(latest, null, 2) + "\n");
-            console.log("Done ok=", ok, "fail=", fail, "posters=", Object.keys(posters).length);
+            console.log("Done ok=", ok, "fail=", fail, "posters=", Object.keys(posters).length, "jav=", Object.keys(javMap).length);
           })().catch(e => { console.error(e); process.exit(1); });
           SCRIPT
 
@@ -135,13 +159,13 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/catalog/posters.json data/latest-posters.json 2>/dev/null || true
+          git add src/lib/catalog/posters.json src/lib/catalog/jav-posters.json data/latest-posters.json 2>/dev/null || true
           if git diff --cached --quiet; then
             echo "No poster changes."
             exit 0
           fi
-          COUNT=$(node --input-type=commonjs -e "try{console.log(Object.keys(require('./src/lib/catalog/posters.json')).length)}catch(e){console.log(0)}")
-          git commit -m "chore(posters): auto-fill ($COUNT)"
+          COUNT=$(node --input-type=commonjs -e "try{console.log(Object.keys(require('./src/lib/catalog/jav-posters.json')).length)}catch(e){console.log(0)}")
+          git commit -m "chore(posters): auto-fill jav+missing ($COUNT jav)"
           for i in 1 2 3 4 5; do
             git pull --rebase origin main || true
             if git push origin HEAD:main; then
