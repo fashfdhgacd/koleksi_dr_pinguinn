@@ -1,25 +1,38 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
-import { InfiniteSentinel } from "@/components/video/infinite-sentinel";
+import { CatalogPager } from "@/components/video/catalog-pager";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { findCategory } from "@/lib/catalog/categories";
 import { useCatalogFeed } from "@/hooks/use-catalog";
 import { DEFAULT_OG, SITE_ORIGIN, homeSeo } from "@/lib/seo";
 
+function parsePage(value: unknown): number | undefined {
+  const n = Math.floor(Number(value));
+  if (!Number.isFinite(n) || n <= 1) return undefined;
+  return Math.min(n, 500);
+}
+
 export const Route = createFileRoute("/kategori/$slug")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    page: parsePage(search.page),
+  }),
   beforeLoad: ({ params }) => {
     const cat = findCategory(params.slug);
     if (!cat) throw notFound();
     return { cat };
   },
-  head: ({ params }) => {
+  head: ({ params, match }) => {
     const cat = findCategory(params.slug);
+    const page = typeof match.search.page === "number" ? match.search.page : 1;
     const seo = homeSeo(undefined, cat?.slug);
-    const url = `${SITE_ORIGIN}/kategori/${cat?.slug || params.slug}`;
+    const url =
+      page > 1
+        ? `${SITE_ORIGIN}/kategori/${cat?.slug || params.slug}?page=${page}`
+        : `${SITE_ORIGIN}/kategori/${cat?.slug || params.slug}`;
     return {
       meta: [
-        { title: seo.title },
+        { title: page > 1 ? `${seo.title} · halaman ${page}` : seo.title },
         { name: "description", content: seo.description },
         { property: "og:title", content: seo.title },
         { property: "og:description", content: seo.description },
@@ -28,7 +41,7 @@ export const Route = createFileRoute("/kategori/$slug")({
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:image", content: DEFAULT_OG },
-        { name: "robots", content: "index,follow" },
+        { name: "robots", content: page > 1 ? "noindex,follow" : "index,follow" },
       ],
       links: [{ rel: "canonical", href: url }],
     };
@@ -38,10 +51,22 @@ export const Route = createFileRoute("/kategori/$slug")({
 
 function CategorySlugPage() {
   const { slug } = Route.useParams();
+  const { page: pageSearch } = Route.useSearch();
+  const navigate = useNavigate({ from: "/kategori/$slug" });
   const cat = findCategory(slug);
-  const feed = useCatalogFeed({ mode: "category", category: cat?.slug || slug });
+  const page = pageSearch || 1;
+  const feed = useCatalogFeed({ mode: "category", category: cat?.slug || slug, page });
   const title = cat?.label || slug;
   const subtitle = feed.total ? `${feed.total.toLocaleString("id-ID")} judul` : "Kategori";
+
+  function setPage(next: number) {
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        page: next <= 1 ? undefined : next,
+      }),
+    });
+  }
 
   return (
     <Shell category={cat?.slug || slug}>
@@ -60,12 +85,12 @@ function CategorySlugPage() {
           ) : (
             <VideoGrid items={feed.items} eagerCount={8} />
           )}
-          <InfiniteSentinel
-            enabled={feed.status === "success" && feed.hasMore && !feed.loadingMore}
-            loading={feed.loadingMore}
-            onLoadMore={feed.loadMore}
-            shown={feed.items.length}
+          <CatalogPager
+            page={feed.page || page}
             total={feed.total}
+            limit={feed.limit}
+            loading={feed.loading}
+            onPage={setPage}
           />
         </section>
       )}
