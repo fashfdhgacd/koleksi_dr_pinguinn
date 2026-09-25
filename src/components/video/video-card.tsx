@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { Play } from "lucide-react";
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
+import { rememberCatalog } from "@/lib/catalog/last-catalog";
 import { VideoThumb } from "./thumb";
 
 type VideoCardPreload = false | "intent" | "viewport";
@@ -21,6 +22,7 @@ export function VideoCard({
       to="/watch/$id"
       params={{ id: video.id }}
       preload={preload}
+      onClick={() => rememberCatalog()}
       className="group block rounded-xl p-1 transition-colors duration-150 ease-out hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div className="relative aspect-video overflow-hidden rounded-lg bg-surface-2">
