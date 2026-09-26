@@ -129,7 +129,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
               title={item.title}
               className="absolute inset-0 size-full border-0 bg-background"
               allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write"
-              referrerPolicy="origin"
+              referrerPolicy="no-referrer-when-downgrade"
               allowFullScreen
               loading="eager"
               onLoad={() => setEmbedReady(true)}
