@@ -388,7 +388,7 @@ function WatchPage() {
                 disabled={!catalogPlayUrl(item)}
                 onClick={() => {
                   const src = catalogPlayUrl(item);
-                  if (src) window.open(src, "_blank", "noopener,noreferrer");
+                  if (src) window.open(src, "_blank", "noopener"); // keep referrer so hoster sees koleksidrpinguin.com
                 }}
               >
                 Buka Sumber
