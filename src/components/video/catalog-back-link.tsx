@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { lastCatalogHref } from "@/lib/catalog/last-catalog";
 import { findCategory } from "@/lib/catalog/categories";
 import type { VideoDetail } from "@/lib/catalog/types";
@@ -11,12 +12,15 @@ function fallbackHref(item: VideoDetail): string {
 }
 
 export function CatalogBackLink({ item }: { item: VideoDetail }) {
-  const href = lastCatalogHref(fallbackHref(item));
+  const fallback = fallbackHref(item);
+  const [href, setHref] = useState(fallback);
+
+  useEffect(() => {
+    setHref(lastCatalogHref(fallback));
+  }, [fallback]);
+
   return (
-    <a
-      href={href}
-      className="flex h-12 items-center rounded-xl bg-secondary px-5 text-base text-foreground"
-    >
+    <a href={href} className="flex h-12 items-center rounded-xl bg-secondary px-5 text-base text-foreground">
       Kembali ke katalog
     </a>
   );
