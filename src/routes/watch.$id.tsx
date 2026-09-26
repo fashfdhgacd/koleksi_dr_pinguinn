@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
@@ -8,7 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
 import { queryCatalog } from "@/lib/catalog/service";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
-import { findCategory } from "@/lib/catalog/categories";
 import {
   DEFAULT_OG,
   SITE_ORIGIN,
@@ -17,6 +16,7 @@ import {
   videoSeoTitle,
 } from "@/lib/seo";
 import { watchDescription } from "@/lib/catalog/watch-description";
+import { CatalogBackLink } from "@/components/video/catalog-back-link";
 
 const SHARE_CARD_VERSION = "11";
 
@@ -204,7 +204,7 @@ function ShareSheet({
             onClick={() => void copyLink()}
             className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-secondary px-4 text-base font-medium text-foreground active:scale-[0.98]"
           >
-            {copied ? "✓ Link disalin" : "Salin link"}
+            {copied ? "\u2713 Link disalin" : "Salin link"}
           </button>
           {typeof navigator !== "undefined" && typeof navigator.share === "function" ? (
             <button
@@ -220,15 +220,6 @@ function ShareSheet({
       </div>
     </div>
   );
-}
-
-function catalogSearchFromItem(item: VideoDetail): { q: undefined; category: string | undefined } {
-  const raw = (item.category || item.creator || "").trim().toLowerCase();
-  if (/videy/.test(raw)) return { q: undefined, category: undefined };
-  if (/jav|putarin|puterin/.test(raw)) return { q: undefined, category: "jav" };
-  if (/ai\+|ai-plus|streamtape/.test(raw)) return { q: undefined, category: "ai-plus" };
-  const cat = findCategory(raw.replace(/\s+/g, "-")) || findCategory(raw);
-  return { q: undefined, category: cat?.slug };
 }
 
 function WatchPage() {
@@ -378,8 +369,8 @@ function WatchPage() {
           <header className="max-w-3xl space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
               {item.category}
-              {item.year ? ` · ${item.year}` : ""}
-              {item.creator ? ` · ${item.creator}` : ""}
+              {item.year ? ` \u00b7 ${item.year}` : ""}
+              {item.creator ? ` \u00b7 ${item.creator}` : ""}
             </p>
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>
             <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>
@@ -402,13 +393,7 @@ function WatchPage() {
               >
                 Buka Sumber
               </button>
-              <Link
-                to="/"
-                search={catalogSearchFromItem(item)}
-                className="flex h-12 items-center rounded-xl bg-secondary px-5 text-base text-foreground"
-              >
-                Kembali ke katalog
-              </Link>
+              <CatalogBackLink item={item} />
             </div>
           </header>
             </>
@@ -419,7 +404,7 @@ function WatchPage() {
               <Skeleton className="h-20 w-full rounded-md" />
             </div>
           )}
-{related.length ? (
+          {related.length ? (
             <section>
               <h2 className="mb-5 font-display text-3xl text-foreground">Tonton juga</h2>
               <VideoGrid items={related} eagerCount={0} />
