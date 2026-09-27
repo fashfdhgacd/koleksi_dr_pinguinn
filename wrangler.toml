@@ -1,10 +1,7 @@
 name = "koleksi-dr-pinguinn"
-compatibility_date = "2025-03-01"
+# Must stay — Nitro merges into .output/server/wrangler.json (we also patch post-build)
+compatibility_date = "2024-09-23"
 compatibility_flags = [ "nodejs_compat" ]
 
-# Nitro cloudflare-module men-generate entry; flag di atas HARUS ada
-# supaya node:fs / unenv jalan di Workers.
-
-# Binding KV: Dashboard → Settings → Bindings
-# Variable name: ANALYTICS_KV
-# Namespace: dr-pinguin-analytics
+# Routes tetap di-manage di Cloudflare Dashboard (jangan kosongkan di sini)
+# Binding KV: Dashboard → Settings → Bindings → ANALYTICS_KV → dr-pinguin-analytics
