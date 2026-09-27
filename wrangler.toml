@@ -1,7 +1,13 @@
 name = "koleksi-dr-pinguinn"
-# Must stay — Nitro merges into .output/server/wrangler.json (we also patch post-build)
-compatibility_date = "2024-09-23"
+compatibility_date = "2026-09-27"
 compatibility_flags = [ "nodejs_compat" ]
 
-# Routes tetap di-manage di Cloudflare Dashboard (jangan kosongkan di sini)
-# Binding KV: Dashboard → Settings → Bindings → ANALYTICS_KV → dr-pinguin-analytics
+# KV analytics (kode baca env.ANALYTICS_KV)
+[[kv_namespaces]]
+binding = "ANALYTICS_KV"
+id = "8c809729ccd64e5da6e9cb7dd62fb40b"
+
+# Alias nama dashboard (opsional, sama namespace)
+[[kv_namespaces]]
+binding = "DR_PINGUIN_ANALYTICS"
+id = "8c809729ccd64e5da6e9cb7dd62fb40b"
