@@ -78,12 +78,26 @@ export function parseVideoLink(url) {
   const origin = parsed.origin;
 
   if (STREAMTAPE_HOST.test(host) || /strcloud/i.test(host)) {
+    // /v/{id}/Judul_File.mp4  atau  /e/{id}
     const m =
-      path.match(/\/(?:e|v|d)\/([A-Za-z0-9_-]+)/i) ||
+      path.match(/\/(?:e|v|d)\/([A-Za-z0-9_-]+)(?:\/([^/?#]+))?/i) ||
       parsed.search.match(/[?&]id=([A-Za-z0-9_-]+)/i);
     if (!m) return null;
     const id = m[1];
     const embed = `https://streamtape.com/e/${id}`;
+    let titleFromPath = "";
+    if (m[2]) {
+      try {
+        titleFromPath = cleanTitle(
+          decodeURIComponent(m[2]).replace(/\.(mp4|mov|mkv|avi|webm|m4v)$/i, ""),
+        );
+      } catch {
+        titleFromPath = cleanTitle(String(m[2]).replace(/\.(mp4|mov|mkv|avi|webm|m4v)$/i, ""));
+      }
+      if (!titleFromPath || titleFromPath === "Video" || titleFromPath === id) {
+        titleFromPath = "";
+      }
+    }
     return {
       id,
       host: "streamtape",
@@ -91,6 +105,7 @@ export function parseVideoLink(url) {
       embed,
       direct: embed,
       file: `videos.json`,
+      ...(titleFromPath ? { title: titleFromPath } : {}),
     };
   }
 
@@ -202,7 +217,8 @@ export function parseMessage(text = "") {
       for (const url of lineUrls) {
         const parsed = parseVideoLink(url);
         if (!parsed) continue;
-        const own = cleanTitle(pendingTitle || title);
+        // Prioritas: judul baris di atas link → judul global → judul dari path URL
+        const own = cleanTitle(pendingTitle || title || parsed.title || "");
         videos.push(own && own !== "Video" ? { ...parsed, title: own } : parsed);
       }
       pendingTitle = "";
@@ -218,7 +234,9 @@ export function parseMessage(text = "") {
   if (!videos.length) {
     for (const url of urls) {
       const parsed = parseVideoLink(url);
-      if (parsed) videos.push(parsed);
+      if (!parsed) continue;
+      const own = cleanTitle(title || parsed.title || "");
+      videos.push(own && own !== "Video" ? { ...parsed, title: own } : parsed);
     }
   }
 
