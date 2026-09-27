@@ -16,7 +16,31 @@ const databaseUrl =
  * the app has a working database even with nothing configured — the live preview
  * included. Swap in Neon later by just setting `DATABASE_URL`; no code changes.
  */
-export const dbSource: DbSource = databaseUrl ? "neon" : "pglite";
+/** Cloudflare Workers — no PGlite (node:fs); Neon if DATABASE_URL, else none. */
+function isCloudflareWorker(): boolean {
+  try {
+    if (typeof navigator !== "undefined" && /Cloudflare-Workers/i.test(String(navigator.userAgent || ""))) {
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  // Build-time / edge hint
+  try {
+    if (typeof process !== "undefined" && (process.env.CF_PAGES || process.env.WORKERS_CI || process.env.CLOUDFLARE)) {
+      return true;
+    }
+  } catch {
+    /* ignore */
+  }
+  return false;
+}
+
+export const dbSource: DbSource | "none" = databaseUrl
+  ? "neon"
+  : isCloudflareWorker()
+    ? "none"
+    : "pglite";
 
 /**
  * Minimal shared SQL surface, satisfied by both Neon and PGLite. Both the
@@ -187,6 +211,14 @@ async function createSql(): Promise<Sql> {
  * both backends — define tables there, never inline in server functions.
  */
 export function getSql(): Promise<Sql> {
+  if ((dbSource as string) === "none") {
+    return Promise.reject(
+      new Error(
+        "DATABASE_URL not set on Cloudflare Worker — set Neon URL, or use KV-only analytics.",
+      ),
+    );
+  }
+
   sqlPromise ??= createSql().catch((err) => {
     sqlPromise = null; // don't memoize failures — let the next call retry
     throw err;
@@ -229,7 +261,7 @@ export function ensureDbReady(): Promise<void> {
 const globalBoot = globalThis as typeof globalThis & {
   __pgBootstrapPromise__?: Promise<void>;
 };
-if (typeof window === "undefined" && dbSource === "pglite") {
+if (typeof window === "undefined" && dbSource === "pglite" && !isCloudflareWorker()) {
   globalBoot.__pgBootstrapPromise__ ??= ensureDbReady().catch((err) => {
     globalBoot.__pgBootstrapPromise__ = undefined;
     console.error("[db] PGLite bootstrap failed:", err);
