@@ -170,7 +170,14 @@ export default defineConfig(({ command, isPreview }) => ({
     ...(command === "build" || isPreview
       ? [
           nitro({
-            preset: "vercel",
+            // CF Workers Builds runs `npx wrangler deploy` → need Worker output.
+            // Override: NITRO_PRESET=vercel for Vercel-only deploys.
+            preset:
+              process.env.NITRO_PRESET ||
+              (process.env.WORKERS_CI || process.env.CF_PAGES || process.env.CLOUDFLARE
+                ? "cloudflare-module"
+                : // Default cloudflare-module: production is Cloudflare Workers
+                  "cloudflare-module"),
             // Auto-registers server/middleware/* (the PWA install page +
             // manifest + head-tag middleware). Nitro v3 defaults serverDir to
             // false, so removing this silently unwires /?install=1 on deploys.
