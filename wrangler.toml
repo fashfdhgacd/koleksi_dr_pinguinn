@@ -1,22 +1,21 @@
-# Cloudflare Workers — config minimal (jangan taruh ID palsu di sini)
-# Binding KV di-set di Dashboard → Worker → Settings → Bindings
-#   Variable name: ANALYTICS_KV
-#   KV namespace:   dr-pinguin-analytics
-#
-# Env opsional (Dashboard → Variables / Secrets) untuk fallback REST:
-#   CF_ACCOUNT_ID
-#   CF_KV_NAMESPACE_ID   = Namespace ID dari halaman KV
-#   CF_API_TOKEN         = API Token (KV Edit)
-#
-# Jangan commit secret. Jangan isi id = "REPLACE_..." — itu bikin build gagal.
-
+# Cloudflare Workers — output dari Nitro preset cloudflare-module
 name = "koleksi-dr-pinguinn"
 compatibility_date = "2024-11-01"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = [ "nodejs_compat" ]
 
-# Binding KV: tambahkan lewat Cloudflare Dashboard (Workers Builds),
-# atau uncomment + isi Namespace ID asli setelah kamu copy dari dashboard:
-#
+# Nitro cloudflare-module menulis entry ke .output/server/index.mjs
+main = ".output/server/index.mjs"
+
+# Static assets (client build)
+[assets]
+directory = ".output/public"
+binding = "ASSETS"
+
+# KV analytics — uncomment + isi Namespace ID asli dari dashboard
+# (Workers KV → dr-pinguin-analytics → Namespace ID)
+# Atau set binding lewat Dashboard → Settings → Bindings (disarankan)
 # [[kv_namespaces]]
 # binding = "ANALYTICS_KV"
-# id = "PASTE_REAL_NAMESPACE_ID_HERE"
+# id = "PASTE_REAL_NAMESPACE_ID"
+
+# Env/secrets di Dashboard: DATABASE_URL, OWNER_SECRET, ONLINE_VIEW_SECRET, dll.
