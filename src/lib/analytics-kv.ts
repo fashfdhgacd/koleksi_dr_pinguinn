@@ -21,10 +21,13 @@ function envStr(name: string): string {
 function pickKv(obj: unknown): KVNamespaceLike | null {
   if (!obj || typeof obj !== "object") return null;
   const o = obj as Record<string, unknown>;
+  const nested = (o.env as Record<string, unknown> | undefined) || {};
   const cand =
     o.ANALYTICS_KV ||
+    o.DR_PINGUIN_ANALYTICS ||
     o["dr-pinguin-analytics"] ||
-    (o.env as Record<string, unknown> | undefined)?.ANALYTICS_KV ?? (env as any)?.DR_PINGUIN_ANALYTICS;
+    nested.ANALYTICS_KV ||
+    nested.DR_PINGUIN_ANALYTICS;
   if (cand && typeof cand === "object" && typeof (cand as KVNamespaceLike).get === "function") {
     return cand as KVNamespaceLike;
   }
