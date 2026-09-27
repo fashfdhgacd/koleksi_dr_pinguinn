@@ -34,10 +34,20 @@ for (const p of paths) {
   ]);
   j.compatibility_flags = [...flags];
 
-  // Prefer a recent date that supports nodejs_compat well
-  if (!j.compatibility_date || j.compatibility_date < "2024-09-23") {
-    j.compatibility_date = "2024-09-23";
-  }
+  // 2026-09-27+: nodejs_compat / node:fs tersedia di Workers
+  j.compatibility_date = "2026-09-27";
+
+  // Ensure ANALYTICS_KV binding survives Nitro rewrite
+  const kvId = "8c809729ccd64e5da6e9cb7dd62fb40b";
+  const need = [
+    { binding: "ANALYTICS_KV", id: kvId },
+    { binding: "DR_PINGUIN_ANALYTICS", id: kvId },
+  ];
+  const existing = Array.isArray(j.kv_namespaces) ? j.kv_namespaces : [];
+  const byBind = new Map(existing.map((x) => [x.binding, x]));
+  for (const n of need) byBind.set(n.binding, n);
+  j.kv_namespaces = [...byBind.values()];
+
 
   // Don't wipe routes — if empty, leave a note; CF dashboard routes may still apply
   // if we avoid sending empty routes array. Delete empty routes key.
