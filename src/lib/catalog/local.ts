@@ -127,12 +127,15 @@ function isVidey(item: RawItem): boolean {
   return /videy/i.test(`${item.embed || ""} ${item.source || ""} ${item.direct || ""}`);
 }
 function isSideSilo(item: RawItem): boolean {
-  // Dipakai hanya untuk statistik/helper — TIDAK menyingkirkan dari katalog utama
   return isPutarin(item) || isStreamtape(item) || isVidey(item);
 }
-/** Katalog utama = SEMUA sumber. Kategori tetap terpisah lewat slugOf (jav, streamtape, videy, jilbab, …). */
+/**
+ * Halaman Utama / Terbaru = IndoAV + Userbokep SAJA (prioritas monetisasi).
+ * AI Streamtape, Putarin/JAV, Videy tetap ada di kategori masing-masing — tidak numpuk di Terbaru.
+ */
 function mainCatalog(items: RawItem[]): RawItem[] {
-  return items;
+  const core = items.filter((x) => isIndoAv(x) || isUserBokep(x));
+  return core.length ? core : items.filter((x) => !isVidey(x));
 }
 function cleanTitle(t: string): string {
   return t.replace(/\s+/g, " ").trim() || "Video";
