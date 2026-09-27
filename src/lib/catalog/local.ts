@@ -134,7 +134,10 @@ function isSideSilo(item: RawItem): boolean {
  * AI Streamtape, Putarin/JAV, Videy tetap ada di kategori masing-masing — tidak numpuk di Terbaru.
  */
 function mainCatalog(items: RawItem[]): RawItem[] {
-  const core = items.filter((x) => isIndoAv(x) || isUserBokep(x));
+  // Hanya IndoAV + Userbokep di beranda; urutan final di sortByNewest (IndoAV > Userbokep)
+  const indo = items.filter((x) => isIndoAv(x));
+  const ub = items.filter((x) => isUserBokep(x) && !isIndoAv(x));
+  const core = [...indo, ...ub];
   return core.length ? core : items.filter((x) => !isVidey(x));
 }
 function cleanTitle(t: string): string {
@@ -257,8 +260,19 @@ function toCard(item: RawItem, posters: Record<string, string>, videyNo?: Map<st
   };
 }
 
+function sourcePriority(item: RawItem): number {
+  // Beranda: IndoAV paling atas (monetisasi), lalu Userbokep, baru sumber lain
+  if (isIndoAv(item)) return 100;
+  if (isUserBokep(item)) return 50;
+  return 0;
+}
+
 function sortByNewest(items: RawItem[]): RawItem[] {
-  return [...items].sort((a, b) => Number(b.createdAt || b.date || 0) - Number(a.createdAt || a.date || 0));
+  return [...items].sort((a, b) => {
+    const pd = sourcePriority(b) - sourcePriority(a);
+    if (pd !== 0) return pd;
+    return Number(b.createdAt || b.date || 0) - Number(a.createdAt || a.date || 0);
+  });
 }
 
 function uniqById(items: RawItem[]): RawItem[] {
