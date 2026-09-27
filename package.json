@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "node scripts/with-app-env.mjs vite dev --host 0.0.0.0 --port 8080",
-    "build": "node scripts/with-app-env.mjs vite build && npm run db:migrate",
+    "build": "node scripts/with-app-env.mjs vite build && npm run db:migrate && node scripts/cf-patch-wrangler.mjs",
     "db:migrate": "node scripts/migrate.mjs",
     "build:dev": "node scripts/with-app-env.mjs vite build --mode development",
     "preview": "node scripts/with-app-env.mjs vite preview",
@@ -19,7 +19,8 @@
     "test": "node --experimental-strip-types --test scripts/catalog-data.test.mjs src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts scripts/check-auth-invariant.test.mjs scripts/migration-plan.test.mjs scripts/preview.test.mjs scripts/sign-out-plan.test.mjs scripts/with-app-env.test.mjs scripts/browser-smoke-verdict.test.mjs",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:platform": "node --test 'scripts/**/*.test.mjs'"
+    "test:platform": "node --test 'scripts/**/*.test.mjs'",
+    "deploy:cf": "npx wrangler deploy --compatibility-flags=nodejs_compat"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
