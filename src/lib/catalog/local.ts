@@ -127,10 +127,12 @@ function isVidey(item: RawItem): boolean {
   return /videy/i.test(`${item.embed || ""} ${item.source || ""} ${item.direct || ""}`);
 }
 function isSideSilo(item: RawItem): boolean {
+  // Dipakai hanya untuk statistik/helper — TIDAK menyingkirkan dari katalog utama
   return isPutarin(item) || isStreamtape(item) || isVidey(item);
 }
+/** Katalog utama = SEMUA sumber. Kategori tetap terpisah lewat slugOf (jav, streamtape, videy, jilbab, …). */
 function mainCatalog(items: RawItem[]): RawItem[] {
-  return items.filter((x) => !isSideSilo(x));
+  return items;
 }
 function cleanTitle(t: string): string {
   return t.replace(/\s+/g, " ").trim() || "Video";
