@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,9 @@ import { Input } from "@/components/ui/input";
 
 const SECRET_KEY = "drp_owner_secret";
 const SECRET_LEGACY = "drp_online_secret";
-const POLL_MS = 20_000;
+const POLL_MS = 25_000;
+
+type DeviceKind = "mobile" | "desktop" | "tablet" | "bot" | "other";
 
 type OwnerStats = {
   ok?: boolean;
@@ -17,6 +19,17 @@ type OwnerStats = {
   hint?: string;
   online?: number;
   count?: number;
+  peakToday?: number;
+  viewsToday?: number;
+  views24h?: number;
+  uniqueToday?: number;
+  views7d?: number;
+  topPaths?: { path: string; views: number }[];
+  topRefs?: { ref: string; views: number }[];
+  devices?: { device: DeviceKind; views: number }[];
+  persistOk?: boolean;
+  presence?: "memory" | "kv" | "postgres" | "hybrid";
+  updatedAt?: string;
 };
 
 function loadSecret(): string {
@@ -41,13 +54,32 @@ function saveSecret(value: string) {
   }
 }
 
+function fmt(n: number | null | undefined): string {
+  return Math.max(0, Number(n) || 0).toLocaleString("id-ID");
+}
+
+function deviceLabel(d: DeviceKind): string {
+  if (d === "mobile") return "HP";
+  if (d === "desktop") return "Desktop";
+  if (d === "tablet") return "Tablet";
+  if (d === "bot") return "Bot";
+  return "Lainnya";
+}
+
+function presenceLabel(p?: OwnerStats["presence"]): string {
+  if (p === "hybrid" || p === "postgres") return "Sesi nyata (server)";
+  if (p === "kv") return "Sesi nyata (KV)";
+  return "Sesi isolate ini";
+}
+
 export function OwnerDashboard() {
   const [secret, setSecret] = useState("");
   const [draft, setDraft] = useState("");
-  const [online, setOnline] = useState<number | null>(null);
+  const [stats, setStats] = useState<OwnerStats | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [authed, setAuthed] = useState(false);
+  const [tickAt, setTickAt] = useState<number>(0);
   const timerRef = useRef<number | null>(null);
 
   const fetchOnline = useCallback(async (key: string, quiet = false) => {
@@ -63,7 +95,7 @@ export function OwnerDashboard() {
       const data = (await res.json()) as OwnerStats;
       if (!res.ok || !data.ok) {
         setAuthed(false);
-        setOnline(null);
+        setStats(null);
         setError(
           data.error === "not_configured"
             ? data.hint || "ONLINE_VIEW_SECRET belum di-set."
@@ -76,7 +108,8 @@ export function OwnerDashboard() {
         return;
       }
       setAuthed(true);
-      setOnline(Math.max(0, data.online ?? data.count ?? 0));
+      setStats(data);
+      setTickAt(Date.now());
       saveSecret(key);
       setSecret(key);
     } catch {
@@ -124,18 +157,29 @@ export function OwnerDashboard() {
     saveSecret("");
     setSecret("");
     setAuthed(false);
-    setOnline(null);
+    setStats(null);
     setDraft("");
     setError(null);
   }
 
+  const online = Math.max(0, stats?.online ?? stats?.count ?? 0);
+  const devices = useMemo(() => {
+    const rows = (stats?.devices || []).filter((d) => d.device !== "bot");
+    const total = rows.reduce((s, d) => s + d.views, 0) || 1;
+    return rows
+      .slice()
+      .sort((a, b) => b.views - a.views)
+      .map((d) => ({ ...d, pct: Math.round((d.views / total) * 100) }));
+  }, [stats]);
+
   return (
     <div className="min-h-dvh text-zinc-100" style={{ backgroundColor: "#0f0f11" }}>
-      <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-10">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-8">
         <header className="flex items-start justify-between gap-4">
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Dr. Pinguin</p>
-            <h1 className="mt-1 font-display text-2xl tracking-tight text-zinc-50">Online</h1>
+            <h1 className="mt-1 font-display text-3xl tracking-tight text-zinc-50">Pengunjung live</h1>
+            <p className="mt-1 text-xs text-zinc-500">Hanya orang yang lagi buka tab situs ± 2 menit. Bot tidak dihitung.</p>
           </div>
           <Link
             to="/"
@@ -149,7 +193,7 @@ export function OwnerDashboard() {
           <form onSubmit={onSubmit} className="rounded-2xl border border-white/[0.08] bg-[#141416] p-6">
             <div className="mb-4 flex items-center gap-2 text-sm font-medium text-zinc-200">
               <Shield className="size-4 text-emerald-400" />
-              Masuk
+              Masuk panel
             </div>
             <Input
               type="password"
@@ -165,24 +209,100 @@ export function OwnerDashboard() {
             </Button>
           </form>
         ) : (
-          <div className="rounded-2xl border border-white/[0.08] bg-[#141416] px-6 py-10 text-center">
-            <p className="text-[11px] uppercase tracking-[0.18em] text-zinc-500">Sedang online</p>
-            <p className="mt-3 font-display text-7xl tabular-nums leading-none text-zinc-50">
-              {online == null ? "—" : online.toLocaleString("id-ID")}
-            </p>
-            <p className="mt-3 text-sm text-zinc-500">pengunjung aktif ± 2 menit</p>
-            {error ? <p className="mt-4 text-xs text-red-400">{error}</p> : null}
-            <div className="mt-8 flex justify-center gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => void fetchOnline(secret)}>
-                Refresh
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={logout}>
-                Keluar
-              </Button>
+          <>
+            <section className="rounded-2xl border border-white/[0.08] bg-[#141416] px-6 py-8 text-center">
+              <div className="flex items-center justify-center gap-2 text-[11px] uppercase tracking-[0.18em] text-zinc-500">
+                <span className="relative flex size-2">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-400/60" />
+                  <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
+                </span>
+                Sedang di situs
+              </div>
+              <p className="mt-3 font-display text-7xl tabular-nums leading-none text-zinc-50">{fmt(online)}</p>
+              <p className="mt-3 text-sm text-zinc-500">tab aktif manusia ± 2 menit</p>
+              <p className="mt-2 text-[11px] text-zinc-600">
+                {presenceLabel(stats?.presence)}
+                {tickAt ? ` · update ${new Date(tickAt).toLocaleTimeString("id-ID")}` : ""}
+              </p>
+              {stats?.hint ? <p className="mt-3 text-xs text-amber-400/90">{stats.hint}</p> : null}
+              {error ? <p className="mt-3 text-xs text-red-400">{error}</p> : null}
+            </section>
+
+            <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Stat label="Unik hari ini" value={fmt(stats?.uniqueToday)} />
+              <Stat label="Tayang hari ini" value={fmt(stats?.viewsToday)} />
+              <Stat label="24 jam" value={fmt(stats?.views24h)} />
+              <Stat label="Puncak hari ini" value={fmt(stats?.peakToday)} />
+            </section>
+
+            {devices.length ? (
+              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Perangkat 24 jam</h2>
+                <ul className="mt-3 space-y-2">
+                  {devices.map((d) => (
+                    <li key={d.device} className="flex items-center gap-3 text-sm">
+                      <span className="w-16 shrink-0 text-zinc-400">{deviceLabel(d.device)}</span>
+                      <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+                        <span className="block h-full rounded-full bg-emerald-400/80" style={{ width: `${d.pct}%` }} />
+                      </span>
+                      <span className="w-10 text-right tabular-nums text-zinc-300">{d.pct}%</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {stats?.topPaths?.length ? (
+              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Halaman 24 jam</h2>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {stats.topPaths.slice(0, 8).map((row) => (
+                    <li key={row.path} className="flex justify-between gap-3">
+                      <span className="truncate text-zinc-300">{row.path}</span>
+                      <span className="tabular-nums text-zinc-500">{fmt(row.views)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {stats?.topRefs?.length ? (
+              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Sumber 24 jam</h2>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {stats.topRefs.slice(0, 6).map((row) => (
+                    <li key={row.ref} className="flex justify-between gap-3">
+                      <span className="truncate text-zinc-300">{row.ref}</span>
+                      <span className="tabular-nums text-zinc-500">{fmt(row.views)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[11px] text-zinc-600">Ping pengunjung 90 dtk · panel refresh 25 dtk · tab tersembunyi tidak dihitung</p>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => void fetchOnline(secret)} disabled={loading}>
+                  {loading ? "..." : "Refresh"}
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={logout}>
+                  Keluar
+                </Button>
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
+    </div>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/[0.08] bg-[#141416] px-4 py-4">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500">{label}</p>
+      <p className="mt-2 font-display text-2xl tabular-nums text-zinc-50">{value}</p>
     </div>
   );
 }
