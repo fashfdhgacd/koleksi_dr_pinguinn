@@ -47,6 +47,9 @@ export type OwnerStats = {
 const ONLINE_WINDOW_MS = 2 * 60 * 1000;
 const ONLINE_KV_PREFIX = "online:";
 const ONLINE_KV_TTL_SEC = 180; // 3 min TTL on KV keys
+const DAYSTATS_KV_PREFIX = "daystats:";
+const UV_KV_PREFIX = "uv:";
+const DAYSTATS_TTL_SEC = 172800; // 48h — keep today+yesterday
 
 type MemState = {
   lastTelegramAlertAt: number;
@@ -172,6 +175,81 @@ async function optionalKvPut(key: string, value: string, ttl?: number): Promise<
   }
 }
 
+
+async function optionalKvGet(key: string): Promise<string | null> {
+  try {
+    const handle = await resolveAnalyticsKV();
+    if (!handle?.kv) return null;
+    const v = await handle.kv.get(key);
+    return v == null ? null : String(v);
+  } catch {
+    return null;
+  }
+}
+
+type DayStatsKv = { views: number; unique: number; peak: number };
+
+async function readDayStatsKv(dk = dayKey()): Promise<DayStatsKv> {
+  const raw = await optionalKvGet(`${DAYSTATS_KV_PREFIX}${dk}`);
+  if (!raw) return { views: 0, unique: 0, peak: 0 };
+  try {
+    const j = JSON.parse(raw) as Partial<DayStatsKv>;
+    return {
+      views: Math.max(0, Number(j.views) || 0),
+      unique: Math.max(0, Number(j.unique) || 0),
+      peak: Math.max(0, Number(j.peak) || 0),
+    };
+  } catch {
+    return { views: 0, unique: 0, peak: 0 };
+  }
+}
+
+async function writeDayStatsKv(dk: string, stats: DayStatsKv): Promise<void> {
+  await optionalKvPut(
+    `${DAYSTATS_KV_PREFIX}${dk}`,
+    JSON.stringify(stats),
+    DAYSTATS_TTL_SEC,
+  );
+}
+
+/** Persist pageview counters to KV when Postgres is down (or as parallel backup). */
+async function recordHitKv(input: {
+  visitorId: string;
+  sessionId: string;
+  path: string;
+  onlineHint?: number;
+}): Promise<DayStatsKv> {
+  const dk = dayKey();
+  const stats = await readDayStatsKv(dk);
+  stats.views += 1;
+
+  const vid = input.visitorId || input.sessionId;
+  if (vid) {
+    const uvKey = `${UV_KV_PREFIX}${dk}:${vid}`;
+    const existed = await optionalKvGet(uvKey);
+    if (!existed) {
+      stats.unique += 1;
+      await optionalKvPut(uvKey, "1", DAYSTATS_TTL_SEC);
+    }
+  }
+
+  const online = Math.max(stats.peak, input.onlineHint || 0, 1);
+  if (online > stats.peak) stats.peak = online;
+
+  await writeDayStatsKv(dk, stats);
+  return stats;
+}
+
+async function bumpPeakKv(online: number): Promise<void> {
+  if (online <= 0) return;
+  const dk = dayKey();
+  const stats = await readDayStatsKv(dk);
+  if (online > stats.peak) {
+    stats.peak = online;
+    await writeDayStatsKv(dk, stats);
+  }
+}
+
 export async function getKV() {
   try {
     const handle = await resolveAnalyticsKV();
@@ -264,10 +342,11 @@ export async function analyticsHealth(): Promise<{
       timestamp: new Date().toISOString(),
     };
   } catch {
+    const kv = await resolveAnalyticsKV();
     return {
       database: "error",
-      analytics: "unavailable",
-      storage: "error",
+      analytics: kv ? "operational" : "unavailable",
+      storage: kv ? "kv" : "error",
       timestamp: new Date().toISOString(),
     };
   }
@@ -308,10 +387,14 @@ export async function touchOnline(id: string): Promise<number> {
            updated_at = now()`,
       [dk, best],
     );
-    return Math.max(best, await countKvOnline(now));
+    const total = Math.max(best, await countKvOnline(now));
+    void bumpPeakKv(total);
+    return total;
   } catch (err) {
     console.error("[analytics] touchOnline db failed — using memory/KV", err);
-    return Math.max(countMemoryOnline(now), await countKvOnline(now));
+    const total = Math.max(countMemoryOnline(now), await countKvOnline(now));
+    void bumpPeakKv(total);
+    return total;
   }
 }
 
@@ -378,8 +461,14 @@ export async function recordHit(input: {
       JSON.stringify({ path, ref, device, host, ts: now }),
       86400,
     );
+    void recordHitKv({ visitorId, sessionId, path });
   } catch (err) {
     console.error("[analytics] recordHit failed", err);
+    try {
+      await recordHitKv({ visitorId, sessionId, path });
+    } catch (e2) {
+      console.error("[analytics] recordHitKv failed", e2);
+    }
   }
 }
 
@@ -522,18 +611,32 @@ export async function getOwnerStats(): Promise<OwnerStats> {
   } catch (err) {
     console.error("[analytics] getOwnerStats failed", err);
     const online = Math.max(memN, kvN);
+    void bumpPeakKv(online);
+    let kvStats = { views: 0, unique: 0, peak: 0 };
+    try {
+      kvStats = await readDayStatsKv(dayKey());
+    } catch {
+      /* ignore */
+    }
+    const peakToday = Math.max(kvStats.peak, online);
     return emptyStats({
       online,
       count: online,
-      storage: kvN > 0 ? "kv" : "memory",
-      persistOk: false,
+      peakToday,
+      viewsToday: kvStats.views,
+      uniqueToday: kvStats.unique,
+      views24h: kvStats.views,
+      storage: kvN > 0 || kvStats.views > 0 ? "kv" : "memory",
+      persistOk: kvStats.views > 0,
       database: "error",
-      analytics: online > 0 ? "operational" : "unavailable",
+      analytics: online > 0 || kvStats.views > 0 ? "operational" : "unavailable",
       presence: kvN > 0 ? "kv" : "memory",
       hint:
-        online > 0
-          ? "DB offline — angka online dari memory/KV."
-          : "Database tidak tersedia dan belum ada heartbeat. Buka katalog di tab lain (setelah age gate) lalu Refresh.",
+        kvStats.views > 0
+          ? "DB offline — Unik/Tayang dari KV (sementara)."
+          : online > 0
+            ? "DB offline — angka online dari memory/KV."
+            : "Database tidak tersedia dan belum ada heartbeat. Buka katalog di tab lain (setelah age gate) lalu Refresh.",
     });
   }
 }
