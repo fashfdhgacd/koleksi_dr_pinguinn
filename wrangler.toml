@@ -1,0 +1,26 @@
+# Cloudflare Worker bindings — jangan dihapus saat deploy
+# Binding name HARUS "ANALYTICS_KV" (dibaca src/lib/analytics-kv.ts)
+#
+# Cara isi id:
+# 1. Cloudflare Dashboard → Workers KV → dr-pinguin-analytics → copy Namespace ID
+# 2. Tempel di bawah, atau set env CF_ANALYTICS_KV_ID di dashboard
+#
+# Setelah file ini ada, binding tidak hilang tiap deploy (selama id benar).
+
+name = "koleksi-dr-pinguinn"
+main = "dist/server/index.js"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+# KV analytics (online + daystats)
+[[kv_namespaces]]
+binding = "ANALYTICS_KV"
+# Ganti dengan Namespace ID dari dashboard (KV → dr-pinguin-analytics)
+id = "REPLACE_WITH_DR_PINGUIN_ANALYTICS_NAMESPACE_ID"
+preview_id = "REPLACE_WITH_DR_PINGUIN_ANALYTICS_NAMESPACE_ID"
+
+# Secrets (set di dashboard, jangan commit):
+# - DATABASE_URL
+# - OWNER_SECRET / ONLINE_VIEW_SECRET / PEMILIK_SECRET
+# - STREAMTAPE_LOGIN / STREAMTAPE_KEY (opsional, untuk fallback judul API)
+# - CF_API_TOKEN + CF_ACCOUNT_ID + CF_KV_NAMESPACE_ID (fallback REST kalau binding absen)
