@@ -24,7 +24,7 @@ function pickKv(obj: unknown): KVNamespaceLike | null {
   const cand =
     o.ANALYTICS_KV ||
     o["dr-pinguin-analytics"] ||
-    (o.env as Record<string, unknown> | undefined)?.ANALYTICS_KV;
+    (o.env as Record<string, unknown> | undefined)?.ANALYTICS_KV ?? (env as any)?.DR_PINGUIN_ANALYTICS;
   if (cand && typeof cand === "object" && typeof (cand as KVNamespaceLike).get === "function") {
     return cand as KVNamespaceLike;
   }
