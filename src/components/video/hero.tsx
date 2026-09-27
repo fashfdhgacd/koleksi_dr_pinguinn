@@ -26,6 +26,16 @@ function isBrandOrEmptyThumb(src: string | null | undefined): boolean {
   return src === BRAND_POSTER || /brand-poster/i.test(src);
 }
 
+/** Judul hero ringkas — buang suffix brand yang bikin numpuk di HP */
+function cleanHeroTitle(raw: string): string {
+  let t = String(raw || "").trim();
+  t = t.replace(/\s*[\(\[]\s*koleksi\s*dr\.?\s*pinguin[^\)\]]*[\)\]]/gi, "");
+  t = t.replace(/\s*[\-|–]\s*koleksi\s*dr\.?\s*pinguin.*$/gi, "");
+  t = t.replace(/\s*,\s*M\.?S\.?B\.?\s*$/gi, "");
+  t = t.replace(/\s+/g, " ").trim();
+  return t || raw || "Video";
+}
+
 export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
   const list =
     videos && videos.length > 0 ? videos : video ? [video] : [];
@@ -112,24 +122,27 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
   const showDescription = !isSpamDescription(current.description);
   const displayIndex = Math.min(index, Math.max(0, usable.length - 1));
 
+  const heroTitle = cleanHeroTitle(current.title);
+
   return (
-    <section className="relative overflow-hidden rounded-[28px] bg-surface">
+    <section className="relative overflow-hidden rounded-2xl bg-surface sm:rounded-[28px]">
       <div
-        className={`relative aspect-[16/9] transition-opacity duration-300 sm:aspect-[16/9] lg:aspect-[21/9] ${
+        className={`relative aspect-[16/10] transition-opacity duration-300 sm:aspect-[16/9] lg:aspect-[21/9] ${
           fade ? "opacity-100" : "opacity-0"
         }`}
       >
         <VideoThumb
           key={current.id}
           src={current.thumbnail}
-          alt={current.title}
+          alt={heroTitle}
           eager
           className="size-full object-cover object-center"
           onUnavailable={onThumbUnavailable}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/55 to-background/10" />
-        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-3 p-5 sm:gap-4 sm:p-8 lg:max-w-2xl lg:p-10">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
+        {/* Gradient lebih kuat di HP biar teks kebaca tanpa nutup seluruh gambar */}
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent sm:via-background/55 sm:to-background/10" />
+        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3.5 pb-4 sm:gap-4 sm:p-8 lg:max-w-2xl lg:p-10">
+          <p className="hidden text-xs font-medium uppercase tracking-[0.18em] text-muted sm:block">
             Pilihan koleksi
             {usable.length > 1 ? (
               <span className="ml-2 tabular-nums text-muted/70">
@@ -137,23 +150,23 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
               </span>
             ) : null}
           </p>
-          <h1 className="font-display text-3xl leading-[1.1] text-foreground sm:text-4xl lg:text-5xl">
-            {current.title}
+          <h1 className="font-display text-[1.35rem] leading-snug text-foreground line-clamp-2 sm:line-clamp-none sm:text-4xl sm:leading-[1.1] lg:text-5xl">
+            {heroTitle}
           </h1>
           {showDescription ? (
-            <p className="line-clamp-2 max-w-xl text-sm leading-relaxed text-muted">
+            <p className="hidden line-clamp-2 max-w-xl text-sm leading-relaxed text-muted sm:block">
               {current.description}
             </p>
           ) : null}
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+          <div className="hidden flex-wrap items-center gap-3 text-xs text-muted sm:flex">
             {current.year ? <span>{current.year}</span> : null}
             {showDuration ? <span>{current.durationLabel}</span> : null}
             {current.category ? <span>{current.category}</span> : null}
           </div>
-          <div>
-            <Button asChild size="lg" className="rounded-lg pl-5 pr-4">
+          <div className="pt-0.5">
+            <Button asChild size="default" className="h-10 rounded-full px-4 text-sm sm:h-11 sm:rounded-lg sm:px-5 sm:text-base">
               <Link to="/watch/$id" params={{ id: current.id }}>
-                <Play className="size-4 fill-current" style={{ marginLeft: 2 }} />
+                <Play className="size-3.5 fill-current sm:size-4" style={{ marginLeft: 2 }} />
                 Putar sekarang
               </Link>
             </Button>
@@ -162,14 +175,14 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
       </div>
 
       {usable.length > 1 ? (
-        <div className="pointer-events-none absolute bottom-3 right-4 flex gap-1.5 sm:bottom-5 sm:right-6">
+        <div className="pointer-events-none absolute bottom-2.5 right-3 flex gap-1 sm:bottom-5 sm:right-6 sm:gap-1.5">
           {usable.slice(0, 8).map((v, i) => (
             <span
               key={v.id}
-              className={`h-1.5 rounded-full transition-all duration-300 ${
+              className={`h-1 rounded-full transition-all duration-300 sm:h-1.5 ${
                 i === displayIndex % Math.min(usable.length, 8)
-                  ? "w-4 bg-foreground/80"
-                  : "w-1.5 bg-foreground/25"
+                  ? "w-3 bg-foreground/80 sm:w-4"
+                  : "w-1 bg-foreground/25 sm:w-1.5"
               }`}
             />
           ))}
