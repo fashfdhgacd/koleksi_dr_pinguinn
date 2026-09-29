@@ -1,4 +1,5 @@
 const warm = new Set<string>();
+const primed = new Map<string, HTMLImageElement>();
 const LS = "dp_poster_warm_v2";
 
 function store() {
@@ -27,7 +28,7 @@ function persist() {
   const ls = typeof window === "undefined" ? null : store();
   if (!ls) return;
   try {
-    ls.setItem(LS, JSON.stringify([...warm].slice(-800)));
+    ls.setItem(LS, JSON.stringify([...warm].slice(-800));
   } catch {
     /* quota */
   }
@@ -44,4 +45,22 @@ export function markPosterWarm(src?: string | null): void {
   if (warm.has(src)) return;
   warm.add(src);
   persist();
+}
+
+export function prefetchPoster(src?: string | null): void {
+  if (!src || src.startsWith("data:") || /brand-poster/i.test(src)) return;
+  if (typeof window === "undefined") return;
+  if (primed.has(src)) return;
+  const img = new Image();
+  img.decoding = "async";
+  img.referrerPolicy = "no-referrer";
+  img.onload = () => {
+    if (img.naturalWidth > 2) markPosterWarm(src);
+  };
+  img.src = src;
+  primed.set(src, img);
+}
+
+export function prefetchPosters(urls: Array<string | null | undefined>): void {
+  for (const u of urls) prefetchPoster(u);
 }
