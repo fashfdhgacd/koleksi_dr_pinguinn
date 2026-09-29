@@ -29,18 +29,30 @@ type FeedSnap = {
   at: number;
 };
 
-const FEED_TTL_MS = 30 * 60 * 1000;
-const SS_KEY = "dp_feed_v2";
+const FRESH_MS = 12 * 60 * 60 * 1000;
+const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
+const LS_KEY = "dp_feed_v3";
 const feedCache = new Map<string, FeedSnap>();
 
-function hydrateFeeds() {
-  if (typeof sessionStorage === "undefined" || feedCache.size) return;
+function ls() {
   try {
-    const raw = sessionStorage.getItem(SS_KEY);
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function hydrateFeeds() {
+  if (typeof window === "undefined" || feedCache.size) return;
+  const store = ls();
+  if (!store) return;
+  try {
+    const raw = store.getItem(LS_KEY);
     if (!raw) return;
     const obj = JSON.parse(raw) as Record<string, FeedSnap>;
+    const now = Date.now();
     for (const [k, v] of Object.entries(obj)) {
-      if (v?.items?.length) feedCache.set(k, v);
+      if (v?.items?.length && now - v.at < KEEP_MS) feedCache.set(k, v);
     }
   } catch {
     /* ignore */
@@ -48,21 +60,25 @@ function hydrateFeeds() {
 }
 
 function persistFeeds() {
-  if (typeof sessionStorage === "undefined") return;
+  if (typeof window === "undefined") return;
+  const store = ls();
+  if (!store) return;
   try {
+    const now = Date.now();
     const obj: Record<string, FeedSnap> = {};
     let n = 0;
     for (const [k, v] of feedCache) {
+      if (now - v.at > KEEP_MS) continue;
       obj[k] = v;
-      if (++n >= 40) break;
+      if (++n >= 60) break;
     }
-    sessionStorage.setItem(SS_KEY, JSON.stringify(obj));
+    store.setItem(LS_KEY, JSON.stringify(obj));
   } catch {
     /* quota */
   }
 }
 
-hydrateFeeds();
+if (typeof window !== "undefined") hydrateFeeds();
 
 function normPage(value?: number): number {
   const n = Math.floor(Number(value) || 1);
@@ -110,7 +126,6 @@ export function useCatalogFeed(params: BrowseParams) {
   const wantedPage = normPage(params.page);
   const paramsKey = `${params.mode}:${params.category ?? ""}:${params.q ?? ""}:${wantedPage}`;
   const cached = feedCache.get(feedKey(params, wantedPage));
-  const warm = Boolean(cached && Date.now() - cached.at < FEED_TTL_MS);
 
   const [items, setItems] = useState<VideoCard[]>(() => (cached ? cached.items : []));
   const [featured, setFeatured] = useState<VideoCard[]>(() => (cached ? cached.featured : []));
@@ -203,7 +218,8 @@ export function useCatalogFeed(params: BrowseParams) {
 
   useEffect(() => {
     const snap = feedCache.get(feedKey(params, wantedPage));
-    if (snap) {
+    const age = snap ? Date.now() - snap.at : Infinity;
+    if (snap && age < KEEP_MS) {
       setItems(snap.items);
       itemsRef.current = snap.items;
       setFeatured(snap.featured);
@@ -213,7 +229,7 @@ export function useCatalogFeed(params: BrowseParams) {
       totalRef.current = snap.total;
       setStatus(snap.items.length ? "success" : "empty");
       warmPosters(snap.items);
-      void load(wantedPage, "silent");
+      if (age >= FRESH_MS) void load(wantedPage, "silent");
     } else {
       void load(wantedPage, itemsRef.current.length ? "silent" : "reset");
     }
@@ -223,21 +239,6 @@ export function useCatalogFeed(params: BrowseParams) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load, paramsKey]);
-
-  useEffect(() => {
-    if (params.mode !== "home" || wantedPage !== 1) return;
-    const SLOT = 5 * 60 * 1000;
-    let tid = 0;
-    const arm = () => {
-      const wait = Math.max(8000, SLOT - (Date.now() % SLOT) + 50);
-      tid = window.setTimeout(() => {
-        void load(1, "silent");
-        arm();
-      }, wait);
-    };
-    arm();
-    return () => window.clearTimeout(tid);
-  }, [load, params.mode, wantedPage]);
 
   const retry = useCallback(() => {
     void load(wantedPage, "retry");
