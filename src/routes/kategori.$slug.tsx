@@ -89,7 +89,7 @@ function CategorySlugPage() {
           {feed.status === "empty" ? (
             <EmptyState title="Kosong" description="Tidak ada judul pada kategori ini." />
           ) : (
-            <VideoGrid items={feed.items} eagerCount={8} />
+            <VideoGrid items={feed.items} eagerCount={24} />
           )}
           <CatalogPager
             page={feed.page || page}
