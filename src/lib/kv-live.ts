@@ -1,7 +1,6 @@
 /** Live visitors + daily rollup on Cloudflare KV. No Postgres required. */
 
 import { resolveAnalyticsKV } from "@/lib/analytics-kv";
-import type { DeviceKind } from "@/lib/owner-analytics";
 
 const ONLINE_PREFIX = "online:";
 const ROLL_PREFIX = "roll:";
@@ -89,7 +88,7 @@ export async function kvTouchLive(input: {
   id: string;
   path?: string;
   ref?: string;
-  device?: DeviceKind;
+  device?: string;
   onlineGuess?: number;
   recordView?: boolean;
 }): Promise<void> {
@@ -121,8 +120,11 @@ export async function kvTouchLive(input: {
     const roll = await kvReadRoll(day);
     roll.views += 1;
     if (!seen) roll.unique += 1;
-    roll.peak = Math.max(roll.peak, input.onlineGuess || 0, roll.unique ? 1 : 0);
-    if (input.path) bumpMap(roll.paths, input.path.startsWith("/") ? input.path : `/${input.path}`);
+    roll.peak = Math.max(roll.peak, input.onlineGuess || 0, 1);
+    if (input.path) {
+      const p = input.path.startsWith("/") ? input.path : `/${input.path}`;
+      bumpMap(roll.paths, p.split("?")[0] || "/");
+    }
     if (input.ref) bumpMap(roll.refs, input.ref);
     if (input.device && input.device !== "bot") bumpMap(roll.devices, input.device);
     await handle.kv.put(`${ROLL_PREFIX}${day}`, JSON.stringify(roll), { expirationTtl: ROLL_TTL_SEC });
@@ -132,10 +134,6 @@ export async function kvTouchLive(input: {
 }
 
 export function rollToStats(roll: KvRoll, online: number) {
-  const devices = top(roll.devices, 6).map((row) => ({
-    device: (row.key as DeviceKind) || "other",
-    views: row.views,
-  }));
   return {
     online,
     count: online,
@@ -146,7 +144,10 @@ export function rollToStats(roll: KvRoll, online: number) {
     views7d: roll.views,
     topPaths: top(roll.paths, 12).map((r) => ({ path: r.key, views: r.views })),
     topRefs: top(roll.refs, 8).map((r) => ({ ref: r.key, views: r.views })),
-    devices,
+    devices: top(roll.devices, 6).map((r) => ({
+      device: r.key as "mobile" | "desktop" | "tablet" | "bot" | "other",
+      views: r.views,
+    })),
     persistOk: true,
     storage: "kv" as const,
     presence: "kv" as const,
