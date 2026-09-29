@@ -37,6 +37,14 @@ function normalizePlayUrl(url: string, host: string): string {
   }
 }
 
+function iframeSrc(url: string, host: string): string {
+  const play = normalizePlayUrl(url, host);
+  if (/indoav/i.test(`${host} ${play}`)) {
+    return `/api/frame?u=${encodeURIComponent(play)}`;
+  }
+  return play;
+}
+
 export function VideoPlayer({ item }: { item: VideoDetail }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const list = useMemo(() => sourcesFromItem(item), [item]);
@@ -50,6 +58,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const current = list[active] ?? null;
   const rawPlay = current?.fallbacks[fallbackAt] ?? current?.url ?? null;
   const playUrl = rawPlay && current ? normalizePlayUrl(rawPlay, current.host) : rawPlay;
+  const frameUrl = rawPlay && current ? iframeSrc(rawPlay, current.host) : null;
   const useVideo = isFileUrl(playUrl);
 
   useEffect(() => {
@@ -65,7 +74,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     if (!started || useVideo || embedReady) return;
     const t = window.setTimeout(() => setEmbedReady(true), 800);
     return () => window.clearTimeout(t);
-  }, [started, useVideo, embedReady, playUrl]);
+  }, [started, useVideo, embedReady, frameUrl]);
 
   function start() {
     if (!current || !playUrl) {
@@ -118,11 +127,11 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
               </span>
             </button>
           </>
-        ) : !useVideo && playUrl ? (
+        ) : !useVideo && frameUrl ? (
           <>
             <iframe
-              key={playUrl}
-              src={playUrl}
+              key={frameUrl}
+              src={frameUrl}
               title={item.title}
               className="absolute inset-0 size-full border-0 bg-background"
               allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write"
