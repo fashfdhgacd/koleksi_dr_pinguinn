@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, ExternalLink, LoaderCircle, Play } from "lucide-react";
+import { AlertTriangle, LoaderCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { VideoDetail } from "@/lib/catalog/types";
 import { hostPriority, resolveSource, type ResolvedSource } from "@/lib/catalog/embed";
@@ -51,8 +51,6 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const rawPlay = current?.fallbacks[fallbackAt] ?? current?.url ?? null;
   const playUrl = rawPlay && current ? normalizePlayUrl(rawPlay, current.host) : rawPlay;
   const useVideo = isFileUrl(playUrl);
-  const lastIframe =
-    Boolean(current && !useVideo && fallbackAt >= Math.max(0, (current.fallbacks.length || 1) - 1));
 
   useEffect(() => {
     setActive(0);
@@ -64,13 +62,10 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   }, [item.id]);
 
   useEffect(() => {
-    if (!started || useVideo || lastIframe) return;
-    const t = window.setTimeout(() => {
-      setFallbackAt((n) => n + 1);
-      setEmbedReady(false);
-    }, 2500);
+    if (!started || useVideo || embedReady) return;
+    const t = window.setTimeout(() => setEmbedReady(true), 800);
     return () => window.clearTimeout(t);
-  }, [started, useVideo, lastIframe, playUrl]);
+  }, [started, useVideo, embedReady, playUrl]);
 
   function start() {
     if (!current || !playUrl) {
@@ -83,10 +78,6 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
       setEmbedReady(false);
       setBuffering(useVideo);
     });
-  }
-
-  function openSource() {
-    if (playUrl) window.open(playUrl, "_blank", "noopener");
   }
 
   function pickSource(index: number) {
@@ -141,16 +132,8 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
               onLoad={() => setEmbedReady(true)}
             />
             {!embedReady ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/70 px-4">
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-background/40">
                 <LoaderCircle className="size-8 animate-spin text-foreground" />
-                <button
-                  type="button"
-                  className="flex h-11 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground"
-                  onClick={openSource}
-                >
-                  <ExternalLink className="size-4" />
-                  Buka pemutar
-                </button>
               </div>
             ) : null}
           </>
@@ -197,13 +180,8 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
         {failed ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/85 px-6 text-center">
             <AlertTriangle className="size-7 text-destructive" />
-            <p className="max-w-sm text-sm text-muted">Hosternya menolak diputar di sini.</p>
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button onClick={openSource}>Buka pemutar</Button>
-              <Button variant="secondary" onClick={retryQuiet}>
-                Coba lagi
-              </Button>
-            </div>
+            <p className="max-w-sm text-sm text-muted">Pemutar gagal. Pakai tombol Buka Sumber di bawah.</p>
+            <Button onClick={retryQuiet}>Coba lagi</Button>
           </div>
         ) : null}
 
