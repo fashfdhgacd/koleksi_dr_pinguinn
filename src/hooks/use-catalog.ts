@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchCatalog } from "@/lib/catalog/client";
 import type { CatalogResponse, VideoCard } from "@/lib/catalog/types";
 import { DEFAULT_PAGE_SIZE } from "@/lib/catalog/types";
+import { markPosterWarm } from "@/lib/poster-warm";
 
 export type CatalogStatus =
   | "idle"
@@ -28,8 +29,40 @@ type FeedSnap = {
   at: number;
 };
 
-const FEED_TTL_MS = 5 * 60 * 1000;
+const FEED_TTL_MS = 30 * 60 * 1000;
+const SS_KEY = "dp_feed_v2";
 const feedCache = new Map<string, FeedSnap>();
+
+function hydrateFeeds() {
+  if (typeof sessionStorage === "undefined" || feedCache.size) return;
+  try {
+    const raw = sessionStorage.getItem(SS_KEY);
+    if (!raw) return;
+    const obj = JSON.parse(raw) as Record<string, FeedSnap>;
+    for (const [k, v] of Object.entries(obj)) {
+      if (v?.items?.length) feedCache.set(k, v);
+    }
+  } catch {
+    /* ignore */
+  }
+}
+
+function persistFeeds() {
+  if (typeof sessionStorage === "undefined") return;
+  try {
+    const obj: Record<string, FeedSnap> = {};
+    let n = 0;
+    for (const [k, v] of feedCache) {
+      obj[k] = v;
+      if (++n >= 40) break;
+    }
+    sessionStorage.setItem(SS_KEY, JSON.stringify(obj));
+  } catch {
+    /* quota */
+  }
+}
+
+hydrateFeeds();
 
 function normPage(value?: number): number {
   const n = Math.floor(Number(value) || 1);
@@ -69,19 +102,23 @@ function extractPage(res: CatalogResponse): {
   };
 }
 
+function warmPosters(items: VideoCard[]) {
+  for (const it of items) markPosterWarm(it.thumbnail);
+}
+
 export function useCatalogFeed(params: BrowseParams) {
   const wantedPage = normPage(params.page);
   const paramsKey = `${params.mode}:${params.category ?? ""}:${params.q ?? ""}:${wantedPage}`;
   const cached = feedCache.get(feedKey(params, wantedPage));
   const warm = Boolean(cached && Date.now() - cached.at < FEED_TTL_MS);
 
-  const [items, setItems] = useState<VideoCard[]>(() => (warm && cached ? cached.items : []));
-  const [featured, setFeatured] = useState<VideoCard[]>(() => (warm && cached ? cached.featured : []));
+  const [items, setItems] = useState<VideoCard[]>(() => (cached ? cached.items : []));
+  const [featured, setFeatured] = useState<VideoCard[]>(() => (cached ? cached.featured : []));
   const [page, setPage] = useState(wantedPage);
-  const [hasMore, setHasMore] = useState(() => (warm && cached ? cached.hasMore : wantedPage === 1));
-  const [total, setTotal] = useState(() => (warm && cached ? cached.total : 0));
+  const [hasMore, setHasMore] = useState(() => (cached ? cached.hasMore : wantedPage === 1));
+  const [total, setTotal] = useState(() => (cached ? cached.total : 0));
   const [status, setStatus] = useState<CatalogStatus>(() =>
-    warm && cached ? (cached.items.length ? "success" : "empty") : "loading",
+    cached ? (cached.items.length ? "success" : "empty") : "loading",
   );
   const [error, setError] = useState<string | null>(null);
   const inflightRef = useRef(false);
@@ -128,6 +165,7 @@ export function useCatalogFeed(params: BrowseParams) {
         const merged = pageData.items.filter((item) => item?.id);
         setItems(merged);
         itemsRef.current = merged;
+        warmPosters(merged);
         if (nextPage === 1 && pageData.featured.length) setFeatured(pageData.featured);
         const resolvedPage = pageData.page || nextPage;
         setPage(resolvedPage);
@@ -146,6 +184,7 @@ export function useCatalogFeed(params: BrowseParams) {
           total: nextTotal,
           at: Date.now(),
         });
+        persistFeeds();
         if (reason !== "silent") setStatus(merged.length ? "success" : "empty");
         else if (!merged.length) setStatus("empty");
         else setStatus("success");
@@ -164,7 +203,7 @@ export function useCatalogFeed(params: BrowseParams) {
 
   useEffect(() => {
     const snap = feedCache.get(feedKey(params, wantedPage));
-    if (snap && Date.now() - snap.at < FEED_TTL_MS) {
+    if (snap) {
       setItems(snap.items);
       itemsRef.current = snap.items;
       setFeatured(snap.featured);
@@ -173,11 +212,10 @@ export function useCatalogFeed(params: BrowseParams) {
       setTotal(snap.total);
       totalRef.current = snap.total;
       setStatus(snap.items.length ? "success" : "empty");
+      warmPosters(snap.items);
       void load(wantedPage, "silent");
     } else {
-      setItems([]);
-      itemsRef.current = [];
-      void load(wantedPage, "reset");
+      void load(wantedPage, itemsRef.current.length ? "silent" : "reset");
     }
     return () => {
       genRef.current += 1;
