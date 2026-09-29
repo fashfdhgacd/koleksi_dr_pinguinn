@@ -1,12 +1,22 @@
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+Disallow: /pemilik
+
+User-agent: Googlebot-Image
+Allow: /
+Disallow: /api/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /api/
+Disallow: /pemilik
+
 User-agent: *
 Allow: /
-Allow: /api/og
-Disallow: /api/img-proxy
-Disallow: /api/tape-thumb
-Disallow: /api/embed-thumb
-Disallow: /api/puterin-thumb
+Allow: /og.jpg
+Allow: /brand-poster.jpg
 Disallow: /api/
-Disallow: /api/online
 Disallow: /pemilik
 
 User-agent: GPTBot
@@ -41,13 +51,13 @@ Disallow: /
 
 User-agent: Twitterbot
 Allow: /
-Allow: /api/og
 Allow: /og.jpg
 Allow: /brand-poster.jpg
 
 User-agent: facebookexternalhit
 Allow: /
-Allow: /api/og
+Allow: /og.jpg
 
+Sitemap: https://koleksidrpinguin.com/sitemap-pages.xml
 Sitemap: https://koleksidrpinguin.com/sitemap.xml
 Sitemap: https://koleksidrpinguin.com/sitemap-video.xml
