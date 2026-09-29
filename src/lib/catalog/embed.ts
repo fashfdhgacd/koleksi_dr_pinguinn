@@ -44,7 +44,6 @@ export function hostLabel(url: string): string {
   }
 }
 
-/** Lower = higher priority. IndoAV first only when URL-nya memang IndoAV di katalog. */
 export function hostPriority(urlOrHost: string): number {
   const s = urlOrHost.toLowerCase();
   if (/indoav/.test(s)) return 0;
@@ -64,17 +63,43 @@ function isFile(url: string): boolean {
   return /\.(mp4|mov|webm)($|\?)/i.test(url);
 }
 
+function playId(url: string): string {
+  const m = String(url).match(/\/(?:e|v|d|watch|embed)\/([A-Za-z0-9_-]+)/i);
+  return m ? m[1] : "";
+}
+
 function toEmbedPath(url: string): string {
   try {
     const u = new URL(url);
-    if (/\/(?:v|d)\//.test(u.pathname)) {
-      u.pathname = u.pathname.replace(/\/(?:v|d)\//, "/e/");
+    if (/\/(?:v|d|watch)\//.test(u.pathname)) {
+      u.pathname = u.pathname.replace(/\/(?:v|d|watch)\//, "/e/");
       return u.toString();
     }
   } catch {
     /* ignore */
   }
   return url;
+}
+
+function indoAvFallbacks(url: string): string[] {
+  const id = playId(url);
+  if (!id) return [toEmbedPath(url)];
+  const hosts = [
+    "https://indoav.app",
+    "https://www.indoav.app",
+    "https://play.indoav.app",
+    "https://tv.indoav.app",
+    "https://tv1.indoav.app",
+  ];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const host of hosts) {
+    const next = `${host}/e/${id}`;
+    if (seen.has(next)) continue;
+    seen.add(next);
+    out.push(next);
+  }
+  return out;
 }
 
 export function resolveSource(raw: string | null | undefined): ResolvedSource | null {
@@ -102,8 +127,17 @@ export function resolveSource(raw: string | null | undefined): ResolvedSource | 
     };
   }
 
-  const embedUrl = toEmbedPath(url);
+  if (/indoav/i.test(url)) {
+    const variants = indoAvFallbacks(url);
+    return {
+      mode: "iframe",
+      url: variants[0],
+      fallbacks: variants,
+      host: "IndoAV",
+    };
+  }
 
+  const embedUrl = toEmbedPath(url);
   return {
     mode: "iframe",
     url: embedUrl,
