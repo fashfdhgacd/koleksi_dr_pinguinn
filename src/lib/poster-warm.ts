@@ -1,28 +1,39 @@
 const warm = new Set<string>();
-const SS = "dp_poster_warm_v1";
+const LS = "dp_poster_warm_v2";
+
+function store() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
 
 function hydrate() {
-  if (typeof sessionStorage === "undefined" || warm.size) return;
+  if (warm.size) return;
+  const ls = typeof window === "undefined" ? null : store();
+  if (!ls) return;
   try {
-    const raw = sessionStorage.getItem(SS);
+    const raw = ls.getItem(LS);
     if (!raw) return;
     const list = JSON.parse(raw) as string[];
-    if (Array.isArray(list)) for (const u of list.slice(-400)) if (typeof u === "string") warm.add(u);
+    if (Array.isArray(list)) for (const u of list.slice(-800)) if (typeof u === "string") warm.add(u);
   } catch {
     /* ignore */
   }
 }
 
 function persist() {
-  if (typeof sessionStorage === "undefined") return;
+  const ls = typeof window === "undefined" ? null : store();
+  if (!ls) return;
   try {
-    sessionStorage.setItem(SS, JSON.stringify([...warm].slice(-400)));
+    ls.setItem(LS, JSON.stringify([...warm].slice(-800)));
   } catch {
     /* quota */
   }
 }
 
-hydrate();
+if (typeof window !== "undefined") hydrate();
 
 export function isPosterWarm(src?: string | null): boolean {
   return Boolean(src && warm.has(src));
@@ -33,9 +44,4 @@ export function markPosterWarm(src?: string | null): void {
   if (warm.has(src)) return;
   warm.add(src);
   persist();
-  if (typeof document === "undefined") return;
-  const img = new Image();
-  img.decoding = "async";
-  img.referrerPolicy = "no-referrer";
-  img.src = src;
 }
