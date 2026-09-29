@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { isPosterWarm, markPosterWarm } from "@/lib/poster-warm";
 
 export const BRAND_POSTER = "/brand-poster.jpg";
 
@@ -7,12 +8,6 @@ function isVideoSrc(src: string): boolean {
   return /\.(mp4|mov|webm)(\?|$)/i.test(src) || /cdn\.videy\.co\//i.test(src);
 }
 
-function withRetryParam(src: string): string {
-  const join = src.includes("?") ? "&" : "?";
-  return `${src}${join}r=1`;
-}
-
-/** Hanya kode bertanda hubung (IPZZ-567). Hindari false match "HD 1080". */
 function dmmCoverFromTitle(title = ""): string {
   const m = String(title).match(/\b([A-Z]{2,8})-(\d{3,5})\b/i);
   if (!m) return "";
@@ -48,16 +43,15 @@ export function VideoThumb({
   const dmm = dmmCoverFromTitle(alt);
   const initial = src && src !== BRAND_POSTER ? src : dmm;
   const [failed, setFailed] = useState(false);
-  const [retried, setRetried] = useState(false);
   const [triedDmm, setTriedDmm] = useState(!dmm || initial === dmm);
   const [currentSrc, setCurrentSrc] = useState(initial);
+  const warm = isPosterWarm(currentSrc);
   const brandOrEmpty =
     !currentSrc || currentSrc === BRAND_POSTER || /brand-poster/i.test(currentSrc) || isVideoSrc(currentSrc);
 
   useEffect(() => {
     const next = src && src !== BRAND_POSTER ? src : dmm;
     setFailed(false);
-    setRetried(false);
     setTriedDmm(!dmm || next === dmm);
     setCurrentSrc(next);
   }, [src, dmm]);
@@ -65,8 +59,7 @@ export function VideoThumb({
   useEffect(() => {
     if (!(brandOrEmpty || failed)) return;
     onUnavailable?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [brandOrEmpty, failed, src]);
+  }, [brandOrEmpty, failed, src, onUnavailable]);
 
   if (failed || brandOrEmpty) {
     return <BrandFallback className={className} alt={alt} />;
@@ -77,20 +70,14 @@ export function VideoThumb({
       <img
         src={currentSrc}
         alt={alt}
-        loading={eager ? "eager" : "lazy"}
+        loading={eager || warm ? "eager" : "lazy"}
         decoding="async"
         fetchPriority={eager ? "high" : "low"}
         referrerPolicy="no-referrer"
         className={cn("media-thumb relative size-full object-cover", className)}
         onError={() => {
-          if (!retried && currentSrc && !/r=1/.test(currentSrc) && !/pics\.dmm\.co\.jp/.test(currentSrc)) {
-            setRetried(true);
-            setCurrentSrc(withRetryParam(currentSrc));
-            return;
-          }
           if (!triedDmm && dmm && currentSrc !== dmm) {
             setTriedDmm(true);
-            setRetried(false);
             setCurrentSrc(dmm);
             return;
           }
@@ -105,7 +92,9 @@ export function VideoThumb({
               return;
             }
             setFailed(true);
+            return;
           }
+          markPosterWarm(currentSrc);
         }}
       />
     </div>
