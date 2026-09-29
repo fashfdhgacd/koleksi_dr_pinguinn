@@ -27,7 +27,11 @@ function normalizePlayUrl(url: string, host: string): string {
   try {
     const u = new URL(url);
     const blob = `${host} ${u.hostname} ${u.pathname}`;
-    if (/streamtape|strcloud|puterin|putarin|indoav|userbokep|lulu/i.test(blob)) {
+    if (/streamtape|strcloud|puterin|putarin|userbokep|lulu/i.test(blob)) {
+      u.pathname = u.pathname.replace(/\/(?:v|d|watch)\//, "/e/");
+      return u.toString();
+    }
+    if (/indoav/i.test(blob)) {
       u.pathname = u.pathname.replace(/\/(?:v|d|watch)\//, "/e/");
       return u.toString();
     }
@@ -35,14 +39,6 @@ function normalizePlayUrl(url: string, host: string): string {
   } catch {
     return url;
   }
-}
-
-function iframeSrc(url: string, host: string): string {
-  const play = normalizePlayUrl(url, host);
-  if (/indoav/i.test(`${host} ${play}`)) {
-    return `/api/frame?u=${encodeURIComponent(play)}`;
-  }
-  return play;
 }
 
 export function VideoPlayer({ item }: { item: VideoDetail }) {
@@ -58,8 +54,8 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const current = list[active] ?? null;
   const rawPlay = current?.fallbacks[fallbackAt] ?? current?.url ?? null;
   const playUrl = rawPlay && current ? normalizePlayUrl(rawPlay, current.host) : rawPlay;
-  const frameUrl = rawPlay && current ? iframeSrc(rawPlay, current.host) : null;
   const useVideo = isFileUrl(playUrl);
+  const isIndoAv = Boolean(current && /indoav/i.test(`${current.host} ${playUrl || ""}`));
 
   useEffect(() => {
     setActive(0);
@@ -71,14 +67,18 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   }, [item.id]);
 
   useEffect(() => {
-    if (!started || useVideo || embedReady) return;
+    if (!started || useVideo || embedReady || isIndoAv) return;
     const t = window.setTimeout(() => setEmbedReady(true), 800);
     return () => window.clearTimeout(t);
-  }, [started, useVideo, embedReady, frameUrl]);
+  }, [started, useVideo, embedReady, playUrl, isIndoAv]);
 
   function start() {
     if (!current || !playUrl) {
       startTransition(() => setFailed(true));
+      return;
+    }
+    if (isIndoAv) {
+      window.open(playUrl, "_blank", "noopener");
       return;
     }
     startTransition(() => {
@@ -127,11 +127,11 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
               </span>
             </button>
           </>
-        ) : !useVideo && frameUrl ? (
+        ) : !useVideo && playUrl ? (
           <>
             <iframe
-              key={frameUrl}
-              src={frameUrl}
+              key={playUrl}
+              src={playUrl}
               title={item.title}
               className="absolute inset-0 size-full border-0 bg-background"
               allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write"
