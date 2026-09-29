@@ -4,7 +4,7 @@ import { VideoCard } from "./video-card";
 
 export function VideoGrid({
   items,
-  eagerCount = 0,
+  eagerCount = 24,
 }: {
   items: VideoCardType[];
   eagerCount?: number;
