@@ -5,10 +5,6 @@ import type { VideoDetail } from "@/lib/catalog/types";
 import { hostPriority, resolveSource, type ResolvedSource } from "@/lib/catalog/embed";
 import { VideoThumb } from "./thumb";
 
-function isEmbedHostUrl(url: string): boolean {
-  return /indoav|userbokep|puterin|putarin|streamtape|strcloud|lulu/i.test(url);
-}
-
 function sourcesFromItem(item: VideoDetail): ResolvedSource[] {
   const raw = [item.video_url, ...item.qualities.map((q) => q.url)].filter((u): u is string => Boolean(u));
   const seen = new Set<string>();
@@ -45,10 +41,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const list = useMemo(() => sourcesFromItem(item), [item]);
   const [active, setActive] = useState(0);
-  const [started, setStarted] = useState(() => {
-    const first = sourcesFromItem(item)[0];
-    return Boolean(first && !isFileUrl(first.url) && isEmbedHostUrl(first.url));
-  });
+  const [started, setStarted] = useState(false);
   const [buffering, setBuffering] = useState(false);
   const [embedReady, setEmbedReady] = useState(false);
   const [failed, setFailed] = useState(false);
@@ -65,14 +58,12 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     setFallbackAt(0);
     setBuffering(false);
     setEmbedReady(false);
-    const first = list[0];
-    const auto = Boolean(first && !isFileUrl(first.url) && isEmbedHostUrl(first.url));
-    setStarted(auto);
-  }, [item.id, list]);
+    setStarted(false);
+  }, [item.id]);
 
   useEffect(() => {
     if (!started || useVideo || embedReady) return;
-    const t = window.setTimeout(() => setEmbedReady(true), 1500);
+    const t = window.setTimeout(() => setEmbedReady(true), 1200);
     return () => window.clearTimeout(t);
   }, [started, useVideo, embedReady, playUrl]);
 
@@ -154,7 +145,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
             poster={item.thumbnail || undefined}
             controls
             playsInline
-            preload="auto"
+            preload="metadata"
             autoPlay
             referrerPolicy="no-referrer-when-downgrade"
             src={playUrl ?? undefined}
