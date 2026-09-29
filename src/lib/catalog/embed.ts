@@ -82,23 +82,23 @@ function toEmbedPath(url: string): string {
 }
 
 function indoAvFallbacks(url: string): string[] {
+  const embed = toEmbedPath(url);
   const id = playId(url);
-  if (!id) return [toEmbedPath(url)];
-  const hosts = [
-    "https://indoav.app",
-    "https://www.indoav.app",
-    "https://play.indoav.app",
-    "https://tv.indoav.app",
-    "https://tv1.indoav.app",
-  ];
   const out: string[] = [];
   const seen = new Set<string>();
-  for (const host of hosts) {
-    const next = `${host}/e/${id}`;
-    if (seen.has(next)) continue;
+  const add = (next: string) => {
+    if (!next || seen.has(next)) return;
     seen.add(next);
     out.push(next);
+  };
+  add(embed);
+  try {
+    const u = new URL(embed);
+    if (id) add(`${u.protocol}//${u.host}/e/${id}`);
+  } catch {
+    /* ignore */
   }
+  if (id) add(`https://tv1.indoav.app/e/${id}`);
   return out;
 }
 
@@ -107,9 +107,9 @@ export function resolveSource(raw: string | null | undefined): ResolvedSource | 
   let url = raw.trim();
   url = url.replace("/d/", "/e/");
 
-  const id = videyId(url);
-  if (id && /videy/i.test(url)) {
-    const cdns = videyCdns(id);
+  const vid = videyId(url);
+  if (vid && /videy/i.test(url)) {
+    const cdns = videyCdns(vid);
     return {
       mode: "video",
       url: cdns[0],
