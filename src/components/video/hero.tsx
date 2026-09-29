@@ -5,13 +5,11 @@ import { Button } from "@/components/ui/button";
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { BRAND_POSTER, VideoThumb } from "./thumb";
 
-const ROTATE_MS = 5 * 60 * 1000; // 5 menit
+const ROTATE_MS = 5 * 60 * 1000;
 
 type HeroProps = {
-  /** Satu video (kompatibel lama) atau daftar untuk auto-rotate */
   video?: VideoCardType;
   videos?: VideoCardType[];
-  /** Interval ganti hero dalam ms (default 5 menit) */
   intervalMs?: number;
 };
 
@@ -21,12 +19,13 @@ function isSpamDescription(text: string | null | undefined): boolean {
   return /nonton .+ bokep indo|streaming amatir, jilbab|konten 18\+/i.test(t);
 }
 
-function isBrandOrEmptyThumb(src: string | null | undefined): boolean {
-  if (!src) return true;
-  return src === BRAND_POSTER || /brand-poster/i.test(src);
+function isUsableThumb(src: string | null | undefined): boolean {
+  if (!src) return false;
+  if (src === BRAND_POSTER || /brand-poster/i.test(src)) return false;
+  if (/\.(mp4|mov|webm)(\?|$)/i.test(src) || /cdn\.videy\.co\//i.test(src)) return false;
+  return /^https?:\/\//i.test(src) || src.startsWith("/");
 }
 
-/** Judul hero ringkas — buang suffix brand yang bikin numpuk di HP */
 function cleanHeroTitle(raw: string): string {
   let t = String(raw || "").trim();
   t = t.replace(/\s*[\(\[]\s*koleksi\s*dr\.?\s*pinguin[^\)\]]*[\)\]]/gi, "");
@@ -37,21 +36,16 @@ function cleanHeroTitle(raw: string): string {
 }
 
 export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
-  const list =
-    videos && videos.length > 0 ? videos : video ? [video] : [];
-
+  const incoming = videos && videos.length > 0 ? videos : video ? [video] : [];
+  const list = useMemo(() => incoming.filter((v) => isUsableThumb(v.thumbnail)), [incoming]);
   const listKey = list.map((v) => v.id).join("|");
   const [failedIds, setFailedIds] = useState<Set<string>>(() => new Set());
-  const [index, setIndex] = useState(() =>
-    list.length ? Math.floor(Date.now() / intervalMs) % list.length : 0,
-  );
+  const [index, setIndex] = useState(0);
   const [fade, setFade] = useState(true);
 
   const usable = useMemo(() => {
-    const filtered = list.filter(
-      (v) => !failedIds.has(v.id) && !isBrandOrEmptyThumb(v.thumbnail),
-    );
-    return filtered.length ? filtered : list;
+    const filtered = list.filter((v) => !failedIds.has(v.id));
+    return filtered;
   }, [list, failedIds, listKey]);
 
   const usableKey = usable.map((v) => v.id).join("|");
@@ -73,7 +67,6 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
     [usable.length],
   );
 
-  // Wall-clock slot: hero maju tiap intervalMs meski silent refetch/remount.
   useEffect(() => {
     if (usable.length <= 1) {
       setIndex(0);
@@ -92,7 +85,6 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
     return () => window.clearTimeout(timeoutId);
   }, [usableKey, usable.length, intervalMs, goTo]);
 
-  // Keep index in range when usable list shrinks (skip-on-fail).
   useEffect(() => {
     if (!usable.length) return;
     if (index >= usable.length) {
@@ -107,7 +99,6 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
   const onThumbUnavailable = useCallback(() => {
     if (!current) return;
     const id = current.id;
-    // Tandai gagal → `usable` menyusut; index di-clamp supaya auto loncat ke slide ber-art.
     setFailedIds((prev) => {
       if (prev.has(id)) return prev;
       const next = new Set(prev);
@@ -121,7 +112,6 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
   const showDuration = Boolean(current.durationLabel && current.durationLabel !== "\u2014");
   const showDescription = !isSpamDescription(current.description);
   const displayIndex = Math.min(index, Math.max(0, usable.length - 1));
-
   const heroTitle = cleanHeroTitle(current.title);
 
   return (
@@ -139,7 +129,6 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
           className="size-full object-cover object-center"
           onUnavailable={onThumbUnavailable}
         />
-        {/* Gradient lebih kuat di HP biar teks kebaca tanpa nutup seluruh gambar */}
         <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent sm:via-background/55 sm:to-background/10" />
         <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3.5 pb-4 sm:gap-4 sm:p-8 lg:max-w-2xl lg:p-10">
           <p className="hidden text-xs font-medium uppercase tracking-[0.18em] text-muted sm:block">
