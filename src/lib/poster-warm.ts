@@ -28,7 +28,7 @@ function persist() {
   const ls = typeof window === "undefined" ? null : store();
   if (!ls) return;
   try {
-    ls.setItem(LS, JSON.stringify([...warm].slice(-800));
+    ls.setItem(LS, JSON.stringify([...warm].slice(-800)));
   } catch {
     /* quota */
   }
