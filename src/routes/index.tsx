@@ -124,7 +124,7 @@ function HomePage() {
                 description={q ? "Tidak ada judul yang cocok. Coba kata kunci lain." : "Tidak ada judul pada saringan ini."}
               />
             ) : (
-              <VideoGrid items={gridItems} eagerCount={heroVideos.length ? 6 : 8} />
+              <VideoGrid items={gridItems} eagerCount={24} />
             )}
 
             {feed.error && feed.items.length ? (
