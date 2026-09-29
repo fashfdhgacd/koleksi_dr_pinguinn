@@ -70,6 +70,12 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     setStarted(auto);
   }, [item.id, list]);
 
+  useEffect(() => {
+    if (!started || useVideo || embedReady) return;
+    const t = window.setTimeout(() => setEmbedReady(true), 1500);
+    return () => window.clearTimeout(t);
+  }, [started, useVideo, embedReady, playUrl]);
+
   function start() {
     if (!current || !playUrl) {
       startTransition(() => setFailed(true));
