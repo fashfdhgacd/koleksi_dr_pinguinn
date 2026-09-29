@@ -6,6 +6,7 @@ import {
   recordHit,
   touchOnline,
 } from "@/lib/owner-analytics";
+import { kvCountOnline, kvReadRoll, kvTouchLive, rollToStats } from "@/lib/kv-live";
 
 const BOT_UA =
   /bot|crawl|spider|slurp|headless|webdriver|puppeteer|playwright|scrapy|httpclient|curl\/|wget|python-requests|axios\/|node-fetch|bytespider|gptbot|claudebot|ccbot|semrush|ahrefs|dataforseo|petalbot|facebookexternalhit|preview/i;
@@ -98,6 +99,29 @@ function shouldSkipBot(ua: string, owner: boolean): boolean {
   return classifyDevice(ua) === "bot";
 }
 
+async function liveOwnerPayload() {
+  const stats = await getOwnerStats();
+  const [kvN, roll] = await Promise.all([kvCountOnline(), kvReadRoll()]);
+  const online = Math.max(Number(stats.online) || 0, Number(stats.count) || 0, kvN);
+  const live = rollToStats(roll, online);
+  return {
+    ...stats,
+    ...live,
+    online,
+    count: online,
+    peakToday: Math.max(Number(stats.peakToday) || 0, live.peakToday),
+    viewsToday: Math.max(Number(stats.viewsToday) || 0, live.viewsToday),
+    uniqueToday: Math.max(Number(stats.uniqueToday) || 0, live.uniqueToday),
+    views24h: Math.max(Number(stats.views24h) || 0, live.views24h),
+    topPaths: live.topPaths.length ? live.topPaths : stats.topPaths,
+    topRefs: live.topRefs.length ? live.topRefs : stats.topRefs,
+    devices: live.devices.length ? live.devices : stats.devices,
+    persistOk: true,
+    analytics: "operational",
+    hint: undefined,
+  };
+}
+
 async function handlePost(request: Request): Promise<Response> {
   let id = "";
   let bodyKey = "";
@@ -144,6 +168,15 @@ async function handlePost(request: Request): Promise<Response> {
   let count = 0;
   if (fresh || owner) {
     count = await touchOnline(id);
+    const device = classifyDevice(ua);
+    void kvTouchLive({
+      id,
+      path: path || undefined,
+      ref: ref || undefined,
+      device,
+      onlineGuess: count,
+      recordView: Boolean(path),
+    });
     if (path) {
       await recordHit({
         path,
@@ -159,7 +192,7 @@ async function handlePost(request: Request): Promise<Response> {
   }
 
   if (!owner) return json(request, { ok: true });
-  return json(request, { ok: true, owner: true, ...(await getOwnerStats()) });
+  return json(request, { ok: true, owner: true, ...(await liveOwnerPayload()) });
 }
 
 async function handleGet(request: Request): Promise<Response> {
@@ -178,7 +211,7 @@ async function handleGet(request: Request): Promise<Response> {
   if (!isOwnerKey(extractKey(request))) {
     return json(request, { ok: false, error: "forbidden" }, 403);
   }
-  return json(request, { ok: true, owner: true, ...(await getOwnerStats()) });
+  return json(request, { ok: true, owner: true, ...(await liveOwnerPayload()) });
 }
 
 export const Route = createFileRoute("/api/online")({
