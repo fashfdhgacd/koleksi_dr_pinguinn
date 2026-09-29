@@ -12,6 +12,14 @@ function withRetryParam(src: string): string {
   return `${src}${join}r=1`;
 }
 
+/** Hanya kode bertanda hubung (IPZZ-567). Hindari false match "HD 1080". */
+function dmmCoverFromTitle(title = ""): string {
+  const m = String(title).match(/\b([A-Z]{2,8})-(\d{3,5})\b/i);
+  if (!m) return "";
+  const code = `${m[1].toLowerCase()}${String(Number(m[2])).padStart(5, "0")}`;
+  return `https://pics.dmm.co.jp/digital/video/${code}/${code}pl.jpg`;
+}
+
 function BrandFallback({ className, alt }: { className?: string; alt?: string }) {
   return (
     <img
@@ -37,17 +45,22 @@ export function VideoThumb({
   className?: string;
   onUnavailable?: () => void;
 }) {
+  const dmm = dmmCoverFromTitle(alt);
+  const initial = src && src !== BRAND_POSTER ? src : dmm;
   const [failed, setFailed] = useState(false);
   const [retried, setRetried] = useState(false);
-  const [currentSrc, setCurrentSrc] = useState(src);
+  const [triedDmm, setTriedDmm] = useState(!dmm || initial === dmm);
+  const [currentSrc, setCurrentSrc] = useState(initial);
   const brandOrEmpty =
-    !src || src === BRAND_POSTER || /brand-poster/i.test(src) || isVideoSrc(src);
+    !currentSrc || currentSrc === BRAND_POSTER || /brand-poster/i.test(currentSrc) || isVideoSrc(currentSrc);
 
   useEffect(() => {
+    const next = src && src !== BRAND_POSTER ? src : dmm;
     setFailed(false);
     setRetried(false);
-    setCurrentSrc(src);
-  }, [src]);
+    setTriedDmm(!dmm || next === dmm);
+    setCurrentSrc(next);
+  }, [src, dmm]);
 
   useEffect(() => {
     if (!(brandOrEmpty || failed)) return;
@@ -55,7 +68,7 @@ export function VideoThumb({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brandOrEmpty, failed, src]);
 
-  if (brandOrEmpty || failed) {
+  if (failed || brandOrEmpty) {
     return <BrandFallback className={className} alt={alt} />;
   }
 
@@ -70,16 +83,29 @@ export function VideoThumb({
         referrerPolicy="no-referrer"
         className={cn("media-thumb relative size-full object-cover", className)}
         onError={() => {
-          if (!retried && src && !/r=1/.test(src)) {
+          if (!retried && currentSrc && !/r=1/.test(currentSrc) && !/pics\.dmm\.co\.jp/.test(currentSrc)) {
             setRetried(true);
-            setCurrentSrc(withRetryParam(src));
+            setCurrentSrc(withRetryParam(currentSrc));
+            return;
+          }
+          if (!triedDmm && dmm && currentSrc !== dmm) {
+            setTriedDmm(true);
+            setRetried(false);
+            setCurrentSrc(dmm);
             return;
           }
           setFailed(true);
         }}
         onLoad={(e) => {
           const img = e.currentTarget;
-          if (img.naturalWidth <= 2 && img.naturalHeight <= 2) setFailed(true);
+          if (img.naturalWidth <= 2 && img.naturalHeight <= 2) {
+            if (!triedDmm && dmm && currentSrc !== dmm) {
+              setTriedDmm(true);
+              setCurrentSrc(dmm);
+              return;
+            }
+            setFailed(true);
+          }
         }}
       />
     </div>
