@@ -12,6 +12,13 @@ const POLL_MS = 25_000;
 
 type DeviceKind = "mobile" | "desktop" | "tablet" | "bot" | "other";
 
+type DayRow = {
+  day: string;
+  views: number;
+  unique: number;
+  peak: number;
+};
+
 type OwnerStats = {
   ok?: boolean;
   owner?: boolean;
@@ -24,6 +31,9 @@ type OwnerStats = {
   views24h?: number;
   uniqueToday?: number;
   views7d?: number;
+  yesterdayViews?: number;
+  yesterdayUnique?: number;
+  days?: DayRow[];
   topPaths?: { path: string; views: number }[];
   topRefs?: { ref: string; views: number }[];
   devices?: { device: DeviceKind; views: number }[];
@@ -70,6 +80,29 @@ function presenceLabel(p?: OwnerStats["presence"]): string {
   if (p === "hybrid" || p === "postgres") return "Sesi nyata (server)";
   if (p === "kv") return "Sesi nyata (KV)";
   return "Sesi isolate ini";
+}
+
+function dayLabel(iso: string, index: number): string {
+  if (index === 0) return "Hari ini";
+  if (index === 1) return "Kemarin";
+  try {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, (m || 1) - 1, d || 1).toLocaleDateString("id-ID", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    });
+  } catch {
+    return iso;
+  }
+}
+
+function deltaPct(now: number, prev: number): string | null {
+  if (!prev && !now) return null;
+  if (!prev) return "baru";
+  const pct = Math.round(((now - prev) / prev) * 100);
+  if (pct === 0) return "0%";
+  return `${pct > 0 ? "+" : ""}${pct}%`;
 }
 
 export function OwnerDashboard() {
@@ -172,6 +205,10 @@ export function OwnerDashboard() {
       .map((d) => ({ ...d, pct: Math.round((d.views / total) * 100) }));
   }, [stats]);
 
+  const days = stats?.days || [];
+  const vsViews = deltaPct(stats?.viewsToday || 0, stats?.yesterdayViews || 0);
+  const vsUniq = deltaPct(stats?.uniqueToday || 0, stats?.yesterdayUnique || 0);
+
   return (
     <div className="min-h-dvh text-zinc-100" style={{ backgroundColor: "#0f0f11" }}>
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-8">
@@ -229,11 +266,45 @@ export function OwnerDashboard() {
             </section>
 
             <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Stat label="Unik hari ini" value={fmt(stats?.uniqueToday)} />
-              <Stat label="Tayang hari ini" value={fmt(stats?.viewsToday)} />
-              <Stat label="24 jam" value={fmt(stats?.views24h)} />
-              <Stat label="Puncak hari ini" value={fmt(stats?.peakToday)} />
+              <Stat label="Unik hari ini" value={fmt(stats?.uniqueToday)} hint={vsUniq} />
+              <Stat label="Tayang hari ini" value={fmt(stats?.viewsToday)} hint={vsViews} />
+              <Stat label="Kemarin" value={fmt(stats?.yesterdayViews)} />
+              <Stat label="7 hari" value={fmt(stats?.views7d)} />
             </section>
+
+            {days.length ? (
+              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Riwayat 14 hari</h2>
+                <div className="mt-3 overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="text-[11px] uppercase tracking-wide text-zinc-600">
+                      <tr>
+                        <th className="pb-2 font-medium">Hari</th>
+                        <th className="pb-2 text-right font-medium">Tayang</th>
+                        <th className="pb-2 text-right font-medium">Unik</th>
+                        <th className="pb-2 text-right font-medium">Puncak</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {days.map((row, i) => (
+                        <tr key={row.day} className="border-t border-white/[0.06]">
+                          <td className="py-2 text-zinc-300">
+                            {dayLabel(row.day, i)}
+                            <span className="ml-2 text-[11px] text-zinc-600">{row.day}</span>
+                          </td>
+                          <td className="py-2 text-right tabular-nums text-zinc-200">{fmt(row.views)}</td>
+                          <td className="py-2 text-right tabular-nums text-zinc-400">{fmt(row.unique)}</td>
+                          <td className="py-2 text-right tabular-nums text-zinc-400">{fmt(row.peak)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mt-3 text-[11px] text-zinc-600">
+                  Data sebelum deploy ini bisa kosong. Mulai hari ini tersimpan 90 hari.
+                </p>
+              </section>
+            ) : null}
 
             {devices.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
@@ -298,11 +369,26 @@ export function OwnerDashboard() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+}: {
+  label: string;
+  value: string;
+  hint?: string | null;
+}) {
+  const up = hint && hint.startsWith("+");
+  const down = hint && hint.startsWith("-");
   return (
     <div className="rounded-2xl border border-white/[0.08] bg-[#141416] px-4 py-4">
       <p className="text-[11px] uppercase tracking-[0.14em] text-zinc-500">{label}</p>
       <p className="mt-2 font-display text-2xl tabular-nums text-zinc-50">{value}</p>
+      {hint ? (
+        <p className={`mt-1 text-[11px] ${up ? "text-emerald-400" : down ? "text-red-400" : "text-zinc-600"}`}>
+          vs kemarin {hint}
+        </p>
+      ) : null}
     </div>
   );
 }
