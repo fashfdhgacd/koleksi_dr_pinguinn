@@ -101,20 +101,20 @@ function HomePage() {
     <Shell query={q} category={category}>
       {feed.loading && !feed.items.length ? (
         <div className="space-y-8">
-          {!q && !category && page === 1 ? <div className="skeleton-shimmer aspect-[16/9] rounded-[28px]" /> : null}
+          {!q && !category && page === 1 ? <div className="skeleton-shimmer aspect-[16/9] rounded-2xl sm:rounded-[28px]" /> : null}
           <VideoGridSkeleton count={12} />
         </div>
       ) : feed.status === "error" && !feed.items.length ? (
         <ErrorState message={feed.error ?? "Gagal memuat katalog."} onRetry={feed.retry} />
       ) : (
-        <div className="space-y-10">
+        <div className="space-y-8 sm:space-y-10">
           {heroVideos.length ? <Hero videos={heroVideos} /> : null}
 
           <section>
-            <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3 sm:mb-5">
               <div>
-                <h1 className="font-display text-3xl text-foreground">{title}</h1>
-                <p className="mt-1 text-sm text-muted">{subtitle}</p>
+                <h1 className="font-display text-2xl text-foreground sm:text-3xl">{title}</h1>
+                <p className="mt-1 text-xs text-muted sm:text-sm">{subtitle}</p>
               </div>
             </div>
 
