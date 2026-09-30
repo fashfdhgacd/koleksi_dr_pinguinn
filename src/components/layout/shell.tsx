@@ -16,15 +16,15 @@ export function Shell({
     <AgeGate>
       <div className="min-h-dvh bg-background text-foreground">
         <Header query={query} category={category} />
-        <main className="mx-auto w-full max-w-[1440px] px-4 pb-16 pt-6 sm:px-6">{children}</main>
-        <footer className="border-t border-border">
-          <div className="mx-auto flex max-w-[1440px] flex-col gap-2 px-4 py-8 text-xs text-muted sm:px-6">
+        <main className="mx-auto w-full max-w-[1440px] px-3 pb-20 pt-4 sm:px-6 sm:pb-16 sm:pt-6">{children}</main>
+        <footer className="border-t border-border pb-[env(safe-area-inset-bottom)]">
+          <div className="mx-auto flex max-w-[1440px] flex-col gap-2 px-3 py-6 text-xs text-muted sm:px-6 sm:py-8">
             <p>
               DR. PINGUIN ·{" "}
               <a href="https://koleksidrpinguin.com" className="underline-offset-2 hover:underline">
                 koleksidrpinguin.com
               </a>{" "}
-              · konten 18+.
+              · 18+
             </p>
             <nav className="flex flex-wrap gap-x-4 gap-y-1" aria-label="Legal">
               <Link to="/syarat" className="hover:underline">
