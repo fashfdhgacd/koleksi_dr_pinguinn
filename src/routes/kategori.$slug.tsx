@@ -82,9 +82,9 @@ function CategorySlugPage() {
         <ErrorState message={feed.error ?? "Gagal memuat kategori."} onRetry={feed.retry} />
       ) : (
         <section>
-          <div className="mb-5">
-            <h1 className="font-display text-3xl text-foreground">{title}</h1>
-            <p className="mt-1 text-sm text-muted">{subtitle}</p>
+          <div className="mb-4 sm:mb-5">
+            <h1 className="font-display text-2xl text-foreground sm:text-3xl">{title}</h1>
+            <p className="mt-1 text-xs text-muted sm:text-sm">{subtitle}</p>
           </div>
           {feed.status === "empty" ? (
             <EmptyState title="Kosong" description="Tidak ada judul pada kategori ini." />
