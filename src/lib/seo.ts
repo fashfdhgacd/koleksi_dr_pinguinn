@@ -6,7 +6,7 @@ export const SITE_NAME = "Dr. Pinguin";
 export const DEFAULT_OG = `${SITE_ORIGIN}/og.jpg?v=12`;
 
 const HOME_DESCRIPTION =
-  "Katalog video dewasa 18+ Dr. Pinguin. Streaming embed koleksi Indo, update berkala.";
+  "Katalog video dewasa 18+ Dr. Pinguin. Streaming embed koleksi Indo, JAV, amatir. Update berkala.";
 
 function categoryLabel(slugOrLabel?: string | null): string {
   const key = (slugOrLabel || "").trim().toLowerCase();
@@ -17,7 +17,7 @@ function categoryLabel(slugOrLabel?: string | null): string {
 
 export function categoryKeywords(slugOrLabel?: string | null): string {
   const label = categoryLabel(slugOrLabel);
-  return `${label}, Dr. Pinguin, katalog 18+`;
+  return `bokep ${label}, ${label} indo, Dr. Pinguin`;
 }
 
 export function pageTitle(parts: Array<string | null | undefined>): string {
@@ -49,7 +49,7 @@ export function videoSeoDescription(
   const src = (extra?.creator || extra?.source || "").trim();
   const shortTitle = t.length > 70 ? `${t.slice(0, 67).trimEnd()}…` : t;
   const from = src ? ` · ${src}` : "";
-  const body = `${shortTitle} — ${label}${from}. Tonton di ${SITE_NAME}. Konten 18+.` ;
+  const body = `${shortTitle} — ${label}${from}. Tonton di ${SITE_NAME}. Konten 18+.`;
   return body.slice(0, 160);
 }
 
@@ -71,16 +71,17 @@ export function homeSeo(q?: string, category?: string) {
   }
   const cat = findCategory(category);
   if (cat) {
+    const label = cat.label;
     return {
-      title: pageTitle([cat.label]),
-      description: `Kategori ${cat.label} di ${SITE_NAME}. Konten 18+.`,
+      title: pageTitle([`Bokep ${label}`]),
+      description: `Katalog bokep ${label} 18+ di ${SITE_NAME}. Streaming embed, update berkala.`,
       keywords: categoryKeywords(cat.slug),
     };
   }
   return {
-    title: pageTitle(["Koleksi Dr. Pinguin", "M.S.B."]),
+    title: pageTitle(["Bokep Dr. Pinguin", "Koleksi M.S.B."]),
     description: HOME_DESCRIPTION,
-    keywords: "Dr. Pinguin, koleksi, M.S.B., 18+",
+    keywords: "bokep dr pinguin, koleksi dr pinguin, M.S.B., 18+",
   };
 }
 
@@ -159,7 +160,7 @@ export function websiteJsonLd() {
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: SITE_NAME,
-    alternateName: ["Koleksi Dr. Pinguin", "M.S.B."],
+    alternateName: ["Koleksi Dr. Pinguin", "M.S.B.", "bokep dr pinguin"],
     url: SITE_ORIGIN,
     description: HOME_DESCRIPTION,
     potentialAction: {
