@@ -27,11 +27,7 @@ function normalizePlayUrl(url: string, host: string): string {
   try {
     const u = new URL(url);
     const blob = `${host} ${u.hostname} ${u.pathname}`;
-    if (/streamtape|strcloud|puterin|putarin|userbokep|lulu/i.test(blob)) {
-      u.pathname = u.pathname.replace(/\/(?:v|d|watch)\//, "/e/");
-      return u.toString();
-    }
-    if (/indoav/i.test(blob)) {
+    if (/streamtape|strcloud|puterin|putarin|indoav|userbokep|lulu/i.test(blob)) {
       u.pathname = u.pathname.replace(/\/(?:v|d|watch)\//, "/e/");
       return u.toString();
     }
@@ -55,7 +51,6 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const rawPlay = current?.fallbacks[fallbackAt] ?? current?.url ?? null;
   const playUrl = rawPlay && current ? normalizePlayUrl(rawPlay, current.host) : rawPlay;
   const useVideo = isFileUrl(playUrl);
-  const isIndoAv = Boolean(current && /indoav/i.test(`${current.host} ${playUrl || ""}`));
 
   useEffect(() => {
     setActive(0);
@@ -67,18 +62,14 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   }, [item.id]);
 
   useEffect(() => {
-    if (!started || useVideo || embedReady || isIndoAv) return;
+    if (!started || useVideo || embedReady) return;
     const t = window.setTimeout(() => setEmbedReady(true), 800);
     return () => window.clearTimeout(t);
-  }, [started, useVideo, embedReady, playUrl, isIndoAv]);
+  }, [started, useVideo, embedReady, playUrl]);
 
   function start() {
     if (!current || !playUrl) {
       startTransition(() => setFailed(true));
-      return;
-    }
-    if (isIndoAv) {
-      window.open(playUrl, "_blank", "noopener");
       return;
     }
     startTransition(() => {
