@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-function windowPages(current: number, totalPages: number, span = 2): number[] {
+function windowPages(current: number, totalPages: number, span = 1): number[] {
   const start = Math.max(1, current - span);
   const end = Math.min(totalPages, current + span);
   const out: number[] = [];
@@ -24,9 +24,7 @@ export function CatalogPager({
   const totalPages = Math.max(1, Math.ceil((total || 0) / Math.max(1, limit)));
   if (totalPages <= 1) {
     return total > 0 ? (
-      <p className="mt-8 text-center text-xs text-muted">
-        {total.toLocaleString("id-ID")} judul
-      </p>
+      <p className="mt-8 text-center text-xs text-muted">{total.toLocaleString("id-ID")} judul</p>
     ) : null;
   }
 
@@ -47,22 +45,23 @@ export function CatalogPager({
   return (
     <nav className="mt-8 flex flex-col items-center gap-3" aria-label="Halaman katalog">
       <p className="text-xs text-muted">
-        {from.toLocaleString("id-ID")}–{to.toLocaleString("id-ID")} dari {total.toLocaleString("id-ID")} judul
-        {" · "}halaman {page}/{totalPages}
+        {from.toLocaleString("id-ID")}–{to.toLocaleString("id-ID")} / {total.toLocaleString("id-ID")}
+        {" · "}{page}/{totalPages}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-1.5">
         <button
           type="button"
           disabled={page <= 1 || loading}
           onClick={() => go(page - 1)}
-          className="inline-flex h-9 items-center gap-1 rounded-full border border-border px-3 text-sm disabled:opacity-40"
+          className="inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-full border border-border px-3 text-sm disabled:opacity-40 sm:h-9"
+          aria-label="Halaman sebelumnya"
         >
           <ChevronLeft className="size-4" />
-          Prev
+          <span className="hidden sm:inline">Prev</span>
         </button>
         {pages[0] > 1 ? (
           <>
-            <button type="button" onClick={() => go(1)} className="h-9 min-w-9 rounded-full px-2 text-sm hover:bg-secondary">
+            <button type="button" onClick={() => go(1)} className="h-11 min-w-11 rounded-full px-2 text-sm hover:bg-secondary sm:h-9 sm:min-w-9">
               1
             </button>
             {pages[0] > 2 ? <span className="px-1 text-muted">…</span> : null}
@@ -73,7 +72,7 @@ export function CatalogPager({
             key={n}
             type="button"
             onClick={() => go(n)}
-            className={`h-9 min-w-9 rounded-full px-2 text-sm ${
+            className={`h-11 min-w-11 rounded-full px-2 text-sm sm:h-9 sm:min-w-9 ${
               n === page ? "bg-primary text-primary-foreground" : "hover:bg-secondary"
             }`}
           >
@@ -83,7 +82,7 @@ export function CatalogPager({
         {pages[pages.length - 1] < totalPages ? (
           <>
             {pages[pages.length - 1] < totalPages - 1 ? <span className="px-1 text-muted">…</span> : null}
-            <button type="button" onClick={() => go(totalPages)} className="h-9 min-w-9 rounded-full px-2 text-sm hover:bg-secondary">
+            <button type="button" onClick={() => go(totalPages)} className="h-11 min-w-11 rounded-full px-2 text-sm hover:bg-secondary sm:h-9 sm:min-w-9">
               {totalPages}
             </button>
           </>
@@ -92,9 +91,10 @@ export function CatalogPager({
           type="button"
           disabled={page >= totalPages || loading}
           onClick={() => go(page + 1)}
-          className="inline-flex h-9 items-center gap-1 rounded-full border border-border px-3 text-sm disabled:opacity-40"
+          className="inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-full border border-border px-3 text-sm disabled:opacity-40 sm:h-9"
+          aria-label="Halaman berikutnya"
         >
-          Next
+          <span className="hidden sm:inline">Next</span>
           <ChevronRight className="size-4" />
         </button>
       </div>
