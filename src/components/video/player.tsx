@@ -23,6 +23,10 @@ function isFileUrl(url: string | null): boolean {
   return Boolean(url && /\.(mp4|mov|webm)($|\?)/i.test(url));
 }
 
+function isIndoAvSrc(host: string, url: string): boolean {
+  return /indoav/i.test(`${host} ${url}`);
+}
+
 function normalizePlayUrl(url: string, host: string): string {
   try {
     const u = new URL(url);
@@ -51,6 +55,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const rawPlay = current?.fallbacks[fallbackAt] ?? current?.url ?? null;
   const playUrl = rawPlay && current ? normalizePlayUrl(rawPlay, current.host) : rawPlay;
   const useVideo = isFileUrl(playUrl);
+  const indoAvOnly = Boolean(current && playUrl && isIndoAvSrc(current.host, playUrl));
 
   useEffect(() => {
     setActive(0);
@@ -62,14 +67,26 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   }, [item.id]);
 
   useEffect(() => {
-    if (!started || useVideo || embedReady) return;
+    if (!started || useVideo || embedReady || indoAvOnly) return;
     const t = window.setTimeout(() => setEmbedReady(true), 800);
     return () => window.clearTimeout(t);
-  }, [started, useVideo, embedReady, playUrl]);
+  }, [started, useVideo, embedReady, playUrl, indoAvOnly]);
 
   function start() {
     if (!current || !playUrl) {
       startTransition(() => setFailed(true));
+      return;
+    }
+    if (isIndoAvSrc(current.host, playUrl)) {
+      const other = list.findIndex((s, i) => i !== active && !isIndoAvSrc(s.host, s.url));
+      if (other >= 0) {
+        pickSource(other);
+        return;
+      }
+      startTransition(() => {
+        setStarted(false);
+        setFailed(true);
+      });
       return;
     }
     startTransition(() => {
@@ -106,17 +123,26 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
           <>
             <VideoThumb src={item.thumbnail} alt={item.title} eager className="size-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent" />
-            <button
-              type="button"
-              className="absolute inset-0 flex items-center justify-center"
-              onClick={start}
-              disabled={!current}
-              aria-label={current ? `Putar ${item.title}` : "Video tidak tersedia"}
-            >
-              <span className="flex size-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform duration-150 active:scale-[0.96] sm:size-20">
-                <Play className="size-7 fill-current sm:size-8" style={{ marginLeft: 3 }} />
-              </span>
-            </button>
+            {failed ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/80 px-6 text-center">
+                <AlertTriangle className="size-7 text-destructive" />
+                <p className="max-w-sm text-sm text-muted">
+                  Hosternya menolak diputar di kotak. Pakai tombol Buka Sumber di bawah.
+                </p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="absolute inset-0 flex items-center justify-center"
+                onClick={start}
+                disabled={!current}
+                aria-label={current ? `Putar ${item.title}` : "Video tidak tersedia"}
+              >
+                <span className="flex size-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform duration-150 active:scale-[0.96] sm:size-20">
+                  <Play className="size-7 fill-current sm:size-8" style={{ marginLeft: 3 }} />
+                </span>
+              </button>
+            )}
           </>
         ) : !useVideo && playUrl ? (
           <>
@@ -177,15 +203,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
           </div>
         ) : null}
 
-        {failed ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/85 px-6 text-center">
-            <AlertTriangle className="size-7 text-destructive" />
-            <p className="max-w-sm text-sm text-muted">Pemutar gagal. Pakai tombol Buka Sumber di bawah.</p>
-            <Button onClick={retryQuiet}>Coba lagi</Button>
-          </div>
-        ) : null}
-
-        {!current && !started ? (
+        {!current && !started && !failed ? (
           <div className="absolute inset-x-0 bottom-0 p-4 text-center text-sm text-muted">
             Video tidak tersedia untuk judul ini.
           </div>
