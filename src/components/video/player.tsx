@@ -1,5 +1,5 @@
 import { startTransition, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, LoaderCircle, Play } from "lucide-react";
+import { AlertTriangle, ExternalLink, LoaderCircle, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { VideoDetail } from "@/lib/catalog/types";
 import { hostPriority, resolveSource, type ResolvedSource } from "@/lib/catalog/embed";
@@ -21,6 +21,10 @@ function sourcesFromItem(item: VideoDetail): ResolvedSource[] {
 
 function isFileUrl(url: string | null): boolean {
   return Boolean(url && /\.(mp4|mov|webm)($|\?)/i.test(url));
+}
+
+function isIndoAvSrc(host: string, url: string): boolean {
+  return /indoav/i.test(`${host} ${url}`);
 }
 
 function normalizePlayUrl(url: string, host: string): string {
@@ -51,6 +55,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const rawPlay = current?.fallbacks[fallbackAt] ?? current?.url ?? null;
   const playUrl = rawPlay && current ? normalizePlayUrl(rawPlay, current.host) : rawPlay;
   const useVideo = isFileUrl(playUrl);
+  const indoAv = Boolean(current && playUrl && isIndoAvSrc(current.host, playUrl));
 
   useEffect(() => {
     setActive(0);
@@ -62,14 +67,23 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   }, [item.id]);
 
   useEffect(() => {
-    if (!started || useVideo || embedReady) return;
+    if (!started || useVideo || embedReady || indoAv) return;
     const t = window.setTimeout(() => setEmbedReady(true), 800);
     return () => window.clearTimeout(t);
-  }, [started, useVideo, embedReady, playUrl]);
+  }, [started, useVideo, embedReady, playUrl, indoAv]);
 
   function start() {
     if (!current || !playUrl) {
       startTransition(() => setFailed(true));
+      return;
+    }
+    if (isIndoAvSrc(current.host, playUrl)) {
+      const other = list.findIndex((s) => !isIndoAvSrc(s.host, s.url));
+      if (other >= 0) {
+        pickSource(other);
+        return;
+      }
+      window.open(playUrl, "_blank", "noopener");
       return;
     }
     startTransition(() => {
@@ -81,12 +95,17 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   }
 
   function pickSource(index: number) {
+    const src = list[index];
+    if (src && isIndoAvSrc(src.host, src.url)) {
+      window.open(normalizePlayUrl(src.url, src.host), "_blank", "noopener");
+      return;
+    }
     setActive(index);
     setFallbackAt(0);
     setFailed(false);
     setStarted(true);
     setEmbedReady(false);
-    setBuffering(isFileUrl(list[index]?.url ?? null));
+    setBuffering(isFileUrl(src?.url ?? null));
   }
 
   function retryQuiet() {
@@ -96,8 +115,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     }
     setFailed(false);
     setFallbackAt(0);
-    setStarted(true);
-    setEmbedReady(false);
+    start();
   }
 
   return (
@@ -109,14 +127,23 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
             <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent" />
             <button
               type="button"
-              className="absolute inset-0 flex items-center justify-center"
+              className="absolute inset-0 flex flex-col items-center justify-center gap-3"
               onClick={start}
               disabled={!current}
               aria-label={current ? `Putar ${item.title}` : "Video tidak tersedia"}
             >
               <span className="flex size-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform duration-150 active:scale-[0.96] sm:size-20">
-                <Play className="size-7 fill-current sm:size-8" style={{ marginLeft: 3 }} />
+                {indoAv ? (
+                  <ExternalLink className="size-7 sm:size-8" />
+                ) : (
+                  <Play className="size-7 fill-current sm:size-8" style={{ marginLeft: 3 }} />
+                )}
               </span>
+              {indoAv ? (
+                <span className="rounded-full bg-background/80 px-3 py-1 text-xs text-foreground">
+                  Putar di IndoAV
+                </span>
+              ) : null}
             </button>
           </>
         ) : !useVideo && playUrl ? (
