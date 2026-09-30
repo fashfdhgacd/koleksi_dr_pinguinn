@@ -6,7 +6,7 @@ import {
   recordHit,
   touchOnline,
 } from "@/lib/owner-analytics";
-import { kvCountOnline, kvReadRoll, kvTouchLive, rollToStats } from "@/lib/kv-live";
+import { kvCountOnline, kvReadHistory, kvReadRoll, kvTouchLive, rollToStats } from "@/lib/kv-live";
 
 const BOT_UA =
   /bot|crawl|spider|slurp|headless|webdriver|puppeteer|playwright|scrapy|httpclient|curl\/|wget|python-requests|axios\/|node-fetch|bytespider|gptbot|claudebot|ccbot|semrush|ahrefs|dataforseo|petalbot|facebookexternalhit|preview/i;
@@ -101,9 +101,9 @@ function shouldSkipBot(ua: string, owner: boolean): boolean {
 
 async function liveOwnerPayload() {
   const stats = await getOwnerStats();
-  const [kvN, roll] = await Promise.all([kvCountOnline(), kvReadRoll()]);
+  const [kvN, roll, history] = await Promise.all([kvCountOnline(), kvReadRoll(), kvReadHistory(14)]);
   const online = Math.max(Number(stats.online) || 0, Number(stats.count) || 0, kvN);
-  const live = rollToStats(roll, online);
+  const live = rollToStats(roll, online, history);
   return {
     ...stats,
     ...live,
@@ -113,6 +113,10 @@ async function liveOwnerPayload() {
     viewsToday: Math.max(Number(stats.viewsToday) || 0, live.viewsToday),
     uniqueToday: Math.max(Number(stats.uniqueToday) || 0, live.uniqueToday),
     views24h: Math.max(Number(stats.views24h) || 0, live.views24h),
+    views7d: live.views7d,
+    days: live.days,
+    yesterdayViews: live.yesterdayViews,
+    yesterdayUnique: live.yesterdayUnique,
     topPaths: live.topPaths.length ? live.topPaths : stats.topPaths,
     topRefs: live.topRefs.length ? live.topRefs : stats.topRefs,
     devices: live.devices.length ? live.devices : stats.devices,
