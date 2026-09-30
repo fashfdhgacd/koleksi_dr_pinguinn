@@ -6,7 +6,7 @@ const ONLINE_PREFIX = "online:";
 const ROLL_PREFIX = "roll:";
 const UNIQ_PREFIX = "uniq:";
 const ONLINE_TTL_SEC = 150;
-const ROLL_TTL_SEC = 172800;
+const ROLL_TTL_SEC = 90 * 24 * 3600;
 
 export type KvRoll = {
   views: number;
@@ -15,6 +15,13 @@ export type KvRoll = {
   paths: Record<string, number>;
   refs: Record<string, number>;
   devices: Record<string, number>;
+};
+
+export type KvDayRow = {
+  day: string;
+  views: number;
+  unique: number;
+  peak: number;
 };
 
 function dayKey(ts = Date.now()): string {
@@ -84,6 +91,23 @@ export async function kvReadRoll(day = dayKey()): Promise<KvRoll> {
   }
 }
 
+export async function kvReadHistory(days = 14): Promise<KvDayRow[]> {
+  const n = Math.min(31, Math.max(2, days));
+  const out: KvDayRow[] = [];
+  const now = Date.now();
+  for (let i = 0; i < n; i++) {
+    const day = dayKey(now - i * 86400_000);
+    const roll = await kvReadRoll(day);
+    out.push({
+      day,
+      views: roll.views,
+      unique: roll.unique,
+      peak: roll.peak,
+    });
+  }
+  return out;
+}
+
 export async function kvTouchLive(input: {
   id: string;
   path?: string;
@@ -133,7 +157,9 @@ export async function kvTouchLive(input: {
   }
 }
 
-export function rollToStats(roll: KvRoll, online: number) {
+export function rollToStats(roll: KvRoll, online: number, history: KvDayRow[] = []) {
+  const views7d = history.slice(0, 7).reduce((s, d) => s + d.views, 0) || roll.views;
+  const yesterday = history[1];
   return {
     online,
     count: online,
@@ -141,7 +167,10 @@ export function rollToStats(roll: KvRoll, online: number) {
     viewsToday: roll.views,
     views24h: roll.views,
     uniqueToday: roll.unique,
-    views7d: roll.views,
+    views7d,
+    yesterdayViews: yesterday?.views || 0,
+    yesterdayUnique: yesterday?.unique || 0,
+    days: history,
     topPaths: top(roll.paths, 12).map((r) => ({ path: r.key, views: r.views })),
     topRefs: top(roll.refs, 8).map((r) => ({ ref: r.key, views: r.views })),
     devices: top(roll.devices, 6).map((r) => ({
