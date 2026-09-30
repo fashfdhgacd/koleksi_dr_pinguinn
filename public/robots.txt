@@ -2,6 +2,7 @@ User-agent: Googlebot
 Allow: /
 Disallow: /api/
 Disallow: /pemilik
+Disallow: /watch/$id
 
 User-agent: Googlebot-Image
 Allow: /
@@ -60,4 +61,3 @@ Allow: /og.jpg
 
 Sitemap: https://koleksidrpinguin.com/sitemap-pages.xml
 Sitemap: https://koleksidrpinguin.com/sitemap.xml
-Sitemap: https://koleksidrpinguin.com/sitemap-video.xml
