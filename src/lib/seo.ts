@@ -129,6 +129,37 @@ export function absoluteThumb(thumbnail?: string | null): string {
   return DEFAULT_OG;
 }
 
+/** True if URL looks like JPEG/PNG Google Video accepts (not webp/avif/svg). */
+export function isGoogleVideoThumbFormat(url: string): boolean {
+  const path = url.split("?")[0].toLowerCase();
+  if (/\.(webp|avif|svg|gif|bmp|ico)($|\/)/i.test(path)) return false;
+  if (/\.(jpe?g|png)($|\/)/i.test(path)) return true;
+  // same-origin OG/proxy endpoints that we force to JPEG
+  if (/\/api\/og(\?|$)/i.test(url) || /\/og\.jpg(\?|$)/i.test(url) || /\/brand-poster\.jpg(\?|$)/i.test(url)) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Thumbnail for VideoObject / GSC video indexing.
+ * Prefer same-origin /api/og (JPEG) so bots are not sent unreachable .webp hosters.
+ */
+export function seoVideoThumbnail(id?: string | null, thumbnail?: string | null): string {
+  const idClean = (id || "").trim();
+  if (idClean && /^[A-Za-z0-9_-]{3,64}$/.test(idClean)) {
+    return `${SITE_ORIGIN}/api/og?id=${encodeURIComponent(idClean)}&v=13`;
+  }
+  const raw = (thumbnail || "").trim();
+  if (raw && isGoogleVideoThumbFormat(raw)) {
+    return absoluteThumb(raw);
+  }
+  return DEFAULT_OG;
+}
+
+/** Canonical homepage URL — must match sitemap loc trailing slash. */
+export const HOME_CANONICAL = `${SITE_ORIGIN}/`;
+
 export function homeSeo(q?: string, category?: string) {
   if (q) {
     return {
@@ -186,9 +217,9 @@ export function videoJsonLd(input: {
 }) {
   const embed = (input.embedUrl || "").trim();
   const content = (input.contentUrl || "").trim();
-  const thumb = absoluteThumb(input.thumbnail);
+  const thumb = seoVideoThumbnail(input.id, input.thumbnail);
   const pageUrl = `${SITE_ORIGIN}/watch/${input.id}`;
-  const label = categoryLabel(input.category);
+  const label = safeSeoLabel(input.category);
 
   return {
     "@context": "https://schema.org",
@@ -229,7 +260,7 @@ export function websiteJsonLd() {
     "@type": "WebSite",
     name: SITE_NAME,
     alternateName: ["Koleksi Dr. Pinguin", "M.S.B.", "bokep dr pinguin"],
-    url: SITE_ORIGIN,
+    url: HOME_CANONICAL,
     description: HOME_DESCRIPTION,
     potentialAction: {
       "@type": "SearchAction",
