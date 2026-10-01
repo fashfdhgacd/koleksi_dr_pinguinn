@@ -67,7 +67,7 @@ export const Route = createFileRoute("/thumb/$id")({
           const source = sourceFor(id);
           if (!source) return new Response(null, { status: 404 });
           const remote = await fetch(source, {
-            headers: { "user-agent": "kdp-poster/1", referer: "https://tv1.indoav.app/" },
+            headers: { "user-agent": "kdp-poster/1" },
             signal: AbortSignal.timeout(8000),
           }).catch(() => null);
           if (!remote?.ok) return new Response(null, { status: 404 });
