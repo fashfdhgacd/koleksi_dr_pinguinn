@@ -5,8 +5,10 @@ import { CatalogPager } from "@/components/video/catalog-pager";
 import { Hero } from "@/components/video/hero";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { findCategory } from "@/lib/catalog/categories";
+import { queryCatalog } from "@/lib/catalog/service";
+import type { VideoCard } from "@/lib/catalog/types";
 import { useCatalogFeed } from "@/hooks/use-catalog";
-import { DEFAULT_OG, SITE_ORIGIN, homeSeo, websiteJsonLd } from "@/lib/seo";
+import { DEFAULT_OG, HOME_CANONICAL, SITE_ORIGIN, homeSeo, websiteJsonLd } from "@/lib/seo";
 
 type HomeSearch = {
   q?: string;
@@ -18,6 +20,43 @@ function parsePage(value: unknown): number | undefined {
   const n = Math.floor(Number(value));
   if (!Number.isFinite(n) || n <= 1) return undefined;
   return Math.min(n, 500);
+}
+
+function seedFromLoader(loaderData: Awaited<ReturnType<typeof loadHome>>): {
+  items: VideoCard[];
+  featured: VideoCard[];
+  total: number;
+  page: number;
+  limit: number;
+} | null {
+  if (!loaderData || !loaderData.ok) return null;
+  if (loaderData.type === "home") {
+    return {
+      items: loaderData.latest.items,
+      featured: loaderData.featured,
+      total: loaderData.latest.total,
+      page: loaderData.latest.page,
+      limit: loaderData.latest.limit,
+    };
+  }
+  if (loaderData.type === "search" || loaderData.type === "latest" || loaderData.type === "category") {
+    return {
+      items: loaderData.items,
+      featured: [],
+      total: loaderData.total,
+      page: loaderData.page,
+      limit: loaderData.limit,
+    };
+  }
+  return null;
+}
+
+async function loadHome({ search }: { search: HomeSearch }) {
+  const page = search.page || 1;
+  if (search.q) {
+    return queryCatalog({ type: "search", q: search.q, page, limit: 24 });
+  }
+  return queryCatalog({ type: "home", page, limit: 24 });
 }
 
 export const Route = createFileRoute("/")({
@@ -41,6 +80,16 @@ export const Route = createFileRoute("/")({
       });
     }
   },
+  loader: async ({ location }) => {
+    const raw = location.search as Record<string, unknown>;
+    const search: HomeSearch = {
+      q: typeof raw.q === "string" && raw.q.trim() ? raw.q.trim() : undefined,
+      category:
+        typeof raw.category === "string" && raw.category.trim() ? raw.category.trim() : undefined,
+      page: parsePage(raw.page),
+    };
+    return loadHome({ search });
+  },
   head: ({ match }) => {
     const q = typeof match.search.q === "string" ? match.search.q : undefined;
     const page = typeof match.search.page === "number" ? match.search.page : 1;
@@ -49,7 +98,7 @@ export const Route = createFileRoute("/")({
       ? `${SITE_ORIGIN}/?q=${encodeURIComponent(q)}${page > 1 ? `&page=${page}` : ""}`
       : page > 1
         ? `${SITE_ORIGIN}/?page=${page}`
-        : SITE_ORIGIN;
+        : HOME_CANONICAL;
     const jsonLd = !q && page <= 1 ? websiteJsonLd() : null;
     return {
       meta: [
@@ -76,17 +125,25 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   const { q, category, page: pageSearch } = Route.useSearch();
+  const loaderData = Route.useLoaderData();
+  const seed = seedFromLoader(loaderData);
   const navigate = useNavigate({ from: "/" });
   const mode = q ? "search" : category ? "category" : "home";
   const page = pageSearch || 1;
-  const feed = useCatalogFeed({ mode, q, category, page });
+  const feed = useCatalogFeed({ mode, q, category, page }, seed);
   const cat = findCategory(category);
   const heroVideos = !q && !category && page === 1 ? feed.featured : [];
   const heroIds = new Set(heroVideos.map((v) => v.id));
   const gridItems = heroIds.size ? feed.items.filter((item) => !heroIds.has(item.id)) : feed.items;
 
   const title = q ? `Hasil untuk “${q}”` : cat ? cat.label : "Koleksi Dr. Pinguin";
-  const subtitle = feed.total ? `${feed.total.toLocaleString("id-ID")} judul · M.S.B.` : "M.S.B. — Koleksi Dr. Pinguin";
+  const subtitle = feed.total
+    ? `${feed.total.toLocaleString("id-ID")} judul · M.S.B.`
+    : "M.S.B. — Koleksi Dr. Pinguin";
+  const intro =
+    q
+      ? `Hasil pencarian “${q}” di katalog Dr. Pinguin. Konten dewasa 18+.`
+      : "Katalog video dewasa 18+ Dr. Pinguin. Streaming embed koleksi Indo, JAV, amatir. Update berkala.";
 
   function setPage(next: number) {
     void navigate({
@@ -97,55 +154,53 @@ function HomePage() {
     });
   }
 
+  const coldLoading = feed.loading && !feed.items.length;
+
   return (
     <Shell query={q} category={category}>
-      {feed.loading && !feed.items.length ? (
-        <div className="space-y-8">
-          {!q && !category && page === 1 ? <div className="skeleton-shimmer aspect-[16/9] rounded-2xl sm:rounded-[28px]" /> : null}
-          <VideoGridSkeleton count={12} />
-        </div>
-      ) : feed.status === "error" && !feed.items.length ? (
-        <ErrorState message={feed.error ?? "Gagal memuat katalog."} onRetry={feed.retry} />
-      ) : (
-        <div className="space-y-8 sm:space-y-10">
-          {heroVideos.length ? <Hero videos={heroVideos} /> : null}
+      <div className="space-y-8 sm:space-y-10">
+        {heroVideos.length ? <Hero videos={heroVideos} /> : null}
 
-          <section>
-            <div className="mb-4 flex flex-wrap items-end justify-between gap-3 sm:mb-5">
-              <div>
-                <h1 className="font-display text-2xl text-foreground sm:text-3xl">{title}</h1>
-                <p className="mt-1 text-xs text-muted sm:text-sm">{subtitle}</p>
-              </div>
+        <section>
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-3 sm:mb-5">
+            <div>
+              <h1 className="font-display text-2xl text-foreground sm:text-3xl">{title}</h1>
+              <p className="mt-1 text-xs text-muted sm:text-sm">{subtitle}</p>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">{intro}</p>
             </div>
+          </div>
 
-            {feed.status === "empty" ? (
-              <EmptyState
-                title={q ? "Tidak ada hasil" : "Katalog kosong"}
-                description={q ? "Tidak ada judul yang cocok. Coba kata kunci lain." : "Tidak ada judul pada saringan ini."}
-              />
-            ) : (
-              <VideoGrid items={gridItems} eagerCount={24} />
-            )}
-
-            {feed.error && feed.items.length ? (
-              <p className="mt-4 text-center text-sm text-muted">
-                {feed.error}{" "}
-                <button type="button" className="underline" onClick={feed.retry}>
-                  Coba lagi
-                </button>
-              </p>
-            ) : null}
-
-            <CatalogPager
-              page={feed.page || page}
-              total={feed.total}
-              limit={feed.limit}
-              loading={feed.loading}
-              onPage={setPage}
+          {coldLoading ? (
+            <VideoGridSkeleton count={12} />
+          ) : feed.status === "error" && !feed.items.length ? (
+            <ErrorState message={feed.error ?? "Gagal memuat katalog."} onRetry={feed.retry} />
+          ) : feed.status === "empty" ? (
+            <EmptyState
+              title={q ? "Tidak ada hasil" : "Katalog kosong"}
+              description={q ? "Tidak ada judul yang cocok. Coba kata kunci lain." : "Tidak ada judul pada saringan ini."}
             />
-          </section>
-        </div>
-      )}
+          ) : (
+            <VideoGrid items={gridItems} eagerCount={24} />
+          )}
+
+          {feed.error && feed.items.length ? (
+            <p className="mt-4 text-center text-sm text-muted">
+              {feed.error}{" "}
+              <button type="button" className="underline" onClick={feed.retry}>
+                Coba lagi
+              </button>
+            </p>
+          ) : null}
+
+          <CatalogPager
+            page={feed.page || page}
+            total={feed.total}
+            limit={feed.limit}
+            loading={feed.loading}
+            onPage={setPage}
+          />
+        </section>
+      </div>
     </Shell>
   );
 }
