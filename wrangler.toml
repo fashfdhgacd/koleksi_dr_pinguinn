@@ -11,3 +11,8 @@ id = "8c809729ccd64e5da6e9cb7dd62fb40b"
 [[kv_namespaces]]
 binding = "DR_PINGUIN_ANALYTICS"
 id = "8c809729ccd64e5da6e9cb7dd62fb40b"
+
+# Poster video. File tetap ada setelah deploy.
+[[r2_buckets]]
+binding = "POSTERS"
+bucket_name = "posters"
