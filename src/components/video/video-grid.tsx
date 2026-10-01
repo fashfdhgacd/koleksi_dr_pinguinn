@@ -1,20 +1,14 @@
-import { useEffect } from "react";
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
-import { prefetchPosters } from "@/lib/poster-warm";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VideoCard } from "./video-card";
 
 export function VideoGrid({
   items,
-  eagerCount = 24,
+  eagerCount = 8,
 }: {
   items: VideoCardType[];
   eagerCount?: number;
 }) {
-  useEffect(() => {
-    prefetchPosters(items.map((v) => v.thumbnail));
-  }, [items]);
-
   return (
     <div className="grid grid-cols-2 gap-x-2 gap-y-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
       {items.map((video, index) => (
