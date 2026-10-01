@@ -1,12 +1,15 @@
-/** Live visitors + daily rollup on Cloudflare KV. No Postgres required. */
+/** Live visitors + daily rollup. Sedikit panggilan KV per request. */
 
-import { resolveAnalyticsKV } from "@/lib/analytics-kv";
+import { resolveAnalyticsKV, type KVNamespaceLike } from "@/lib/analytics-kv";
 
 const ONLINE_PREFIX = "online:";
 const ROLL_PREFIX = "roll:";
 const UNIQ_PREFIX = "uniq:";
 const ONLINE_TTL_SEC = 150;
 const ROLL_TTL_SEC = 90 * 24 * 3600;
+const FLUSH_MS = 20_000;
+const COUNT_CACHE_MS = 45_000;
+const HISTORY_CACHE_MS = 60_000;
 
 export type KvRoll = {
   views: number;
@@ -24,6 +27,14 @@ export type KvDayRow = {
   peak: number;
 };
 
+let kvHandle: KVNamespaceLike | null = null;
+let rollMem: KvRoll | null = null;
+let rollDay = "";
+let rollDirty = false;
+let lastFlush = 0;
+let countCache: { at: number; n: number } | null = null;
+let historyCache: { at: number; rows: KvDayRow[] } | null = null;
+
 function dayKey(ts = Date.now()): string {
   return new Date(ts + 7 * 3600_000).toISOString().slice(0, 10);
 }
@@ -32,7 +43,7 @@ function emptyRoll(): KvRoll {
   return { views: 0, unique: 0, peak: 0, paths: {}, refs: {}, devices: {} };
 }
 
-function bumpMap(map: Record<string, number>, key: string, cap = 40): void {
+function bumpMap(map: Record<string, number>, key: string, cap = 24): void {
   const k = (key || "(lain)").slice(0, 80);
   map[k] = (map[k] || 0) + 1;
   const keys = Object.keys(map);
@@ -48,35 +59,20 @@ function top(map: Record<string, number>, n: number): { key: string; views: numb
     .map(([key, views]) => ({ key, views }));
 }
 
-export async function kvCountOnline(): Promise<number> {
+async function kv(): Promise<KVNamespaceLike | null> {
+  if (kvHandle) return kvHandle;
   try {
     const handle = await resolveAnalyticsKV();
-    if (!handle?.kv) return 0;
-    let cursor: string | undefined;
-    let total = 0;
-    for (let page = 0; page < 8; page++) {
-      const listed = await handle.kv.list({
-        prefix: ONLINE_PREFIX,
-        limit: 1000,
-        cursor,
-      });
-      total += listed.keys.length;
-      if (listed.list_complete) break;
-      cursor = listed.cursor;
-      if (!cursor) break;
-    }
-    return total;
+    kvHandle = handle?.kv || null;
+    return kvHandle;
   } catch {
-    return 0;
+    return null;
   }
 }
 
-export async function kvReadRoll(day = dayKey()): Promise<KvRoll> {
+function parseRoll(raw: string | null): KvRoll {
+  if (!raw) return emptyRoll();
   try {
-    const handle = await resolveAnalyticsKV();
-    if (!handle?.kv) return emptyRoll();
-    const raw = await handle.kv.get(`${ROLL_PREFIX}${day}`);
-    if (!raw) return emptyRoll();
     const parsed = JSON.parse(raw) as Partial<KvRoll>;
     return {
       views: Number(parsed.views) || 0,
@@ -91,21 +87,63 @@ export async function kvReadRoll(day = dayKey()): Promise<KvRoll> {
   }
 }
 
-export async function kvReadHistory(days = 14): Promise<KvDayRow[]> {
-  const n = Math.min(31, Math.max(2, days));
-  const out: KvDayRow[] = [];
+async function flushRoll(force = false): Promise<void> {
+  if (!rollDirty || !rollMem) return;
   const now = Date.now();
-  for (let i = 0; i < n; i++) {
-    const day = dayKey(now - i * 86400_000);
-    const roll = await kvReadRoll(day);
-    out.push({
-      day,
-      views: roll.views,
-      unique: roll.unique,
-      peak: roll.peak,
-    });
+  if (!force && now - lastFlush < FLUSH_MS) return;
+  const store = await kv();
+  if (!store) return;
+  lastFlush = now;
+  rollDirty = false;
+  await store.put(`${ROLL_PREFIX}${rollDay}`, JSON.stringify(rollMem), { expirationTtl: ROLL_TTL_SEC });
+}
+
+export async function kvCountOnline(): Promise<number> {
+  const now = Date.now();
+  if (countCache && now - countCache.at < COUNT_CACHE_MS) return countCache.n;
+  try {
+    const store = await kv();
+    if (!store) return countCache?.n || 0;
+    const listed = await store.list({ prefix: ONLINE_PREFIX, limit: 1000 });
+    const n = listed.keys.length;
+    countCache = { at: now, n };
+    return n;
+  } catch {
+    return countCache?.n || 0;
   }
-  return out;
+}
+
+export async function kvReadRoll(day = dayKey()): Promise<KvRoll> {
+  if (rollMem && rollDay === day) return rollMem;
+  try {
+    const store = await kv();
+    if (!store) return emptyRoll();
+    const raw = await store.get(`${ROLL_PREFIX}${day}`);
+    const parsed = parseRoll(raw);
+    if (day === dayKey()) {
+      rollDay = day;
+      rollMem = parsed;
+    }
+    return parsed;
+  } catch {
+    return emptyRoll();
+  }
+}
+
+export async function kvReadHistory(days = 14): Promise<KvDayRow[]> {
+  const now = Date.now();
+  if (historyCache && now - historyCache.at < HISTORY_CACHE_MS) return historyCache.rows;
+  const n = Math.min(14, Math.max(2, days));
+  const store = await kv();
+  if (!store) return historyCache?.rows || [];
+  const keys = Array.from({ length: n }, (_, i) => dayKey(now - i * 86400_000));
+  const raws = await Promise.all(keys.map((day) => store.get(`${ROLL_PREFIX}${day}`).catch(() => null)));
+  const rows = keys.map((day, i) => {
+    const roll = parseRoll(raws[i]);
+    return { day, views: roll.views, unique: roll.unique, peak: roll.peak };
+  });
+  historyCache = { at: now, rows };
+  return rows;
 }
 
 export async function kvTouchLive(input: {
@@ -119,39 +157,40 @@ export async function kvTouchLive(input: {
   const id = input.id.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
   if (!id) return;
   try {
-    const handle = await resolveAnalyticsKV();
-    if (!handle?.kv) return;
+    const store = await kv();
+    if (!store) return;
     const now = Date.now();
     const day = dayKey(now);
-    await handle.kv.put(`${ONLINE_PREFIX}${id}`, String(now), { expirationTtl: ONLINE_TTL_SEC });
+    await store.put(`${ONLINE_PREFIX}${id}`, "1", { expirationTtl: ONLINE_TTL_SEC });
+    if (countCache) countCache = null;
 
     if (input.recordView === false) {
-      const roll = await kvReadRoll(day);
-      const peak = Math.max(roll.peak, input.onlineGuess || 0);
-      if (peak > roll.peak) {
-        roll.peak = peak;
-        await handle.kv.put(`${ROLL_PREFIX}${day}`, JSON.stringify(roll), { expirationTtl: ROLL_TTL_SEC });
-      }
+      await flushRoll(false);
       return;
     }
 
-    const uniqKey = `${UNIQ_PREFIX}${day}:${id}`;
-    const seen = await handle.kv.get(uniqKey);
-    if (!seen) {
-      await handle.kv.put(uniqKey, "1", { expirationTtl: ROLL_TTL_SEC });
+    if (!rollMem || rollDay !== day) {
+      rollDay = day;
+      rollMem = parseRoll(await store.get(`${ROLL_PREFIX}${day}`));
     }
-
-    const roll = await kvReadRoll(day);
-    roll.views += 1;
-    if (!seen) roll.unique += 1;
-    roll.peak = Math.max(roll.peak, input.onlineGuess || 0, 1);
+    rollMem.views += 1;
+    rollMem.peak = Math.max(rollMem.peak, input.onlineGuess || 0, 1);
     if (input.path) {
       const p = input.path.startsWith("/") ? input.path : `/${input.path}`;
-      bumpMap(roll.paths, p.split("?")[0] || "/");
+      bumpMap(rollMem.paths, p.split("?")[0] || "/");
     }
-    if (input.ref) bumpMap(roll.refs, input.ref);
-    if (input.device && input.device !== "bot") bumpMap(roll.devices, input.device);
-    await handle.kv.put(`${ROLL_PREFIX}${day}`, JSON.stringify(roll), { expirationTtl: ROLL_TTL_SEC });
+    if (input.ref) bumpMap(rollMem.refs, input.ref);
+    if (input.device && input.device !== "bot") bumpMap(rollMem.devices, input.device);
+
+    const uniqKey = `${UNIQ_PREFIX}${day}:${id}`;
+    const seen = await store.get(uniqKey);
+    if (!seen) {
+      rollMem.unique += 1;
+      await store.put(uniqKey, "1", { expirationTtl: 36 * 3600 });
+    }
+    rollDirty = true;
+    historyCache = null;
+    await flushRoll(false);
   } catch {
     /* KV optional */
   }

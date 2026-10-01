@@ -1,6 +1,6 @@
 import { resolveAnalyticsKV } from "@/lib/analytics-kv";
 
-const SHARE_USED_MAX = 8000;
+const SHARE_USED_MAX = 4000;
 const SHARE_USED_TTL_SEC = 36 * 3600;
 
 export type ShareUsedFile = {
@@ -25,23 +25,7 @@ function emptyUsed(day = wibDay()): ShareUsedFile {
   return { resetAt: Date.now(), used: [], titles: [], lastCat: "", lastSource: "", lastCount: 10, day };
 }
 
-/** Cache RAM per instance — cegah ulang sebelum KV sempat tersimpan. */
 let mem: ShareUsedFile | null = null;
-
-function mergeUsed(a: ShareUsedFile, b: ShareUsedFile): ShareUsedFile {
-  if (a.day && b.day && a.day !== b.day) return b.day > a.day ? b : a;
-  const used = Array.from(new Set([...(a.used || []), ...(b.used || [])].map(String)));
-  const titles = Array.from(new Set([...(a.titles || []), ...(b.titles || [])].map(String)));
-  return {
-    resetAt: Math.max(Number(a.resetAt) || 0, Number(b.resetAt) || 0) || Date.now(),
-    used,
-    titles,
-    lastCat: b.lastCat || a.lastCat || "",
-    lastSource: b.lastSource || a.lastSource || "",
-    lastCount: b.lastCount || a.lastCount || 10,
-    day: b.day || a.day || wibDay(),
-  };
-}
 
 function trim(file: ShareUsedFile): ShareUsedFile {
   const day = file.day || wibDay();
@@ -58,27 +42,27 @@ function trim(file: ShareUsedFile): ShareUsedFile {
 
 export async function loadShareUsed(): Promise<ShareUsedFile> {
   const day = wibDay();
+  if (mem && mem.day === day) return mem;
   let remote = emptyUsed(day);
   try {
     const handle = await resolveAnalyticsKV();
     const raw = handle?.kv ? await handle.kv.get(keyFor(day)) : null;
     if (raw) {
       const d = JSON.parse(raw) as ShareUsedFile;
-      remote = {
+      remote = trim({
         resetAt: Number(d.resetAt) || Date.now(),
-        used: Array.isArray(d.used) ? d.used.map(String) : [],
-        titles: Array.isArray(d.titles) ? d.titles.map(String) : [],
+        used: Array.isArray(d.used) ? d.used : [],
+        titles: Array.isArray(d.titles) ? d.titles : [],
         lastCat: d.lastCat || "",
         lastSource: d.lastSource || "",
         lastCount: d.lastCount || 10,
         day,
-      };
+      });
     }
   } catch {
     /* keep empty */
   }
-  if (mem && mem.day === day) mem = mergeUsed(remote, mem);
-  else mem = remote;
+  mem = remote;
   return mem;
 }
 
@@ -89,7 +73,7 @@ export async function saveShareUsed(file: ShareUsedFile): Promise<void> {
     const handle = await resolveAnalyticsKV();
     if (!handle?.kv) return;
     await handle.kv.put(keyFor(day), JSON.stringify(mem), { expirationTtl: SHARE_USED_TTL_SEC });
-  } catch (err) {
-    console.error("saveShareUsed kv", err);
+  } catch {
+    /* KV optional */
   }
 }
