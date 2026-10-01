@@ -5,6 +5,7 @@ import { Link } from "@tanstack/react-router";
 import { Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { OwnerTools } from "@/components/owner-tools";
 
 const SECRET_KEY = "drp_owner_secret";
 const SECRET_LEGACY = "drp_online_secret";
@@ -271,6 +272,8 @@ export function OwnerDashboard() {
               <Stat label="Kemarin" value={fmt(stats?.yesterdayViews)} />
               <Stat label="7 hari" value={fmt(stats?.views7d)} />
             </section>
+
+            <OwnerTools secret={secret} />
 
             {days.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
