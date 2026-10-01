@@ -127,7 +127,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
               title={item.title}
               className="absolute inset-0 size-full border-0 bg-background"
               allow="autoplay; encrypted-media; fullscreen; picture-in-picture; clipboard-write"
-              referrerPolicy="no-referrer-when-downgrade"
+              referrerPolicy="strict-origin-when-cross-origin"
               allowFullScreen
               loading="eager"
               onLoad={() => setEmbedReady(true)}
@@ -148,7 +148,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
             playsInline
             preload="metadata"
             autoPlay
-            referrerPolicy="no-referrer-when-downgrade"
+            referrerPolicy="strict-origin-when-cross-origin"
             src={playUrl ?? undefined}
             onWaiting={() => setBuffering(true)}
             onPlaying={() => {
