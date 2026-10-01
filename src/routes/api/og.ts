@@ -61,14 +61,21 @@ async function fetchImage(target: string, requestUrl: string): Promise<Response 
     const finalUrl = new URL(res.url || url.toString());
     if (finalUrl.pathname === "/og.jpg") return null;
 
-    const type = (res.headers.get("content-type") || "image/jpeg").split(";")[0].trim();
+    const type = (res.headers.get("content-type") || "image/jpeg").split(";")[0].trim().toLowerCase();
     if (!type.startsWith("image/")) return null;
+    // Google Video / GSC reject webp/avif/svg as video thumbnail formats — only JPEG/PNG.
+    if (type !== "image/jpeg" && type !== "image/jpg" && type !== "image/png") return null;
     const buf = await res.arrayBuffer();
     if (buf.byteLength < 2000 || buf.byteLength > 10 * 1024 * 1024) return null;
+    const sniff = new Uint8Array(buf.slice(0, 4));
+    const isJpeg = sniff[0] === 0xff && sniff[1] === 0xd8;
+    const isPng = sniff[0] === 0x89 && sniff[1] === 0x50 && sniff[2] === 0x4e && sniff[3] === 0x47;
+    if (!isJpeg && !isPng) return null;
+    const outType = isPng ? "image/png" : "image/jpeg";
     return new Response(buf, {
       status: 200,
       headers: {
-        "content-type": type,
+        "content-type": outType,
         "content-length": String(buf.byteLength),
         "cache-control": "public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000",
         "x-og": "1",
