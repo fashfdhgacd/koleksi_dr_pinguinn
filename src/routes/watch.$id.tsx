@@ -11,8 +11,8 @@ import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
 import {
   DEFAULT_OG,
   SITE_ORIGIN,
+  resolveVideoSeoDescription,
   videoJsonLd,
-  videoSeoDescription,
   videoSeoTitle,
 } from "@/lib/seo";
 import { watchDescription } from "@/lib/catalog/watch-description";
@@ -31,9 +31,7 @@ export const Route = createFileRoute("/watch/$id")({
     const item = ok ? loaderData.item : null;
     const title = item ? videoSeoTitle(item.title, item.category) : "Dr. Pinguin — Bokep Indo";
     const description = item
-      ? item.description?.trim()?.length > 40
-        ? item.description.trim().slice(0, 160)
-        : videoSeoDescription(item.title, item.category, { creator: item.creator })
+      ? resolveVideoSeoDescription(item)
       : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
     const image = item
       ? `${SITE_ORIGIN}/api/og?id=${encodeURIComponent(item.id)}&v=${SHARE_CARD_VERSION}`
@@ -369,8 +367,8 @@ function WatchPage() {
           <header className="max-w-3xl space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
               {item.category}
-              {item.year ? ` \u00b7 ${item.year}` : ""}
-              {item.creator ? ` \u00b7 ${item.creator}` : ""}
+              {item.year ? ` · ${item.year}` : ""}
+              {item.creator ? ` · ${item.creator}` : ""}
             </p>
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>
             <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>
