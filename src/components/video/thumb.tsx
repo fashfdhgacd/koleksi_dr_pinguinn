@@ -33,7 +33,7 @@ export function VideoThumb({
   const dmm = dmmCoverFromTitle(alt);
   const real = src && src !== BRAND_POSTER && !isVideoSrc(src) && !src.startsWith("data:") ? src : "";
   const local = videoId && real ? `/thumb/${videoId}.jpg` : "";
-  const first = real || dmm;
+  const first = local || real || dmm;
   const [current, setCurrent] = useState(first);
   const [step, setStep] = useState(0);
   const warm = isPosterWarm(current);
@@ -62,9 +62,9 @@ export function VideoThumb({
       fetchPriority={eager ? "high" : "low"}
       className={cn("media-thumb size-full object-cover", className)}
       onError={() => {
-        if (step === 0 && local && current !== local) {
+        if (step === 0 && real && current !== real) {
           setStep(1);
-          setCurrent(local);
+          setCurrent(real);
           return;
         }
         if (step < 2 && dmm && current !== dmm) {
