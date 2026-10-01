@@ -5,12 +5,7 @@ import { processUploadBatch } from "@/lib/bot/upload-handler.js";
 
 export const maxDuration = 60;
 
-const HOST_SITE = "https://www.koleksidrpinguin.site";
-const HOST_COM = "https://koleksidrpinguin.com";
-
-function pickHost(): string {
-  return Math.random() < 0.5 ? HOST_SITE : HOST_COM;
-}
+const HOST = "https://koleksidrpinguin.com";
 
 const MAIN_KEYBOARD = {
   keyboard: [
@@ -222,8 +217,7 @@ async function handleShare(token: string, chatId: string | number, text: string)
     lastCount: n,
   }).catch((err) => console.error("saveShareUsed", err));
 
-  const body =
-    take.map((v) => `\u25b6 ${v.title}\n${pickHost()}/watch/${v.id}`).join("\n\n");
+  const body = take.map((v) => `\u25b6 ${v.title}\n${HOST}/watch/${v.id}`).join("\n\n");
   await tgSendChunks(token, chatId, body, { reply_markup: MAIN_KEYBOARD });
 }
 
@@ -346,8 +340,7 @@ export const Route = createFileRoute("/api/telegram")({
         return Response.json({
           ok: true,
           service: "telegram-webhook",
-          host: pickHost(),
-          hosts: { site: HOST_SITE, com: HOST_COM },
+          host: HOST,
           modes: ["upload", "share", "keyboard"],
           ready: Boolean(envToken()),
           upload: {
