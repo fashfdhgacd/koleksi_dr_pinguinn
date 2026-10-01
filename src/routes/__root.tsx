@@ -2,7 +2,7 @@ import { createRootRoute, HeadContent, Outlet, Scripts, redirect } from "@tansta
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PresencePing } from "@/components/presence-ping";
-import { DEFAULT_OG, SITE_ORIGIN, websiteJsonLd } from "@/lib/seo";
+import { DEFAULT_OG, websiteJsonLd } from "@/lib/seo";
 import appCss from "../styles.css?url";
 
 const UMAMI_WEBSITE_ID = "b952a905-cb5b-419d-8aa4-534435e5cc8b";
@@ -44,7 +44,6 @@ export const Route = createRootRoute({
       { property: "og:site_name", content: "Dr. Pinguin" },
       { property: "og:title", content: "Dr. Pinguin | Katalog Koleksi Dr. Pinguin" },
       { property: "og:type", content: "website" },
-      { property: "og:url", content: SITE_ORIGIN },
       { property: "og:image", content: DEFAULT_OG },
       { property: "og:image:secure_url", content: DEFAULT_OG },
       { property: "og:image:type", content: "image/jpeg" },
@@ -54,7 +53,6 @@ export const Route = createRootRoute({
       { name: "twitter:image", content: DEFAULT_OG },
     ],
     links: [
-      { rel: "canonical", href: SITE_ORIGIN },
       { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
       { rel: "image_src", href: DEFAULT_OG },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },

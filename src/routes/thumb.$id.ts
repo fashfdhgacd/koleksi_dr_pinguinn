@@ -72,8 +72,25 @@ export const Route = createFileRoute("/thumb/$id")({
           }).catch(() => null);
           if (!remote?.ok) return new Response(null, { status: 404 });
           const buf = await remote.arrayBuffer().catch(() => null);
-          const type = buf ? sniffType(buf) : "";
+          let type = buf ? sniffType(buf) : "";
           if (!buf || !type || buf.byteLength < 800) return new Response(null, { status: 404 });
+          const wantJpeg = /\.(jpe?g)$/i.test(String(params.id || ""));
+          // GSC video thumbs: if client asked for .jpg but source is webp, serve brand JPEG instead.
+          if (wantJpeg && type === "image/webp") {
+            try {
+              const fallback = await fetch(new URL("/og.jpg", request.url), {
+                signal: AbortSignal.timeout(4000),
+              });
+              if (fallback.ok) {
+                const fb = await fallback.arrayBuffer();
+                if (fb.byteLength > 2000) {
+                  return imageResponse(fb, "image/jpeg");
+                }
+              }
+            } catch {
+              /* keep webp below as last resort for UI */
+            }
+          }
           if (bucket) {
             await bucket.put(key, buf, { httpMetadata: { contentType: type } }).catch(() => undefined);
           }

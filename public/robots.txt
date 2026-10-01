@@ -1,19 +1,29 @@
 User-agent: Googlebot
+Allow: /api/og
 Allow: /
 Disallow: /api/
 Disallow: /pemilik
 
 User-agent: Googlebot-Image
+Allow: /api/og
 Allow: /
 Disallow: /api/
 
+User-agent: Googlebot-Video
+Allow: /api/og
+Allow: /
+Disallow: /api/
+Disallow: /pemilik
+
 User-agent: Bingbot
+Allow: /api/og
 Allow: /
 Disallow: /api/
 Disallow: /pemilik
 
 User-agent: *
 Allow: /
+Allow: /api/og
 Allow: /og.jpg
 Allow: /brand-poster.jpg
 Disallow: /api/
@@ -51,11 +61,13 @@ Disallow: /
 
 User-agent: Twitterbot
 Allow: /
+Allow: /api/og
 Allow: /og.jpg
 Allow: /brand-poster.jpg
 
 User-agent: facebookexternalhit
 Allow: /
+Allow: /api/og
 Allow: /og.jpg
 
 Sitemap: https://koleksidrpinguin.com/sitemap.xml

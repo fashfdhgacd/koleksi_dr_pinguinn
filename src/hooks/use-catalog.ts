@@ -122,18 +122,37 @@ function warmPosters(items: VideoCard[]) {
   for (const it of items) markPosterWarm(it.thumbnail);
 }
 
-export function useCatalogFeed(params: BrowseParams) {
+export type CatalogFeedSeed = {
+  items: VideoCard[];
+  featured?: VideoCard[];
+  total: number;
+  page?: number;
+  hasMore?: boolean;
+};
+
+export function useCatalogFeed(params: BrowseParams, ssrSeed?: CatalogFeedSeed | null) {
   const wantedPage = normPage(params.page);
   const paramsKey = `${params.mode}:${params.category ?? ""}:${params.q ?? ""}:${wantedPage}`;
   const cached = feedCache.get(feedKey(params, wantedPage));
-
-  const [items, setItems] = useState<VideoCard[]>(() => (cached ? cached.items : []));
-  const [featured, setFeatured] = useState<VideoCard[]>(() => (cached ? cached.featured : []));
+  const seed: FeedSnap | null =
+    cached ||
+    (ssrSeed && ssrSeed.items.length
+      ? {
+          items: ssrSeed.items,
+          featured: ssrSeed.featured ?? [],
+          page: ssrSeed.page ?? wantedPage,
+          hasMore: ssrSeed.hasMore ?? true,
+          total: ssrSeed.total,
+          at: Date.now(),
+        }
+      : null);
+  const [items, setItems] = useState<VideoCard[]>(() => (seed ? seed.items : []));
+  const [featured, setFeatured] = useState<VideoCard[]>(() => (seed ? seed.featured : []));
   const [page, setPage] = useState(wantedPage);
-  const [hasMore, setHasMore] = useState(() => (cached ? cached.hasMore : wantedPage === 1));
-  const [total, setTotal] = useState(() => (cached ? cached.total : 0));
+  const [hasMore, setHasMore] = useState(() => (seed ? seed.hasMore : wantedPage === 1));
+  const [total, setTotal] = useState(() => (seed ? seed.total : 0));
   const [status, setStatus] = useState<CatalogStatus>(() =>
-    cached ? (cached.items.length ? "success" : "empty") : "loading",
+    seed ? (seed.items.length ? "success" : "empty") : "loading",
   );
   const [error, setError] = useState<string | null>(null);
   const inflightRef = useRef(false);
@@ -217,6 +236,16 @@ export function useCatalogFeed(params: BrowseParams) {
   );
 
   useEffect(() => {
+    if (ssrSeed?.items?.length && !feedCache.has(feedKey(params, wantedPage))) {
+      feedCache.set(feedKey(params, wantedPage), {
+        items: ssrSeed.items,
+        featured: ssrSeed.featured ?? [],
+        page: ssrSeed.page ?? wantedPage,
+        hasMore: ssrSeed.hasMore ?? true,
+        total: ssrSeed.total,
+        at: Date.now(),
+      });
+    }
     const snap = feedCache.get(feedKey(params, wantedPage));
     const age = snap ? Date.now() - snap.at : Infinity;
     if (snap && age < KEEP_MS) {

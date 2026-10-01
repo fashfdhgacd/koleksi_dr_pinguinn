@@ -6,6 +6,8 @@ import { CatalogPager } from "@/components/video/catalog-pager";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { findCategory } from "@/lib/catalog/categories";
 import { rememberCatalog } from "@/lib/catalog/last-catalog";
+import { queryCatalog } from "@/lib/catalog/service";
+import type { VideoCard } from "@/lib/catalog/types";
 import { useCatalogFeed } from "@/hooks/use-catalog";
 import { DEFAULT_OG, SITE_ORIGIN, homeSeo } from "@/lib/seo";
 
@@ -23,6 +25,13 @@ export const Route = createFileRoute("/kategori/$slug")({
     const cat = findCategory(params.slug);
     if (!cat) throw notFound();
     return { cat };
+  },
+  loader: async ({ params, location }) => {
+    const cat = findCategory(params.slug);
+    if (!cat) return { ok: false as const, error: "not found", code: "not_found" as const };
+    const raw = location.search as Record<string, unknown>;
+    const page = parsePage(raw.page) || 1;
+    return queryCatalog({ type: "category", category: cat.slug, page, limit: 24 });
   },
   head: ({ params, match }) => {
     const cat = findCategory(params.slug);
@@ -54,12 +63,23 @@ export const Route = createFileRoute("/kategori/$slug")({
 function CategorySlugPage() {
   const { slug } = Route.useParams();
   const { page: pageSearch } = Route.useSearch();
+  const loaderData = Route.useLoaderData();
   const navigate = useNavigate({ from: "/kategori/$slug" });
   const cat = findCategory(slug);
   const page = pageSearch || 1;
-  const feed = useCatalogFeed({ mode: "category", category: cat?.slug || slug, page });
+  const seed =
+    loaderData && loaderData.ok && loaderData.type === "category"
+      ? {
+          items: loaderData.items as VideoCard[],
+          total: loaderData.total,
+          page: loaderData.page,
+          hasMore: loaderData.hasMore,
+        }
+      : null;
+  const feed = useCatalogFeed({ mode: "category", category: cat?.slug || slug, page }, seed);
   const title = cat?.label || slug;
   const subtitle = feed.total ? `${feed.total.toLocaleString("id-ID")} judul` : "Kategori";
+  const intro = `Katalog ${title} 18+ di Dr. Pinguin. Streaming embed, update berkala.`;
 
   useEffect(() => {
     rememberCatalog(`/kategori/${slug}${page > 1 ? `?page=${page}` : ""}`);
@@ -74,32 +94,33 @@ function CategorySlugPage() {
     });
   }
 
+  const coldLoading = feed.loading && !feed.items.length;
+
   return (
     <Shell category={cat?.slug || slug}>
-      {feed.loading && !feed.items.length ? (
-        <VideoGridSkeleton count={12} />
-      ) : feed.status === "error" && !feed.items.length ? (
-        <ErrorState message={feed.error ?? "Gagal memuat kategori."} onRetry={feed.retry} />
-      ) : (
-        <section>
-          <div className="mb-4 sm:mb-5">
-            <h1 className="font-display text-2xl text-foreground sm:text-3xl">{title}</h1>
-            <p className="mt-1 text-xs text-muted sm:text-sm">{subtitle}</p>
-          </div>
-          {feed.status === "empty" ? (
-            <EmptyState title="Kosong" description="Tidak ada judul pada kategori ini." />
-          ) : (
-            <VideoGrid items={feed.items} eagerCount={24} />
-          )}
-          <CatalogPager
-            page={feed.page || page}
-            total={feed.total}
-            limit={feed.limit}
-            loading={feed.loading}
-            onPage={setPage}
-          />
-        </section>
-      )}
+      <section>
+        <div className="mb-4 sm:mb-5">
+          <h1 className="font-display text-2xl text-foreground sm:text-3xl">{title}</h1>
+          <p className="mt-1 text-xs text-muted sm:text-sm">{subtitle}</p>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">{intro}</p>
+        </div>
+        {coldLoading ? (
+          <VideoGridSkeleton count={12} />
+        ) : feed.status === "error" && !feed.items.length ? (
+          <ErrorState message={feed.error ?? "Gagal memuat kategori."} onRetry={feed.retry} />
+        ) : feed.status === "empty" ? (
+          <EmptyState title="Kosong" description="Tidak ada judul pada kategori ini." />
+        ) : (
+          <VideoGrid items={feed.items} eagerCount={24} />
+        )}
+        <CatalogPager
+          page={feed.page || page}
+          total={feed.total}
+          limit={feed.limit}
+          loading={feed.loading}
+          onPage={setPage}
+        />
+      </section>
     </Shell>
   );
 }
