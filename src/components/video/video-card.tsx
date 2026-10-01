@@ -26,7 +26,7 @@ export function VideoCard({
       className="group block rounded-xl p-0.5 transition-colors duration-150 ease-out hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-1"
     >
       <div className="relative aspect-video overflow-hidden rounded-lg bg-surface-2">
-        <VideoThumb src={video.thumbnail} alt={video.title} eager={eager} />
+        <VideoThumb src={video.thumbnail} alt={video.title} videoId={video.id} eager={eager} />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent opacity-80" />
         {showDuration ? (
           <div className="absolute bottom-1.5 left-1.5 text-[10px] font-medium tabular-nums text-foreground sm:bottom-2 sm:left-2 sm:text-[11px]">
