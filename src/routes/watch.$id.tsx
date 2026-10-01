@@ -367,8 +367,8 @@ function WatchPage() {
           <header className="max-w-3xl space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
               {item.category}
-              {item.year ? ` · ${item.year}` : ""}
-              {item.creator ? ` · ${item.creator}` : ""}
+              {item.year ? ` \u00b7 ${item.year}` : ""}
+              {item.creator ? ` \u00b7 ${item.creator}` : ""}
             </p>
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>
             <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>
