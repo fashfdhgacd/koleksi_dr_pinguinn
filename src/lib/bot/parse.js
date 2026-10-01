@@ -5,26 +5,36 @@ const INDOAV_HOST = /indoav\./i;
 const USERBOKEP_HOST = /userbokep\./i;
 const VIDEY_HOST = /(^|\.)videy\.co$/i;
 
+/** Spesifik dulu. Viral dan amatir paling umum, dicek terakhir. */
 const CATEGORY_RULES = [
-  ["jilbab", /jilbab|hijab|ukhty|ukhti|tudung|berhijab/i],
-  ["tante", /tante|janda|\bstw\b|milf|ibu ?tiri|\bemak\b/i],
-  ["live", /\blive\b/i],
-  ["chindo", /chindo/i],
-  ["malaysia", /malay|malaysia/i],
-  ["open-bo", /open ?bo|michat/i],
-  ["percakapan", /percakapan|vcs|ngobrol|telpon/i],
-  ["viral", /viral/i],
-  ["gangbang", /gangbang|gilir|rame rame|threesome|foursome|bertiga/i],
-  ["doggy", /doggy|nungging/i],
-  ["colmek", /colmek|omek|coliin|dildo/i],
-  ["kosan", /pacar|kosan|check ?in|hotel|\bkos\b|\bkost\b/i],
-  ["istri", /istri|suami|selingkuh|hamil/i],
-  ["amatir", /amatir|bokepindo|bokep indo|pasutri|pasangan/i],
-  ["abg", /\babg\b|\bsma\b|mahasiswi|mahasiswa|pelajar/i],
+  ["jilbab", /\b(jilbab|hijab|berhijab|ukht[iy]|tudung|cadar)\b/i],
+  ["chindo", /\b(chindo|cindo|tionghoa)\b/i],
+  ["malaysia", /\b(malaysia|malay|melayu)\b/i],
+  ["open-bo", /\b(open\s*bo|openbo|michat)\b/i],
+  ["gangbang", /\b(gang\s*bang|gangbang|threesome|foursome|bertiga|digilir)\b|rame[\s-]*rame/i],
+  ["doggy", /\b(doggy|dogi|nungging)\b/i],
+  ["colmek", /\b(colmek|omek|coliin|dildo)\b/i],
+  ["percakapan", /\b(percakapan|vcs|ngobrol|telpon|telepon)\b/i],
+  ["kosan", /\b(kosan|kost|kos|pacar|hotel|check\s*in)\b/i],
+  ["istri", /\b(istri|suami|selingkuh|hamil|binor)\b/i],
+  ["tante", /\b(tante|janda|stw|milf|ibu\s*tiri|emak|mama\s*muda)\b/i],
+  ["live", /\b(live\s*streaming|livestream|\blive)\b/i],
+  ["abg", /\b(abg|sma|mahasiswi|mahasiswa|pelajar|tocil)\b/i],
+  ["amatir", /\b(amatir|bokep\s*indo|bokepindo|pasutri|pasangan|homemade)\b/i],
+  ["viral", /\bviral\b/i],
 ];
 
+function normText(value = "") {
+  return String(value)
+    .toLowerCase()
+    .replace(/[_./-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export function detectCategory(title = "", fallback = "") {
-  const text = `${title} ${fallback}`.trim();
+  const text = normText(`${title} ${fallback}`);
+  if (!text) return "lainnya";
   for (const [slug, re] of CATEGORY_RULES) {
     if (re.test(text)) return slug;
   }
@@ -34,9 +44,9 @@ export function detectCategory(title = "", fallback = "") {
 export function cleanTitle(raw = "") {
   return String(raw)
     .replace(/^\u25b6\s*/, "")
-    .replace(/^[\u{1F4C1}\u{1F4C2}\u{1F3AC}\u{1F3A5}\u{1F4F9}]\s*/u, "") // 📁📂🎬🎥📹
-    .replace(/^judul\s*[:：-]\s*/i, "")
-    .replace(/^title\s*[:：-]\s*/i, "")
+    .replace(/^[\u{1F4C1}\u{1F4C2}\u{1F3AC}\u{1F3A5}\u{1F4F9}]\s*/u, "")
+    .replace(/^judul\s*[:\uff1a-]\s*/i, "")
+    .replace(/^title\s*[:\uff1a-]\s*/i, "")
     .replace(/koleksidrpinguin\.(com|site)/gi, "")
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
@@ -78,7 +88,6 @@ export function parseVideoLink(url) {
   const origin = parsed.origin;
 
   if (STREAMTAPE_HOST.test(host) || /strcloud/i.test(host)) {
-    // /v/{id}/Judul_File.mp4  atau  /e/{id}
     const m =
       path.match(/\/(?:e|v|d)\/([A-Za-z0-9_-]+)(?:\/([^/?#]+))?/i) ||
       parsed.search.match(/[?&]id=([A-Za-z0-9_-]+)/i);
@@ -217,20 +226,17 @@ export function parseMessage(text = "") {
       for (const url of lineUrls) {
         const parsed = parseVideoLink(url);
         if (!parsed) continue;
-        // Prioritas: judul baris di atas link → judul global → judul dari path URL
         const own = cleanTitle(pendingTitle || title || parsed.title || "");
         videos.push(own && own !== "Video" ? { ...parsed, title: own } : parsed);
       }
       pendingTitle = "";
       continue;
     }
-    // Baris judul (📁 / 🎬 / sejenis)
     pendingTitle = line
       .replace(/^[\u{1F4C1}\u{1F4C2}\u{1F3AC}\u{1F3A5}\u{1F4F9}]\s*/u, "")
-      .replace(/^🎬\s*/, "");
+      .replace(/^\ud83c\udfac\s*/, "");
   }
 
-  // Fallback kalau URL tidak di baris sendiri
   if (!videos.length) {
     for (const url of urls) {
       const parsed = parseVideoLink(url);
