@@ -15,8 +15,18 @@ function categoryLabel(slugOrLabel?: string | null): string {
   return (cat?.label || slugOrLabel || "Indo").trim();
 }
 
-export function categoryKeywords(slugOrLabel?: string | null): string {
+
+/** Jangan amplify kategori yang mengarah ke minor / underage di meta. */
+function safeSeoLabel(slugOrLabel?: string | null): string {
   const label = categoryLabel(slugOrLabel);
+  if (/\b(abg|teen|underage|bocil|anak|smp|sma|loli|shota|remap)\b/i.test(label)) {
+    return "Dewasa";
+  }
+  return label;
+}
+
+export function categoryKeywords(slugOrLabel?: string | null): string {
+  const label = safeSeoLabel(slugOrLabel);
   return `bokep ${label}, ${label} indo, Dr. Pinguin`;
 }
 
@@ -32,25 +42,83 @@ export function pageTitle(parts: Array<string | null | undefined>): string {
 
 export function videoSeoTitle(title: string, category?: string | null): string {
   const base = (title || "Video").trim().replace(/\s+/g, " ");
-  const label = categoryLabel(category);
+  const label = safeSeoLabel(category);
   const hasLabel = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(base);
   const head = hasLabel || !label ? base : `${base} — ${label}`;
   const clipped = head.length > 58 ? `${head.slice(0, 55).trimEnd()}…` : head;
   return pageTitle([clipped]);
 }
 
+/** Hash stabil biar deskripsi meta tidak berubah tiap load. */
+function stablePick(seed: string, n: number): number {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return Math.abs(h) % n;
+}
+
+function clipAtWord(s: string, max: number): string {
+  const t = s.trim().replace(/\s+/g, " ");
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max - 1);
+  const sp = cut.lastIndexOf(" ");
+  return `${(sp > 48 ? cut.slice(0, sp) : cut).trimEnd()}…`;
+}
+
+/**
+ * Meta description kompetitif: 4 varian natural Bahasa Indonesia,
+ * dipilih stabil dari judul+kategori+sumber, target ~130–155 karakter.
+ */
 export function videoSeoDescription(
   title: string,
   category?: string | null,
   extra?: { creator?: string | null; source?: string | null },
 ): string {
   const t = (title || "video").trim().replace(/\s+/g, " ");
-  const label = categoryLabel(category);
+  const label = safeSeoLabel(category);
   const src = (extra?.creator || extra?.source || "").trim();
-  const shortTitle = t.length > 70 ? `${t.slice(0, 67).trimEnd()}…` : t;
-  const from = src ? ` · ${src}` : "";
-  const body = `${shortTitle} — ${label}${from}. Tonton di ${SITE_NAME}. Konten 18+.`;
-  return body.slice(0, 160);
+  const tagBit =
+    src &&
+    src.toLowerCase() !== label.toLowerCase() &&
+    !/\b(abg|teen|underage|bocil|anak|smp|sma|loli|shota|remap)\b/i.test(src)
+      ? src
+      : "";
+  const shortT = t.length > 72 ? `${t.slice(0, 69).trimEnd()}…` : t;
+
+  const variants = [
+    `Nonton ${shortT} di ${SITE_NAME}. Koleksi ${label}${tagBit ? ` dari ${tagBit}` : ""} yang sering dicari, streaming tanpa ribet. Konten dewasa 18+.`,
+    `${shortT} masuk katalog ${label} di ${SITE_NAME}${tagBit ? ` (${tagBit})` : ""}. Halaman tonton lengkap biar gampang ketemu di pencarian. Usia 18+.`,
+    `${shortT} tersedia di ${SITE_NAME}${tagBit ? ` · ${tagBit}` : ""}, kategori ${label}. Deskripsi natural, bukan spam kata kunci. Konten 18+.`,
+    `${shortT} — upload ${label}${tagBit ? ` · ${tagBit}` : ""} di ${SITE_NAME}. Cocok buat yang mau tonton katalog streaming dewasa. 18+.`,
+  ];
+
+  const picked = variants[stablePick(`${t}|${label}|${tagBit}`, variants.length)]!;
+  return clipAtWord(picked, 155);
+}
+
+/** Pakai deskripsi katalog hanya kalau cukup bagus; kalau tipis/ulang judul → generator. */
+export function resolveVideoSeoDescription(item: {
+  title: string;
+  description?: string | null;
+  category?: string | null;
+  creator?: string | null;
+  source?: string | null;
+}): string {
+  const title = (item.title || "").trim();
+  const raw = (item.description || "").trim();
+  const looksWeak =
+    !raw ||
+    raw.length < 60 ||
+    raw.toLowerCase() === title.toLowerCase() ||
+    /^nonton\s+/i.test(raw) ||
+    /streaming amatir, jilbab/i.test(raw) ||
+    raw === `${title} —` ||
+    (title.length > 8 && raw.toLowerCase().startsWith(title.toLowerCase()) && raw.length < title.length + 40);
+
+  if (!looksWeak) return clipAtWord(raw, 155);
+  return videoSeoDescription(title, item.category, {
+    creator: item.creator,
+    source: item.source,
+  });
 }
 
 export function absoluteThumb(thumbnail?: string | null): string {
@@ -71,7 +139,7 @@ export function homeSeo(q?: string, category?: string) {
   }
   const cat = findCategory(category);
   if (cat) {
-    const label = cat.label;
+    const label = safeSeoLabel(cat.slug || cat.label);
     return {
       title: pageTitle([`Bokep ${label}`]),
       description: `Katalog bokep ${label} 18+ di ${SITE_NAME}. Streaming embed, update berkala.`,
