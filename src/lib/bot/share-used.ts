@@ -1,5 +1,8 @@
-const SHARE_USED_PATH = "data/share-used.json";
+import { resolveAnalyticsKV } from "@/lib/analytics-kv";
+
+const SHARE_USED_KEY = "bot:share-used";
 const SHARE_USED_MAX = 8000;
+const SHARE_USED_TTL_SEC = 14 * 24 * 3600;
 
 export type ShareUsedFile = {
   resetAt: number;
@@ -14,17 +17,8 @@ function emptyUsed(): ShareUsedFile {
   return { resetAt: Date.now(), used: [], titles: [], lastCat: "", lastSource: "", lastCount: 10 };
 }
 
-/** Cache RAM per instance — cegah ulang sebelum GitHub sempat tersimpan. */
+/** Cache RAM per instance — cegah ulang sebelum KV sempat tersimpan. */
 let mem: ShareUsedFile | null = null;
-
-function ghCfg() {
-  const token = String(process.env.GH_TOKEN || process.env.GITHUB_TOKEN || "").trim();
-  const owner = String(process.env.GH_OWNER || process.env.GITHUB_OWNER || "fashfdhgacd").trim();
-  let repo = String(process.env.GH_REPO || process.env.GITHUB_REPO || "koleksi_dr_pinguinn").trim();
-  if (repo === "koleksi_dr_pinguin" || repo === "koleksi-dr-pinguin") repo = "koleksi_dr_pinguinn";
-  const branch = String(process.env.GH_BRANCH || process.env.GITHUB_BRANCH || "main").trim();
-  return { token, owner, repo, branch };
-}
 
 function mergeUsed(a: ShareUsedFile, b: ShareUsedFile): ShareUsedFile {
   const used = Array.from(new Set([...(a.used || []), ...(b.used || [])].map(String)));
@@ -39,14 +33,24 @@ function mergeUsed(a: ShareUsedFile, b: ShareUsedFile): ShareUsedFile {
   };
 }
 
+function trim(file: ShareUsedFile): ShareUsedFile {
+  return {
+    resetAt: file.resetAt || Date.now(),
+    used: (file.used || []).map(String).slice(-SHARE_USED_MAX),
+    titles: (file.titles || []).map(String).slice(-SHARE_USED_MAX),
+    lastCat: file.lastCat || "",
+    lastSource: file.lastSource || "",
+    lastCount: file.lastCount || 10,
+  };
+}
+
 export async function loadShareUsed(): Promise<ShareUsedFile> {
-  const { owner, repo, branch } = ghCfg();
-  const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${SHARE_USED_PATH}?t=${Date.now()}`;
   let remote = emptyUsed();
   try {
-    const r = await fetch(url, { headers: { "user-agent": "kdp-share-bot" }, cache: "no-store" });
-    if (r.ok) {
-      const d = (await r.json()) as ShareUsedFile;
+    const handle = await resolveAnalyticsKV();
+    const raw = handle?.kv ? await handle.kv.get(SHARE_USED_KEY) : null;
+    if (raw) {
+      const d = JSON.parse(raw) as ShareUsedFile;
       remote = {
         resetAt: Number(d.resetAt) || Date.now(),
         used: Array.isArray(d.used) ? d.used.map(String) : [],
@@ -59,58 +63,17 @@ export async function loadShareUsed(): Promise<ShareUsedFile> {
   } catch {
     /* keep empty */
   }
-  if (mem) {
-    mem = mergeUsed(remote, mem);
-    return mem;
-  }
-  mem = remote;
+  mem = mem ? mergeUsed(remote, mem) : remote;
   return mem;
 }
 
 export async function saveShareUsed(file: ShareUsedFile): Promise<void> {
-  const used = file.used.slice(-SHARE_USED_MAX);
-  const titles = (file.titles || []).slice(-SHARE_USED_MAX);
-  mem = {
-    resetAt: file.resetAt || Date.now(),
-    used,
-    titles,
-    lastCat: file.lastCat || "",
-    lastSource: file.lastSource || "",
-    lastCount: file.lastCount || 10,
-  };
-  const { token, owner, repo, branch } = ghCfg();
-  if (!token) return;
-  const api = `https://api.github.com/repos/${owner}/${repo}/contents/${SHARE_USED_PATH}`;
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    Accept: "application/vnd.github+json",
-    "User-Agent": "kdp-share-bot",
-    "Content-Type": "application/json",
-  };
-  let sha: string | undefined;
+  mem = trim(file);
   try {
-    const cur = await fetch(`${api}?ref=${encodeURIComponent(branch)}`, { headers });
-    if (cur.ok) {
-      const body = (await cur.json()) as { sha?: string };
-      sha = body.sha;
-    }
-  } catch {
-    /* create */
-  }
-  const payload = mem;
-  const content = Buffer.from(JSON.stringify(payload, null, 2) + "\n", "utf8").toString("base64");
-  const res = await fetch(api, {
-    method: "PUT",
-    headers,
-    body: JSON.stringify({
-      message: `bot: share-used ${used.length}`,
-      content,
-      branch,
-      ...(sha ? { sha } : {}),
-    }),
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    console.error("saveShareUsed failed", res.status, body.slice(0, 200));
+    const handle = await resolveAnalyticsKV();
+    if (!handle?.kv) return;
+    await handle.kv.put(SHARE_USED_KEY, JSON.stringify(mem), { expirationTtl: SHARE_USED_TTL_SEC });
+  } catch (err) {
+    console.error("saveShareUsed kv", err);
   }
 }
