@@ -35,15 +35,14 @@ function labelOf(title: string, id: string): string {
   return (words.join(" ") || id).slice(0, 22);
 }
 
-/** Poster lokal dari id+judul. Tidak butuh request, tidak bisa hilang. */
 export function posterFromVideo(id: string, title: string): string {
   const h = hash(`${id}|${title}`);
   const hue = h % 360;
   const hue2 = (hue + 38) % 360;
   const text = labelOf(title, id)
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">");
+    .replace(/&/g, "and")
+    .replace(/</g, "")
+    .replace(/>/g, "");
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 360"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="hsl(${hue} 42% 22%)"/><stop offset="1" stop-color="hsl(${hue2} 48% 12%)"/></linearGradient></defs><rect width="640" height="360" fill="url(#g)"/><circle cx="520" cy="70" r="90" fill="hsl(${hue} 50% 32%)" opacity="0.35"/><text x="32" y="196" fill="#f4f4f5" font-family="Arial,sans-serif" font-size="36" font-weight="700">${text}</text><text x="32" y="232" fill="#a1a1aa" font-family="Arial,sans-serif" font-size="16">${id.slice(0, 16)}</text></svg>`;
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
@@ -51,16 +50,18 @@ export function posterFromVideo(id: string, title: string): string {
 export function VideoThumb({
   src,
   alt,
+  videoId = "",
   eager = false,
   className,
 }: {
   src: string;
   alt: string;
+  videoId?: string;
   eager?: boolean;
   className?: string;
   onUnavailable?: () => void;
 }) {
-  const stuck = useMemo(() => posterFromVideo(alt, alt), [alt]);
+  const stuck = useMemo(() => posterFromVideo(videoId || alt, alt), [videoId, alt]);
   const dmm = dmmCoverFromTitle(alt);
   const remote = src && src !== BRAND_POSTER && !isVideoSrc(src) ? src : dmm;
   const [current, setCurrent] = useState(remote);
