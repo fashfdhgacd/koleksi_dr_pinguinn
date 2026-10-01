@@ -5,29 +5,29 @@ const INDOAV_HOST = /indoav\./i;
 const USERBOKEP_HOST = /userbokep\./i;
 const VIDEY_HOST = /(^|\.)videy\.co$/i;
 
-/** Spesifik dulu. Viral dan amatir paling umum, dicek terakhir. */
+/** Spesifik dulu. Imbuhan Indonesia (ber-, di-, nge-) ikut. Viral paling akhir. */
 const CATEGORY_RULES = [
-  ["jilbab", /\b(jilbab|hijab|berhijab|ukht[iy]|tudung|cadar)\b/i],
-  ["chindo", /\b(chindo|cindo|tionghoa)\b/i],
-  ["malaysia", /\b(malaysia|malay|melayu)\b/i],
-  ["open-bo", /\b(open\s*bo|openbo|michat)\b/i],
-  ["gangbang", /\b(gang\s*bang|gangbang|threesome|foursome|bertiga|digilir)\b|rame[\s-]*rame/i],
-  ["doggy", /\b(doggy|dogi|nungging)\b/i],
-  ["colmek", /\b(colmek|omek|coliin|dildo)\b/i],
-  ["percakapan", /\b(percakapan|vcs|ngobrol|telpon|telepon)\b/i],
-  ["kosan", /\b(kosan|kost|kos|pacar|hotel|check\s*in)\b/i],
-  ["istri", /\b(istri|suami|selingkuh|hamil|binor)\b/i],
-  ["tante", /\b(tante|janda|stw|milf|ibu\s*tiri|emak|mama\s*muda)\b/i],
-  ["live", /\b(live\s*streaming|livestream|\blive)\b/i],
-  ["abg", /\b(abg|sma|mahasiswi|mahasiswa|pelajar|tocil)\b/i],
-  ["amatir", /\b(amatir|bokep\s*indo|bokepindo|pasutri|pasangan|homemade)\b/i],
-  ["viral", /\bviral\b/i],
+  ["jilbab", /(ber|di)?(jilbab|hijab)|ukht[iy]|tudung|cadar|berkerudung/i],
+  ["chindo", /\b(chindo|cindo|tionghoa|chinese indo)\b/i],
+  ["malaysia", /\b(malaysia|malaysi|melayu)\b/i],
+  ["open-bo", /open\s*bo|openbo|\bmichat\b|\bopenbo\b/i],
+  ["gangbang", /gang\s*bang|threesome|foursome|bertiga|berempat|di\s*gilir|rame[\s-]*rame|ramai[\s-]*ramai/i],
+  ["doggy", /\bdoggy\b|\bdogi\b|nungging|menungging/i],
+  ["colmek", /colmek|coliin|\bomek\b|dildo|colay/i],
+  ["percakapan", /percakapan|\bvcs\b|\bvc\b|ngobrol|telpon|telepon|nelpon|nelfon|video\s*call/i],
+  ["kosan", /kosan|kostan|\bkost\b|\bkos\b|pacar|hotel|check\s*in|nginep|menginap/i],
+  ["istri", /\bistri\b|\bsuami\b|selingkuh|berselingkuh|\bhamil\b|\bbinor\b|istri\s*orang|suami\s*orang/i],
+  ["tante", /\btante\b|\bjanda\b|\bstw\b|\bmilf\b|ibu\s*tiri|\bemak\b|emak2|mama\s*muda|mbak\s*muda/i],
+  ["live", /live\s*stream|livestream|siaran\s*langsung|\blive\b/i],
+  ["abg", /\babg\b|\bsma\b|mahasiswi|mahasiswa|\bpelajar\b|\btocil\b/i],
+  ["amatir", /amatir|bokep\s*indo|bokepindo|pasutri|\brumahan\b|homemade|\bindo\b/i],
+  ["viral", /\bviral\b|\bfyp\b/i],
 ];
 
 function normText(value = "") {
   return String(value)
     .toLowerCase()
-    .replace(/[_./-]+/g, " ")
+    .replace(/[_–—./-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
