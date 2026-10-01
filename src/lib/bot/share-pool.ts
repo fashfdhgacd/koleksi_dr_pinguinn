@@ -18,6 +18,8 @@ function shuffleInPlace<T>(arr: T[]): T[] {
   return arr;
 }
 
+const SHARE_MAX = 100;
+
 export async function collectSharePool(opts: {
   count: number;
   category: string;
@@ -50,6 +52,7 @@ export async function collectSharePool(opts: {
     if (!page.hasMore) break;
   }
 
+  const want = Math.min(SHARE_MAX, Math.max(1, opts.count));
   const excludeIds = new Set(opts.excludeIds.map((s) => s.toLowerCase()));
   const excludeTitles = new Set((opts.excludeTitles || []).map(titleKey));
   let fresh = all.filter((it) => {
@@ -59,15 +62,15 @@ export async function collectSharePool(opts: {
     return true;
   });
   let reset = false;
-  if (fresh.length < opts.count && all.length >= opts.count) {
+  if (fresh.length < want && all.length >= want) {
     fresh = all.slice();
     reset = true;
   }
   shuffleInPlace(fresh);
   return {
-    items: fresh.slice(0, Math.min(Math.max(1, opts.count), 30)),
+    items: fresh.slice(0, want),
     poolSize: all.length,
-    freshSize: reset ? fresh.length : fresh.length,
+    freshSize: fresh.length,
     reset,
   };
 }
