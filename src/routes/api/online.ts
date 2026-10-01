@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   classifyDevice,
   getOwnerStats,
-  maybeTelegramAlert,
   recordHit,
   touchOnline,
 } from "@/lib/owner-analytics";
@@ -13,9 +12,12 @@ const BOT_UA =
 
 const lastTouch = new Map<string, number>();
 const ipHits = new Map<string, { n: number; t: number }>();
-const TOUCH_GAP_MS = 20_000;
+const TOUCH_GAP_MS = 60_000;
 const IP_WINDOW_MS = 60_000;
-const IP_MAX = 30;
+const IP_MAX = 20;
+const OWNER_CACHE_MS = 20_000;
+
+let ownerCache: { at: number; data: Record<string, unknown> } | null = null;
 
 function viewSecret(): string {
   const a = (process.env.ONLINE_VIEW_SECRET || "").trim();
@@ -100,11 +102,13 @@ function shouldSkipBot(ua: string, owner: boolean): boolean {
 }
 
 async function liveOwnerPayload() {
+  const now = Date.now();
+  if (ownerCache && now - ownerCache.at < OWNER_CACHE_MS) return ownerCache.data;
   const stats = await getOwnerStats();
   const [kvN, roll, history] = await Promise.all([kvCountOnline(), kvReadRoll(), kvReadHistory(14)]);
   const online = Math.max(Number(stats.online) || 0, Number(stats.count) || 0, kvN);
   const live = rollToStats(roll, online, history);
-  return {
+  const data = {
     ...stats,
     ...live,
     online,
@@ -124,6 +128,8 @@ async function liveOwnerPayload() {
     analytics: "operational",
     hint: undefined,
   };
+  ownerCache = { at: now, data };
+  return data;
 }
 
 async function handlePost(request: Request): Promise<Response> {
@@ -149,10 +155,10 @@ async function handlePost(request: Request): Promise<Response> {
     host = typeof body?.host === "string" ? body.host : "";
     eventId = typeof body?.eventId === "string" ? body.eventId : "";
   } catch {
-    return json(request, { ok: false, error: "bad_json" }, 400);
+    return json(request, { ok: true, skipped: "bad_json" });
   }
   if (!id || !/^[a-zA-Z0-9_-]+$/.test(id)) {
-    return json(request, { ok: false, error: "bad_id" }, 400);
+    return json(request, { ok: true, skipped: "bad_id" });
   }
 
   const owner = isOwnerKey(extractKey(request, bodyKey));
@@ -161,7 +167,7 @@ async function handlePost(request: Request): Promise<Response> {
     return json(request, { ok: true, skipped: "bot" });
   }
   if (!owner && tooMany(clientIp(request))) {
-    return json(request, { ok: true, skipped: "rate" }, 429);
+    return json(request, { ok: true, skipped: "rate" });
   }
 
   const now = Date.now();
@@ -169,53 +175,66 @@ async function handlePost(request: Request): Promise<Response> {
   const fresh = now - prev >= TOUCH_GAP_MS;
   if (fresh) lastTouch.set(id, now);
 
-  let count = 0;
   if (fresh || owner) {
-    count = await touchOnline(id);
-    const device = classifyDevice(ua);
-    void kvTouchLive({
-      id,
-      path: path || undefined,
-      ref: ref || undefined,
-      device,
-      onlineGuess: count,
-      recordView: Boolean(path),
-    });
-    if (path) {
-      await recordHit({
-        path,
-        ref: ref || request.headers.get("referer") || "",
-        ua,
-        host: host || request.headers.get("host") || "",
-        sessionId: id,
-        visitorId: id,
-        eventId,
+    try {
+      const device = classifyDevice(ua);
+      await kvTouchLive({
+        id,
+        path: path || undefined,
+        ref: ref || undefined,
+        device,
+        recordView: Boolean(path),
       });
+      if (path) {
+        await recordHit({
+          path,
+          ref: ref || request.headers.get("referer") || "",
+          ua,
+          host: host || request.headers.get("host") || "",
+          sessionId: id,
+          visitorId: id,
+          eventId,
+        });
+      }
+      if (owner) void touchOnline(id);
+    } catch {
+      return json(request, { ok: true, skipped: "busy" });
     }
-    void maybeTelegramAlert(count);
   }
 
   if (!owner) return json(request, { ok: true });
-  return json(request, { ok: true, owner: true, ...(await liveOwnerPayload()) });
+  try {
+    return json(request, { ok: true, owner: true, ...(await liveOwnerPayload()) });
+  } catch {
+    return json(request, { ok: true, owner: true, online: 0 });
+  }
 }
 
 async function handleGet(request: Request): Promise<Response> {
   const secret = viewSecret();
   if (!secret) {
-    return json(
-      request,
-      {
-        ok: false,
-        error: "not_configured",
-        hint: "Set ONLINE_VIEW_SECRET di Cloudflare (domain .com) lalu redeploy.",
-      },
-      503,
-    );
+    return json(request, {
+      ok: false,
+      error: "not_configured",
+      hint: "Set ONLINE_VIEW_SECRET di Cloudflare (domain .com) lalu redeploy.",
+    });
   }
   if (!isOwnerKey(extractKey(request))) {
-    return json(request, { ok: false, error: "forbidden" }, 403);
+    return json(request, { ok: false, error: "forbidden" });
   }
-  return json(request, { ok: true, owner: true, ...(await liveOwnerPayload()) });
+  try {
+    return json(request, { ok: true, owner: true, ...(await liveOwnerPayload()) });
+  } catch {
+    return json(request, { ok: true, owner: true, online: 0, hint: "Statistik sibuk, coba lagi." });
+  }
+}
+
+async function safe(request: Request, fn: (request: Request) => Promise<Response>): Promise<Response> {
+  try {
+    return await fn(request);
+  } catch {
+    return json(request, { ok: true, skipped: "error" });
+  }
 }
 
 export const Route = createFileRoute("/api/online")({
@@ -230,8 +249,8 @@ export const Route = createFileRoute("/api/online")({
             "access-control-allow-headers": "content-type, x-online-key",
           },
         }),
-      GET: async ({ request }) => handleGet(request),
-      POST: async ({ request }) => handlePost(request),
+      GET: async ({ request }) => safe(request, handleGet),
+      POST: async ({ request }) => safe(request, handlePost),
     },
   },
 });

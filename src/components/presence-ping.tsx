@@ -4,8 +4,8 @@ import { useEffect, useRef } from "react";
 import { useRouterState } from "@tanstack/react-router";
 
 const ID_KEY = "drp_online_id";
-const HEARTBEAT_MS = 90_000;
-const MIN_GAP_MS = 40_000;
+const HEARTBEAT_MS = 150_000;
+const MIN_GAP_MS = 70_000;
 const BOT_RE =
   /bot|crawl|spider|slurp|headless|webdriver|puppeteer|playwright|phantom|scrapy|httpclient|curl\/|wget|python-requests|axios\/|node-fetch|bytespider|gptbot|claudebot|ccbot|semrush|ahrefs|dataforseo|petalbot/i;
 
@@ -70,13 +70,8 @@ export function PresencePing() {
         }
         const payload = JSON.stringify({
           ...body,
-          eventId: `${id}-${pathname || ""}-${Math.floor(Date.now() / 40000)}`,
+          eventId: `${id}-${pathname || ""}-${Math.floor(Date.now() / 70000)}`,
         });
-        const blob = new Blob([payload], { type: "application/json" });
-        if (typeof navigator.sendBeacon === "function") {
-          const ok = navigator.sendBeacon("/api/online", blob);
-          if (ok) return;
-        }
         await fetch("/api/online", {
           method: "POST",
           headers: { "content-type": "application/json" },
