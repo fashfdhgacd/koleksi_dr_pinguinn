@@ -6,10 +6,11 @@ import { processUploadBatch } from "@/lib/bot/upload-handler.js";
 export const maxDuration = 60;
 
 const HOST = "https://koleksidrpinguin.com";
+const COUNTS = [5, 10, 15, 20, 25, 30, 50, 100];
 
 const MAIN_KEYBOARD = {
   keyboard: [
-    [{ text: "Minta 10" }, { text: "Minta 25" }],
+    [{ text: "Minta 10" }, { text: "Minta 25" }, { text: "Minta 100" }],
     [{ text: "Semua" }, { text: "Amatir" }, { text: "Videy" }],
     [{ text: "Jav" }, { text: "AI+" }, { text: "Lulu" }],
     [{ text: "Jilbab" }, { text: "ABG" }, { text: "Streamtape" }],
@@ -119,8 +120,12 @@ async function tgSendChunks(
 }
 
 function parseCount(text: string): number {
-  const m = text.match(/\b(5|10|15|20|25|30)\b/);
+  const m = text.match(/\b(100|50|30|25|20|15|10|5)\b/);
   return m ? Number(m[1]) : 10;
+}
+
+function hasCount(text: string): boolean {
+  return COUNTS.some((n) => new RegExp(`\\b${n}\\b`).test(text));
 }
 
 function parseCat(text: string): string {
@@ -183,9 +188,7 @@ async function handleShare(token: string, chatId: string | number, text: string)
   const usedFile = await loadShareUsed();
   const raw = text.trim();
   const isLagi = /^lagi$/i.test(raw);
-  const n = /\b(5|10|15|20|25|30)\b/.test(raw)
-    ? parseCount(raw)
-    : usedFile.lastCount || parseCount(raw);
+  const n = hasCount(raw) ? parseCount(raw) : usedFile.lastCount || parseCount(raw);
   const cat = parseCat(raw) || (isLagi ? usedFile.lastCat || "" : "");
   const source = parseSource(raw) || (isLagi ? usedFile.lastSource || "" : "");
 
@@ -217,7 +220,9 @@ async function handleShare(token: string, chatId: string | number, text: string)
     lastCount: n,
   }).catch((err) => console.error("saveShareUsed", err));
 
-  const body = take.map((v) => `\u25b6 ${v.title}\n${HOST}/watch/${v.id}`).join("\n\n");
+  const body =
+    `${take.length} link · tidak diulang hari ini\n\n` +
+    take.map((v) => `\u25b6 ${v.title}\n${HOST}/watch/${v.id}`).join("\n\n");
   await tgSendChunks(token, chatId, body, { reply_markup: MAIN_KEYBOARD });
 }
 
@@ -259,7 +264,7 @@ async function handlePost(request: Request): Promise<Response> {
         "Bot aktif.",
         "",
         "\ud83d\udce4 Upload: IndoAV / UserBokep / Puterin / Streamtape / Lulu / Videy",
-        "\ud83d\udce5 Minta: tekan tombol di bawah",
+        "\ud83d\udce5 Minta: 10, 25, atau 100",
       ].join("\n"),
       { reply_markup: MAIN_KEYBOARD },
     );
