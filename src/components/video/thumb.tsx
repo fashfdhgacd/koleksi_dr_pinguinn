@@ -31,18 +31,18 @@ export function VideoThumb({
 }) {
   const dmm = dmmCoverFromTitle(alt);
   const real = src && src !== BRAND_POSTER && !isVideoSrc(src) && !src.startsWith("data:") ? src : "";
-  const local = videoId ? `/thumb/${videoId}.jpg` : "";
-  const first = real || dmm || local;
+  const local = videoId && real ? `/thumb/${videoId}.jpg` : "";
+  const first = real || dmm;
   const [current, setCurrent] = useState(first);
-  const [failed, setFailed] = useState(!first);
+  const [step, setStep] = useState(0);
   const warm = isPosterWarm(current);
 
   useEffect(() => {
     setCurrent(first);
-    setFailed(!first);
+    setStep(0);
   }, [first]);
 
-  if (failed || !current) {
+  if (!current || step > 2) {
     return <div className="size-full bg-zinc-900" aria-label={alt} />;
   }
 
@@ -57,27 +57,22 @@ export function VideoThumb({
       fetchPriority={eager ? "high" : "low"}
       className={cn("media-thumb size-full object-cover", className)}
       onError={() => {
-        if (local && current !== local) {
+        if (step === 0 && local && current !== local) {
+          setStep(1);
           setCurrent(local);
           return;
         }
-        if (dmm && current !== dmm) {
+        if (step < 2 && dmm && current !== dmm) {
+          setStep(2);
           setCurrent(dmm);
           return;
         }
-        setFailed(true);
+        setStep(3);
       }}
       onLoad={(e) => {
         const img = e.currentTarget;
-        if (img.naturalWidth <= 2 && img.naturalHeight <= 2) {
-          if (local && current !== local) {
-            setCurrent(local);
-            return;
-          }
-          setFailed(true);
-          return;
-        }
-        markPosterWarm(current);
+        if (img.naturalWidth > 2) markPosterWarm(current);
+        else setStep(3);
       }}
     />
   );
