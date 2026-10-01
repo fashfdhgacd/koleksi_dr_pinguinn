@@ -21,6 +21,7 @@ export function VideoThumb({
   videoId = "",
   eager = false,
   className,
+  onUnavailable,
 }: {
   src: string;
   alt: string;
@@ -41,6 +42,10 @@ export function VideoThumb({
     setCurrent(first);
     setStep(0);
   }, [first]);
+
+  useEffect(() => {
+    if (step > 2) onUnavailable?.();
+  }, [step, onUnavailable]);
 
   if (!current || step > 2) {
     return <div className="size-full bg-zinc-900" aria-label={alt} />;
