@@ -34,46 +34,6 @@ function imageResponse(body: BodyInit, type: string): Response {
   });
 }
 
-async function fetchSmall(source: string): Promise<{ buf: ArrayBuffer; type: string } | null> {
-  const attempts = [
-    fetch(source, {
-      headers: { "user-agent": "kdp-poster/1", referer: "https://tv1.indoav.app/" },
-      signal: AbortSignal.timeout(8000),
-      cf: { image: { width: 480, height: 270, fit: "cover", quality: 65, format: "jpeg" } },
-    } as RequestInit),
-    fetch(source, {
-      headers: { "user-agent": "kdp-poster/1", referer: "https://tv1.indoav.app/" },
-      signal: AbortSignal.timeout(8000),
-    }),
-  ];
-  for (const pending of attempts) {
-    const remote = await pending.catch(() => null);
-    if (!remote?.ok) continue;
-    const buf = await remote.arrayBuffer().catch(() => null);
-    if (!buf || buf.byteLength < 800 || buf.byteLength > 1_500_000) continue;
-    const type = sniffType(buf);
-    if (!type) continue;
-    return { buf, type };
-  }
-  return null;
-}
-
-async function readCache(request: Request): Promise<Response | null> {
-  try {
-    return (await caches.default.match(request)) || null;
-  } catch {
-    return null;
-  }
-}
-
-async function writeCache(request: Request, response: Response): Promise<void> {
-  try {
-    await caches.default.put(request, response);
-  } catch {
-    /* cache optional */
-  }
-}
-
 export const Route = createFileRoute("/thumb/$id")({
   server: {
     handlers: {
@@ -81,7 +41,12 @@ export const Route = createFileRoute("/thumb/$id")({
         try {
           const id = String(params.id || "").replace(/\.(jpg|jpeg|webp|png)$/i, "");
           if (!id) return new Response(null, { status: 404 });
-          const hit = await readCache(request);
+          let hit: Response | null = null;
+          try {
+            hit = (await caches.default.match(request)) || null;
+          } catch {
+            hit = null;
+          }
           if (hit) return hit;
 
           const bucket = await resolvePostersBucket().catch(() => null);
@@ -90,20 +55,34 @@ export const Route = createFileRoute("/thumb/$id")({
             const saved = await bucket.get(key).catch(() => null);
             if (saved) {
               const res = imageResponse(saved.body, saved.httpMetadata?.contentType || "image/jpeg");
-              await writeCache(request, res.clone());
+              try {
+                await caches.default.put(request, res.clone());
+              } catch {
+                /* cache optional */
+              }
               return res;
             }
           }
 
           const source = sourceFor(id);
           if (!source) return new Response(null, { status: 404 });
-          const small = await fetchSmall(source);
-          if (!small) return new Response(null, { status: 404 });
+          const remote = await fetch(source, {
+            headers: { "user-agent": "kdp-poster/1", referer: "https://tv1.indoav.app/" },
+            signal: AbortSignal.timeout(8000),
+          }).catch(() => null);
+          if (!remote?.ok) return new Response(null, { status: 404 });
+          const buf = await remote.arrayBuffer().catch(() => null);
+          const type = buf ? sniffType(buf) : "";
+          if (!buf || !type || buf.byteLength < 800) return new Response(null, { status: 404 });
           if (bucket) {
-            await bucket.put(key, small.buf, { httpMetadata: { contentType: small.type } }).catch(() => undefined);
+            await bucket.put(key, buf, { httpMetadata: { contentType: type } }).catch(() => undefined);
           }
-          const res = imageResponse(small.buf, small.type);
-          await writeCache(request, res.clone());
+          const res = imageResponse(buf, type);
+          try {
+            await caches.default.put(request, res.clone());
+          } catch {
+            /* cache optional */
+          }
           return res;
         } catch {
           return new Response(null, { status: 404 });
