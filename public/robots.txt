@@ -58,5 +58,4 @@ User-agent: facebookexternalhit
 Allow: /
 Allow: /og.jpg
 
-Sitemap: https://koleksidrpinguin.com/sitemap-pages.xml
 Sitemap: https://koleksidrpinguin.com/sitemap.xml
