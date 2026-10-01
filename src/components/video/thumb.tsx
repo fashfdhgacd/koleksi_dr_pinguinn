@@ -50,8 +50,8 @@ export function VideoThumb({
     <img
       src={current}
       alt={alt}
-      width={640}
-      height={360}
+      width={320}
+      height={180}
       loading={eager || warm ? "eager" : "lazy"}
       decoding="async"
       fetchPriority={eager ? "high" : "low"}
