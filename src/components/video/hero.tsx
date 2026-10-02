@@ -105,19 +105,27 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
   const activeDot = displayIndex % dotCount;
 
   return (
-    <section className="relative overflow-hidden rounded-2xl bg-surface sm:rounded-[28px]" aria-roledescription="carousel">
+    // isolate + z-0: keep internal z-index (dots) from competing with page content below
+    <section
+      className="relative z-0 isolate overflow-hidden rounded-2xl bg-surface sm:rounded-[28px]"
+      aria-roledescription="carousel"
+    >
       <div className="relative aspect-[16/10] sm:aspect-[16/9] lg:aspect-[21/9]">
-        <VideoThumb
-          key={current.id}
-          src={current.thumbnail}
-          alt={heroTitle}
-          eager
-          className="size-full object-cover object-center transition-opacity duration-300"
-          onUnavailable={onThumbUnavailable}
-        />
+        {/* Decorative media — never steal taps meant for CTA / dots / page below */}
+        <div className="pointer-events-none absolute inset-0">
+          <VideoThumb
+            key={current.id}
+            src={current.thumbnail}
+            alt={heroTitle}
+            eager
+            className="size-full object-cover object-center transition-opacity duration-300"
+            onUnavailable={onThumbUnavailable}
+          />
+        </div>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background via-background/55 to-transparent sm:via-background/50 sm:to-background/10" />
 
-        <div className="absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3.5 pb-8 sm:gap-4 sm:p-8 sm:pb-10 lg:max-w-2xl lg:p-10 lg:pb-12">
+        {/* Copy stack: none by default so it cannot cover dots; only CTA re-enables hits */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3.5 pb-11 sm:gap-4 sm:p-8 sm:pb-12 lg:max-w-2xl lg:p-10 lg:pb-14">
           <p className="hidden text-xs font-medium uppercase tracking-[0.18em] text-muted sm:block">
             Pilihan koleksi
             {usable.length > 1 ? (
@@ -139,7 +147,7 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
             {showDuration ? <span>{current.durationLabel}</span> : null}
             {current.category ? <span>{current.category}</span> : null}
           </div>
-          <div className="pt-0.5">
+          <div className="pointer-events-auto pt-0.5">
             <Button asChild size="default" className="h-10 rounded-full px-4 text-sm sm:h-11 sm:rounded-lg sm:px-5 sm:text-base">
               <Link to="/watch/$id" params={{ id: current.id }}>
                 <Play className="size-3.5 fill-current sm:size-4" style={{ marginLeft: 2 }} />
@@ -150,29 +158,37 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
         </div>
 
         {usable.length > 1 ? (
+          // Full-width row is pointer-events-none so empty gutters never eat taps;
+          // only the centered dot cluster is interactive (min ~44px touch targets).
           <div
-            className="absolute inset-x-0 bottom-2.5 z-10 flex items-center justify-center gap-1.5 sm:bottom-4 sm:gap-2"
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-center pb-1.5 sm:pb-2.5"
             role="tablist"
             aria-label="Pilihan hero"
           >
-            {usable.slice(0, MAX_DOTS).map((v, i) => {
-              const active = i === activeDot;
-              return (
-                <button
-                  key={v.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  aria-label={`Slide ${i + 1}`}
-                  onClick={() => goTo(i)}
-                  className={`rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    active
-                      ? "h-1.5 w-4 bg-foreground/90 sm:h-2 sm:w-5"
-                      : "h-1.5 w-1.5 bg-foreground/35 hover:bg-foreground/55 sm:h-2 sm:w-2"
-                  }`}
-                />
-              );
-            })}
+            <div className="pointer-events-auto flex items-center justify-center gap-0.5 sm:gap-1">
+              {usable.slice(0, MAX_DOTS).map((v, i) => {
+                const active = i === activeDot;
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    aria-label={`Slide ${i + 1}`}
+                    onClick={() => goTo(i)}
+                    className={`flex min-h-11 min-w-11 items-center justify-center rounded-full transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      active ? "text-foreground" : "text-foreground/35 hover:text-foreground/55"
+                    }`}
+                  >
+                    <span
+                      className={`rounded-full bg-current transition-all duration-300 ${
+                        active ? "h-1.5 w-4 sm:h-2 sm:w-5" : "h-1.5 w-1.5 sm:h-2 sm:w-2"
+                      }`}
+                    />
+                  </button>
+                );
+              })}
+            </div>
           </div>
         ) : null}
       </div>
