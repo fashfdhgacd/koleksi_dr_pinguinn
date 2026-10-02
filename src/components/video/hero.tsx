@@ -176,7 +176,7 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
                     aria-selected={active}
                     aria-label={`Slide ${i + 1}`}
                     onClick={() => goTo(i)}
-                    className={`flex min-h-11 min-w-11 items-center justify-center rounded-full transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    className={`flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                       active ? "text-foreground" : "text-foreground/35 hover:text-foreground/55"
                     }`}
                   >
