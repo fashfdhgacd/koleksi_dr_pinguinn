@@ -38,7 +38,12 @@ export function CatalogPager({
     onPage(next);
     if (next !== page) {
       try {
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        // Coarse pointers (phones): instant jump — smooth + scrollRestoration races on Android
+        // Chrome and can leave the viewport mid-page while the grid already swapped.
+        const coarse =
+          typeof window.matchMedia === "function" &&
+          window.matchMedia("(pointer: coarse)").matches;
+        window.scrollTo({ top: 0, behavior: coarse ? "auto" : "smooth" });
       } catch {
         /* ignore */
       }
@@ -46,7 +51,7 @@ export function CatalogPager({
   }
 
   return (
-    <nav className="mt-8 flex flex-col items-center gap-3" aria-label="Halaman katalog">
+    <nav className="relative z-10 mt-8 flex flex-col items-center gap-3" aria-label="Halaman katalog">
       <p className="text-xs text-muted">
         {from.toLocaleString("id-ID")}–{to.toLocaleString("id-ID")} / {total.toLocaleString("id-ID")}
         {" · "}{page}/{totalPages}
@@ -56,7 +61,7 @@ export function CatalogPager({
           type="button"
           disabled={page <= 1}
           onClick={() => go(page - 1)}
-          className="inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-full border border-border px-3 text-sm disabled:opacity-40 sm:h-9"
+          className="inline-flex h-11 min-w-11 touch-manipulation items-center justify-center gap-1 rounded-full border border-border px-3 text-sm disabled:opacity-40 sm:h-9"
           aria-label="Halaman sebelumnya"
         >
           <ChevronLeft className="size-4" />
@@ -64,7 +69,7 @@ export function CatalogPager({
         </button>
         {pages[0] > 1 ? (
           <>
-            <button type="button" onClick={() => go(1)} className="h-11 min-w-11 rounded-full px-2 text-sm hover:bg-secondary sm:h-9 sm:min-w-9">
+            <button type="button" onClick={() => go(1)} className="h-11 min-w-11 touch-manipulation rounded-full px-2 text-sm hover:bg-secondary sm:h-9 sm:min-w-9">
               1
             </button>
             {pages[0] > 2 ? <span className="px-1 text-muted">…</span> : null}
@@ -75,7 +80,7 @@ export function CatalogPager({
             key={n}
             type="button"
             onClick={() => go(n)}
-            className={`h-11 min-w-11 rounded-full px-2 text-sm sm:h-9 sm:min-w-9 ${
+            className={`h-11 min-w-11 touch-manipulation rounded-full px-2 text-sm sm:h-9 sm:min-w-9 ${
               n === page ? "bg-primary text-primary-foreground" : "hover:bg-secondary"
             }`}
           >
@@ -85,7 +90,7 @@ export function CatalogPager({
         {pages[pages.length - 1] < totalPages ? (
           <>
             {pages[pages.length - 1] < totalPages - 1 ? <span className="px-1 text-muted">…</span> : null}
-            <button type="button" onClick={() => go(totalPages)} className="h-11 min-w-11 rounded-full px-2 text-sm hover:bg-secondary sm:h-9 sm:min-w-9">
+            <button type="button" onClick={() => go(totalPages)} className="h-11 min-w-11 touch-manipulation rounded-full px-2 text-sm hover:bg-secondary sm:h-9 sm:min-w-9">
               {totalPages}
             </button>
           </>
@@ -94,7 +99,7 @@ export function CatalogPager({
           type="button"
           disabled={page >= totalPages}
           onClick={() => go(page + 1)}
-          className="inline-flex h-11 min-w-11 items-center justify-center gap-1 rounded-full border border-border px-3 text-sm disabled:opacity-40 sm:h-9"
+          className="inline-flex h-11 min-w-11 touch-manipulation items-center justify-center gap-1 rounded-full border border-border px-3 text-sm disabled:opacity-40 sm:h-9"
           aria-label="Halaman berikutnya"
         >
           <span className="hidden sm:inline">Next</span>

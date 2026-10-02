@@ -81,13 +81,24 @@ async function fetchCatalogOnce(path: string, signal?: AbortSignal): Promise<Cat
   };
 }
 
-/** Retry 499/502/503/504 — Vercel kadang batalkan request (cold start / abort). */
+/**
+ * Retry 499/502/503/504 — Vercel/CF sometimes cancel (cold start / abort).
+ * Without a signal, coalesce identical in-flight GETs.
+ * With a signal (pagination / retry), never reuse a possibly-hung promise —
+ * mobile cellular stalls used to pin the shared Map entry forever so
+ * same-page retry and hard-refetch awaited a dead request.
+ */
 export function fetchCatalog(query: ClientQuery, signal?: AbortSignal): Promise<CatalogResponse> {
   const path = catalogPath(query);
-  const existing = inflight.get(path);
-  if (existing) return existing;
-  const pending = fetchCatalogOnce(path, signal).finally(() => {
+  if (!signal) {
+    const existing = inflight.get(path);
+    if (existing) return existing;
+  } else {
+    // Drop any shared entry so this abortable attempt is what waiters attach to.
     inflight.delete(path);
+  }
+  const pending = fetchCatalogOnce(path, signal).finally(() => {
+    if (inflight.get(path) === pending) inflight.delete(path);
   });
   inflight.set(path, pending);
   return pending;
