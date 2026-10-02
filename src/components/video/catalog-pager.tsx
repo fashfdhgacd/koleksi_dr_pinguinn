@@ -33,12 +33,16 @@ export function CatalogPager({
   const to = Math.min(page * limit, total);
 
   function go(next: number) {
-    if (next < 1 || next > totalPages || next === page || loading) return;
+    if (next < 1 || next > totalPages || loading) return;
+    // Always invoke onPage — including when next === page — so a failed page
+    // fetch can be retried (URL already matches; parent must force reload).
     onPage(next);
-    try {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch {
-      /* ignore */
+    if (next !== page) {
+      try {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      } catch {
+        /* ignore */
+      }
     }
   }
 
