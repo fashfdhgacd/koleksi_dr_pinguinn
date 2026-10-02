@@ -15,6 +15,8 @@ import {
 import { runtime } from "./local-shared";
 import { loadItems, pageOf, sortByNewest } from "./local-cache";
 
+export { loadItems } from "./local-cache";
+
 const SLOT_MS = 5 * 60 * 1000;
 
 function slotIndex(salt = 0): number {
