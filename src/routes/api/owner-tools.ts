@@ -2,6 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { collectSharePool } from "@/lib/bot/share-pool";
 import { loadShareUsed, saveShareUsed } from "@/lib/bot/share-used";
 import { processUploadBatch } from "@/lib/bot/upload-handler.js";
+import {
+  cleanPosterId,
+  isHttpPoster,
+  mergeLatestPosters,
+  refreshMissingPosters,
+} from "@/lib/bot/posters.js";
 
 export const maxDuration = 60;
 
@@ -78,20 +84,62 @@ async function handleUpload(body: { text?: string; category?: string }) {
   return json({ ok: true, text: lines.filter(Boolean).join("\n\n") || "Selesai." });
 }
 
+async function handleSetPoster(body: { id?: string; url?: string }) {
+  const id = cleanPosterId(body.id);
+  const url = String(body.url || "").trim();
+  if (!id) return json({ ok: false, error: "bad_id" }, 400);
+  if (!isHttpPoster(url)) return json({ ok: false, error: "bad_url" }, 400);
+  const merged = await mergeLatestPosters(process.env, { [id]: url });
+  if (!merged.ok) return json({ ok: false, error: merged.error || "merge_failed" }, 502);
+  return json({
+    ok: true,
+    id,
+    url,
+    added: merged.added,
+    updated: merged.updated,
+    total: merged.total,
+    text:
+      merged.added || merged.updated
+        ? `Poster ${id} tersimpan. Map: ${merged.total} entri.`
+        : `Poster ${id} sudah sama. Map: ${merged.total} entri.`,
+  });
+}
+
+async function handleRefreshPosters(body: { limit?: number }) {
+  const result = await refreshMissingPosters(process.env, { limit: body.limit });
+  if (!result.ok) {
+    return json({ ok: false, error: result.error || "refresh_failed", text: result.text }, 502);
+  }
+  return json(result);
+}
+
+type OwnerBody = {
+  action?: string;
+  count?: number;
+  category?: string;
+  source?: string;
+  text?: string;
+  id?: string;
+  url?: string;
+  limit?: number;
+};
+
 export const Route = createFileRoute("/api/owner-tools")({
   server: {
     handlers: {
       POST: async ({ request }) => {
         if (!viewSecret()) return json({ ok: false, error: "not_configured" }, 503);
         if (!isOwner(request)) return json({ ok: false, error: "forbidden" }, 403);
-        let body: { action?: string; count?: number; category?: string; source?: string; text?: string } = {};
+        let body: OwnerBody = {};
         try {
-          body = (await request.json()) as typeof body;
+          body = (await request.json()) as OwnerBody;
         } catch {
           return json({ ok: false, error: "bad_json" }, 400);
         }
         if (body.action === "share") return handleShare(body);
         if (body.action === "upload") return handleUpload(body);
+        if (body.action === "set-poster") return handleSetPoster(body);
+        if (body.action === "refresh-posters") return handleRefreshPosters(body);
         return json({ ok: false, error: "bad_action" }, 400);
       },
     },

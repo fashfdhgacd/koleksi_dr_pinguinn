@@ -1,30 +1,40 @@
 import { parseMessage, detectCategory, cleanTitle } from "@/lib/bot/parse.js";
 import { toRecord } from "@/lib/bot/store.js";
-import { fetchPutarinTitle, fetchStreamtapeTitle, expandPutarinFolder } from "@/lib/bot/providers.js";
+import { fetchPutarinMeta, fetchStreamtapeMeta, expandPutarinFolder } from "@/lib/bot/providers.js";
 import { upsertVideosBatch } from "@/lib/bot/github.js";
+import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
 
 function hasUserTitle(raw) {
   const t = cleanTitle(String(raw || ""));
   return Boolean(t && t !== "Video");
 }
 
-async function resolveTitleFast(video, givenTitle, env) {
-  if (hasUserTitle(givenTitle) || hasUserTitle(video.title)) {
-    return cleanTitle(givenTitle || video.title || "") || `Video ${video.id}`;
-  }
+async function resolveMetaFast(video, givenTitle, env) {
+  let title =
+    hasUserTitle(givenTitle) || hasUserTitle(video.title)
+      ? cleanTitle(givenTitle || video.title || "") || `Video ${video.id}`
+      : "";
+  let thumb = String(video.poster || video.thumbnail || "").trim();
+  if (thumb && !isHttpPoster(thumb)) thumb = "";
+
   try {
     if (video.host === "putarin") {
-      const t = await fetchPutarinTitle(video.id, env);
-      if (t) return cleanTitle(t);
-    }
-    if (video.host === "streamtape") {
-      const t = await fetchStreamtapeTitle(video.id, env);
-      if (t) return cleanTitle(t);
+      const meta = await fetchPutarinMeta(video.id, env);
+      if (!title && meta.title) title = cleanTitle(meta.title);
+      if (!thumb && isHttpPoster(meta.thumb)) thumb = meta.thumb;
+    } else if (video.host === "streamtape") {
+      const meta = await fetchStreamtapeMeta(video.id, env);
+      if (!title && meta.title) title = cleanTitle(meta.title);
+      if (!thumb && isHttpPoster(meta.thumb)) thumb = meta.thumb;
     }
   } catch {
     /* fallback */
   }
-  return givenTitle && givenTitle !== "Video" ? givenTitle : `Video ${video.id}`;
+
+  if (!title) {
+    title = givenTitle && givenTitle !== "Video" ? givenTitle : `Video ${video.id}`;
+  }
+  return { title, thumb };
 }
 
 async function mapPool(items, limit, fn) {
@@ -42,7 +52,8 @@ async function mapPool(items, limit, fn) {
 
 /**
  * Process upload batch: ACK already sent by caller.
- * Titles: skip remote fetch when user sent title; else parallel <=5 with short timeout.
+ * Titles/thumbs: skip remote fetch when user sent title; else parallel <=5 with short timeout.
+ * When API returns thumb, save poster/thumbnail on record + merge data/latest-posters.json.
  * GitHub: one upsertVideosBatch per feed file.
  */
 export async function processUploadBatch({ token, chatId, text, env, tgSend, tgSendChunks, MAIN_KEYBOARD }) {
@@ -63,6 +74,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   let createdTotal = 0;
   let skippedTotal = 0;
   let failedTotal = 0;
+  const posterBatch = {};
 
   const queue = [];
   for (const video of parsedMsg.videos) {
@@ -97,15 +109,16 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     return;
   }
 
-  const titles = await mapPool(queue, 5, async (video) => {
+  const metas = await mapPool(queue, 5, async (video) => {
     const given = cleanTitle(String(video.title || parsedMsg.title || ""));
-    return resolveTitleFast(video, given, env);
+    return resolveMetaFast(video, given, env);
   });
 
   const byFile = new Map();
   for (let i = 0; i < queue.length; i++) {
     const video = queue[i];
-    const title = titles[i] || `Video ${video.id}`;
+    const meta = metas[i] || { title: `Video ${video.id}`, thumb: "" };
+    const title = meta.title || `Video ${video.id}`;
     const category =
       parsedMsg.category ||
       (video.host === "putarin" || video.host === "putarin-folder"
@@ -113,7 +126,10 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
         : video.host === "streamtape"
           ? "ai-plus"
           : detectCategory(title));
-    const record = toRecord({ parsed: video, title, category });
+    const withPoster = isHttpPoster(meta.thumb)
+      ? { ...video, poster: meta.thumb, thumbnail: meta.thumb }
+      : video;
+    const record = toRecord({ parsed: withPoster, title, category });
     const fileName = video.file || "videos.json";
     const list = byFile.get(fileName) || [];
     list.push({ video, title, record });
@@ -138,8 +154,13 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
 
       for (const it of items) {
         const idKey = String(it.record.id || "").toLowerCase();
-        if (createdIds.has(idKey)) lines.push(`✅ ${it.record.id} — ${it.title}`);
-        else lines.push(`⏭️ ${it.record.id} — ${it.title} (sudah ada)`);
+        const poster = String(it.record.poster || it.record.thumbnail || "").trim();
+        if (isHttpPoster(poster)) posterBatch[it.record.id] = poster;
+        if (createdIds.has(idKey)) {
+          lines.push(`✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}`);
+        } else {
+          lines.push(`⏭️ ${it.record.id} — ${it.title} (sudah ada)`);
+        }
       }
 
       if (result.rotated) lines.push(`📦 Chunk penuh → data/${result.rotated}; aktif: data/${result.file}`);
@@ -155,6 +176,20 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     }
   }
 
+  if (Object.keys(posterBatch).length) {
+    try {
+      const merged = await mergeLatestPosters(env, posterBatch);
+      if (merged.ok) {
+        lines.push(`🖼️ Poster map: +${merged.added} baru · ${merged.updated} update · total ${merged.total}`);
+      } else {
+        lines.push(`⚠️ Poster map gagal: ${merged.error || "unknown"}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      lines.push(`⚠️ Poster map error: ${msg}`);
+    }
+  }
+
   const summary = `✅ ${createdTotal} dibuat · ⏭️ ${skippedTotal} skip · ⚠️ ${failedTotal} gagal`;
   await tgSendChunks(
     token,
@@ -163,3 +198,4 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     { reply_markup: MAIN_KEYBOARD },
   );
 }
+
