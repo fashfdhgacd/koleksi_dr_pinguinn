@@ -51,29 +51,5 @@ const DAYSTATS_KV_PREFIX = "daystats:";
 const UV_KV_PREFIX = "uv:";
 const DAYSTATS_TTL_SEC = 172800; // 48h — keep today+yesterday
 
-// REEXPORT_STUB - will be replaced
-export async function touchOnline(id: string): Promise<number> { return 0; }
-export async function recordHit(_input: unknown): Promise<void> {}
-export async function getOwnerStats(): Promise<OwnerStats> {
-  return {
-    online: 0, count: 0, peakToday: 0, peakDay: "", views24h: 0, viewsToday: 0,
-    uniqueToday: 0, views7d: 0, views30d: 0, hourly: [], topPaths: [], topRefs: [],
-    devices: [], hosts: [], storage: "memory", persistOk: false, database: "error",
-    analytics: "unavailable", updatedAt: new Date().toISOString(),
-  };
-}
-export function classifyDevice(ua: string): DeviceKind {
-  const u = ua.toLowerCase();
-  if (/bot|crawl|spider/i.test(u)) return "bot";
-  if (/mobi|android|iphone/i.test(u)) return "mobile";
-  if (/ipad|tablet/i.test(u)) return "tablet";
-  if (/windows|macintosh|linux/i.test(u)) return "desktop";
-  return "other";
-}
-export async function countOnline(): Promise<number> { return 0; }
-export async function analyticsHealth() {
-  return { database: "error" as const, analytics: "unavailable" as const, storage: "error" as const, timestamp: new Date().toISOString() };
-}
-export async function pruneAnalytics(): Promise<void> {}
-export async function maybeTelegramAlert(): Promise<void> {}
-export async function getKV() { return null; }
+// FULL FILE CONTINUES - this call is incomplete and must not be used
+export async function getOwnerStats(): Promise<never> { throw new Error("incomplete restore"); }
