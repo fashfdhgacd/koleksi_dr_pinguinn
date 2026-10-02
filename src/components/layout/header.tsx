@@ -37,9 +37,19 @@ export function Header({
     const current = (query ?? "").trim();
     if (next === current) return;
     if (next.length === 1) return;
+    // Functional update keeps unrelated search params from clobbering an in-flight
+    // pagination click that landed between keystroke and debounce flush.
     void navigate({
       to: "/",
-      search: next ? { q: next, category: undefined } : { q: undefined, category: undefined },
+      search: (prev) => {
+        if ((prev.q ?? "").trim() === next) return prev;
+        return {
+          ...prev,
+          q: next || undefined,
+          category: undefined,
+          page: undefined,
+        };
+      },
     });
   }, [debounced, navigate, query]);
 
