@@ -117,16 +117,56 @@ export async function fetchPutarinMeta(code, env) {
   return { title, thumb };
 }
 
-export async function fetchStreamtapeTitle(fileId, env) {
+export async function fetchStreamtapeMeta(fileId, env) {
   const login = env.STREAMTAPE_LOGIN;
   const key = env.STREAMTAPE_KEY;
   const api = (env.STREAMTAPE_API || "https://api.streamtape.com").replace(/\/$/, "");
-  if (!login || !key || !fileId) return "";
-  const url = `${api}/file/info?file=${encodeURIComponent(fileId)}&login=${encodeURIComponent(login)}&key=${encodeURIComponent(key)}`;
-  const { ok, data } = await withTimeout(getJson(url), 3000, { ok: false, data: null });
-  if (!ok || !data || data.status !== 200) return "";
-  const info = data.result?.[fileId] || data.result;
-  return String(info?.name || info?.title || "").replace(/\.[a-z0-9]+$/i, "").trim();
+  let title = "";
+  let thumb = "";
+  if (!fileId) return { title, thumb };
+
+  const infoUrl = new URL(`${api}/file/info`);
+  infoUrl.searchParams.set("file", fileId);
+  if (login && key) {
+    infoUrl.searchParams.set("login", login);
+    infoUrl.searchParams.set("key", key);
+  }
+  try {
+    const { ok, data } = await withTimeout(getJson(infoUrl.toString()), 3500, { ok: false, data: null });
+    if (ok && data && data.status === 200 && data.result) {
+      const info = data.result?.[fileId] || data.result;
+      title = String(info?.name || info?.title || "")
+        .replace(/\.[a-z0-9]+$/i, "")
+        .trim();
+      const t = String(info?.thumb || info?.thumbnail || info?.poster || "").trim();
+      if (t.startsWith("http")) thumb = t;
+    }
+  } catch {
+    /* ignore */
+  }
+
+  if (!thumb && login && key) {
+    try {
+      const splashUrl = new URL(`${api}/file/getsplash`);
+      splashUrl.searchParams.set("file", fileId);
+      splashUrl.searchParams.set("login", login);
+      splashUrl.searchParams.set("key", key);
+      const { ok, data } = await withTimeout(getJson(splashUrl.toString()), 3500, { ok: false, data: null });
+      if (ok && data && data.status === 200) {
+        const t = String(data.result || "").trim();
+        if (t.startsWith("http")) thumb = t;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return { title, thumb };
+}
+
+export async function fetchStreamtapeTitle(fileId, env) {
+  const { title } = await fetchStreamtapeMeta(fileId, env);
+  return title;
 }
 
 
