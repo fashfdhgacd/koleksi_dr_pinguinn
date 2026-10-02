@@ -31,6 +31,8 @@ type FeedSnap = {
 
 const FRESH_MS = 12 * 60 * 60 * 1000;
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
+/** Mobile cellular often hangs TCP; without a budget, inflight coalescing stuck forever. */
+const FETCH_TIMEOUT_MS = 15_000;
 const LS_KEY = "dp_feed_v4";
 const feedCache = new Map<string, FeedSnap>();
 
@@ -169,6 +171,7 @@ export function useCatalogFeed(params: BrowseParams, ssrSeed?: CatalogFeedSeed |
   const itemsRef = useRef<VideoCard[]>(items);
   const totalRef = useRef(total);
   const pageRef = useRef(wantedPage);
+  const abortRef = useRef<AbortController | null>(null);
   itemsRef.current = items;
   totalRef.current = total;
 
@@ -199,12 +202,19 @@ export function useCatalogFeed(params: BrowseParams, ssrSeed?: CatalogFeedSeed |
               ? { type: "home" as const, page: 1, limit: DEFAULT_PAGE_SIZE }
               : { type: "latest" as const, page: nextPage, limit: DEFAULT_PAGE_SIZE };
 
+      // Abort prior attempt so a hung mobile fetch cannot block the next page/retry.
+      abortRef.current?.abort();
+      const ac = new AbortController();
+      abortRef.current = ac;
+      const timeoutId = window.setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+
       try {
-        const res = await fetchCatalog(query);
+        const res = await fetchCatalog(query, ac.signal);
         if (gen !== genRef.current) return;
         if (!res.ok) {
           if (reason === "silent") return;
-          setError(res.error);
+          // Current-gen timeout/abort (cleanup bumps gen first, so those never reach here).
+          setError(ac.signal.aborted ? "Koneksi lambat. Coba lagi." : res.error);
           setStatus(itemsRef.current.length ? "success" : "error");
           return;
         }
@@ -240,10 +250,16 @@ export function useCatalogFeed(params: BrowseParams, ssrSeed?: CatalogFeedSeed |
       } catch (err) {
         if (gen !== genRef.current) return;
         if (reason === "silent") return;
-        const message = err instanceof Error ? err.message : "Gagal memuat katalog.";
+        const message = ac.signal.aborted
+          ? "Koneksi lambat. Coba lagi."
+          : err instanceof Error
+            ? err.message
+            : "Gagal memuat katalog.";
         setError(message);
         setStatus(itemsRef.current.length ? "success" : "error");
       } finally {
+        window.clearTimeout(timeoutId);
+        if (abortRef.current === ac) abortRef.current = null;
         if (gen === genRef.current) inflightRef.current = false;
       }
     },
@@ -300,9 +316,25 @@ export function useCatalogFeed(params: BrowseParams, ssrSeed?: CatalogFeedSeed |
     return () => {
       genRef.current += 1;
       inflightRef.current = false;
+      abortRef.current?.abort();
+      abortRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load, paramsKey]);
+
+  // Android/iOS bfcache: restored heap can leave URL page ahead of grid items.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setItems([]);
+      itemsRef.current = [];
+      setStatus("loading");
+      setError(null);
+      void load(pageRef.current, "reset");
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, [load]);
 
   const retry = useCallback(() => {
     setItems([]);
