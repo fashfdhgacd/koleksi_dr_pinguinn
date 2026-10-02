@@ -86,6 +86,11 @@ function CategorySlugPage() {
   }, [slug, page]);
 
   function setPage(next: number) {
+    const current = pageSearch || 1;
+    if (next === current) {
+      feed.retry();
+      return;
+    }
     void navigate({
       search: (prev) => ({
         ...prev,
@@ -114,7 +119,7 @@ function CategorySlugPage() {
           <VideoGrid items={feed.items} eagerCount={24} />
         )}
         <CatalogPager
-          page={feed.page || page}
+          page={page}
           total={feed.total}
           limit={feed.limit}
           loading={feed.loading}

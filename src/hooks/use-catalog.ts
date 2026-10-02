@@ -31,7 +31,9 @@ type FeedSnap = {
 
 const FRESH_MS = 12 * 60 * 60 * 1000;
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
-const LS_KEY = "dp_feed_v3";
+/** Mobile cellular often hangs TCP; without a budget, inflight coalescing stuck forever. */
+const FETCH_TIMEOUT_MS = 15_000;
+const LS_KEY = "dp_feed_v4";
 const feedCache = new Map<string, FeedSnap>();
 
 function ls() {
@@ -52,7 +54,11 @@ function hydrateFeeds() {
     const obj = JSON.parse(raw) as Record<string, FeedSnap>;
     const now = Date.now();
     for (const [k, v] of Object.entries(obj)) {
-      if (v?.items?.length && now - v.at < KEEP_MS) feedCache.set(k, v);
+      if (!v?.items?.length || now - v.at >= KEEP_MS) continue;
+      const keyPage = Math.floor(Number(String(k).split(":").pop()) || 1);
+      const snapPage = Math.floor(Number(v.page) || 1);
+      if (keyPage !== snapPage) continue;
+      feedCache.set(k, v);
     }
   } catch {
     /* ignore */
@@ -134,18 +140,23 @@ export function useCatalogFeed(params: BrowseParams, ssrSeed?: CatalogFeedSeed |
   const wantedPage = normPage(params.page);
   const paramsKey = `${params.mode}:${params.category ?? ""}:${params.q ?? ""}:${wantedPage}`;
   const cached = feedCache.get(feedKey(params, wantedPage));
-  const seed: FeedSnap | null =
-    cached ||
-    (ssrSeed && ssrSeed.items.length
+  // Never hydrate from a cache/SSR seed whose page does not match the URL page.
+  // Stale loaderData during client nav used to poison feedKey(..., 2) with page-1 items.
+  const cachedOk = Boolean(cached?.items?.length && cached.page === wantedPage);
+  const seedPage = ssrSeed ? normPage(ssrSeed.page ?? wantedPage) : -1;
+  const seedOk = Boolean(ssrSeed?.items?.length && seedPage === wantedPage);
+  const seed: FeedSnap | null = cachedOk
+    ? cached!
+    : seedOk && ssrSeed
       ? {
           items: ssrSeed.items,
           featured: ssrSeed.featured ?? [],
-          page: ssrSeed.page ?? wantedPage,
+          page: seedPage,
           hasMore: ssrSeed.hasMore ?? true,
           total: ssrSeed.total,
           at: Date.now(),
         }
-      : null);
+      : null;
   const [items, setItems] = useState<VideoCard[]>(() => (seed ? seed.items : []));
   const [featured, setFeatured] = useState<VideoCard[]>(() => (seed ? seed.featured : []));
   const [page, setPage] = useState(wantedPage);
@@ -159,18 +170,23 @@ export function useCatalogFeed(params: BrowseParams, ssrSeed?: CatalogFeedSeed |
   const genRef = useRef(0);
   const itemsRef = useRef<VideoCard[]>(items);
   const totalRef = useRef(total);
+  const pageRef = useRef(wantedPage);
+  const abortRef = useRef<AbortController | null>(null);
   itemsRef.current = items;
   totalRef.current = total;
 
   const load = useCallback(
-    async (nextPage: number, reason: "reset" | "retry" | "silent") => {
-      if ((reason === "silent" || reason === "retry") && inflightRef.current) return;
+    async (nextPage: number, reason: "reset" | "retry" | "silent" | "page") => {
+      // silent: skip if another request is already in flight.
+      // page/reset/retry: always proceed (bumps gen) so pagination cannot stall.
+      if (reason === "silent" && inflightRef.current) return;
 
       const gen = reason === "silent" ? genRef.current : ++genRef.current;
       inflightRef.current = true;
       if (reason !== "silent") setError(null);
       if (reason === "retry" && !itemsRef.current.length) setStatus("retrying");
-      else if (reason === "reset" && !itemsRef.current.length) setStatus("loading");
+      else if (reason === "reset") setStatus("loading");
+      else if (reason === "page") setStatus("loading");
 
       const query =
         params.mode === "search"
@@ -186,23 +202,32 @@ export function useCatalogFeed(params: BrowseParams, ssrSeed?: CatalogFeedSeed |
               ? { type: "home" as const, page: 1, limit: DEFAULT_PAGE_SIZE }
               : { type: "latest" as const, page: nextPage, limit: DEFAULT_PAGE_SIZE };
 
+      // Abort prior attempt so a hung mobile fetch cannot block the next page/retry.
+      abortRef.current?.abort();
+      const ac = new AbortController();
+      abortRef.current = ac;
+      const timeoutId = window.setTimeout(() => ac.abort(), FETCH_TIMEOUT_MS);
+
       try {
-        const res = await fetchCatalog(query);
+        const res = await fetchCatalog(query, ac.signal);
         if (gen !== genRef.current) return;
         if (!res.ok) {
           if (reason === "silent") return;
-          setError(res.error);
+          // Current-gen timeout/abort (cleanup bumps gen first, so those never reach here).
+          setError(ac.signal.aborted ? "Koneksi lambat. Coba lagi." : res.error);
           setStatus(itemsRef.current.length ? "success" : "error");
           return;
         }
         const pageData = extractPage(res);
         const merged = pageData.items.filter((item) => item?.id);
+        // Always apply under the requested page (URL), even if upstream echoes a stale page field.
+        const applyPage = nextPage;
         setItems(merged);
         itemsRef.current = merged;
         warmPosters(merged);
-        if (nextPage === 1 && pageData.featured.length) setFeatured(pageData.featured);
-        const resolvedPage = pageData.page || nextPage;
-        setPage(resolvedPage);
+        if (applyPage === 1 && pageData.featured.length) setFeatured(pageData.featured);
+        setPage(applyPage);
+        pageRef.current = applyPage;
         setHasMore(pageData.hasMore);
         const nextTotal =
           reason === "silent" && totalRef.current > pageData.total && pageData.total > 0
@@ -210,10 +235,10 @@ export function useCatalogFeed(params: BrowseParams, ssrSeed?: CatalogFeedSeed |
             : pageData.total;
         setTotal(nextTotal);
         totalRef.current = nextTotal;
-        feedCache.set(feedKey(params, resolvedPage), {
+        feedCache.set(feedKey(params, applyPage), {
           items: merged,
-          featured: nextPage === 1 ? pageData.featured : [],
-          page: resolvedPage,
+          featured: applyPage === 1 ? pageData.featured : [],
+          page: applyPage,
           hasMore: pageData.hasMore,
           total: nextTotal,
           at: Date.now(),
@@ -225,10 +250,16 @@ export function useCatalogFeed(params: BrowseParams, ssrSeed?: CatalogFeedSeed |
       } catch (err) {
         if (gen !== genRef.current) return;
         if (reason === "silent") return;
-        const message = err instanceof Error ? err.message : "Gagal memuat katalog.";
+        const message = ac.signal.aborted
+          ? "Koneksi lambat. Coba lagi."
+          : err instanceof Error
+            ? err.message
+            : "Gagal memuat katalog.";
         setError(message);
         setStatus(itemsRef.current.length ? "success" : "error");
       } finally {
+        window.clearTimeout(timeoutId);
+        if (abortRef.current === ac) abortRef.current = null;
         if (gen === genRef.current) inflightRef.current = false;
       }
     },
@@ -236,41 +267,80 @@ export function useCatalogFeed(params: BrowseParams, ssrSeed?: CatalogFeedSeed |
   );
 
   useEffect(() => {
-    if (ssrSeed?.items?.length && !feedCache.has(feedKey(params, wantedPage))) {
-      feedCache.set(feedKey(params, wantedPage), {
-        items: ssrSeed.items,
-        featured: ssrSeed.featured ?? [],
-        page: ssrSeed.page ?? wantedPage,
-        hasMore: ssrSeed.hasMore ?? true,
-        total: ssrSeed.total,
-        at: Date.now(),
-      });
+    const key = feedKey(params, wantedPage);
+
+    // Only accept SSR/loader seed when it is actually for this URL page.
+    if (ssrSeed?.items?.length) {
+      const sp = normPage(ssrSeed.page ?? wantedPage);
+      if (sp === wantedPage && !feedCache.has(key)) {
+        feedCache.set(key, {
+          items: ssrSeed.items,
+          featured: ssrSeed.featured ?? [],
+          page: sp,
+          hasMore: ssrSeed.hasMore ?? true,
+          total: ssrSeed.total,
+          at: Date.now(),
+        });
+      }
     }
-    const snap = feedCache.get(feedKey(params, wantedPage));
-    const age = snap ? Date.now() - snap.at : Infinity;
-    if (snap && age < KEEP_MS) {
+
+    // Pager label/highlight must follow the URL immediately on every search change.
+    setPage(wantedPage);
+    pageRef.current = wantedPage;
+
+    const snap = feedCache.get(key);
+    const snapOk = Boolean(snap?.items?.length && snap.page === wantedPage);
+    const age = snapOk && snap ? Date.now() - snap.at : Infinity;
+
+    if (snapOk && snap && age < KEEP_MS) {
       setItems(snap.items);
       itemsRef.current = snap.items;
       setFeatured(snap.featured);
-      setPage(snap.page);
       setHasMore(snap.hasMore);
       setTotal(snap.total);
       totalRef.current = snap.total;
-      setStatus(snap.items.length ? "success" : "empty");
+      setStatus("success");
+      setError(null);
       warmPosters(snap.items);
+      // Soft revalidate only for a matching cached page — never the sole path after nav.
       if (age >= FRESH_MS) void load(wantedPage, "silent");
     } else {
-      void load(wantedPage, itemsRef.current.length ? "silent" : "reset");
+      // URL page changed (or cache missing/poisoned): clear stale grid and hard-fetch.
+      // Never use silent here — silent errors used to leave page-1 items under ?page=2.
+      setItems([]);
+      itemsRef.current = [];
+      setStatus("loading");
+      setError(null);
+      void load(wantedPage, "reset");
     }
     return () => {
       genRef.current += 1;
       inflightRef.current = false;
+      abortRef.current?.abort();
+      abortRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [load, paramsKey]);
 
+  // Android/iOS bfcache: restored heap can leave URL page ahead of grid items.
+  useEffect(() => {
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      setItems([]);
+      itemsRef.current = [];
+      setStatus("loading");
+      setError(null);
+      void load(pageRef.current, "reset");
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, [load]);
+
   const retry = useCallback(() => {
-    void load(wantedPage, "retry");
+    setItems([]);
+    itemsRef.current = [];
+    setStatus("loading");
+    void load(wantedPage, "reset");
   }, [load, wantedPage]);
 
   return {

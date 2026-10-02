@@ -146,6 +146,11 @@ function HomePage() {
       : "Katalog video dewasa 18+ Dr. Pinguin. Streaming embed koleksi Indo, JAV, amatir. Update berkala.";
 
   function setPage(next: number) {
+    const current = pageSearch || 1;
+    if (next === current) {
+      feed.retry();
+      return;
+    }
     void navigate({
       search: (prev) => ({
         ...prev,
@@ -193,7 +198,7 @@ function HomePage() {
           ) : null}
 
           <CatalogPager
-            page={feed.page || page}
+            page={page}
             total={feed.total}
             limit={feed.limit}
             loading={feed.loading}
