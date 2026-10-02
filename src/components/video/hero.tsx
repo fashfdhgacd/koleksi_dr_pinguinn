@@ -6,7 +6,6 @@ import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { BRAND_POSTER, VideoThumb } from "./thumb";
 
 const ROTATE_MS = 5 * 60 * 1000;
-const MAX_DOTS = 8;
 
 type HeroProps = {
   video?: VideoCardType;
@@ -101,17 +100,15 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
   const showDescription = !isSpamDescription(current.description);
   const displayIndex = Math.min(index, Math.max(0, usable.length - 1));
   const heroTitle = cleanHeroTitle(current.title);
-  const dotCount = Math.min(usable.length, MAX_DOTS);
-  const activeDot = displayIndex % dotCount;
 
   return (
-    // isolate + z-0: keep internal z-index (dots) from competing with page content below
+    // isolate + z-0: keep the hero's internal layering from competing with page content below
     <section
       className="relative z-0 isolate overflow-hidden rounded-2xl bg-surface sm:rounded-[28px]"
       aria-roledescription="carousel"
     >
       <div className="relative aspect-[16/10] sm:aspect-[16/9] lg:aspect-[21/9]">
-        {/* Decorative media — never steal taps meant for CTA / dots / page below */}
+        {/* Decorative media — never steal taps meant for the CTA or page below */}
         <div className="pointer-events-none absolute inset-0">
           <VideoThumb
             key={current.id}
@@ -124,7 +121,7 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
         </div>
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background via-background/55 to-transparent sm:via-background/50 sm:to-background/10" />
 
-        {/* Copy stack: none by default so it cannot cover dots; only CTA re-enables hits */}
+        {/* Copy stack: none by default so it cannot cover the CTA */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3.5 pb-11 sm:gap-4 sm:p-8 sm:pb-12 lg:max-w-2xl lg:p-10 lg:pb-14">
           <p className="hidden text-xs font-medium uppercase tracking-[0.18em] text-muted sm:block">
             Pilihan koleksi
@@ -156,41 +153,6 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
             </Button>
           </div>
         </div>
-
-        {usable.length > 1 ? (
-          // Full-width row is pointer-events-none so empty gutters never eat taps;
-          // only the centered dot cluster is interactive (min ~44px touch targets).
-          <div
-            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex items-end justify-center pb-1.5 sm:pb-2.5"
-            role="tablist"
-            aria-label="Pilihan hero"
-          >
-            <div className="pointer-events-auto flex items-center justify-center gap-0.5 sm:gap-1">
-              {usable.slice(0, MAX_DOTS).map((v, i) => {
-                const active = i === activeDot;
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    aria-label={`Slide ${i + 1}`}
-                    onClick={() => goTo(i)}
-                    className={`flex min-h-11 min-w-11 touch-manipulation items-center justify-center rounded-full transition-colors duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      active ? "text-foreground" : "text-foreground/35 hover:text-foreground/55"
-                    }`}
-                  >
-                    <span
-                      className={`rounded-full bg-current transition-all duration-300 ${
-                        active ? "h-1.5 w-4 sm:h-2 sm:w-5" : "h-1.5 w-1.5 sm:h-2 sm:w-2"
-                      }`}
-                    />
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ) : null}
       </div>
     </section>
   );
