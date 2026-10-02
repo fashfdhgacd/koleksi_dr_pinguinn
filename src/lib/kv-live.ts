@@ -5,7 +5,8 @@ import { resolveAnalyticsKV, type KVNamespaceLike } from "@/lib/analytics-kv";
 const ONLINE_PREFIX = "online:";
 const ROLL_PREFIX = "roll:";
 const UNIQ_PREFIX = "uniq:";
-const ONLINE_TTL_SEC = 150;
+/** ≥ presence window (120s) + margin; client heartbeat ~90s. */
+const ONLINE_TTL_SEC = 180;
 const ROLL_TTL_SEC = 90 * 24 * 3600;
 const FLUSH_MS = 20_000;
 const COUNT_CACHE_MS = 45_000;
@@ -162,22 +163,33 @@ export async function kvTouchLive(input: {
     const now = Date.now();
     const day = dayKey(now);
     await store.put(`${ONLINE_PREFIX}${id}`, "1", { expirationTtl: ONLINE_TTL_SEC });
-    if (countCache) countCache = null;
+    // Invalidate so peak uses a fresh concurrent count after this put.
+    countCache = null;
+    const onlineNow = Math.max(
+      1,
+      Number(input.onlineGuess) || 0,
+      await kvCountOnline(),
+    );
+
+    if (!rollMem || rollDay !== day) {
+      rollDay = day;
+      rollMem = parseRoll(await store.get(`${ROLL_PREFIX}${day}`));
+    }
+    // Peak tracks real concurrent users on every live touch (not only pageviews).
+    if (onlineNow > rollMem.peak) {
+      rollMem.peak = onlineNow;
+      rollDirty = true;
+    }
 
     if (input.recordView === false) {
       await flushRoll(false);
       return;
     }
 
-    if (!rollMem || rollDay !== day) {
-      rollDay = day;
-      rollMem = parseRoll(await store.get(`${ROLL_PREFIX}${day}`));
-    }
     rollMem.views += 1;
-    rollMem.peak = Math.max(rollMem.peak, input.onlineGuess || 0, 1);
     if (input.path) {
-      const p = input.path.startsWith("/") ? input.path : `/${input.path}`;
-      bumpMap(rollMem.paths, p.split("?")[0] || "/");
+      const pathKey = input.path.startsWith("/") ? input.path : `/${input.path}`;
+      bumpMap(rollMem.paths, pathKey.split("?")[0] || "/");
     }
     if (input.ref) bumpMap(rollMem.refs, input.ref);
     if (input.device && input.device !== "bot") bumpMap(rollMem.devices, input.device);
@@ -216,7 +228,8 @@ export function rollToStats(roll: KvRoll, online: number, history: KvDayRow[] = 
       device: r.key as "mobile" | "desktop" | "tablet" | "bot" | "other",
       views: r.views,
     })),
-    persistOk: true,
+    // Caller (liveOwnerPayload) merges real persistOk/hint from getOwnerStats.
+    persistOk: false,
     storage: "kv" as const,
     presence: "kv" as const,
     analytics: "operational" as const,
