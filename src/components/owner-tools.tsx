@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 
 const CATS = [
   { slug: "", label: "Semua" },
+  { slug: "terbaru", label: "Terbaru" },
   { slug: "jav", label: "Jav" },
   { slug: "jilbab", label: "Jilbab" },
   { slug: "amatir", label: "Amatir" },
@@ -201,7 +202,7 @@ export function OwnerTools({ secret }: { secret: string }) {
             onChange={(e) => setUploadCat(e.target.value)}
             className="h-10 rounded-lg border border-white/[0.08] bg-[#0f0f11] px-3 text-sm text-zinc-200"
           >
-            {CATS.filter((c) => c.slug).map((c) => (
+            {CATS.filter((c) => c.slug && c.slug !== "terbaru").map((c) => (
               <option key={c.slug} value={c.slug}>
                 {c.label}
               </option>

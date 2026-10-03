@@ -11,7 +11,7 @@ const COUNTS = [5, 10, 15, 20, 25, 30, 50, 100];
 const MAIN_KEYBOARD = {
   keyboard: [
     [{ text: "Minta 10" }, { text: "Minta 25" }, { text: "Minta 100" }],
-    [{ text: "Semua" }, { text: "Amatir" }, { text: "Videy" }],
+    [{ text: "Terbaru" }, { text: "Semua" }, { text: "Amatir" }, { text: "Videy" }],
     [{ text: "Jav" }, { text: "AI+" }, { text: "Lulu" }],
     [{ text: "Jilbab" }, { text: "ABG" }, { text: "Streamtape" }],
     [{ text: "Lagi" }, { text: "Menu" }],
@@ -131,6 +131,7 @@ function hasCount(text: string): boolean {
 function parseCat(text: string): string {
   const t = text.toLowerCase().trim();
   const map: Record<string, string> = {
+    terbaru: "terbaru",
     jilbab: "jilbab",
     amatir: "amatir",
     abg: "abg",
