@@ -1,4 +1,5 @@
 import { listCategory, listLatest } from "@/lib/catalog/local";
+import { DEFAULT_PAGE_SIZE } from "@/lib/catalog/types";
 import type { VideoCard } from "@/lib/catalog/types";
 
 export function titleKey(t: string): string {
@@ -30,11 +31,15 @@ export async function collectSharePool(opts: {
   const all: VideoCard[] = [];
   const seen = new Set<string>();
   const seenTitle = new Set<string>();
-  const maxPages = 150;
+  const category = String(opts.category || "").trim();
+  const terbaruOnly = category.toLowerCase() === "terbaru";
+  const maxPages = terbaruOnly ? 1 : 150;
   for (let p = 1; p <= maxPages; p++) {
-    const page = opts.category
-      ? await listCategory(opts.category, p, 48)
-      : await listLatest(p, 48);
+    const page = terbaruOnly
+      ? await listLatest(1, DEFAULT_PAGE_SIZE)
+      : opts.category
+        ? await listCategory(opts.category, p, 48)
+        : await listLatest(p, 48);
     for (const it of page.items) {
       if (!it?.id || seen.has(it.id)) continue;
       const tk = titleKey(it.title || "");
@@ -49,7 +54,7 @@ export async function collectSharePool(opts: {
       if (tk) seenTitle.add(tk);
       all.push(it);
     }
-    if (!page.hasMore) break;
+    if (terbaruOnly || !page.hasMore) break;
   }
 
   const want = Math.min(SHARE_MAX, Math.max(1, opts.count));
