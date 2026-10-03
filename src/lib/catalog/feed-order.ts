@@ -1,6 +1,11 @@
 /** Urutan feed Terbaru beranda (IndoAV halaman 1, lalu campur by date). */
 export function itemDate(item: { createdAt?: string | number; date?: string }): number {
-  return Number(item.createdAt || item.date || 0);
+  const raw = item.createdAt || item.date || 0;
+  if (typeof raw === "number") return Number.isFinite(raw) ? raw : 0;
+  const parsed = Date.parse(raw);
+  if (Number.isFinite(parsed)) return parsed;
+  const numeric = Number(raw);
+  return Number.isFinite(numeric) ? numeric : 0;
 }
 
 export function sortByDateDesc<T extends { createdAt?: string | number; date?: string }>(items: T[]): T[] {
