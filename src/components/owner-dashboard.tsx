@@ -6,6 +6,7 @@ import { Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OwnerTools } from "@/components/owner-tools";
+import { OwnerChart } from "@/components/owner-chart";
 
 const SECRET_KEY = "drp_owner_secret";
 const SECRET_LEGACY = "drp_online_secret";
@@ -266,14 +267,24 @@ export function OwnerDashboard() {
               {error ? <p className="mt-3 text-xs text-red-400">{error}</p> : null}
             </section>
 
-            <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <Stat label="Unik hari ini" value={fmt(stats?.uniqueToday)} hint={vsUniq} />
               <Stat label="Tayang hari ini" value={fmt(stats?.viewsToday)} hint={vsViews} />
+              <Stat label="Puncak hari ini" value={fmt(stats?.peakToday)} />
               <Stat label="Kemarin" value={fmt(stats?.yesterdayViews)} />
               <Stat label="7 hari" value={fmt(stats?.views7d)} />
             </section>
 
             <OwnerTools secret={secret} />
+
+            {days.length ? (
+              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Grafik 14 hari (WIB)</h2>
+                <div className="mt-3">
+                  <OwnerChart days={days} />
+                </div>
+              </section>
+            ) : null}
 
             {days.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
@@ -304,7 +315,7 @@ export function OwnerDashboard() {
                   </table>
                 </div>
                 <p className="mt-3 text-[11px] text-zinc-600">
-                  Data sebelum deploy ini bisa kosong. Mulai hari ini tersimpan 90 hari.
+                  Kartu atas dan baris "Hari ini" memakai sumber yang sama (Postgres pageview / KV daystats). Hari yang sudah tersimpan salah tidak bisa di-backfill otomatis.
                 </p>
               </section>
             ) : null}
