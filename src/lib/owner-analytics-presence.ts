@@ -1,16 +1,18 @@
 /**
  * Owner analytics presence + hit recording.
  */
-import { getSql } from "@/lib/db";
+import { dbSource, getSql } from "@/lib/db";
+import { resolveAnalyticsKV } from "@/lib/analytics-kv";
+import { kvCountOnline } from "@/lib/kv-live";
 import {
   ONLINE_KV_PREFIX,
   ONLINE_KV_TTL_SEC,
   ONLINE_WINDOW_MS,
+  type OwnerStats,
   bumpPeakKv,
   classifyBrowser,
   classifyDevice,
   dayKey,
-  getKV,
   hourUtcBucket,
   mem,
   normalizePath,
@@ -36,32 +38,14 @@ function touchMemory(id: string, now = Date.now()): number {
   return countMemoryOnline(now);
 }
 
-/** List active online:* keys from KV (shared across Workers isolates). */
-export async function countKvOnline(now = Date.now()): Promise<number> {
+/**
+ * Active online:* keys in KV (shared across Workers isolates). One cached list()
+ * call — the old per-key get() loop cost N KV reads per heartbeat and ignored
+ * keys written by kv-live (value "1" instead of a timestamp).
+ */
+export async function countKvOnline(_now = Date.now()): Promise<number> {
   try {
-    const kv = await getKV();
-    if (!kv) return 0;
-    let cursor: string | undefined;
-    let total = 0;
-    for (let page = 0; page < 10; page++) {
-      const listed = await kv.list({
-        prefix: ONLINE_KV_PREFIX,
-        limit: 1000,
-        cursor,
-      });
-      for (const k of listed.keys) {
-        // Prefer TTL on keys; also verify value timestamp if present
-        const raw = await kv.get(k.name);
-        if (!raw) continue;
-        const ts = Number(raw);
-        if (Number.isFinite(ts) && now - ts > ONLINE_WINDOW_MS) continue;
-        total += 1;
-      }
-      if (listed.list_complete) break;
-      cursor = listed.cursor;
-      if (!cursor) break;
-    }
-    return total;
+    return await kvCountOnline();
   } catch {
     return 0;
   }
@@ -113,7 +97,7 @@ export async function analyticsHealth(): Promise<{
   }
 }
 
-export async function touchOnline(id: string): Promise<number> {
+export async function touchOnline(id: string, opts: { skipKv?: boolean } = {}): Promise<number> {
   const sid = safeId(id);
   if (!sid) return 0;
   const now = Date.now();
@@ -121,8 +105,10 @@ export async function touchOnline(id: string): Promise<number> {
   // 1) Always update memory (works even if DB/KV down)
   touchMemory(sid, now);
 
-  // 2) KV write-through (shared)
-  void optionalKvPut(`${ONLINE_KV_PREFIX}${sid}`, String(now), ONLINE_KV_TTL_SEC);
+  // 2) KV write-through (shared). /api/online already wrote online:<id> via kvTouchLive.
+  if (!opts.skipKv) {
+    await optionalKvPut(`${ONLINE_KV_PREFIX}${sid}`, String(now), ONLINE_KV_TTL_SEC);
+  }
 
   // 3) Postgres when available
   try {
@@ -139,6 +125,7 @@ export async function touchOnline(id: string): Promise<number> {
     );
     const dbCount = Number(rows[0]?.n || 0);
     const dk = dayKey(now);
+    // Real concurrent visitors: PG sessions seen in the last 2 min (all isolates).
     const best = Math.max(dbCount, countMemoryOnline(now));
     await sql.query(
       `insert into analytics_daily_peak (day_wib, peak, updated_at)
@@ -149,12 +136,13 @@ export async function touchOnline(id: string): Promise<number> {
       [dk, best],
     );
     const total = Math.max(best, await countKvOnline(now));
-    void bumpPeakKv(total);
+    // Mirror into KV daystats so the KV fallback history keeps a real peak too.
+    await bumpPeakKv(total);
     return total;
   } catch (err) {
     console.error("[analytics] touchOnline db failed — using memory/KV", err);
     const total = Math.max(countMemoryOnline(now), await countKvOnline(now));
-    void bumpPeakKv(total);
+    await bumpPeakKv(total);
     return total;
   }
 }
@@ -182,11 +170,9 @@ export async function recordHit(input: {
     `${now.toString(36)}${Math.random().toString(36).slice(2, 10)}`;
   const eventType = (input.eventType || "pageview").slice(0, 32);
 
-  // Keep presence warm on pageview too
-  if (sessionId) {
-    touchMemory(sessionId, now);
-    void optionalKvPut(`${ONLINE_KV_PREFIX}${sessionId}`, String(now), ONLINE_KV_TTL_SEC);
-  }
+  // Keep presence warm on pageview too (KV online:<id> is written by the caller's
+  // presence touch — writing the same key again here hit KV's 1 write/s/key limit).
+  if (sessionId) touchMemory(sessionId, now);
 
   try {
     const sql = await getSql();
@@ -217,12 +203,9 @@ export async function recordHit(input: {
        set page_views = analytics_hourly.page_views + 1`,
       [bucket.toISOString()],
     );
-    void optionalKvPut(
-      `hit:${now}:${eventId.slice(0, 8)}`,
-      JSON.stringify({ path, ref, device, host, ts: now }),
-      86400,
-    );
-    void recordHitKv({ visitorId, sessionId, path });
+    // KV daystats mirror = fallback history if Postgres goes down later today.
+    // Awaited: un-awaited promises are cancelled once a Worker returns its response.
+    await recordHitKv({ visitorId, sessionId, path }).catch(() => undefined);
   } catch (err) {
     console.error("[analytics] recordHit failed", err);
     try {
@@ -231,9 +214,4 @@ export async function recordHit(input: {
       console.error("[analytics] recordHitKv failed", e2);
     }
   }
-}
-
-function n(v: unknown): number {
-  const x = Number(v);
-  return Number.isFinite(x) && x > 0 ? x : 0;
 }

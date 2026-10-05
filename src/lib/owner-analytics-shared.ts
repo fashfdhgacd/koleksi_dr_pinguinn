@@ -14,6 +14,8 @@ export type PageHit = {
   ts: number;
 };
 
+export type DayRow = { day: string; views: number; unique: number; peak: number };
+
 export type OwnerStats = {
   online: number;
   count: number;
@@ -24,6 +26,12 @@ export type OwnerStats = {
   uniqueToday: number;
   views7d: number;
   views30d: number;
+  /** Last 14 WIB days, newest first. days[0] is today — same numbers as the top cards. */
+  days: DayRow[];
+  yesterdayViews: number;
+  yesterdayUnique: number;
+  /** Where days/top cards came from (single source of truth for this response). */
+  historySource: "postgres" | "kv" | "none";
   hourly: { hour: string; views: number }[];
   topPaths: { path: string; views: number }[];
   topRefs: { ref: string; views: number }[];
@@ -44,7 +52,11 @@ export const ONLINE_KV_PREFIX = "online:";
 export const ONLINE_KV_TTL_SEC = 180; // 3 min TTL (≥ 2 min window + margin)
 export const DAYSTATS_KV_PREFIX = "daystats:";
 export const UV_KV_PREFIX = "uv:";
-export const DAYSTATS_TTL_SEC = 172800; // 48h — keep today+yesterday
+/** Keep ≥14 WIB days so the KV fallback can render the full history table. */
+export const DAYSTATS_TTL_SEC = 16 * 86400;
+/** Unique-visitor marker only needs to outlive its WIB day. */
+export const UV_TTL_SEC = 36 * 3600;
+export const HISTORY_DAYS = 14;
 
 type MemState = {
   lastTelegramAlertAt: number;
@@ -146,6 +158,10 @@ export function emptyStats(partial: Partial<OwnerStats> = {}): OwnerStats {
     uniqueToday: 0,
     views7d: 0,
     views30d: 0,
+    days: [],
+    yesterdayViews: 0,
+    yesterdayUnique: 0,
+    historySource: "none",
     hourly: emptyHourly(),
     topPaths: [],
     topRefs: [],
@@ -223,12 +239,13 @@ export async function recordHitKv(input: {
     const existed = await optionalKvGet(uvKey);
     if (!existed) {
       stats.unique += 1;
-      await optionalKvPut(uvKey, "1", DAYSTATS_TTL_SEC);
+      await optionalKvPut(uvKey, "1", UV_TTL_SEC);
     }
   }
 
-  const online = Math.max(stats.peak, input.onlineHint || 0, 1);
-  if (online > stats.peak) stats.peak = online;
+  // Peak = real concurrent count (bumpPeakKv from presence); only raise, never fake.
+  const hint = Math.max(0, Number(input.onlineHint) || 0);
+  if (hint > stats.peak) stats.peak = hint;
 
   await writeDayStatsKv(dk, stats);
   return stats;
@@ -242,6 +259,18 @@ export async function bumpPeakKv(online: number): Promise<void> {
     stats.peak = online;
     await writeDayStatsKv(dk, stats);
   }
+}
+
+/** WIB day keys, newest first: [today, yesterday, ...]. */
+export function lastDayKeys(count = HISTORY_DAYS, now = Date.now()): string[] {
+  return Array.from({ length: count }, (_, i) => dayKey(now - i * 86400_000));
+}
+
+/** KV fallback history (per-request daystats counters), newest first. */
+export async function readDayStatsHistoryKv(count = HISTORY_DAYS, now = Date.now()): Promise<DayRow[]> {
+  const keys = lastDayKeys(count, now);
+  const rows = await Promise.all(keys.map((day) => readDayStatsKv(day)));
+  return keys.map((day, i) => ({ day, ...rows[i] }));
 }
 
 export async function getKV() {
