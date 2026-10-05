@@ -129,6 +129,37 @@ async function maybePruneD1(d1: NonNullable<Awaited<ReturnType<typeof readyD1>>>
   }
 }
 
+/**
+ * DB history only covers days since the DB started recording. For past days with
+ * no DB rows, fall back to KV daystats, then the legacy KV roll, so the table and
+ * cards don't drop to 0 after a storage switch. Today always keeps the DB value.
+ */
+async function mergeKvHistory(history: DayRow[], now: number): Promise<{ days: DayRow[]; usedKv: boolean }> {
+  let kvDays = new Map<string, DayRow>();
+  try {
+    kvDays = new Map((await readDayStatsHistoryKv(HISTORY_DAYS, now)).map((d) => [d.day, d]));
+  } catch {
+    /* ignore */
+  }
+  let rolls = new Map<string, DayRow>();
+  try {
+    rolls = new Map((await kvReadHistory(HISTORY_DAYS)).map((r) => [r.day, r as DayRow]));
+  } catch {
+    /* ignore */
+  }
+  let usedKv = false;
+  const days = history.map((d, i) => {
+    if (i === 0 || d.views > 0 || d.unique > 0) return d;
+    const k = kvDays.get(d.day);
+    const r = rolls.get(d.day);
+    const src = k && k.views > 0 ? k : r && r.views > 0 ? r : null;
+    if (!src) return d;
+    usedKv = true;
+    return { day: d.day, views: src.views, unique: src.unique, peak: Math.max(d.peak, src.peak || 0) };
+  });
+  return { days, usedKv };
+}
+
 export async function getOwnerStats(): Promise<OwnerStats> {
   const now = Date.now();
   const dk = dayKey(now);
@@ -230,7 +261,10 @@ export async function getOwnerStats(): Promise<OwnerStats> {
 
     dbOnline = n(onlineRows[0]?.n);
     const online = Math.max(memN, kvN, dbOnline);
+    const merged = await mergeKvHistory(history, now);
+    history = merged.days;
     const cards = cardsFromDays(history, online);
+    const merged30 = history.slice(1).reduce((s, d) => s + d.views, 0) + cards.viewsToday;
 
     const hourMap = new Map<string, number>();
     for (const row of hourlyRows) {
@@ -259,7 +293,7 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       ...cards,
       peakDay: dk,
       views24h: n(views24[0]?.n),
-      views30d: n(views30d[0]?.n),
+      views30d: merged.usedKv ? Math.max(n(views30d[0]?.n), merged30) : n(views30d[0]?.n),
       historySource: source === "d1" ? "d1" : "postgres",
       hourly,
       topPaths: pathRows.map((r) => ({ path: r.path || "/", views: n(r.views) })),
