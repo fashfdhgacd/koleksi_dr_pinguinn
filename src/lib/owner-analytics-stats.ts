@@ -17,6 +17,7 @@ import {
 } from "@/lib/owner-analytics-shared";
 import { countKvOnline, countMemoryOnline, describeDbError } from "@/lib/owner-analytics-presence";
 import { kvReadHistory } from "@/lib/kv-live";
+import { d1HistoryRows, d1Prune, d1StatsParts, readyD1 } from "@/lib/analytics-d1";
 
 /** WIB calendar day of a timestamptz column (no tz-name dependency). */
 const WIB_DAY = `((created_at at time zone 'UTC') + interval '7 hours')::date`;
@@ -39,7 +40,13 @@ async function readHistoryPg(
   today: string,
   days = HISTORY_DAYS,
 ): Promise<DayRow[]> {
-  const rows = await sql.query<{ day: string; views: number; uniq: number; peak: number; est: number }>(
+  const rows = await sql.query<{
+    day: string;
+    views: number;
+    uniq: number;
+    peak: number;
+    est: number;
+  }>(
     `with ev as (
        select ${WIB_DAY} as day_wib,
               count(*)::int as views,
@@ -71,6 +78,13 @@ async function readHistoryPg(
         and not exists (select 1 from ev where ev.day_wib = p.day_wib)`,
     [today, days],
   );
+  return rowsToDays(rows, today, days);
+}
+
+type HistoryRow = { day: string; views: number; uniq: number; peak: number; est: number };
+
+/** Normalize per-day rows (Postgres or D1) into newest-first DayRow[] with gaps filled. */
+function rowsToDays(rows: HistoryRow[], today: string, days: number): DayRow[] {
   const byDay = new Map<string, DayRow>();
   for (const r of rows) {
     byDay.set(String(r.day), {
@@ -103,6 +117,18 @@ function cardsFromDays(days: DayRow[], online: number) {
   };
 }
 
+/** Throttled D1 prune (once per 12h per isolate), piggybacked on owner stats reads. */
+const pruneState = globalThis as typeof globalThis & { __d1LastPruneAt__?: number };
+async function maybePruneD1(d1: NonNullable<Awaited<ReturnType<typeof readyD1>>>, now: number) {
+  if (now - (pruneState.__d1LastPruneAt__ || 0) < 12 * 3600_000) return;
+  pruneState.__d1LastPruneAt__ = now;
+  try {
+    await d1Prune(d1, now, 90);
+  } catch (err) {
+    console.error("[analytics] d1 prune failed", err);
+  }
+}
+
 export async function getOwnerStats(): Promise<OwnerStats> {
   const now = Date.now();
   const dk = dayKey(now);
@@ -118,57 +144,89 @@ export async function getOwnerStats(): Promise<OwnerStats> {
   }
 
   try {
-    const sql = await getSql();
-    const [
-      onlineRows,
-      history,
-      views24,
-      views30d,
-      hourlyRows,
-      pathRows,
-      refRows,
-      deviceRows,
-      hostRows,
-    ] = await Promise.all([
-      sql.query<{ n: number }>(
-        `select count(*)::int as n from analytics_sessions where last_seen_at >= now() - interval '2 minutes'`,
-      ),
-      readHistoryPg(sql, dk),
-      sql.query<{ n: number }>(
-        `select count(*)::int as n from analytics_events where created_at >= now() - interval '24 hours' and event_type = 'pageview'`,
-      ),
-      sql.query<{ n: number }>(
-        `select count(*)::int as n from analytics_events where created_at >= now() - interval '30 days' and event_type = 'pageview'`,
-      ),
-      sql.query<{ hour_utc: string | Date; page_views: number }>(
-        `select hour_utc, page_views from analytics_hourly
+    const d1 = await readyD1();
+    const source: "d1" | "postgres" | "pglite" = d1
+      ? "d1"
+      : getDbSource() === "neon"
+        ? "postgres"
+        : "pglite";
+    let onlineRows: { n: number }[];
+    let history: DayRow[];
+    let views24: { n: number }[];
+    let views30d: { n: number }[];
+    let hourlyRows: { hour_utc: string | Date; page_views: number }[];
+    let pathRows: { path: string; views: number }[];
+    let refRows: { ref: string; views: number }[];
+    let deviceRows: { device: DeviceKind; views: number }[];
+    let hostRows: { host: string; views: number }[];
+    if (d1) {
+      await maybePruneD1(d1, now);
+      const [parts, histRows] = await Promise.all([
+        d1StatsParts(d1, dk, now),
+        d1HistoryRows(d1, dk, HISTORY_DAYS),
+      ]);
+      onlineRows = [{ n: parts.online }];
+      history = rowsToDays(histRows, dk, HISTORY_DAYS);
+      views24 = [{ n: parts.views24 }];
+      views30d = [{ n: parts.views30d }];
+      hourlyRows = parts.hourlyRows;
+      pathRows = parts.pathRows;
+      refRows = parts.refRows;
+      deviceRows = parts.deviceRows as { device: DeviceKind; views: number }[];
+      hostRows = parts.hostRows;
+    } else {
+      const sql = await getSql();
+      [
+        onlineRows,
+        history,
+        views24,
+        views30d,
+        hourlyRows,
+        pathRows,
+        refRows,
+        deviceRows,
+        hostRows,
+      ] = await Promise.all([
+        sql.query<{ n: number }>(
+          `select count(*)::int as n from analytics_sessions where last_seen_at >= now() - interval '2 minutes'`,
+        ),
+        readHistoryPg(sql, dk),
+        sql.query<{ n: number }>(
+          `select count(*)::int as n from analytics_events where created_at >= now() - interval '24 hours' and event_type = 'pageview'`,
+        ),
+        sql.query<{ n: number }>(
+          `select count(*)::int as n from analytics_events where created_at >= now() - interval '30 days' and event_type = 'pageview'`,
+        ),
+        sql.query<{ hour_utc: string | Date; page_views: number }>(
+          `select hour_utc, page_views from analytics_hourly
          where hour_utc >= now() - interval '24 hours'`,
-      ),
-      sql.query<{ path: string; views: number }>(
-        `select path, count(*)::int as views from analytics_events
+        ),
+        sql.query<{ path: string; views: number }>(
+          `select path, count(*)::int as views from analytics_events
          where ${TODAY_WINDOW} and event_type = 'pageview'
          group by path order by views desc limit 15`,
-        [dk],
-      ),
-      sql.query<{ ref: string; views: number }>(
-        `select coalesce(referrer,'(direct)') as ref, count(*)::int as views from analytics_events
+          [dk],
+        ),
+        sql.query<{ ref: string; views: number }>(
+          `select coalesce(referrer,'(direct)') as ref, count(*)::int as views from analytics_events
          where ${TODAY_WINDOW} and event_type = 'pageview'
          group by 1 order by views desc limit 12`,
-        [dk],
-      ),
-      sql.query<{ device: DeviceKind; views: number }>(
-        `select coalesce(device_type,'other') as device, count(*)::int as views from analytics_events
+          [dk],
+        ),
+        sql.query<{ device: DeviceKind; views: number }>(
+          `select coalesce(device_type,'other') as device, count(*)::int as views from analytics_events
          where ${TODAY_WINDOW} and event_type = 'pageview'
          group by 1`,
-        [dk],
-      ),
-      sql.query<{ host: string; views: number }>(
-        `select coalesce(host,'(unknown)') as host, count(*)::int as views from analytics_events
+          [dk],
+        ),
+        sql.query<{ host: string; views: number }>(
+          `select coalesce(host,'(unknown)') as host, count(*)::int as views from analytics_events
          where ${TODAY_WINDOW} and event_type = 'pageview'
          group by 1 order by views desc limit 6`,
-        [dk],
-      ),
-    ]);
+          [dk],
+        ),
+      ]);
+    }
 
     dbOnline = n(onlineRows[0]?.n);
     const online = Math.max(memN, kvN, dbOnline);
@@ -185,7 +243,7 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       views: hourMap.get(slot.hour) || 0,
     }));
 
-    const persistOk = getDbSource() === "neon";
+    const persistOk = source !== "pglite";
     const presence: OwnerStats["presence"] =
       dbOnline > 0 && (memN > 0 || kvN > 0)
         ? "hybrid"
@@ -202,20 +260,20 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       peakDay: dk,
       views24h: n(views24[0]?.n),
       views30d: n(views30d[0]?.n),
-      historySource: "postgres",
+      historySource: source === "d1" ? "d1" : "postgres",
       hourly,
       topPaths: pathRows.map((r) => ({ path: r.path || "/", views: n(r.views) })),
       topRefs: refRows.map((r) => ({ ref: r.ref || "(direct)", views: n(r.views) })),
       devices: deviceRows.map((r) => ({ device: r.device || "other", views: n(r.views) })),
       hosts: hostRows.map((r) => ({ host: r.host || "(unknown)", views: n(r.views) })),
-      storage: getDbSource() === "neon" ? "postgres" : "pglite",
+      storage: source,
       persistOk,
       database: "connected",
       analytics: "operational",
       presence,
       hint: persistOk
         ? undefined
-        : "DATABASE_URL belum di-set. Online pakai memory/KV; isi Neon URL agar history tahan redeploy.",
+        : "Database belum terpasang. Pasang binding D1 ANALYTICS_DB (atau DATABASE_URL) agar history tahan redeploy.",
     });
   } catch (err) {
     console.error("[analytics] getOwnerStats failed", err);
@@ -241,7 +299,7 @@ export async function getOwnerStats(): Promise<OwnerStats> {
     const why = describeDbError(err);
     const whyText =
       why.db === "not_configured"
-        ? "DATABASE_URL tidak terbaca di Worker"
+        ? "binding D1 ANALYTICS_DB belum terpasang di Worker"
         : `koneksi DB gagal${why.code ? ` (${why.code})` : ""}`;
     const cards = cardsFromDays(history, online);
     const anyKv = history.some((d) => d.views > 0);
@@ -267,11 +325,19 @@ export async function getOwnerStats(): Promise<OwnerStats> {
 
 export async function pruneAnalytics(rawDays = 60): Promise<void> {
   try {
+    const d1 = await readyD1();
+    if (d1) {
+      await d1Prune(d1, Date.now(), 90);
+      return;
+    }
     const sql = await getSql();
-    await sql.query(`delete from analytics_events where created_at < now() - ($1 || ' days')::interval`, [
-      String(rawDays),
-    ]);
-    await sql.query(`delete from analytics_sessions where last_seen_at < now() - interval '2 days'`);
+    await sql.query(
+      `delete from analytics_events where created_at < now() - ($1 || ' days')::interval`,
+      [String(rawDays)],
+    );
+    await sql.query(
+      `delete from analytics_sessions where last_seen_at < now() - interval '2 days'`,
+    );
   } catch (err) {
     console.error("[analytics] prune failed", err);
   }

@@ -3,6 +3,15 @@
  */
 import { getDbSource, getSql } from "@/lib/db";
 import { resolveAnalyticsKV } from "@/lib/analytics-kv";
+import {
+  d1BumpPeak,
+  d1CountOnline,
+  d1Ping,
+  d1RecordHit,
+  d1TouchSession,
+  getD1,
+  readyD1,
+} from "@/lib/analytics-d1";
 import { kvCountOnline } from "@/lib/kv-live";
 import {
   ONLINE_KV_PREFIX,
@@ -53,6 +62,8 @@ export async function countKvOnline(_now = Date.now()): Promise<number> {
 
 async function countDbOnline(): Promise<number> {
   try {
+    const d1 = await readyD1();
+    if (d1) return await d1CountOnline(d1);
     const sql = await getSql();
     const rows = await sql.query<{ n: number }>(
       `select count(*)::int as n from analytics_sessions
@@ -72,9 +83,10 @@ export async function countOnline(): Promise<number> {
 }
 
 /** Non-secret DB failure category for diagnostics (never includes the URL/host). */
-export type DbProblem = "ok" | "not_configured" | "connect_error" | "query_error";
+export type DbProblem = "ok" | "not_configured" | "connect_error" | "query_error" | "error";
 
 export function describeDbError(err: unknown): { db: DbProblem; code?: string } {
+  if ((err as { __d1?: boolean } | null)?.__d1) return { db: "error", code: "d1" };
   if (getDbSource() === "none") return { db: "not_configured" };
   const raw = (err as { code?: unknown } | null)?.code;
   let code = typeof raw === "string" && /^[A-Za-z0-9_]{1,24}$/.test(raw) ? raw : undefined;
@@ -104,6 +116,29 @@ export async function analyticsHealth(): Promise<{
   code?: string;
   timestamp: string;
 }> {
+  const d1 = await getD1();
+  if (d1) {
+    try {
+      await d1Ping(d1);
+      return {
+        database: "connected",
+        analytics: "operational",
+        storage: "d1",
+        db: "ok",
+        timestamp: new Date().toISOString(),
+      };
+    } catch {
+      const kv = await resolveAnalyticsKV();
+      return {
+        database: "error",
+        analytics: kv ? "operational" : "unavailable",
+        storage: kv ? "kv" : "error",
+        db: "error",
+        code: "d1",
+        timestamp: new Date().toISOString(),
+      };
+    }
+  }
   try {
     const sql = await getSql();
     await sql.query("select 1 as ok");
@@ -139,8 +174,17 @@ export async function touchOnline(id: string, opts: { skipKv?: boolean } = {}): 
     await optionalKvPut(`${ONLINE_KV_PREFIX}${sid}`, String(now), ONLINE_KV_TTL_SEC);
   }
 
-  // 3) Postgres when available
+  // 3) D1 when bound, else Postgres when available
   try {
+    const d1 = await readyD1();
+    if (d1) {
+      const dbCount = await d1TouchSession(d1, sid, now);
+      const best = Math.max(dbCount, countMemoryOnline(now));
+      await d1BumpPeak(d1, dayKey(now), best, now);
+      const total = Math.max(best, await countKvOnline(now));
+      await bumpPeakKv(total);
+      return total;
+    }
     const sql = await getSql();
     await sql.query(
       `insert into analytics_sessions (session_id, visitor_id, last_seen_at)
@@ -195,8 +239,7 @@ export async function recordHit(input: {
   const sessionId = safeId(input.sessionId || input.visitorId || "");
   const visitorId = safeId(input.visitorId || sessionId);
   const eventId =
-    safeId(input.eventId || "") ||
-    `${now.toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+    safeId(input.eventId || "") || `${now.toString(36)}${Math.random().toString(36).slice(2, 10)}`;
   const eventType = (input.eventType || "pageview").slice(0, 32);
 
   // Keep presence warm on pageview too (KV online:<id> is written by the caller's
@@ -204,6 +247,25 @@ export async function recordHit(input: {
   if (sessionId) touchMemory(sessionId, now);
 
   try {
+    const d1 = await readyD1();
+    if (d1) {
+      await d1RecordHit(d1, {
+        id: eventId,
+        eventType,
+        visitorId: visitorId || null,
+        sessionId: sessionId || null,
+        path,
+        ref,
+        ua: (input.ua || "").slice(0, 300),
+        device,
+        browser,
+        host,
+        now,
+        hourUtc: hourUtcBucket(now).toISOString(),
+      });
+      await recordHitKv({ visitorId, sessionId, path }).catch(() => undefined);
+      return;
+    }
     const sql = await getSql();
     await sql.query(
       `insert into analytics_events
