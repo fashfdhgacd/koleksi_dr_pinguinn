@@ -1,10 +1,17 @@
-/** Live visitors + daily rollup. Sedikit panggilan KV per request. */
+/**
+ * Live visitors (online:<id> keys) + per-isolate rollup of top paths/refs/devices.
+ *
+ * NOTE: the roll is buffered in isolate memory and flushed with last-writer-wins,
+ * so its view/unique/peak totals undercount badly when several Workers isolates
+ * are live (that was the "Riwayat 14 hari" vs top-card mismatch). Daily totals now
+ * come from Postgres events (or KV daystats fallback) in owner-analytics-stats;
+ * this roll is only used as a fallback for the top lists.
+ */
 
 import { resolveAnalyticsKV, type KVNamespaceLike } from "@/lib/analytics-kv";
 
 const ONLINE_PREFIX = "online:";
 const ROLL_PREFIX = "roll:";
-const UNIQ_PREFIX = "uniq:";
 /** ≥ presence window (120s) + margin; client heartbeat ~90s. */
 const ONLINE_TTL_SEC = 180;
 const ROLL_TTL_SEC = 90 * 24 * 3600;
@@ -163,8 +170,8 @@ export async function kvTouchLive(input: {
     const now = Date.now();
     const day = dayKey(now);
     await store.put(`${ONLINE_PREFIX}${id}`, "1", { expirationTtl: ONLINE_TTL_SEC });
-    // Invalidate so peak uses a fresh concurrent count after this put.
-    countCache = null;
+    // Cached list() (45s) — avoids one KV list per heartbeat. Real peak is
+    // recorded by touchOnline (Postgres sessions / KV daystats).
     const onlineNow = Math.max(
       1,
       Number(input.onlineGuess) || 0,
@@ -193,13 +200,7 @@ export async function kvTouchLive(input: {
     }
     if (input.ref) bumpMap(rollMem.refs, input.ref);
     if (input.device && input.device !== "bot") bumpMap(rollMem.devices, input.device);
-
-    const uniqKey = `${UNIQ_PREFIX}${day}:${id}`;
-    const seen = await store.get(uniqKey);
-    if (!seen) {
-      rollMem.unique += 1;
-      await store.put(uniqKey, "1", { expirationTtl: 36 * 3600 });
-    }
+    // Unique visitors are counted by recordHitKv (uv:<day>:<id>) — no second marker here.
     rollDirty = true;
     historyCache = null;
     await flushRoll(false);
