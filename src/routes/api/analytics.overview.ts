@@ -40,6 +40,7 @@ export const Route = createFileRoute("/api/analytics/overview")({
           storage: stats.storage,
           persistOk: stats.persistOk,
           topPaths: stats.topPaths,
+          topVideos: stats.topVideos,
           topRefs: stats.topRefs,
           devices: stats.devices,
         });
