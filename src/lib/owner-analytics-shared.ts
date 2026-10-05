@@ -31,13 +31,13 @@ export type OwnerStats = {
   yesterdayViews: number;
   yesterdayUnique: number;
   /** Where days/top cards came from (single source of truth for this response). */
-  historySource: "postgres" | "kv" | "none";
+  historySource: "d1" | "postgres" | "kv" | "none";
   hourly: { hour: string; views: number }[];
   topPaths: { path: string; views: number }[];
   topRefs: { ref: string; views: number }[];
   devices: { device: DeviceKind; views: number }[];
   hosts: { host: string; views: number }[];
-  storage: "postgres" | "pglite" | "kv" | "kv-rest" | "memory" | "error";
+  storage: "d1" | "postgres" | "pglite" | "kv" | "kv-rest" | "memory" | "error";
   persistOk: boolean;
   database: "connected" | "error";
   analytics: "operational" | "unavailable";
