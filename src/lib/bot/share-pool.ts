@@ -1,4 +1,5 @@
 import { listCategory, listLatest } from "@/lib/catalog/local";
+import { DEFAULT_PAGE_SIZE } from "@/lib/catalog/types";
 import type { VideoCard } from "@/lib/catalog/types";
 
 export function titleKey(t: string): string {
@@ -30,11 +31,20 @@ export async function collectSharePool(opts: {
   const all: VideoCard[] = [];
   const seen = new Set<string>();
   const seenTitle = new Set<string>();
+  const category = String(opts.category || "").trim();
+  const terbaruOnly = category.toLowerCase() === "terbaru";
+  const want = Math.min(SHARE_MAX, Math.max(1, opts.count));
+  const excludeIds = new Set(opts.excludeIds.map((s) => s.toLowerCase()));
+  const excludeTitles = new Set((opts.excludeTitles || []).map(titleKey));
   const maxPages = 150;
+  let terbaruFresh = 0;
+  let catalogDone = false;
   for (let p = 1; p <= maxPages; p++) {
-    const page = opts.category
-      ? await listCategory(opts.category, p, 48)
-      : await listLatest(p, 48);
+    const page = terbaruOnly
+      ? await listLatest(p, DEFAULT_PAGE_SIZE)
+      : opts.category
+        ? await listCategory(opts.category, p, 48)
+        : await listLatest(p, 48);
     for (const it of page.items) {
       if (!it?.id || seen.has(it.id)) continue;
       const tk = titleKey(it.title || "");
@@ -48,13 +58,18 @@ export async function collectSharePool(opts: {
       seen.add(it.id);
       if (tk) seenTitle.add(tk);
       all.push(it);
+      if (terbaruOnly) {
+        const used = excludeIds.has(it.id.toLowerCase()) || Boolean(tk && excludeTitles.has(tk));
+        if (!used) terbaruFresh++;
+      }
     }
-    if (!page.hasMore) break;
+    if (!page.hasMore) {
+      catalogDone = true;
+      break;
+    }
+    if (terbaruOnly && terbaruFresh >= want) break;
   }
 
-  const want = Math.min(SHARE_MAX, Math.max(1, opts.count));
-  const excludeIds = new Set(opts.excludeIds.map((s) => s.toLowerCase()));
-  const excludeTitles = new Set((opts.excludeTitles || []).map(titleKey));
   let fresh = all.filter((it) => {
     if (excludeIds.has(it.id.toLowerCase())) return false;
     const tk = titleKey(it.title || "");
@@ -62,11 +77,16 @@ export async function collectSharePool(opts: {
     return true;
   });
   let reset = false;
-  if (fresh.length < want && all.length >= want) {
+  if (terbaruOnly) {
+    if (catalogDone && fresh.length === 0 && all.length > 0) {
+      fresh = all.slice();
+      reset = true;
+    }
+  } else if (fresh.length < want && all.length >= want) {
     fresh = all.slice();
     reset = true;
   }
-  shuffleInPlace(fresh);
+  if (!terbaruOnly) shuffleInPlace(fresh);
   return {
     items: fresh.slice(0, want),
     poolSize: all.length,

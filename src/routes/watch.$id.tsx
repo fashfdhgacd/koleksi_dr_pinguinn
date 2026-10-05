@@ -10,7 +10,18 @@ import {
 } from "@/lib/seo";
 import { WatchPage } from "@/lib/watch/watch-page";
 
-const SHARE_CARD_VERSION = "13";
+/** Absolute https image for share cards. Never a page or a stream. */
+function shareCardImage(thumbnail: string | null | undefined): string {
+  const raw = (thumbnail || "").trim();
+  const absolute = raw.startsWith("/")
+    ? `${SITE_ORIGIN}${raw}`
+    : /^https:\/\//i.test(raw)
+      ? raw
+      : "";
+  if (!absolute) return DEFAULT_OG;
+  if (/\.(mp4|webm|m3u8|mov)(?:$|\?)/i.test(absolute)) return DEFAULT_OG;
+  return absolute;
+}
 
 export const Route = createFileRoute("/watch/$id")({
   loader: async ({ params }) => {
@@ -25,9 +36,7 @@ export const Route = createFileRoute("/watch/$id")({
     const description = item
       ? resolveVideoSeoDescription(item)
       : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
-    const image = item
-      ? `${SITE_ORIGIN}/api/og?id=${encodeURIComponent(item.id)}&v=${SHARE_CARD_VERSION}`
-      : DEFAULT_OG;
+    const image = item ? shareCardImage(item.thumbnail) : DEFAULT_OG;
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
     const embedUrl = item
       ? (item.video_url || item.qualities?.[0]?.url || "").trim() || null
@@ -63,6 +72,7 @@ export const Route = createFileRoute("/watch/$id")({
         { property: "og:description", content: description },
         { property: "og:url", content: url },
         { property: "og:image", content: image },
+        { property: "og:image:secure_url", content: image },
         { property: "og:image:type", content: "image/jpeg" },
         { property: "og:image:width", content: "1280" },
         { property: "og:image:height", content: "720" },
