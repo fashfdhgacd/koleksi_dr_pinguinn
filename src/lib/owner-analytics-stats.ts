@@ -1,7 +1,7 @@
 /**
  * Owner analytics owner stats + alerts.
  */
-import { dbSource, getSql } from "@/lib/db";
+import { getDbSource, getSql } from "@/lib/db";
 import {
   type DayRow,
   type DeviceKind,
@@ -15,7 +15,8 @@ import {
   n,
   readDayStatsHistoryKv,
 } from "@/lib/owner-analytics-shared";
-import { countKvOnline, countMemoryOnline } from "@/lib/owner-analytics-presence";
+import { countKvOnline, countMemoryOnline, describeDbError } from "@/lib/owner-analytics-presence";
+import { kvReadHistory } from "@/lib/kv-live";
 
 /** WIB calendar day of a timestamptz column (no tz-name dependency). */
 const WIB_DAY = `((created_at at time zone 'UTC') + interval '7 hours')::date`;
@@ -184,7 +185,7 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       views: hourMap.get(slot.hour) || 0,
     }));
 
-    const persistOk = dbSource === "neon";
+    const persistOk = getDbSource() === "neon";
     const presence: OwnerStats["presence"] =
       dbOnline > 0 && (memN > 0 || kvN > 0)
         ? "hybrid"
@@ -207,7 +208,7 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       topRefs: refRows.map((r) => ({ ref: r.ref || "(direct)", views: n(r.views) })),
       devices: deviceRows.map((r) => ({ device: r.device || "other", views: n(r.views) })),
       hosts: hostRows.map((r) => ({ host: r.host || "(unknown)", views: n(r.views) })),
-      storage: dbSource === "neon" ? "postgres" : "pglite",
+      storage: getDbSource() === "neon" ? "postgres" : "pglite",
       persistOk,
       database: "connected",
       analytics: "operational",
@@ -225,6 +226,23 @@ export async function getOwnerStats(): Promise<OwnerStats> {
     } catch {
       /* ignore */
     }
+    // Past days whose daystats key is gone (old 48h TTL) fall back to the legacy
+    // KV roll (90-day TTL, undercounted) instead of showing 0.
+    try {
+      const rolls = new Map((await kvReadHistory(HISTORY_DAYS)).map((r) => [r.day, r]));
+      history = history.map((d, i) => {
+        const r = rolls.get(d.day);
+        if (i === 0 || d.views > 0 || !r || r.views <= 0) return d;
+        return { day: d.day, views: r.views, unique: r.unique, peak: Math.max(d.peak, r.peak) };
+      });
+    } catch {
+      /* ignore */
+    }
+    const why = describeDbError(err);
+    const whyText =
+      why.db === "not_configured"
+        ? "DATABASE_URL tidak terbaca di Worker"
+        : `koneksi DB gagal${why.code ? ` (${why.code})` : ""}`;
     const cards = cardsFromDays(history, online);
     const anyKv = history.some((d) => d.views > 0);
     return emptyStats({
@@ -239,9 +257,9 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       analytics: online > 0 || anyKv ? "operational" : "unavailable",
       presence: kvN > 0 ? "kv" : "memory",
       hint: anyKv
-        ? "DB offline — Unik/Tayang/riwayat dari KV (sementara)."
+        ? `DB offline (${whyText}) — Unik/Tayang/riwayat dari KV (sementara).`
         : online > 0
-          ? "DB offline — angka online dari memory/KV."
+          ? `DB offline (${whyText}) — angka online dari memory/KV.`
           : "Database tidak tersedia dan belum ada heartbeat. Buka katalog di tab lain (setelah age gate) lalu Refresh.",
     });
   }

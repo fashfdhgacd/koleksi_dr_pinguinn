@@ -9,6 +9,9 @@ export const Route = createFileRoute("/api/analytics/health")({
         return Response.json({
           database: health.database,
           analytics: health.analytics,
+          // Non-secret category: ok | not_configured | connect_error | query_error
+          db: health.db,
+          code: health.code,
           timestamp: health.timestamp,
         });
       },

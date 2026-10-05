@@ -1,7 +1,7 @@
 /**
  * Owner analytics presence + hit recording.
  */
-import { dbSource, getSql } from "@/lib/db";
+import { getDbSource, getSql } from "@/lib/db";
 import { resolveAnalyticsKV } from "@/lib/analytics-kv";
 import { kvCountOnline } from "@/lib/kv-live";
 import {
@@ -71,10 +71,37 @@ export async function countOnline(): Promise<number> {
   return Math.max(memN, kvN, dbN);
 }
 
+/** Non-secret DB failure category for diagnostics (never includes the URL/host). */
+export type DbProblem = "ok" | "not_configured" | "connect_error" | "query_error";
+
+export function describeDbError(err: unknown): { db: DbProblem; code?: string } {
+  if (getDbSource() === "none") return { db: "not_configured" };
+  const raw = (err as { code?: unknown } | null)?.code;
+  let code = typeof raw === "string" && /^[A-Za-z0-9_]{1,24}$/.test(raw) ? raw : undefined;
+  if (!code) {
+    // Map well-known messages to fixed tokens — the message itself is never echoed.
+    const msg = String((err as { message?: unknown } | null)?.message || "").toLowerCase();
+    if (msg.includes("different request")) code = "cross_request_io";
+    else if (msg.includes("password authentication")) code = "auth_failed";
+    else if (msg.includes("getaddrinfo") || msg.includes("enotfound")) code = "dns";
+    else if (msg.includes("timeout") || msg.includes("timed out")) code = "timeout";
+    else if (msg.includes("does not exist")) code = "missing_object";
+    else if (msg.includes("endpoint") && msg.includes("disabled")) code = "endpoint_disabled";
+    else if (msg.includes("quota") || msg.includes("limit")) code = "quota";
+    else if (msg.includes("ssl") || msg.includes("tls")) code = "tls";
+  }
+  // SQLSTATE class 42 (undefined table/column, syntax) => query problem; else connection/auth.
+  const db: DbProblem =
+    code && (/^42/.test(code) || code === "missing_object") ? "query_error" : "connect_error";
+  return { db, code };
+}
+
 export async function analyticsHealth(): Promise<{
   database: "connected" | "error";
   analytics: "operational" | "unavailable";
   storage: OwnerStats["storage"];
+  db: DbProblem;
+  code?: string;
   timestamp: string;
 }> {
   try {
@@ -83,15 +110,17 @@ export async function analyticsHealth(): Promise<{
     return {
       database: "connected",
       analytics: "operational",
-      storage: dbSource === "neon" ? "postgres" : "pglite",
+      storage: getDbSource() === "neon" ? "postgres" : "pglite",
+      db: "ok",
       timestamp: new Date().toISOString(),
     };
-  } catch {
+  } catch (err) {
     const kv = await resolveAnalyticsKV();
     return {
       database: "error",
       analytics: kv ? "operational" : "unavailable",
       storage: kv ? "kv" : "error",
+      ...describeDbError(err),
       timestamp: new Date().toISOString(),
     };
   }
