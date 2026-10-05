@@ -5,13 +5,16 @@ import {
   recordHit,
   touchOnline,
 } from "@/lib/owner-analytics";
-import { kvCountOnline, kvReadHistory, kvReadRoll, kvTouchLive, rollToStats } from "@/lib/kv-live";
+import { kvCountOnline, kvReadRoll, kvTouchLive, rollToStats } from "@/lib/kv-live";
 
 const BOT_UA =
   /bot|crawl|spider|slurp|headless|webdriver|puppeteer|playwright|scrapy|httpclient|curl\/|wget|python-requests|axios\/|node-fetch|bytespider|gptbot|claudebot|ccbot|semrush|ahrefs|dataforseo|petalbot|facebookexternalhit|preview/i;
 
 const lastTouch = new Map<string, number>();
+/** Last recorded path per session — SPA nav within TOUCH_GAP still counts a pageview. */
+const lastPathById = new Map<string, string>();
 const ipHits = new Map<string, { n: number; t: number }>();
+/** Rate-limit presence/heartbeat only; pageviews on path change bypass this. */
 const TOUCH_GAP_MS = 60_000;
 const IP_WINDOW_MS = 60_000;
 const IP_MAX = 20;
@@ -104,29 +107,32 @@ function shouldSkipBot(ua: string, owner: boolean): boolean {
 async function liveOwnerPayload() {
   const now = Date.now();
   if (ownerCache && now - ownerCache.at < OWNER_CACHE_MS) return ownerCache.data;
+  // Single source of truth: getOwnerStats builds days[] (Postgres events, or KV
+  // daystats when DB is down) and derives today/yesterday/7d cards from it.
   const stats = await getOwnerStats();
-  const [kvN, roll, history] = await Promise.all([kvCountOnline(), kvReadRoll(), kvReadHistory(14)]);
+  const [kvN, roll] = await Promise.all([kvCountOnline(), kvReadRoll()]);
   const online = Math.max(Number(stats.online) || 0, Number(stats.count) || 0, kvN);
-  const live = rollToStats(roll, online, history);
+  const live = rollToStats(roll, online);
+  const peakToday = Math.max(Number(stats.peakToday) || 0, online);
+  const days = stats.days.length
+    ? [{ ...stats.days[0], peak: Math.max(stats.days[0].peak, peakToday) }, ...stats.days.slice(1)]
+    : stats.days;
   const data = {
     ...stats,
-    ...live,
     online,
     count: online,
-    peakToday: Math.max(Number(stats.peakToday) || 0, live.peakToday),
-    viewsToday: Math.max(Number(stats.viewsToday) || 0, live.viewsToday),
-    uniqueToday: Math.max(Number(stats.uniqueToday) || 0, live.uniqueToday),
-    views24h: Math.max(Number(stats.views24h) || 0, live.views24h),
-    views7d: live.views7d,
-    days: live.days,
-    yesterdayViews: live.yesterdayViews,
-    yesterdayUnique: live.yesterdayUnique,
-    topPaths: live.topPaths.length ? live.topPaths : stats.topPaths,
-    topRefs: live.topRefs.length ? live.topRefs : stats.topRefs,
-    devices: live.devices.length ? live.devices : stats.devices,
-    persistOk: true,
-    analytics: "operational",
-    hint: undefined,
+    peakToday,
+    days,
+    // Top lists: Postgres (today WIB) first; KV roll only as fallback.
+    topPaths: stats.topPaths.length ? stats.topPaths : live.topPaths,
+    topRefs: stats.topRefs.length ? stats.topRefs : live.topRefs,
+    devices: stats.devices.length ? stats.devices : live.devices,
+    presence: stats.presence === "memory" && kvN > 0 ? "kv" : stats.presence,
+    // Surface real PG/KV persist status — do not hardcode healthy.
+    persistOk: Boolean(stats.persistOk),
+    analytics: stats.analytics || "operational",
+    database: stats.database,
+    hint: stats.hint,
   };
   ownerCache = { at: now, data };
   return data;
@@ -173,21 +179,31 @@ async function handlePost(request: Request): Promise<Response> {
   const now = Date.now();
   const prev = lastTouch.get(id) || 0;
   const fresh = now - prev >= TOUCH_GAP_MS;
-  if (fresh) lastTouch.set(id, now);
+  const normPath = path
+    ? (path.startsWith("/") ? path : `/${path}`).split("?")[0].slice(0, 200) || "/"
+    : "";
+  const prevPath = lastPathById.get(id) || "";
+  const pathChanged = Boolean(normPath) && normPath !== prevPath;
+  // Presence/heartbeat: rate-limited. Pageview: still count on SPA path change.
+  const shouldTouchPresence = fresh || owner;
+  const shouldRecordView = Boolean(normPath) && (fresh || pathChanged || owner);
 
-  if (fresh || owner) {
+  if (fresh) lastTouch.set(id, now);
+  if (normPath) lastPathById.set(id, normPath);
+
+  if (shouldTouchPresence || shouldRecordView) {
     try {
       const device = classifyDevice(ua);
       await kvTouchLive({
         id,
-        path: path || undefined,
+        path: normPath || undefined,
         ref: ref || undefined,
         device,
-        recordView: Boolean(path),
+        recordView: shouldRecordView,
       });
-      if (path) {
+      if (shouldRecordView) {
         await recordHit({
-          path,
+          path: normPath,
           ref: ref || request.headers.get("referer") || "",
           ua,
           host: host || request.headers.get("host") || "",
@@ -196,7 +212,12 @@ async function handlePost(request: Request): Promise<Response> {
           eventId,
         });
       }
-      if (owner) void touchOnline(id);
+      // PG presence + peak for every presence touch and every pageview (SPA nav).
+      // Awaited: Workers cancel un-awaited promises after the response is sent.
+      // skipKv: kvTouchLive already wrote online:<id> this request.
+      if (shouldTouchPresence || shouldRecordView) {
+        await touchOnline(id, { skipKv: true });
+      }
     } catch {
       return json(request, { ok: true, skipped: "busy" });
     }

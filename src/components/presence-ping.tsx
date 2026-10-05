@@ -4,8 +4,10 @@ import { useEffect, useRef } from "react";
 import { useRouterState } from "@tanstack/react-router";
 
 const ID_KEY = "drp_online_id";
-const HEARTBEAT_MS = 150_000;
-const MIN_GAP_MS = 70_000;
+/** ≤ presence window (~2 min); KV TTL 180s. Matches dashboard copy "90 dtk". */
+const HEARTBEAT_MS = 90_000;
+/** Client debounce for non-navigation heartbeats — below HEARTBEAT_MS. */
+const MIN_GAP_MS = 60_000;
 const BOT_RE =
   /bot|crawl|spider|slurp|headless|webdriver|puppeteer|playwright|phantom|scrapy|httpclient|curl\/|wget|python-requests|axios\/|node-fetch|bytespider|gptbot|claudebot|ccbot|semrush|ahrefs|dataforseo|petalbot/i;
 
@@ -70,7 +72,7 @@ export function PresencePing() {
         }
         const payload = JSON.stringify({
           ...body,
-          eventId: `${id}-${pathname || ""}-${Math.floor(Date.now() / 70000)}`,
+          eventId: `${id}-${pathname || ""}-${Math.floor(Date.now() / 60000)}`,
         });
         await fetch("/api/online", {
           method: "POST",

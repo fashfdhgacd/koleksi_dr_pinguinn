@@ -6,6 +6,7 @@ import { Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { OwnerTools } from "@/components/owner-tools";
+import { OwnerChart } from "@/components/owner-chart";
 
 const SECRET_KEY = "drp_owner_secret";
 const SECRET_LEGACY = "drp_online_secret";
@@ -217,7 +218,7 @@ export function OwnerDashboard() {
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Dr. Pinguin</p>
             <h1 className="mt-1 font-display text-3xl tracking-tight text-zinc-50">Pengunjung live</h1>
-            <p className="mt-1 text-xs text-zinc-500">Hanya orang yang lagi buka tab situs ± 2 menit. Bot tidak dihitung.</p>
+            <p className="mt-1 text-xs text-zinc-500">Hanya orang yang lagi buka tab situs ±2 menit (TTL online ~3 menit). Bot tidak dihitung.</p>
           </div>
           <Link
             to="/"
@@ -257,7 +258,7 @@ export function OwnerDashboard() {
                 Sedang di situs
               </div>
               <p className="mt-3 font-display text-7xl tabular-nums leading-none text-zinc-50">{fmt(online)}</p>
-              <p className="mt-3 text-sm text-zinc-500">tab aktif manusia ± 2 menit</p>
+              <p className="mt-3 text-sm text-zinc-500">tab aktif manusia ±2 menit</p>
               <p className="mt-2 text-[11px] text-zinc-600">
                 {presenceLabel(stats?.presence)}
                 {tickAt ? ` · update ${new Date(tickAt).toLocaleTimeString("id-ID")}` : ""}
@@ -266,14 +267,24 @@ export function OwnerDashboard() {
               {error ? <p className="mt-3 text-xs text-red-400">{error}</p> : null}
             </section>
 
-            <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <Stat label="Unik hari ini" value={fmt(stats?.uniqueToday)} hint={vsUniq} />
               <Stat label="Tayang hari ini" value={fmt(stats?.viewsToday)} hint={vsViews} />
+              <Stat label="Puncak hari ini" value={fmt(stats?.peakToday)} />
               <Stat label="Kemarin" value={fmt(stats?.yesterdayViews)} />
               <Stat label="7 hari" value={fmt(stats?.views7d)} />
             </section>
 
             <OwnerTools secret={secret} />
+
+            {days.length ? (
+              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Grafik 14 hari (WIB)</h2>
+                <div className="mt-3">
+                  <OwnerChart days={days} />
+                </div>
+              </section>
+            ) : null}
 
             {days.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
@@ -304,14 +315,14 @@ export function OwnerDashboard() {
                   </table>
                 </div>
                 <p className="mt-3 text-[11px] text-zinc-600">
-                  Data sebelum deploy ini bisa kosong. Mulai hari ini tersimpan 90 hari.
+                  Kartu atas dan baris "Hari ini" memakai sumber yang sama (Postgres pageview / KV daystats). Hari yang sudah tersimpan salah tidak bisa di-backfill otomatis.
                 </p>
               </section>
             ) : null}
 
             {devices.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Perangkat 24 jam</h2>
+                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Perangkat hari ini (WIB)</h2>
                 <ul className="mt-3 space-y-2">
                   {devices.map((d) => (
                     <li key={d.device} className="flex items-center gap-3 text-sm">
@@ -328,7 +339,7 @@ export function OwnerDashboard() {
 
             {stats?.topPaths?.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Halaman 24 jam</h2>
+                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Halaman hari ini (WIB)</h2>
                 <ul className="mt-3 space-y-2 text-sm">
                   {stats.topPaths.slice(0, 8).map((row) => (
                     <li key={row.path} className="flex justify-between gap-3">
@@ -342,7 +353,7 @@ export function OwnerDashboard() {
 
             {stats?.topRefs?.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Sumber 24 jam</h2>
+                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Sumber hari ini (WIB)</h2>
                 <ul className="mt-3 space-y-2 text-sm">
                   {stats.topRefs.slice(0, 6).map((row) => (
                     <li key={row.ref} className="flex justify-between gap-3">
