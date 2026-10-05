@@ -22,6 +22,8 @@ export interface D1DatabaseLike {
 const BINDING = "ANALYTICS_DB";
 const WIB_DAY = `date((created_at/1000)+25200,'unixepoch')`;
 const DAY_MS = 86_400_000;
+/** Max rows for "Video terpopuler hari ini". */
+export const TOP_VIDEOS_LIMIT = 20;
 
 function pickD1(obj: unknown): D1DatabaseLike | null {
   if (!obj || typeof obj !== "object") return null;
@@ -315,7 +317,7 @@ export async function d1StatsParts(db: D1DatabaseLike, today: string, now = Date
   const t0 = wibDayStartMs(today);
   const t1 = t0 + DAY_MS;
   const TODAY = `created_at >= ?1 and created_at < ?2 and event_type = 'pageview'`;
-  const [online, views24, views30d, hourlyRows, pathRows, refRows, deviceRows, hostRows] =
+  const [online, views24, views30d, hourlyRows, pathRows, refRows, deviceRows, hostRows, videoRows] =
     await Promise.all([
       d1CountOnline(db, now),
       count(
@@ -361,8 +363,18 @@ export async function d1StatsParts(db: D1DatabaseLike, today: string, now = Date
         t0,
         t1,
       ),
+      // Video pages only (/watch/<id>) — separate from the mixed "Halaman" list.
+      all<{ path: string; views: number; uniq: number }>(
+        db,
+        `select path, count(*) as views, count(distinct visitor_id) as uniq from analytics_events
+          where ${TODAY} and path like '/watch/%'
+          group by path order by views desc, uniq desc limit ?3`,
+        t0,
+        t1,
+        TOP_VIDEOS_LIMIT,
+      ),
     ]);
-  return { online, views24, views30d, hourlyRows, pathRows, refRows, deviceRows, hostRows };
+  return { online, views24, views30d, hourlyRows, pathRows, refRows, deviceRows, hostRows, videoRows };
 }
 
 /** Events older than 90 days, sessions older than 2 days. */

@@ -14,6 +14,16 @@ export type PageHit = {
   ts: number;
 };
 
+/** One row of "Video terpopuler hari ini" (/watch/<id> pageviews, today WIB). */
+export type TopVideo = {
+  id: string;
+  path: string;
+  views: number;
+  unique?: number;
+  title?: string;
+  category?: string;
+};
+
 export type DayRow = { day: string; views: number; unique: number; peak: number };
 
 export type OwnerStats = {
@@ -34,6 +44,8 @@ export type OwnerStats = {
   historySource: "d1" | "postgres" | "kv" | "none";
   hourly: { hour: string; views: number }[];
   topPaths: { path: string; views: number }[];
+  /** Today's (WIB) most viewed video pages, views desc. Separate from topPaths. */
+  topVideos: TopVideo[];
   topRefs: { ref: string; views: number }[];
   devices: { device: DeviceKind; views: number }[];
   hosts: { host: string; views: number }[];
@@ -164,6 +176,7 @@ export function emptyStats(partial: Partial<OwnerStats> = {}): OwnerStats {
     historySource: "none",
     hourly: emptyHourly(),
     topPaths: [],
+    topVideos: [],
     topRefs: [],
     devices: [],
     hosts: [],

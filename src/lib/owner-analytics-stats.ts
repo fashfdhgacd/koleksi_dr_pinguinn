@@ -17,7 +17,8 @@ import {
 } from "@/lib/owner-analytics-shared";
 import { countKvOnline, countMemoryOnline, describeDbError } from "@/lib/owner-analytics-presence";
 import { kvReadHistory } from "@/lib/kv-live";
-import { d1HistoryRows, d1Prune, d1StatsParts, readyD1 } from "@/lib/analytics-d1";
+import { TOP_VIDEOS_LIMIT, d1HistoryRows, d1Prune, d1StatsParts, readyD1 } from "@/lib/analytics-d1";
+import { toTopVideos, withVideoTitles } from "@/lib/owner-top-videos";
 
 /** WIB calendar day of a timestamptz column (no tz-name dependency). */
 const WIB_DAY = `((created_at at time zone 'UTC') + interval '7 hours')::date`;
@@ -190,6 +191,7 @@ export async function getOwnerStats(): Promise<OwnerStats> {
     let refRows: { ref: string; views: number }[];
     let deviceRows: { device: DeviceKind; views: number }[];
     let hostRows: { host: string; views: number }[];
+    let videoRows: { path: string; views: number; uniq: number }[];
     if (d1) {
       await maybePruneD1(d1, now);
       const [parts, histRows] = await Promise.all([
@@ -205,6 +207,7 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       refRows = parts.refRows;
       deviceRows = parts.deviceRows as { device: DeviceKind; views: number }[];
       hostRows = parts.hostRows;
+      videoRows = parts.videoRows;
     } else {
       const sql = await getSql();
       [
@@ -217,6 +220,7 @@ export async function getOwnerStats(): Promise<OwnerStats> {
         refRows,
         deviceRows,
         hostRows,
+        videoRows,
       ] = await Promise.all([
         sql.query<{ n: number }>(
           `select count(*)::int as n from analytics_sessions where last_seen_at >= now() - interval '2 minutes'`,
@@ -256,8 +260,16 @@ export async function getOwnerStats(): Promise<OwnerStats> {
          group by 1 order by views desc limit 6`,
           [dk],
         ),
+        sql.query<{ path: string; views: number; uniq: number }>(
+          `select path, count(*)::int as views, count(distinct visitor_id)::int as uniq from analytics_events
+         where ${TODAY_WINDOW} and event_type = 'pageview' and path like '/watch/%'
+         group by path order by views desc, uniq desc limit $2`,
+          [dk, TOP_VIDEOS_LIMIT],
+        ),
       ]);
     }
+
+    const topVideos = await withVideoTitles(toTopVideos(videoRows, TOP_VIDEOS_LIMIT));
 
     dbOnline = n(onlineRows[0]?.n);
     const online = Math.max(memN, kvN, dbOnline);
@@ -297,6 +309,7 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       historySource: source === "d1" ? "d1" : "postgres",
       hourly,
       topPaths: pathRows.map((r) => ({ path: r.path || "/", views: n(r.views) })),
+      topVideos,
       topRefs: refRows.map((r) => ({ ref: r.ref || "(direct)", views: n(r.views) })),
       devices: deviceRows.map((r) => ({ device: r.device || "other", views: n(r.views) })),
       hosts: hostRows.map((r) => ({ host: r.host || "(unknown)", views: n(r.views) })),
