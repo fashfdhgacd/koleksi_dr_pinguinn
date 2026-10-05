@@ -12,6 +12,12 @@ id = "8c809729ccd64e5da6e9cb7dd62fb40b"
 binding = "DR_PINGUIN_ANALYTICS"
 id = "8c809729ccd64e5da6e9cb7dd62fb40b"
 
+# D1 analytics (kode baca env.ANALYTICS_DB)
+[[d1_databases]]
+binding = "ANALYTICS_DB"
+database_name = "koleksi-analytics"
+database_id = "97453aca-c414-4251-92db-a7fb6d8d3b54"
+
 # Poster video. File tetap ada setelah deploy.
 [[r2_buckets]]
 binding = "POSTERS"
