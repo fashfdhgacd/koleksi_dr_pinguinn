@@ -31,7 +31,7 @@ export type OwnerStats = {
   yesterdayViews: number;
   yesterdayUnique: number;
   /** Where days/top cards came from (single source of truth for this response). */
-  historySource: "d1" | "postgres" | "kv" | "none";
+  historySource: "d1" | "postgres" | "d1+kv" | "postgres+kv" | "kv" | "none";
   hourly: { hour: string; views: number }[];
   topPaths: { path: string; views: number }[];
   topRefs: { ref: string; views: number }[];

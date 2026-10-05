@@ -117,6 +117,48 @@ function cardsFromDays(days: DayRow[], online: number) {
   };
 }
 
+/** KV per-day history (daystats, legacy roll fallback for past days), newest first. */
+async function readKvHistory(now: number): Promise<DayRow[]> {
+  let history: DayRow[] = [];
+  try {
+    history = await readDayStatsHistoryKv(HISTORY_DAYS, now);
+  } catch {
+    /* ignore */
+  }
+  // Past days whose daystats key is gone (old 48h TTL) fall back to the legacy
+  // KV roll (90-day TTL, undercounted) instead of showing 0.
+  try {
+    const rolls = new Map((await kvReadHistory(HISTORY_DAYS)).map((r) => [r.day, r]));
+    history = history.map((d, i) => {
+      const r = rolls.get(d.day);
+      if (i === 0 || d.views > 0 || !r || r.views <= 0) return d;
+      return { day: d.day, views: r.views, unique: r.unique, peak: Math.max(d.peak, r.peak) };
+    });
+  } catch {
+    /* ignore */
+  }
+  return history;
+}
+
+/**
+ * Back-fill DB history with KV for past days the DB has no rows for (e.g. D1
+ * was enabled mid-month). Today keeps DB counts; peak = max(db, kv).
+ * Returns merged days + extra views pulled from KV (for views30d).
+ */
+function mergeKvHistory(db: DayRow[], kv: DayRow[]): { days: DayRow[]; kvViews: number } {
+  const byDay = new Map(kv.map((d) => [d.day, d]));
+  let kvViews = 0;
+  const days = db.map((d, i) => {
+    const k = byDay.get(d.day);
+    if (!k) return d;
+    const peak = Math.max(d.peak, k.peak);
+    if (i === 0 || d.views > 0 || d.unique > 0 || k.views <= 0) return { ...d, peak };
+    kvViews += k.views;
+    return { day: d.day, views: k.views, unique: k.unique, peak };
+  });
+  return { days, kvViews };
+}
+
 /** Throttled D1 prune (once per 12h per isolate), piggybacked on owner stats reads. */
 const pruneState = globalThis as typeof globalThis & { __d1LastPruneAt__?: number };
 async function maybePruneD1(d1: NonNullable<Awaited<ReturnType<typeof readyD1>>>, now: number) {
@@ -228,6 +270,9 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       ]);
     }
 
+    const merged = mergeKvHistory(history, await readKvHistory(now));
+    history = merged.days;
+
     dbOnline = n(onlineRows[0]?.n);
     const online = Math.max(memN, kvN, dbOnline);
     const cards = cardsFromDays(history, online);
@@ -259,8 +304,8 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       ...cards,
       peakDay: dk,
       views24h: n(views24[0]?.n),
-      views30d: n(views30d[0]?.n),
-      historySource: source === "d1" ? "d1" : "postgres",
+      views30d: n(views30d[0]?.n) + merged.kvViews,
+      historySource: `${source === "d1" ? "d1" : "postgres"}${merged.kvViews > 0 ? "+kv" : ""}` as OwnerStats["historySource"],
       hourly,
       topPaths: pathRows.map((r) => ({ path: r.path || "/", views: n(r.views) })),
       topRefs: refRows.map((r) => ({ ref: r.ref || "(direct)", views: n(r.views) })),
@@ -278,24 +323,7 @@ export async function getOwnerStats(): Promise<OwnerStats> {
   } catch (err) {
     console.error("[analytics] getOwnerStats failed", err);
     const online = Math.max(memN, kvN);
-    let history: DayRow[] = [];
-    try {
-      history = await readDayStatsHistoryKv(HISTORY_DAYS, now);
-    } catch {
-      /* ignore */
-    }
-    // Past days whose daystats key is gone (old 48h TTL) fall back to the legacy
-    // KV roll (90-day TTL, undercounted) instead of showing 0.
-    try {
-      const rolls = new Map((await kvReadHistory(HISTORY_DAYS)).map((r) => [r.day, r]));
-      history = history.map((d, i) => {
-        const r = rolls.get(d.day);
-        if (i === 0 || d.views > 0 || !r || r.views <= 0) return d;
-        return { day: d.day, views: r.views, unique: r.unique, peak: Math.max(d.peak, r.peak) };
-      });
-    } catch {
-      /* ignore */
-    }
+    const history = await readKvHistory(now);
     const why = describeDbError(err);
     const whyText =
       why.db === "not_configured"
