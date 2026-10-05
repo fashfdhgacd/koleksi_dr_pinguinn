@@ -17,29 +17,39 @@ function fmt(n: number | null | undefined): string {
   return Math.max(0, Number(n) || 0).toLocaleString("id-ID");
 }
 
+function videoUrl(v: TopVideo): string {
+  return `${SITE_ORIGIN}${v.path}`;
+}
+
+/** "Title\nhttps://koleksidrpinguin.com/watch/…" — falls back to id when title is missing. */
+function entryText(v: TopVideo): string {
+  const label = (v.title || "").trim() || v.id;
+  return `${label}\n${videoUrl(v)}`;
+}
+
 export function TopVideosSection({ videos }: { videos: TopVideo[] }) {
   const [copied, setCopied] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
   const total = videos.reduce((s, v) => s + v.views, 0);
   const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
 
-  function allUrls() {
-    return videos.map((v) => `${SITE_ORIGIN}${v.path}`).join("\n");
+  function allEntries() {
+    return videos.map(entryText).join("\n\n");
   }
 
   async function copyLink(v: TopVideo) {
-    const url = `${SITE_ORIGIN}${v.path}`;
+    const text = entryText(v);
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(text);
       setCopied(v.id);
       window.setTimeout(() => setCopied((c) => (c === v.id ? null : c)), 1500);
     } catch {
-      window.prompt("Salin link:", url);
+      window.prompt("Salin link:", text);
     }
   }
 
   async function copyAll() {
-    const text = allUrls();
+    const text = allEntries();
     if (!text) return;
     try {
       await navigator.clipboard.writeText(text);
@@ -52,24 +62,26 @@ export function TopVideosSection({ videos }: { videos: TopVideo[] }) {
 
   async function shareAll() {
     if (!videos.length || !canShare) return;
-    const urls = allUrls();
+    const entries = allEntries();
     const count = videos.length;
     const title = "Video terpopuler hari ini";
     const text =
       count === 1
-        ? urls
-        : `${count} video terpopuler hari ini:\n\n${urls}`;
+        ? entries
+        : `${count} video terpopuler hari ini:\n\n${entries}`;
     try {
-      await navigator.share({ title, text, url: `${SITE_ORIGIN}${videos[0].path}` });
+      // No separate `url` field: links are already in `text`, and some share
+      // targets append `url` to `text`, which would duplicate the first link.
+      await navigator.share({ title, text });
     } catch (err) {
       // User cancel or share unsupported payload — fall back to copy
       if (err instanceof DOMException && err.name === "AbortError") return;
       try {
-        await navigator.clipboard.writeText(urls);
+        await navigator.clipboard.writeText(entries);
         setCopiedAll(true);
         window.setTimeout(() => setCopiedAll(false), 1500);
       } catch {
-        window.prompt("Salin semua link:", urls);
+        window.prompt("Salin semua link:", entries);
       }
     }
   }
