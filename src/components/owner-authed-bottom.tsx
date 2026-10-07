@@ -80,25 +80,25 @@ export function OwnerAuthedBottom(props: {
               </section>
             ) : null}
 
-            <TopVideosSection secret={secret} />
+            <TopVideosSection videos={stats?.topVideos || []} />
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 pt-1">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={loading}
                 onClick={() => void fetchOnline(secret)}
-                className="border-white/10 bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08]"
+                disabled={loading}
+                className="border-white/10 bg-transparent text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100"
               >
-                Refresh statistik
+                {loading ? "Memuat…" : "Refresh"}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={logout}
-                className="border-white/10 bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200"
+                className="border-white/10 bg-transparent text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-300"
               >
                 Keluar
               </Button>
