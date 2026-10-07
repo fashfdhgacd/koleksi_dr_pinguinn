@@ -1,7 +1,5 @@
-import { isRealMinor } from "../minor-terms";
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos } from "./types";
-import { buildMainSorted } from "./feed-order";
 import {
   type RawItem,
   type CatalogCache,
@@ -89,12 +87,8 @@ export function buildIndexes(
     });
   }
   const core = mainCatalog(items);
-  const mainSorted = buildMainSorted(
-    core.filter((x) => isIndoAv(x)),
-    core.filter((x) => isUserBokep(x) && !isIndoAv(x)),
-    DEFAULT_PAGE_SIZE,
-    core,
-  );
+  // Homepage = semua item (urut tanggal), tanpa batasi cuma IndoAV/UserBokep
+  const mainSorted = sortByNewest(core);
   for (const [slug, list] of bySlug) {
     bySlug.set(slug, sortByNewest(list));
   }
@@ -181,42 +175,17 @@ export async function loadItemsRaw(): Promise<CatalogCache> {
   return runtime.cache;
 }
 
-let clientOff: { at: number; ids: Set<string> } | null = null;
-
-/** Id yang di-set 'Tidak publish'. Server: KV langsung; browser: /api/hidden-ids (id saja). */
+/** Fitur 'Tidak publish' / hidden review DINONAKTIFKAN — selalu return set kosong. */
 export async function getUnpublished(): Promise<Set<string>> {
-  try {
-    if (import.meta.env.SSR) {
-      const { unpublishedIds } = await import("../owner-review-store");
-      return await unpublishedIds();
-    }
-    if (clientOff && Date.now() - clientOff.at < 60_000) return clientOff.ids;
-    const r = await fetch("/api/hidden-ids", { cache: "no-store" });
-    const d = (await r.json()) as { ids?: string[] };
-    clientOff = { at: Date.now(), ids: new Set(d.ids || []) };
-    return clientOff.ids;
-  } catch {
-    return clientOff?.ids || new Set();
-  }
+  return new Set();
 }
 
-let filtered: { base: CatalogCache; key: string; out: CatalogCache } | null = null;
-
-/** True bila item tidak boleh tampil publik (istilah minor sungguhan, atau 'Tidak publish'). */
-export async function isPublicHidden(id: string): Promise<boolean> {
-  if ((await getUnpublished()).has(id)) return true;
-  const raw = (await loadItemsRaw()).byId.get(id);
-  return Boolean(raw && isRealMinor(raw));
+/** Fitur hidden DINONAKTIFKAN — tidak ada video yang disembunyikan. */
+export async function isPublicHidden(_id: string): Promise<boolean> {
+  return false;
 }
 
-/** Katalog publik: tanpa item istilah minor sungguhan dan tanpa 'Tidak publish'. */
+/** Katalog publik = semua item (tanpa filter minor / Tidak publish). */
 export async function loadItems(): Promise<CatalogCache> {
-  const base = await loadItemsRaw();
-  const off = await getUnpublished();
-  const key = [...off].sort().join(",");
-  if (filtered && filtered.base === base && filtered.key === key) return filtered.out;
-  const items = base.items.filter((x) => !off.has(x.id) && !isRealMinor(x));
-  const out = buildIndexes(items, base.posters, base.videyNo, base.at);
-  filtered = { base, key, out };
-  return out;
+  return loadItemsRaw();
 }
