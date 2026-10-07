@@ -23,7 +23,7 @@ function videoUrl(v: TopVideo): string {
 
 /** "Title\nhttps://koleksidrpinguin.com/watch/…" — falls back to id when title is missing. */
 function entryText(v: TopVideo): string {
-  const label = (v.title || "").trim() || v.id;
+  const label = String(v.title || "").trim() || v.id;
   return `${label}\n${videoUrl(v)}`;
 }
 
