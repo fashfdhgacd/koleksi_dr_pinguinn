@@ -2,7 +2,6 @@
 
 import { Button } from "@/components/ui/button";
 import { OwnerChart } from "@/components/owner-chart";
-import { HiddenReviewSection } from "@/components/owner-hidden-review";
 import { TopVideosSection } from "@/components/owner-top-videos";
 import { fmt, deviceLabel, dayLabel, type OwnerStats, type DeviceKind, type DayRow } from "@/components/owner-dashboard-shared";
 
@@ -20,7 +19,7 @@ export function OwnerAuthedBottom(props: {
   const { days, devices, stats, secret, loading, fetchOnline, logout } = props;
   return (
     <>
-      <HiddenReviewSection secret={secret} />
+      {/* HiddenReviewSection dihapus — fitur review/Tidak publish dinonaktifkan */}
       {days.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
                 <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Grafik 14 hari (WIB)</h2>
@@ -81,46 +80,28 @@ export function OwnerAuthedBottom(props: {
               </section>
             ) : null}
 
-            <TopVideosSection videos={stats?.topVideos || []} />
+            <TopVideosSection secret={secret} />
 
-            {stats?.topPaths?.length ? (
-              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Halaman hari ini (WIB)</h2>
-                <ul className="mt-3 space-y-2 text-sm">
-                  {stats.topPaths.slice(0, 8).map((row) => (
-                    <li key={row.path} className="flex justify-between gap-3">
-                      <span className="truncate text-zinc-300">{row.path}</span>
-                      <span className="tabular-nums text-zinc-500">{fmt(row.views)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-
-            {stats?.topRefs?.length ? (
-              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Sumber hari ini (WIB)</h2>
-                <ul className="mt-3 space-y-2 text-sm">
-                  {stats.topRefs.slice(0, 6).map((row) => (
-                    <li key={row.ref} className="flex justify-between gap-3">
-                      <span className="truncate text-zinc-300">{row.ref}</span>
-                      <span className="tabular-nums text-zinc-500">{fmt(row.views)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] text-zinc-600">Ping pengunjung 90 dtk · panel refresh 25 dtk · tab tersembunyi tidak dihitung</p>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => void fetchOnline(secret)} disabled={loading}>
-                  {loading ? "..." : "Refresh"}
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={logout}>
-                  Keluar
-                </Button>
-              </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={loading}
+                onClick={() => void fetchOnline(secret)}
+                className="border-white/10 bg-white/[0.04] text-zinc-200 hover:bg-white/[0.08]"
+              >
+                Refresh statistik
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={logout}
+                className="border-white/10 bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-200"
+              >
+                Keluar
+              </Button>
             </div>
     </>
   );
