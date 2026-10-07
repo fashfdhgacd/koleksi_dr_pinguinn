@@ -253,7 +253,7 @@ export function isGoogleVideoThumbFormat(url: string): boolean {
 export function seoVideoThumbnail(id?: string | null, thumbnail?: string | null): string {
   const idClean = (id || "").trim();
   if (idClean && /^[A-Za-z0-9_-]{3,64}$/.test(idClean)) {
-    return `${SITE_ORIGIN}/api/og?id=${encodeURIComponent(idClean)}&v=13`;
+    return `${SITE_ORIGIN}/thumb/${encodeURIComponent(idClean)}.jpg`;
   }
   const raw = String(thumbnail || "").trim();
   if (raw && isGoogleVideoThumbFormat(raw)) {

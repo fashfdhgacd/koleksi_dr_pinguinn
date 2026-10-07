@@ -86,29 +86,17 @@ async function fetchImage(target: string, requestUrl: string): Promise<Response 
   }
 }
 
-async function fallbackOg(requestUrl: string): Promise<Response> {
-  try {
-    const fallback = await fetch(new URL("/og.jpg", requestUrl), {
-      signal: AbortSignal.timeout(4000),
-    });
-    if (fallback.ok) {
-      const buf = await fallback.arrayBuffer();
-      if (buf.byteLength > 2000) {
-        return new Response(buf, {
-          status: 200,
-          headers: {
-            "content-type": "image/jpeg",
-            "content-length": String(buf.byteLength),
-            "cache-control": "public, max-age=3600",
-            "x-og": "fallback",
-          },
-        });
-      }
-    }
-  } catch {
-    /* keep 404 */
-  }
-  return fail();
+/** Self-fetch ke Worker yang sama sering gagal di Cloudflare → redirect saja. */
+function redirectTo(path: string): Response {
+  return new Response(null, {
+    status: 302,
+    headers: { location: path, "cache-control": "public, max-age=3600" },
+  });
+}
+
+async function fallbackOg(_requestUrl: string, id?: string): Promise<Response> {
+  if (id) return redirectTo(`/thumb/${encodeURIComponent(id)}.jpg`);
+  return redirectTo("/og.jpg");
 }
 
 export const Route = createFileRoute("/api/og")({
@@ -135,7 +123,7 @@ export const Route = createFileRoute("/api/og")({
           /* use fallback */
         }
 
-        return fallbackOg(request.url);
+        return fallbackOg(request.url, id);
       },
     },
   },
