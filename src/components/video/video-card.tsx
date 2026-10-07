@@ -1,3 +1,4 @@
+import { cleanDisplayTitle } from "@/lib/seo";
 import { Link } from "@tanstack/react-router";
 import { Play } from "lucide-react";
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
@@ -40,7 +41,7 @@ export function VideoCard({
         </div>
       </div>
       <div className="px-0.5 pb-2 pt-2 sm:px-1.5 sm:pt-2.5">
-        <h3 className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground sm:text-sm">{video.title}</h3>
+        <h3 className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground sm:text-sm">{cleanDisplayTitle(video.title)}</h3>
         <p className="mt-0.5 truncate text-[11px] text-muted sm:mt-1 sm:text-xs">{video.category}</p>
       </div>
     </Link>
