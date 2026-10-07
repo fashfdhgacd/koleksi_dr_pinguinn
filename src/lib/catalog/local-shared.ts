@@ -223,7 +223,7 @@ export function isUsable(item: RawItem): boolean {
   if (item.id.length < 3) return false;
   const play = String(item.embed || item.direct || "").trim();
   if (!play) return false;
-  if (/^https?:\/\/i.test(play) || play.startsWith("/")) return true;
+  if (/^https?:\/\//i.test(play) || play.startsWith("/")) return true;
   return play.length >= 6;
 }
 
@@ -249,3 +249,4 @@ export function toCard(item: RawItem, posters: Record<string, string>, videyNo?:
     views: null,
   };
 }
+
