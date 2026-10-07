@@ -9,7 +9,6 @@ import {
   resolveVideoSeoDescription,
   videoJsonLd,
   videoSeoTitle,
-  hasTocilTitle,
 } from "@/lib/seo";
 import { WatchPage } from "@/lib/watch/watch-page";
 
@@ -31,7 +30,7 @@ export const Route = createFileRoute("/watch/$id")({
     const id = (params.id || "").trim();
     if (!id) return { ok: false as const, error: "ID kosong", code: "bad_request" as const };
     const res = await queryCatalog({ type: "detail", id });
-    // Istilah minor / 'Tidak publish' → 404 sungguhan (bukan halaman kosong 200).
+    // Istilah minor / 'Tidak publish' → 404 sungguhan.
     if (!res.ok && res.code === "not_found" && (await isPublicHidden(id))) throw notFound();
     return res;
   },
@@ -70,7 +69,7 @@ export const Route = createFileRoute("/watch/$id")({
         {
           name: "keywords",
           content: item
-            ? `${categoryKeywords(item.category)}, ${cleanDisplayTitle(item.title)}, dr pinguin`
+            ? `${categoryKeywords(item.category)}, ${item.title}, dr pinguin`
             : "bokep indo, dr pinguin, 18+",
         },
         { property: "og:type", content: "video.other" },
@@ -88,10 +87,7 @@ export const Route = createFileRoute("/watch/$id")({
         { name: "twitter:description", content: description },
         { name: "twitter:image", content: image },
         { name: "twitter:image:alt", content: "DR. PINGUIN" },
-        {
-          name: "robots",
-          content: item.noindex || hasTocilTitle(item) ? "noindex,follow" : "index,follow,max-video-preview:120",
-        },
+        { name: "robots", content: "index,follow,max-video-preview:120" },
         { name: "rating", content: "adult" },
       ],
       links: [{ rel: "canonical", href: url }],
