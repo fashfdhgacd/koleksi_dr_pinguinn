@@ -1,11 +1,11 @@
 /**
  * Dynamic sitemap for Google Search Console.
  * Nitro middleware (Cloudflare) — do not keep static public/sitemap*.xml or they shadow this.
- * URL list only (no video: title/description SEO copy).
+ * Includes Google video sitemap extension (video:video) for /watch entries.
  */
 import { CATEGORY_LIST } from "../../src/lib/catalog/categories";
 import { listSitemapWatchEntries } from "../../src/lib/catalog/sitemap-entries";
-import { SITE_ORIGIN } from "../../src/lib/seo";
+import { SITE_ORIGIN, cleanDisplayTitle, seoVideoThumbnail, videoSeoDescription } from "../../src/lib/seo";
 
 interface SitemapEvent {
   url: URL;
@@ -54,22 +54,42 @@ function pageEntries(): string[] {
   return out;
 }
 
+function videoBlock(item: Awaited<ReturnType<typeof listSitemapWatchEntries>>[number]): string {
+  const pageUrl = `${SITE_ORIGIN}/watch/${encodeURIComponent(item.id)}`;
+  const title = cleanDisplayTitle(item.title || "") || "Video";
+  const desc = videoSeoDescription(title, item.category || null);
+  const thumb = seoVideoThumbnail(item.id, item.thumbnail);
+  const player = item.embed || pageUrl;
+  const parts = [
+    `    <video:video>`,
+    `      <video:thumbnail_loc>${escapeXml(thumb)}</video:thumbnail_loc>`,
+    `      <video:title>${escapeXml(title.slice(0, 100))}</video:title>`,
+    `      <video:description>${escapeXml(desc.slice(0, 2048))}</video:description>`,
+    `      <video:player_loc>${escapeXml(player)}</video:player_loc>`,
+  ];
+  if (item.duration && item.duration <= 28800) parts.push(`      <video:duration>${item.duration}</video:duration>`);
+  if (item.lastmod) parts.push(`      <video:publication_date>${escapeXml(item.lastmod)}</video:publication_date>`);
+  parts.push(`      <video:family_friendly>no</video:family_friendly>`, `    </video:video>`);
+  return parts.join("\n");
+}
+
 function watchEntries(
   entries: Awaited<ReturnType<typeof listSitemapWatchEntries>>,
   start: number,
   end: number,
 ): string[] {
-  return entries.slice(start, end).map((item) =>
-    urlEntry(`${SITE_ORIGIN}/watch/${encodeURIComponent(item.id)}`, {
+  return entries.slice(start, end).map((item) => {
+    const base = urlEntry(`${SITE_ORIGIN}/watch/${encodeURIComponent(item.id)}`, {
       changefreq: "weekly",
       priority: "0.6",
       lastmod: item.lastmod,
-    }),
-  );
+    });
+    return base.replace(/\n  <\/url>$/, `\n${videoBlock(item)}\n  </url>`);
+  });
 }
 
 function wrapUrlset(body: string[]): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${body.join("\n")}\n</urlset>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n${body.join("\n")}\n</urlset>\n`;
 }
 
 function wrapIndex(locs: Array<{ loc: string; lastmod?: string }>): string {

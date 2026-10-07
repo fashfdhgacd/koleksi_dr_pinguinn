@@ -3,7 +3,16 @@ import { loadItems } from "./local";
 export type SitemapWatchEntry = {
   id: string;
   lastmod?: string;
+  title?: string;
+  category?: string;
+  embed?: string;
+  thumbnail?: string;
+  duration?: number;
 };
+
+function str(v: unknown): string {
+  return typeof v === "string" ? v.trim() : "";
+}
 
 function isVideyItem(item: { embed?: unknown; source?: unknown; direct?: unknown }): boolean {
   return /videy/i.test(`${item.embed || ""} ${item.source || ""} ${item.direct || ""}`);
@@ -37,7 +46,20 @@ export async function listSitemapWatchEntries(): Promise<SitemapWatchEntry[]> {
     if (!it?.id || seen.has(it.id) || isVideyItem(it)) continue;
     seen.add(it.id);
     const lastmod = toSitemapLastmod(it.createdAt ?? it.date);
-    out.push(lastmod ? { id: it.id, lastmod } : { id: it.id });
+    const entry: SitemapWatchEntry = { id: it.id };
+    if (lastmod) entry.lastmod = lastmod;
+    const title = str(it.title);
+    if (title) entry.title = title;
+    const category = str(it.category);
+    if (category) entry.category = category;
+    const embed = str(it.embed);
+    if (/^https:\/\//i.test(embed)) entry.embed = embed;
+    const thumb = str(it.poster) || str(it.thumbnail);
+    if (thumb) entry.thumbnail = thumb;
+    if (typeof it.duration === "number" && Number.isFinite(it.duration) && it.duration > 0) {
+      entry.duration = Math.round(it.duration);
+    }
+    out.push(entry);
   }
   out.sort((a, b) => {
     const da = a.lastmod || "";

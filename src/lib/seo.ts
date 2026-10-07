@@ -59,7 +59,7 @@ export function videoSeoTitle(title: string, category?: string | null): string {
   const base = cleanDisplayTitle(title);
   const label = safeSeoLabel(category);
   const hasLabel = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(base);
-  const head = hasLabel || !label ? base : `${base} — ${label}`;
+  const head = !label ? base : hasLabel ? `${base} – Bokep` : `${base} – Bokep ${label}`;
   const clipped = head.length > 58 ? `${head.slice(0, 55).trimEnd()}…` : head;
   return pageTitle([clipped]);
 }
