@@ -32,8 +32,6 @@ export function CatalogPager({
   }
 
   const pages = windowPages(page, totalPages);
-  const from = (page - 1) * limit + 1;
-  const to = Math.min(page * limit, total);
 
   function go(next: number) {
     if (next < 1 || next > totalPages) return;
@@ -80,9 +78,10 @@ export function CatalogPager({
 
   return (
     <nav className="relative z-10 mt-8 flex flex-col items-center gap-3" aria-label="Halaman katalog">
-      <p className="text-xs text-muted">
-        {from.toLocaleString("id-ID")}–{to.toLocaleString("id-ID")} / {total.toLocaleString("id-ID")}
-        {" · "}{page}/{totalPages}
+      <p className="text-xs tracking-wide text-muted">
+        Halaman {page.toLocaleString("id-ID")} dari {totalPages.toLocaleString("id-ID")}
+        {" · "}
+        {total.toLocaleString("id-ID")} video
       </p>
       <div className="flex flex-wrap items-center justify-center gap-1.5">
         <a
@@ -91,7 +90,7 @@ export function CatalogPager({
           aria-label="Halaman sebelumnya"
         >
           <ChevronLeft className="size-4" />
-          <span className="hidden sm:inline">Prev</span>
+          <span className="hidden sm:inline">Sebelumnya</span>
         </a>
         {pages[0] > 1 ? (
           <>
@@ -107,7 +106,7 @@ export function CatalogPager({
             {...linkProps(n)}
             aria-current={n === page ? "page" : undefined}
             className={`h-11 min-w-11 touch-manipulation inline-flex items-center justify-center rounded-full px-2 text-sm sm:h-9 sm:min-w-9 ${
-              n === page ? "bg-primary text-primary-foreground" : "hover:bg-secondary"
+              n === page ? "bg-primary font-semibold text-primary-foreground" : "hover:bg-secondary"
             }`}
           >
             {n}
@@ -126,7 +125,7 @@ export function CatalogPager({
           className="inline-flex h-11 min-w-11 touch-manipulation items-center justify-center gap-1 rounded-full border border-border px-3 text-sm aria-disabled:pointer-events-none aria-disabled:opacity-40 sm:h-9"
           aria-label="Halaman berikutnya"
         >
-          <span className="hidden sm:inline">Next</span>
+          <span className="hidden sm:inline">Berikutnya</span>
           <ChevronRight className="size-4" />
         </a>
       </div>
