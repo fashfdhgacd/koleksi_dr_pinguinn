@@ -1,3 +1,4 @@
+import { categoryLabel } from "@/lib/catalog/categories";
 import { cleanDisplayTitle } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -138,7 +139,7 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
           <div className="hidden flex-wrap items-center gap-3 text-xs text-muted sm:flex">
             {current.year ? <span>{current.year}</span> : null}
             {showDuration ? <span>{current.durationLabel}</span> : null}
-            {current.category ? <span>{current.category}</span> : null}
+            {current.category ? <span>{categoryLabel(current.category)}</span> : null}
           </div>
           <div className="pointer-events-auto pt-0.5">
             <Button asChild size="default" className="h-10 rounded-full px-4 text-sm sm:h-11 sm:rounded-lg sm:px-5 sm:text-base">
