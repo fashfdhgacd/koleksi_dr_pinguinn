@@ -9,6 +9,8 @@ import {
   refreshMissingPosters,
 } from "@/lib/bot/posters.js";
 
+import { listHiddenForReview, setReviewMark } from "@/lib/owner-hidden-review";
+
 export const maxDuration = 60;
 
 const HOST = "https://koleksidrpinguin.com";
@@ -135,6 +137,14 @@ export const Route = createFileRoute("/api/owner-tools")({
           body = (await request.json()) as OwnerBody;
         } catch {
           return json({ ok: false, error: "bad_json" }, 400);
+        }
+        if (body.action === "hidden-review") {
+          const items = await listHiddenForReview();
+          return json({ ok: true, count: items.length, items });
+        }
+        if (body.action === "review-mark") {
+          const r = await setReviewMark(body as never);
+          return json(r, r.status || 200);
         }
         if (body.action === "share") return handleShare(body);
         if (body.action === "upload") return handleUpload(body);
