@@ -48,6 +48,12 @@ export const runtime: {
   inflight: Promise<CatalogCache> | null;
 } = { cache: null, inflight: null };
 
+/** Safe startsWith that never throws if value is not a string. */
+export function safeStartsWith(value: unknown, prefix: string): boolean {
+  if (typeof value !== "string") return false;
+  return value.startsWith(prefix);
+}
+
 export function asList(data: unknown): RawItem[] {
   if (Array.isArray(data)) return data as RawItem[];
   if (data && typeof data === "object") {
@@ -62,7 +68,7 @@ export function asPosterMap(data: unknown): Record<string, string> {
   if (!data || typeof data !== "object" || Array.isArray(data)) return {};
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(data as Record<string, unknown>)) {
-    if (typeof v === "string" && v.startsWith("http")) out[k] = v;
+    if (safeStartsWith(v, "http")) out[k] = v as string;
   }
   return out;
 }
@@ -184,9 +190,9 @@ export function videyFile(item: RawItem): string {
   return "";
 }
 
-export function directPoster(url: string): string {
+export function directPoster(url: unknown): string {
   const u = String(url || "").trim();
-  if (!u.startsWith("http")) return "";
+  if (!safeStartsWith(u, "http")) return "";
   if (PLACEHOLDER_IMAGE_RE.test(u)) return "";
   if (/cdnhlsplayer\.lat/i.test(u)) return "";
   if (/\/api\/(img-proxy|tape-thumb|embed-thumb|puterin-thumb)/i.test(u)) return "";
@@ -206,8 +212,8 @@ export function thumbOf(item: RawItem, posters: Record<string, string>): string 
   return (
     directPoster(posters[id]) ||
     directPoster(posters[embedKey(item.embed || "")]) ||
-    directPoster(String(item.poster || "")) ||
-    directPoster(String(item.thumbnail || "")) ||
+    directPoster(item.poster) ||
+    directPoster(item.thumbnail) ||
     (isPutarin(item) ? javCoverFromTitle(String(item.title || "")) : "") ||
     ""
   );
@@ -223,7 +229,7 @@ export function isUsable(item: RawItem): boolean {
   if (item.id.length < 3) return false;
   const play = String(item.embed || item.direct || "").trim();
   if (!play) return false;
-  if (/^https?:\/\//i.test(play) || play.startsWith("/")) return true;
+  if (/^https?:\/\//i.test(play) || safeStartsWith(play, "/")) return true;
   return play.length >= 6;
 }
 
