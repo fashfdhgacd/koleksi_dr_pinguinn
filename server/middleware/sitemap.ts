@@ -15,7 +15,7 @@ interface SitemapEvent {
 /** Soft chunk under Google's 50_000 URL / sitemap limit. */
 const WATCH_CHUNK = 45_000;
 
-const LEGAL_PATHS = ["/syarat", "/privasi", "/dmca", "/kontak"] as const;
+const LEGAL_PATHS = ["/syarat", "/privasi", "/2257", "/dmca", "/kontak"] as const;
 
 function escapeXml(s: string): string {
   return s

@@ -10,23 +10,95 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as R2257RouteImport } from './routes/2257'
+import { Route as CampurRouteImport } from './routes/campur'
+import { Route as DmcaRouteImport } from './routes/dmca'
 import { Route as KategoriRouteImport } from './routes/kategori'
+import { Route as KontakRouteImport } from './routes/kontak'
+import { Route as PemilikRouteImport } from './routes/pemilik'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as PrivasiRouteImport } from './routes/privasi'
+import { Route as PutarinRouteImport } from './routes/putarin'
+import { Route as SyaratRouteImport } from './routes/syarat'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiEmbedThumbRouteImport } from './routes/api/embed-thumb'
+import { Route as ApiFrameRouteImport } from './routes/api/frame'
+import { Route as ApiImgProxyRouteImport } from './routes/api/img-proxy'
+import { Route as ApiOgRouteImport } from './routes/api/og'
+import { Route as ApiOnlineRouteImport } from './routes/api/online'
+import { Route as ApiOwnerToolsRouteImport } from './routes/api/owner-tools'
 import { Route as ApiPuterinThumbRouteImport } from './routes/api/puterin-thumb'
 import { Route as ApiTapeThumbRouteImport } from './routes/api/tape-thumb'
 import { Route as ApiTelegramRouteImport } from './routes/api/telegram'
+import { Route as KategoriIndexRouteImport } from './routes/kategori.index'
+import { Route as KategoriSlugRouteImport } from './routes/kategori.$slug'
+import { Route as ThumbIdRouteImport } from './routes/thumb.$id'
 import { Route as VIdRouteImport } from './routes/v.$id'
 import { Route as WatchIdRouteImport } from './routes/watch.$id'
+import { Route as ApiAnalyticsHealthRouteImport } from './routes/api/analytics.health'
+import { Route as ApiAnalyticsHourlyRouteImport } from './routes/api/analytics.hourly'
+import { Route as ApiAnalyticsOverviewRouteImport } from './routes/api/analytics.overview'
+import { Route as ApiAnalyticsTrackRouteImport } from './routes/api/analytics.track'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const R2257Route = R2257RouteImport.update({
+  id: '/2257',
+  path: '/2257',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CampurRoute = CampurRouteImport.update({
+  id: '/campur',
+  path: '/campur',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DmcaRoute = DmcaRouteImport.update({
+  id: '/dmca',
+  path: '/dmca',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KategoriRoute = KategoriRouteImport.update({
   id: '/kategori',
   path: '/kategori',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const KontakRoute = KontakRouteImport.update({
+  id: '/kontak',
+  path: '/kontak',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PemilikRoute = PemilikRouteImport.update({
+  id: '/pemilik',
+  path: '/pemilik',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivasiRoute = PrivasiRouteImport.update({
+  id: '/privasi',
+  path: '/privasi',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PutarinRoute = PutarinRouteImport.update({
+  id: '/putarin',
+  path: '/putarin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SyaratRoute = SyaratRouteImport.update({
+  id: '/syarat',
+  path: '/syarat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDataRoute = ApiDataRouteImport.update({
@@ -37,6 +109,31 @@ const ApiDataRoute = ApiDataRouteImport.update({
 const ApiEmbedThumbRoute = ApiEmbedThumbRouteImport.update({
   id: '/api/embed-thumb',
   path: '/api/embed-thumb',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiFrameRoute = ApiFrameRouteImport.update({
+  id: '/api/frame',
+  path: '/api/frame',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiImgProxyRoute = ApiImgProxyRouteImport.update({
+  id: '/api/img-proxy',
+  path: '/api/img-proxy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOgRoute = ApiOgRouteImport.update({
+  id: '/api/og',
+  path: '/api/og',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOnlineRoute = ApiOnlineRouteImport.update({
+  id: '/api/online',
+  path: '/api/online',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOwnerToolsRoute = ApiOwnerToolsRouteImport.update({
+  id: '/api/owner-tools',
+  path: '/api/owner-tools',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPuterinThumbRoute = ApiPuterinThumbRouteImport.update({
@@ -54,6 +151,21 @@ const ApiTelegramRoute = ApiTelegramRouteImport.update({
   path: '/api/telegram',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KategoriIndexRoute = KategoriIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => KategoriRoute,
+} as any)
+const KategoriSlugRoute = KategoriSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => KategoriRoute,
+} as any)
+const ThumbIdRoute = ThumbIdRouteImport.update({
+  id: '/thumb/$id',
+  path: '/thumb/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const VIdRoute = VIdRouteImport.update({
   id: '/v/$id',
   path: '/v/$id',
@@ -64,87 +176,257 @@ const WatchIdRoute = WatchIdRouteImport.update({
   path: '/watch/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiAnalyticsHealthRoute = ApiAnalyticsHealthRouteImport.update({
+  id: '/api/analytics/health',
+  path: '/api/analytics/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAnalyticsHourlyRoute = ApiAnalyticsHourlyRouteImport.update({
+  id: '/api/analytics/hourly',
+  path: '/api/analytics/hourly',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAnalyticsOverviewRoute = ApiAnalyticsOverviewRouteImport.update({
+  id: '/api/analytics/overview',
+  path: '/api/analytics/overview',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAnalyticsTrackRoute = ApiAnalyticsTrackRouteImport.update({
+  id: '/api/analytics/track',
+  path: '/api/analytics/track',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/kategori': typeof KategoriRoute
+  '/2257': typeof R2257Route
+  '/campur': typeof CampurRoute
+  '/dmca': typeof DmcaRoute
+  '/kategori': typeof KategoriRouteWithChildren
+  '/kontak': typeof KontakRoute
+  '/pemilik': typeof PemilikRoute
+  '/privacy': typeof PrivacyRoute
+  '/privasi': typeof PrivasiRoute
+  '/putarin': typeof PutarinRoute
+  '/syarat': typeof SyaratRoute
+  '/terms': typeof TermsRoute
   '/api/data': typeof ApiDataRoute
   '/api/embed-thumb': typeof ApiEmbedThumbRoute
+  '/api/frame': typeof ApiFrameRoute
+  '/api/img-proxy': typeof ApiImgProxyRoute
+  '/api/og': typeof ApiOgRoute
+  '/api/online': typeof ApiOnlineRoute
+  '/api/owner-tools': typeof ApiOwnerToolsRoute
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/kategori/$slug': typeof KategoriSlugRoute
+  '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
+  '/kategori/': typeof KategoriIndexRoute
+  '/api/analytics/health': typeof ApiAnalyticsHealthRoute
+  '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
+  '/api/analytics/overview': typeof ApiAnalyticsOverviewRoute
+  '/api/analytics/track': typeof ApiAnalyticsTrackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/kategori': typeof KategoriRoute
+  '/2257': typeof R2257Route
+  '/campur': typeof CampurRoute
+  '/dmca': typeof DmcaRoute
+  '/kontak': typeof KontakRoute
+  '/pemilik': typeof PemilikRoute
+  '/privacy': typeof PrivacyRoute
+  '/privasi': typeof PrivasiRoute
+  '/putarin': typeof PutarinRoute
+  '/syarat': typeof SyaratRoute
+  '/terms': typeof TermsRoute
   '/api/data': typeof ApiDataRoute
   '/api/embed-thumb': typeof ApiEmbedThumbRoute
+  '/api/frame': typeof ApiFrameRoute
+  '/api/img-proxy': typeof ApiImgProxyRoute
+  '/api/og': typeof ApiOgRoute
+  '/api/online': typeof ApiOnlineRoute
+  '/api/owner-tools': typeof ApiOwnerToolsRoute
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/kategori/$slug': typeof KategoriSlugRoute
+  '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
+  '/kategori': typeof KategoriIndexRoute
+  '/api/analytics/health': typeof ApiAnalyticsHealthRoute
+  '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
+  '/api/analytics/overview': typeof ApiAnalyticsOverviewRoute
+  '/api/analytics/track': typeof ApiAnalyticsTrackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/kategori': typeof KategoriRoute
+  '/2257': typeof R2257Route
+  '/campur': typeof CampurRoute
+  '/dmca': typeof DmcaRoute
+  '/kategori': typeof KategoriRouteWithChildren
+  '/kontak': typeof KontakRoute
+  '/pemilik': typeof PemilikRoute
+  '/privacy': typeof PrivacyRoute
+  '/privasi': typeof PrivasiRoute
+  '/putarin': typeof PutarinRoute
+  '/syarat': typeof SyaratRoute
+  '/terms': typeof TermsRoute
   '/api/data': typeof ApiDataRoute
   '/api/embed-thumb': typeof ApiEmbedThumbRoute
+  '/api/frame': typeof ApiFrameRoute
+  '/api/img-proxy': typeof ApiImgProxyRoute
+  '/api/og': typeof ApiOgRoute
+  '/api/online': typeof ApiOnlineRoute
+  '/api/owner-tools': typeof ApiOwnerToolsRoute
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/kategori/$slug': typeof KategoriSlugRoute
+  '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
+  '/kategori/': typeof KategoriIndexRoute
+  '/api/analytics/health': typeof ApiAnalyticsHealthRoute
+  '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
+  '/api/analytics/overview': typeof ApiAnalyticsOverviewRoute
+  '/api/analytics/track': typeof ApiAnalyticsTrackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/2257'
+    | '/campur'
+    | '/dmca'
     | '/kategori'
+    | '/kontak'
+    | '/pemilik'
+    | '/privacy'
+    | '/privasi'
+    | '/putarin'
+    | '/syarat'
+    | '/terms'
     | '/api/data'
     | '/api/embed-thumb'
+    | '/api/frame'
+    | '/api/img-proxy'
+    | '/api/og'
+    | '/api/online'
+    | '/api/owner-tools'
     | '/api/puterin-thumb'
     | '/api/tape-thumb'
     | '/api/telegram'
+    | '/kategori/$slug'
+    | '/thumb/$id'
     | '/v/$id'
     | '/watch/$id'
+    | '/kategori/'
+    | '/api/analytics/health'
+    | '/api/analytics/hourly'
+    | '/api/analytics/overview'
+    | '/api/analytics/track'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/kategori'
+    | '/2257'
+    | '/campur'
+    | '/dmca'
+    | '/kontak'
+    | '/pemilik'
+    | '/privacy'
+    | '/privasi'
+    | '/putarin'
+    | '/syarat'
+    | '/terms'
     | '/api/data'
     | '/api/embed-thumb'
+    | '/api/frame'
+    | '/api/img-proxy'
+    | '/api/og'
+    | '/api/online'
+    | '/api/owner-tools'
     | '/api/puterin-thumb'
     | '/api/tape-thumb'
     | '/api/telegram'
+    | '/kategori/$slug'
+    | '/thumb/$id'
     | '/v/$id'
     | '/watch/$id'
+    | '/kategori'
+    | '/api/analytics/health'
+    | '/api/analytics/hourly'
+    | '/api/analytics/overview'
+    | '/api/analytics/track'
   id:
     | '__root__'
     | '/'
+    | '/2257'
+    | '/campur'
+    | '/dmca'
     | '/kategori'
+    | '/kontak'
+    | '/pemilik'
+    | '/privacy'
+    | '/privasi'
+    | '/putarin'
+    | '/syarat'
+    | '/terms'
     | '/api/data'
     | '/api/embed-thumb'
+    | '/api/frame'
+    | '/api/img-proxy'
+    | '/api/og'
+    | '/api/online'
+    | '/api/owner-tools'
     | '/api/puterin-thumb'
     | '/api/tape-thumb'
     | '/api/telegram'
+    | '/kategori/$slug'
+    | '/thumb/$id'
     | '/v/$id'
     | '/watch/$id'
+    | '/kategori/'
+    | '/api/analytics/health'
+    | '/api/analytics/hourly'
+    | '/api/analytics/overview'
+    | '/api/analytics/track'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  KategoriRoute: typeof KategoriRoute
+  R2257Route: typeof R2257Route
+  CampurRoute: typeof CampurRoute
+  DmcaRoute: typeof DmcaRoute
+  KategoriRoute: typeof KategoriRouteWithChildren
+  KontakRoute: typeof KontakRoute
+  PemilikRoute: typeof PemilikRoute
+  PrivacyRoute: typeof PrivacyRoute
+  PrivasiRoute: typeof PrivasiRoute
+  PutarinRoute: typeof PutarinRoute
+  SyaratRoute: typeof SyaratRoute
+  TermsRoute: typeof TermsRoute
   ApiDataRoute: typeof ApiDataRoute
   ApiEmbedThumbRoute: typeof ApiEmbedThumbRoute
+  ApiFrameRoute: typeof ApiFrameRoute
+  ApiImgProxyRoute: typeof ApiImgProxyRoute
+  ApiOgRoute: typeof ApiOgRoute
+  ApiOnlineRoute: typeof ApiOnlineRoute
+  ApiOwnerToolsRoute: typeof ApiOwnerToolsRoute
   ApiPuterinThumbRoute: typeof ApiPuterinThumbRoute
   ApiTapeThumbRoute: typeof ApiTapeThumbRoute
   ApiTelegramRoute: typeof ApiTelegramRoute
+  ThumbIdRoute: typeof ThumbIdRoute
   VIdRoute: typeof VIdRoute
   WatchIdRoute: typeof WatchIdRoute
+  ApiAnalyticsHealthRoute: typeof ApiAnalyticsHealthRoute
+  ApiAnalyticsHourlyRoute: typeof ApiAnalyticsHourlyRoute
+  ApiAnalyticsOverviewRoute: typeof ApiAnalyticsOverviewRoute
+  ApiAnalyticsTrackRoute: typeof ApiAnalyticsTrackRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -156,11 +438,81 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/2257': {
+      id: '/2257'
+      path: '/2257'
+      fullPath: '/2257'
+      preLoaderRoute: typeof R2257RouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/campur': {
+      id: '/campur'
+      path: '/campur'
+      fullPath: '/campur'
+      preLoaderRoute: typeof CampurRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/dmca': {
+      id: '/dmca'
+      path: '/dmca'
+      fullPath: '/dmca'
+      preLoaderRoute: typeof DmcaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kategori': {
       id: '/kategori'
       path: '/kategori'
       fullPath: '/kategori'
       preLoaderRoute: typeof KategoriRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/kontak': {
+      id: '/kontak'
+      path: '/kontak'
+      fullPath: '/kontak'
+      preLoaderRoute: typeof KontakRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pemilik': {
+      id: '/pemilik'
+      path: '/pemilik'
+      fullPath: '/pemilik'
+      preLoaderRoute: typeof PemilikRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privasi': {
+      id: '/privasi'
+      path: '/privasi'
+      fullPath: '/privasi'
+      preLoaderRoute: typeof PrivasiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/putarin': {
+      id: '/putarin'
+      path: '/putarin'
+      fullPath: '/putarin'
+      preLoaderRoute: typeof PutarinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/syarat': {
+      id: '/syarat'
+      path: '/syarat'
+      fullPath: '/syarat'
+      preLoaderRoute: typeof SyaratRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/data': {
@@ -175,6 +527,41 @@ declare module '@tanstack/react-router' {
       path: '/api/embed-thumb'
       fullPath: '/api/embed-thumb'
       preLoaderRoute: typeof ApiEmbedThumbRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/frame': {
+      id: '/api/frame'
+      path: '/api/frame'
+      fullPath: '/api/frame'
+      preLoaderRoute: typeof ApiFrameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/img-proxy': {
+      id: '/api/img-proxy'
+      path: '/api/img-proxy'
+      fullPath: '/api/img-proxy'
+      preLoaderRoute: typeof ApiImgProxyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/og': {
+      id: '/api/og'
+      path: '/api/og'
+      fullPath: '/api/og'
+      preLoaderRoute: typeof ApiOgRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/online': {
+      id: '/api/online'
+      path: '/api/online'
+      fullPath: '/api/online'
+      preLoaderRoute: typeof ApiOnlineRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/owner-tools': {
+      id: '/api/owner-tools'
+      path: '/api/owner-tools'
+      fullPath: '/api/owner-tools'
+      preLoaderRoute: typeof ApiOwnerToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/puterin-thumb': {
@@ -198,6 +585,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelegramRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kategori/': {
+      id: '/kategori/'
+      path: '/'
+      fullPath: '/kategori/'
+      preLoaderRoute: typeof KategoriIndexRouteImport
+      parentRoute: typeof KategoriRoute
+    }
+    '/kategori/$slug': {
+      id: '/kategori/$slug'
+      path: '/$slug'
+      fullPath: '/kategori/$slug'
+      preLoaderRoute: typeof KategoriSlugRouteImport
+      parentRoute: typeof KategoriRoute
+    }
+    '/thumb/$id': {
+      id: '/thumb/$id'
+      path: '/thumb/$id'
+      fullPath: '/thumb/$id'
+      preLoaderRoute: typeof ThumbIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/v/$id': {
       id: '/v/$id'
       path: '/v/$id'
@@ -212,19 +620,81 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WatchIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/analytics/health': {
+      id: '/api/analytics/health'
+      path: '/api/analytics/health'
+      fullPath: '/api/analytics/health'
+      preLoaderRoute: typeof ApiAnalyticsHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/analytics/hourly': {
+      id: '/api/analytics/hourly'
+      path: '/api/analytics/hourly'
+      fullPath: '/api/analytics/hourly'
+      preLoaderRoute: typeof ApiAnalyticsHourlyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/analytics/overview': {
+      id: '/api/analytics/overview'
+      path: '/api/analytics/overview'
+      fullPath: '/api/analytics/overview'
+      preLoaderRoute: typeof ApiAnalyticsOverviewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/analytics/track': {
+      id: '/api/analytics/track'
+      path: '/api/analytics/track'
+      fullPath: '/api/analytics/track'
+      preLoaderRoute: typeof ApiAnalyticsTrackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
+interface KategoriRouteChildren {
+  KategoriSlugRoute: typeof KategoriSlugRoute
+  KategoriIndexRoute: typeof KategoriIndexRoute
+}
+
+const KategoriRouteChildren: KategoriRouteChildren = {
+  KategoriSlugRoute: KategoriSlugRoute,
+  KategoriIndexRoute: KategoriIndexRoute,
+}
+
+const KategoriRouteWithChildren = KategoriRoute._addFileChildren(
+  KategoriRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  KategoriRoute: KategoriRoute,
+  R2257Route: R2257Route,
+  CampurRoute: CampurRoute,
+  DmcaRoute: DmcaRoute,
+  KategoriRoute: KategoriRouteWithChildren,
+  KontakRoute: KontakRoute,
+  PemilikRoute: PemilikRoute,
+  PrivacyRoute: PrivacyRoute,
+  PrivasiRoute: PrivasiRoute,
+  PutarinRoute: PutarinRoute,
+  SyaratRoute: SyaratRoute,
+  TermsRoute: TermsRoute,
   ApiDataRoute: ApiDataRoute,
   ApiEmbedThumbRoute: ApiEmbedThumbRoute,
+  ApiFrameRoute: ApiFrameRoute,
+  ApiImgProxyRoute: ApiImgProxyRoute,
+  ApiOgRoute: ApiOgRoute,
+  ApiOnlineRoute: ApiOnlineRoute,
+  ApiOwnerToolsRoute: ApiOwnerToolsRoute,
   ApiPuterinThumbRoute: ApiPuterinThumbRoute,
   ApiTapeThumbRoute: ApiTapeThumbRoute,
   ApiTelegramRoute: ApiTelegramRoute,
+  ThumbIdRoute: ThumbIdRoute,
   VIdRoute: VIdRoute,
   WatchIdRoute: WatchIdRoute,
+  ApiAnalyticsHealthRoute: ApiAnalyticsHealthRoute,
+  ApiAnalyticsHourlyRoute: ApiAnalyticsHourlyRoute,
+  ApiAnalyticsOverviewRoute: ApiAnalyticsOverviewRoute,
+  ApiAnalyticsTrackRoute: ApiAnalyticsTrackRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
