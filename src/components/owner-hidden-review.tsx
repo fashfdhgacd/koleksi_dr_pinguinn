@@ -135,8 +135,7 @@ export function HiddenReviewSection({ secret }: { secret: string }) {
         Cek videonya. Kalau pemeran jelas dewasa, ganti judul di situs sumber; kalau ragu, hapus dari sumber.
       </p>
       <p className="mt-1 text-[11px] text-zinc-500">
-        "Tidak publish" menghapus video dari situs publik (listing, cari, sitemap, halaman tonton 404). "Publish" hanya
-        tersedia untuk judul yang cuma kena kata 'tocil' (judul tetap dimask ***, noindex).
+        "Tidak publish" menghapus video dari situs publik (listing, cari, sitemap, halaman tonton 404).
       </p>
       {err ? <p className="mt-3 text-xs text-red-400">Error: {err}</p> : null}
       {!rows && !err ? <p className="mt-3 text-xs text-zinc-500">Memuat…</p> : null}
@@ -220,7 +219,6 @@ export function HiddenReviewSection({ secret }: { secret: string }) {
                       >
                         <option value="">Default</option>
                         <option value="off">Tidak publish</option>
-                        {r.tocilOnly ? <option value="on">Publish</option> : null}
                       </select>
                     </td>
                     <td className="py-2 whitespace-nowrap">

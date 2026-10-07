@@ -13,7 +13,7 @@ import {
   toCard,
 } from "./local-shared";
 import { runtime } from "./local-shared";
-import { loadItems, pageOf, sortByNewest } from "./local-cache";
+import { isPublicHidden, loadItems, pageOf, sortByNewest } from "./local-cache";
 
 export { loadItems } from "./local-cache";
 
@@ -162,6 +162,7 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
     bag = await runtime.inflight;
     item = bag.byId.get(id);
   }
+  if (item && (await isPublicHidden(id))) item = undefined;
   if (!item || isVidey(item)) {
     throw Object.assign(new Error("Video tidak ditemukan"), { code: "not_found" as const });
   }
