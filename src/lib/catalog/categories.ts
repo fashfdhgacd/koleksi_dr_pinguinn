@@ -65,3 +65,15 @@ export function findCategory(slug: string | null | undefined): CategoryDef | und
   }
   return CATEGORIES.find((c) => c.slug === key);
 }
+
+/** Nama tampilan kategori dari slug (fallback: title-case slug). */
+export function categoryLabel(slug: string | null | undefined): string {
+  if (!slug) return "";
+  const cat = findCategory(slug) || findCategory(slug.trim().replace(/\s+/g, "-"));
+  if (cat) return cat.label;
+  return slug
+    .trim()
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
