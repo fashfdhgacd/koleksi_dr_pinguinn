@@ -5,7 +5,6 @@
  */
 import { CATEGORY_LIST } from "../../src/lib/catalog/categories";
 import { listSitemapWatchEntries } from "../../src/lib/catalog/sitemap-entries";
-import { listNonEmptyCategorySlugs } from "../../src/lib/catalog/local";
 import { SITE_ORIGIN } from "../../src/lib/seo";
 
 interface SitemapEvent {
@@ -36,13 +35,12 @@ function urlEntry(loc: string, opts?: { changefreq?: string; priority?: string; 
   return parts.join("\n");
 }
 
-function pageEntries(nonEmpty: Set<string>): string[] {
+function pageEntries(): string[] {
   const out: string[] = [
     urlEntry(`${SITE_ORIGIN}/`, { changefreq: "hourly", priority: "1.0" }),
     urlEntry(`${SITE_ORIGIN}/kategori`, { changefreq: "daily", priority: "0.8" }),
   ];
   for (const c of CATEGORY_LIST) {
-    if (!nonEmpty.has(c.slug)) continue;
     out.push(
       urlEntry(`${SITE_ORIGIN}/kategori/${encodeURIComponent(c.slug)}`, {
         changefreq: "daily",
@@ -103,8 +101,7 @@ function errorXml(method: string, message: string): Response {
 }
 
 async function buildPagesXml(): Promise<string> {
-  const nonEmpty = new Set(await listNonEmptyCategorySlugs());
-  return wrapUrlset(pageEntries(nonEmpty));
+  return wrapUrlset(pageEntries());
 }
 
 async function buildWatchXml(chunkIndex?: number): Promise<{ xml: string; total: number; chunks: number }> {
@@ -125,15 +122,14 @@ async function buildWatchXml(chunkIndex?: number): Promise<{ xml: string; total:
 
 async function buildRootXml(): Promise<string> {
   const entries = await listSitemapWatchEntries();
-  const pages = pageEntries(new Set(await listNonEmptyCategorySlugs()));
-  const pageCount = pages.length;
+  const pageCount = pageEntries().length;
   const total = pageCount + entries.length;
   const watchChunks = Math.max(1, Math.ceil(Math.max(entries.length, 1) / WATCH_CHUNK));
 
   // Single urlset when under the 50k limit; otherwise sitemap index.
   if (total <= 50_000 && watchChunks === 1) {
     return wrapUrlset([
-      ...pages,
+      ...pageEntries(),
       ...watchEntries(entries, 0, entries.length),
     ]);
   }
