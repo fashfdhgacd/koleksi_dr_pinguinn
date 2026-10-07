@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getRouteApi, Link } from "@tanstack/react-router";
-import { categoryLabel, findCategory } from "@/lib/catalog/categories";
+import { getRouteApi } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
@@ -282,7 +281,7 @@ export function WatchPage() {
                 <noscript>
                   <iframe
                     src={src}
-                    title={cleanDisplayTitle(item.title)}
+                    title={item.title}
                     width="640"
                     height="360"
                     allowFullScreen
@@ -293,17 +292,7 @@ export function WatchPage() {
           </div>
           <header className="max-w-3xl space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
-              {(() => {
-                const cat = findCategory(item.category);
-                const label = categoryLabel(item.category);
-                return cat ? (
-                  <Link to="/kategori/$slug" params={{ slug: cat.slug }} className="hover:text-foreground">
-                    {label}
-                  </Link>
-                ) : (
-                  label
-                );
-              })()}
+              {item.category}
               {item.year ? ` \u00b7 ${item.year}` : ""}
               {item.creator ? ` \u00b7 ${item.creator}` : ""}
             </p>
@@ -348,7 +337,7 @@ export function WatchPage() {
             <VideoGridSkeleton count={6} />
           )}
           {item ? (
-            <ShareSheet open={shareOpen} title={cleanDisplayTitle(item.title)} id={item.id} onClose={closeShare} />
+            <ShareSheet open={shareOpen} title={item.title} id={item.id} onClose={closeShare} />
           ) : null}
         </article>
       )}

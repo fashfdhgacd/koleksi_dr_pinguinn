@@ -2,21 +2,8 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { CATEGORY_LIST } from "@/lib/catalog/categories";
 import { SITE_ORIGIN } from "@/lib/seo";
-import { createServerFn } from "@tanstack/react-start";
-
-const getNonEmptySlugs = createServerFn({ method: "GET" }).handler(async () => {
-  const { listNonEmptyCategorySlugs } = await import("@/lib/catalog/local");
-  return listNonEmptyCategorySlugs();
-});
 
 export const Route = createFileRoute("/kategori/")({
-  loader: async () => {
-    try {
-      return { slugs: await getNonEmptySlugs() };
-    } catch {
-      return { slugs: null as string[] | null };
-    }
-  },
   head: () => {
     const title = "Kategori | Dr. Pinguin";
     const description = "Pilih kategori di Dr. Pinguin: Jav, AI+, Jilbab, Tante, dan lainnya.";
@@ -38,8 +25,6 @@ export const Route = createFileRoute("/kategori/")({
 });
 
 function CategoriesPage() {
-  const { slugs } = Route.useLoaderData();
-  const visible = slugs ? CATEGORY_LIST.filter((c) => slugs.includes(c.slug)) : CATEGORY_LIST;
   return (
     <Shell>
       <section className="space-y-6">
@@ -58,7 +43,7 @@ function CategoriesPage() {
               Terbaru
             </Link>
           </li>
-          {visible.map((cat) => (
+          {CATEGORY_LIST.map((cat) => (
             <li key={cat.slug}>
               <Link
                 to="/kategori/$slug"
