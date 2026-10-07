@@ -1,5 +1,12 @@
 const COM_HOST = "koleksidrpinguin.com";
 
+/** Host yang wajib 301 ke https://koleksidrpinguin.com (path + query dipertahankan). */
+const REDIRECT_HOSTS = new Set([
+  `www.${COM_HOST}`,
+  "koleksidrpinguin.site",
+  "www.koleksidrpinguin.site",
+]);
+
 interface HostEvent {
   url: URL;
   req: { method: string; headers: Headers };
@@ -18,8 +25,7 @@ export default function canonicalHostMiddleware(
   next: () => unknown | Promise<unknown>,
 ): unknown | Promise<unknown> {
   const host = requestHost(event);
-  // Hanya rapikan www pada .com. Domain .site diurus Vercel — jangan diutak-atik.
-  if (host !== `www.${COM_HOST}`) return next();
+  if (!REDIRECT_HOSTS.has(host)) return next();
   return new Response(null, {
     status: 301,
     headers: {
