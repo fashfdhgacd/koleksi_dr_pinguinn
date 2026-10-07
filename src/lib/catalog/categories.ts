@@ -14,7 +14,7 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "percakapan", label: "Percakapan", query: "percakapan" },
   { slug: "kosan", label: "Kosan", query: "kosan" },
   { slug: "colmek", label: "Colmek", query: "colmek" },
-  { slug: "18-25", label: "18-25", query: "18-25" },
+  { slug: "abg", label: "Muda 18+", query: "abg" },
   { slug: "istri", label: "Istri", query: "istri" },
   { slug: "live", label: "Live", query: "live" },
   { slug: "doggy", label: "Doggy", query: "doggy" },
@@ -25,10 +25,12 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "lainnya", label: "Lainnya", query: "lainnya" },
 ];
 
-export const CATEGORY_LIST: CategoryInfo[] = CATEGORIES.map(({ slug, label }) => ({
-  slug,
-  label,
-}));
+/** Kategori yang tidak dipromosikan publik (slug ber-istilah minor): keluar dari menu/sitemap, noindex. */
+export const UNLISTED_CATEGORY_SLUGS = new Set<string>(["abg"]);
+
+export const CATEGORY_LIST: CategoryInfo[] = CATEGORIES.filter((c) => !UNLISTED_CATEGORY_SLUGS.has(c.slug)).map(
+  ({ slug, label }) => ({ slug, label }),
+);
 
 /** Chip utama di header; sisanya di menu "Lainnya". */
 export const PRIMARY_CATEGORY_SLUGS = [
@@ -40,7 +42,6 @@ export const PRIMARY_CATEGORY_SLUGS = [
   "viral",
   "istri",
   "live",
-  "18-25",
 ] as const;
 
 export const PRIMARY_CATEGORIES: CategoryInfo[] = PRIMARY_CATEGORY_SLUGS.map(
@@ -57,10 +58,6 @@ export function findCategory(slug: string | null | undefined): CategoryDef | und
   if (key === "ai" || key === "ai+") {
     return CATEGORIES.find((c) => c.slug === "ai-plus");
   }
-  // Slug lama (data tersimpan / URL lama) dipetakan saat baca.
-  if (key === "abg" || key === "18 25" || key === "1825") {
-    return CATEGORIES.find((c) => c.slug === "18-25");
-  }
   if (key === "puterin" || key === "putarin") {
     return CATEGORIES.find((c) => c.slug === "jav");
   }
@@ -68,16 +65,4 @@ export function findCategory(slug: string | null | undefined): CategoryDef | und
     return CATEGORIES.find((c) => c.slug === "ai-plus");
   }
   return CATEGORIES.find((c) => c.slug === key);
-}
-
-/** Nama tampilan kategori dari slug (fallback: title-case slug). */
-export function categoryLabel(slug: string | null | undefined): string {
-  if (!slug) return "";
-  const cat = findCategory(slug) || findCategory(slug.trim().replace(/\s+/g, "-"));
-  if (cat) return cat.label;
-  return slug
-    .trim()
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ")
-    .replace(/\b\w/g, (c) => c.toUpperCase());
 }

@@ -1,4 +1,3 @@
-import { maskDisplayTerms } from "../seo";
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
 import { findCategory } from "./categories";
@@ -146,7 +145,7 @@ export function classify(title: string): string {
   if (/kosan|kontrakan|indekos/.test(t)) return "kosan";
   if (/viral/.test(t)) return "viral";
   if (/\blive\b|bokep live/.test(t)) return "live";
-  if (/\b18\s*-\s*25\b/.test(t)) return "18-25";
+  if (/abg|\bsma\b|\bsmk\b|mahasisw|tocil|remaja/.test(t)) return "abg";
   if (/colmek|\bcoli\b/.test(t)) return "colmek";
   if (/doggy/.test(t)) return "doggy";
   if (/open\s*bo|openbo|\bstw\b|\blc\b|karaoke/.test(t)) return "open-bo";
@@ -162,9 +161,7 @@ export function slugOf(item: RawItem): string {
   if (isVidey(item)) return "videy";
   if (isPutarin(item)) return "jav";
   if (isStreamtape(item)) return "ai-plus";
-  const raw = (item.category || (typeof item.c === "string" ? item.c : "") || "").toLowerCase().trim();
-  // Kategori tersimpan "lainnya" dihormati (jangan dilempar ke "amatir" oleh fallback sumber).
-  if (raw === "lainnya") return "lainnya";
+  const raw = (item.category || "").toLowerCase().trim();
   const mapped = raw && raw !== "lainnya" ? findCategory(raw) : undefined;
   if (mapped && mapped.slug !== "lainnya") return mapped.slug;
   const hit = classify(item.title || "");
@@ -238,8 +235,7 @@ export function toCard(item: RawItem, posters: Record<string, string>, videyNo?:
   const id = item.id;
   const title = isVidey(item)
     ? videyDisplayTitle(item, videyNo?.get(id) || 1)
-    : cleanTitle(maskDisplayTerms(item.title || "Video"));
-  const masked = /(?<![A-Za-z0-9])tocil(?![A-Za-z0-9])/i.test(String(item.title || ""));
+    : cleanTitle(item.title || "Video");
   let quality = "HD";
   if (isStreamtape(item)) quality = "Streamtape";
   else if (isPutarin(item)) quality = "Puterin";
@@ -255,6 +251,5 @@ export function toCard(item: RawItem, posters: Record<string, string>, videyNo?:
     year: null,
     creator: sourceLabel(item),
     views: null,
-    ...(masked ? { noindex: true } : {}),
   };
 }

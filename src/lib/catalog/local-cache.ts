@@ -68,12 +68,21 @@ export function buildVideyNo(items: RawItem[]): Map<string, number> {
   return m;
 }
 
+/** Id yang dikeluarkan dari katalog publik karena istilah minor (untuk 404 di /watch). */
+export const minorHiddenIds = new Set<string>();
+
 export function buildIndexes(
-  items: RawItem[],
+  allItems: RawItem[],
   posters: Record<string, string>,
   videyNo: Map<string, number>,
   at: number,
 ): CatalogCache {
+  // Konten ber-istilah minor disembunyikan dari seluruh situs publik.
+  const items: RawItem[] = [];
+  for (const it of allItems) {
+    if (isRealMinor(it)) minorHiddenIds.add(it.id);
+    else items.push(it);
+  }
   const byId = new Map<string, RawItem>();
   const bySlug = new Map<string, RawItem[]>();
   const haystack: { item: RawItem; hay: string }[] = [];
@@ -159,7 +168,7 @@ export function kickRemoteRefresh(base: { items: RawItem[]; posters: Record<stri
     });
 }
 
-export async function loadItemsRaw(): Promise<CatalogCache> {
+export async function loadItems(): Promise<CatalogCache> {
   const now = Date.now();
   if (runtime.cache && now - runtime.cache.at < CACHE_MS) return runtime.cache;
   if (runtime.cache && now - runtime.cache.at < STALE_MS) {
@@ -179,44 +188,4 @@ export async function loadItemsRaw(): Promise<CatalogCache> {
   }
   kickRemoteRefresh({ items: runtime.cache.items, posters: runtime.cache.posters });
   return runtime.cache;
-}
-
-let clientOff: { at: number; ids: Set<string> } | null = null;
-
-/** Id yang di-set 'Tidak publish'. Server: KV langsung; browser: /api/hidden-ids (id saja). */
-export async function getUnpublished(): Promise<Set<string>> {
-  try {
-    if (import.meta.env.SSR) {
-      const { unpublishedIds } = await import("../owner-review-store");
-      return await unpublishedIds();
-    }
-    if (clientOff && Date.now() - clientOff.at < 60_000) return clientOff.ids;
-    const r = await fetch("/api/hidden-ids", { cache: "no-store" });
-    const d = (await r.json()) as { ids?: string[] };
-    clientOff = { at: Date.now(), ids: new Set(d.ids || []) };
-    return clientOff.ids;
-  } catch {
-    return clientOff?.ids || new Set();
-  }
-}
-
-let filtered: { base: CatalogCache; key: string; out: CatalogCache } | null = null;
-
-/** True bila item tidak boleh tampil publik (istilah minor sungguhan, atau 'Tidak publish'). */
-export async function isPublicHidden(id: string): Promise<boolean> {
-  if ((await getUnpublished()).has(id)) return true;
-  const raw = (await loadItemsRaw()).byId.get(id);
-  return Boolean(raw && isRealMinor(raw));
-}
-
-/** Katalog publik: tanpa item istilah minor sungguhan dan tanpa 'Tidak publish'. */
-export async function loadItems(): Promise<CatalogCache> {
-  const base = await loadItemsRaw();
-  const off = await getUnpublished();
-  const key = [...off].sort().join(",");
-  if (filtered && filtered.base === base && filtered.key === key) return filtered.out;
-  const items = base.items.filter((x) => !off.has(x.id) && !isRealMinor(x));
-  const out = buildIndexes(items, base.posters, base.videyNo, base.at);
-  filtered = { base, key, out };
-  return out;
 }
