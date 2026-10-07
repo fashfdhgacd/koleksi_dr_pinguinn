@@ -21,7 +21,7 @@ const E = "(?![A-Za-z0-9])";
 const S = "[\\s_\\-]*";
 const AGE = `(?:1[0-7]${S}(?:yo|y\\.?o\\.?|th|thn|tahun|years?${S}old)|(?:umur|usia)${S}1[0-7])`;
 /** Selalu flag. */
-export const STRONG_SOURCE = `${B}(?:sma|smp|smk|sd|pelajar|siswi|siswa|osis|bocil|loli|lolita|shota|remaja|teen|teens|abg|under${S}age|di${S}bawah${S}umur|${AGE})${E}`;
+export const STRONG_SOURCE = `${B}(?:sma|smp|smk|sd|sekolah|murid|murit|anak${S}perawan|pelajar|siswi|siswa|osis|bocil|loli|lolita|shota|remaja|teen|teens|abg|under${S}age|di${S}bawah${S}umur|${AGE})${E}`;
 /** Konteks sekolah/umur (untuk mengaktifkan kata generik). */
 export const CONTEXT_SOURCE = `${B}(?:sekolah|seragam${S}sekolah|umur|usia)${E}`;
 /** Kata generik/ambigu: hanya flag bila bersama STRONG/CONTEXT. */
@@ -44,6 +44,7 @@ export function isRealMinorV2(item: { title?: unknown; tags?: unknown } | null |
   const h = hay(item);
   if (new RegExp(STRONG_SOURCE, "i").test(h)) return true;
   if (SIBLING_SMALL.every((r) => new RegExp(r, "i").test(h))) return true;
+  if (new RegExp(SIBLING_SMALL[0]!, "i").test(h) && new RegExp(TOCIL_SOURCE, "i").test(h)) return true;
   return new RegExp(WEAK_SOURCE, "i").test(h) && new RegExp(CONTEXT_SOURCE, "i").test(h);
 }
 
