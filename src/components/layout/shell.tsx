@@ -29,7 +29,8 @@ export function Shell({
                 </a>{" "}
                 · 18+
               </p>
-              <p className="text-[11px] text-muted/60">Katalog embed. Bukan arsip file video.</p>
+              <p className="text-[11px] text-muted/60">Video diputar dari server pihak ketiga · Khusus 18+</p>
+              <p className="text-[11px] text-muted/60">Videos are streamed from third-party hosts · Adults 18+ only</p>
             </div>
             <nav className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Legal">
               <Link to="/2257" className="hover:text-foreground hover:underline">
