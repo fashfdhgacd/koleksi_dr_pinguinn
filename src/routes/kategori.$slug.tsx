@@ -33,7 +33,8 @@ export const Route = createFileRoute("/kategori/$slug")({
     const page = parsePage(raw.page) || 1;
     return queryCatalog({ type: "category", category: cat.slug, page, limit: 24 });
   },
-  head: ({ params, match }) => {
+  head: ({ params, match, loaderData }) => {
+    const empty = Boolean(loaderData && loaderData.ok && "total" in loaderData && loaderData.total === 0);
     const cat = findCategory(params.slug);
     const page = typeof match.search.page === "number" ? match.search.page : 1;
     const seo = homeSeo(undefined, cat?.slug);
@@ -52,7 +53,7 @@ export const Route = createFileRoute("/kategori/$slug")({
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:image", content: DEFAULT_OG },
-        { name: "robots", content: page > 1 ? "noindex,follow" : "index,follow" },
+        { name: "robots", content: empty ? "noindex,follow" : page > 1 ? "noindex,follow" : "index,follow" },
       ],
       links: [{ rel: "canonical", href: url }],
     };

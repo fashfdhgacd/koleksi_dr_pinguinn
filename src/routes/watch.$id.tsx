@@ -65,7 +65,7 @@ export const Route = createFileRoute("/watch/$id")({
         {
           name: "keywords",
           content: item
-            ? `${categoryKeywords(item.category)}, ${item.title}, dr pinguin`
+            ? `${categoryKeywords(item.category)}, ${cleanDisplayTitle(item.title)}, dr pinguin`
             : "bokep indo, dr pinguin, 18+",
         },
         { property: "og:type", content: "video.other" },
