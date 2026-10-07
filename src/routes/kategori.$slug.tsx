@@ -8,7 +8,7 @@ import { UNLISTED_CATEGORY_SLUGS, findCategory } from "@/lib/catalog/categories"
 import { rememberCatalog } from "@/lib/catalog/last-catalog";
 import { queryCatalog } from "@/lib/catalog/service";
 import type { VideoCard } from "@/lib/catalog/types";
-import { useCatalogFeed } from "@/hooks/use-catalog";
+import { useCatalogFeed } from "../hooks/use-catalog";
 import { DEFAULT_OG, SITE_ORIGIN, homeSeo } from "@/lib/seo";
 
 function parsePage(value: unknown): number | undefined {
@@ -39,96 +39,96 @@ export const Route = createFileRoute("/kategori/$slug")({
     const seo = homeSeo(undefined, cat?.slug);
     const url =
       page > 1
-        ? `${SITE_ORIGIN}/kategori/${cat?.slug || params.slug}?page=${page}`
-        : `${SITE_ORIGIN}/kategori/${cat?.slug || params.slug}`;
+        ? `${SITE_ORIGIN}/kategori/${params.slug}?page=${page}`
+        : `${SITE_ORIGIN}/kategori/${params.slug}`;
     return {
       meta: [
-        { title: page > 1 ? `${seo.title} · halaman ${page}` : seo.title },
+        { title: seo.title },
         { name: "description", content: seo.description },
         { property: "og:title", content: seo.title },
         { property: "og:description", content: seo.description },
         { property: "og:url", content: url },
-        { property: "og:type", content: "website" },
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
-        { name: "twitter:image", content: DEFAULT_OG },
-        {
-          name: "robots",
-          content: page > 1 || UNLISTED_CATEGORY_SLUGS.has(cat?.slug || "") ? "noindex,follow" : "index,follow",
-        },
       ],
       links: [{ rel: "canonical", href: url }],
     };
   },
-  component: CategorySlugPage,
+  component: CategoryPage,
 });
 
-function CategorySlugPage() {
+function CategoryPage() {
   const { slug } = Route.useParams();
   const { page: pageSearch } = Route.useSearch();
-  const loaderData = Route.useLoaderData();
-  const navigate = useNavigate({ from: "/kategori/$slug" });
-  const cat = findCategory(slug);
   const page = pageSearch || 1;
+  const navigate = useNavigate();
+  const cat = findCategory(slug);
+  const loaderData = Route.useLoaderData();
+
   const seed =
     loaderData && loaderData.ok && loaderData.type === "category"
       ? {
           items: loaderData.items as VideoCard[],
-          total: loaderData.total,
           page: loaderData.page,
           hasMore: loaderData.hasMore,
+          total: loaderData.total,
         }
-      : null;
+      : undefined;
+
   const feed = useCatalogFeed({ mode: "category", category: cat?.slug || slug, page }, seed);
-  const title = cat?.label || slug;
-  const subtitle = feed.total ? `${feed.total.toLocaleString("id-ID")} judul` : "Kategori";
-  const intro = `Katalog ${title} 18+ di Dr. Pinguin. Streaming embed, update berkala.`;
 
   useEffect(() => {
-    rememberCatalog(`/kategori/${slug}${page > 1 ? `?page=${page}` : ""}`);
-  }, [slug, page]);
+    if (cat?.slug) rememberCatalog({ type: "category", category: cat.slug, page: feed.page });
+  }, [cat?.slug, feed.page]);
 
-  function setPage(next: number) {
-    const current = pageSearch || 1;
-    if (next === current) {
-      feed.retry();
-      return;
-    }
-    void navigate({
-      search: (prev) => ({
-        ...prev,
-        page: next <= 1 ? undefined : next,
-      }),
-    });
+  if (!cat || UNLISTED_CATEGORY_SLUGS.has(cat.slug)) {
+    return (
+      <Shell>
+        <EmptyState title="Kategori tidak ada" description="Coba pilih kategori lain." />
+      </Shell>
+    );
   }
 
-  const coldLoading = feed.loading && !feed.items.length;
+  if (loaderData && !loaderData.ok) {
+    return (
+      <Shell>
+        <ErrorState message={loaderData.error || "Gagal memuat"} onRetry={() => navigate({ to: "/kategori/$slug", params: { slug } })} />
+      </Shell>
+    );
+  }
 
   return (
-    <Shell category={cat?.slug || slug}>
-      <section>
-        <div className="mb-4 sm:mb-5">
-          <h1 className="font-display text-2xl text-foreground sm:text-3xl">{title}</h1>
-          <p className="mt-1 text-xs text-muted sm:text-sm">{subtitle}</p>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted">{intro}</p>
-        </div>
-        {coldLoading ? (
-          <VideoGridSkeleton count={12} />
-        ) : feed.status === "error" && !feed.items.length ? (
-          <ErrorState message={feed.error ?? "Gagal memuat kategori."} onRetry={feed.retry} />
-        ) : feed.status === "empty" ? (
-          <EmptyState title="Kosong" description="Tidak ada judul pada kategori ini." />
-        ) : (
-          <VideoGrid items={feed.items} eagerCount={24} />
-        )}
-        <CatalogPager
-          page={page}
-          total={feed.total}
-          limit={feed.limit}
-          loading={feed.loading}
-          onPage={setPage}
-        />
-      </section>
+    <Shell>
+      <div className="mb-4">
+        <h1 className="text-xl font-semibold text-zinc-100">{cat.label}</h1>
+        {typeof feed.total === "number" ? (
+          <p className="mt-1 text-sm text-zinc-500">{feed.total.toLocaleString("id-ID")} video</p>
+        ) : null}
+      </div>
+
+      {feed.loading && !feed.items.length ? (
+        <VideoGridSkeleton count={12} />
+      ) : feed.error && !feed.items.length ? (
+        <ErrorState message={feed.error} onRetry={feed.retry} />
+      ) : !feed.items.length ? (
+        <EmptyState title="Kosong" description="Belum ada video di kategori ini." />
+      ) : (
+        <>
+          <VideoGrid items={feed.items} />
+          <CatalogPager
+            page={feed.page}
+            hasMore={feed.hasMore}
+            loadingMore={feed.loadingMore}
+            onPage={(p) =>
+              navigate({
+                to: "/kategori/$slug",
+                params: { slug },
+                search: p > 1 ? { page: p } : {},
+              })
+            }
+          />
+        </>
+      )}
     </Shell>
   );
 }
