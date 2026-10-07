@@ -82,26 +82,44 @@ export function OwnerAuthedBottom(props: {
 
             <TopVideosSection videos={stats?.topVideos || []} />
 
-            <div className="flex flex-wrap gap-2 pt-1">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => void fetchOnline(secret)}
-                disabled={loading}
-                className="border-white/10 bg-transparent text-zinc-300 hover:bg-white/[0.06] hover:text-zinc-100"
-              >
-                {loading ? "Memuat…" : "Refresh"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={logout}
-                className="border-white/10 bg-transparent text-zinc-500 hover:bg-white/[0.06] hover:text-zinc-300"
-              >
-                Keluar
-              </Button>
+            {stats?.topPaths?.length ? (
+              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Halaman hari ini (WIB)</h2>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {stats.topPaths.slice(0, 8).map((row) => (
+                    <li key={row.path} className="flex justify-between gap-3">
+                      <span className="truncate text-zinc-300">{row.path}</span>
+                      <span className="tabular-nums text-zinc-500">{fmt(row.views)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            {stats?.topRefs?.length ? (
+              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Sumber hari ini (WIB)</h2>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {stats.topRefs.slice(0, 6).map((row) => (
+                    <li key={row.ref} className="flex justify-between gap-3">
+                      <span className="truncate text-zinc-300">{row.ref}</span>
+                      <span className="tabular-nums text-zinc-500">{fmt(row.views)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[11px] text-zinc-600">Ping pengunjung 90 dtk · panel refresh 25 dtk · tab tersembunyi tidak dihitung</p>
+              <div className="flex gap-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => void fetchOnline(secret)} disabled={loading}>
+                  {loading ? "..." : "Refresh"}
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={logout}>
+                  Keluar
+                </Button>
+              </div>
             </div>
     </>
   );
