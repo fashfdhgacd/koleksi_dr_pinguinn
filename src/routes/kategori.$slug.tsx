@@ -1,3 +1,4 @@
+import { categorySeo } from "@/lib/catalog/category-seo";
 import { useEffect } from "react";
 import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
@@ -37,7 +38,7 @@ export const Route = createFileRoute("/kategori/$slug")({
   head: ({ params, match }) => {
     const cat = findCategory(params.slug);
     const page = typeof match.search.page === "number" ? match.search.page : 1;
-    const seo = homeSeo(undefined, cat?.slug);
+    const seo = cat ? categorySeo(cat.slug) : homeSeo(undefined, undefined);
     const url =
       page > 1
         ? `${SITE_ORIGIN}/kategori/${params.slug}?page=${page}`
@@ -123,7 +124,8 @@ function CategoryPage() {
     <Shell>
       <section>
         <div className="mb-4">
-          <h1 className="text-xl font-semibold text-zinc-100">{cat.label}</h1>
+          <h1 className="text-xl font-semibold text-zinc-100">{categorySeo(cat.slug).h1}</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{categorySeo(cat.slug).intro}</p>
           {typeof feed.total === "number" ? (
             <p className="mt-1 text-sm text-zinc-500">{feed.total.toLocaleString("id-ID")} video</p>
           ) : null}

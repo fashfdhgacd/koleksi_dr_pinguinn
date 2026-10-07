@@ -10,6 +10,7 @@ import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
 import { SITE_ORIGIN } from "@/lib/seo";
 import { watchDescription } from "@/lib/catalog/watch-description";
 import { cleanDisplayTitle } from "@/lib/seo";
+import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { CatalogBackLink } from "@/components/video/catalog-back-link";
 
 const routeApi = getRouteApi("/watch/$id");
@@ -292,7 +293,16 @@ export function WatchPage() {
           </div>
           <header className="max-w-3xl space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
-              {item.category}
+              {(() => {
+                const slug = categorySlugFor(item.category);
+                return slug ? (
+                  <a href={`/kategori/${slug}`} className="hover:text-foreground hover:underline">
+                    {item.category}
+                  </a>
+                ) : (
+                  item.category
+                );
+              })()}
               {item.year ? ` \u00b7 ${item.year}` : ""}
               {item.creator ? ` \u00b7 ${item.creator}` : ""}
             </p>
