@@ -8,6 +8,7 @@ import {
   resolveVideoSeoDescription,
   videoJsonLd,
   videoSeoTitle,
+  hasTocilTitle,
 } from "@/lib/seo";
 import { WatchPage } from "@/lib/watch/watch-page";
 
@@ -83,7 +84,10 @@ export const Route = createFileRoute("/watch/$id")({
         { name: "twitter:description", content: description },
         { name: "twitter:image", content: image },
         { name: "twitter:image:alt", content: "DR. PINGUIN" },
-        { name: "robots", content: "index,follow,max-video-preview:120" },
+        {
+          name: "robots",
+          content: hasTocilTitle(item) ? "noindex,follow" : "index,follow,max-video-preview:120",
+        },
         { name: "rating", content: "adult" },
       ],
       links: [{ rel: "canonical", href: url }],

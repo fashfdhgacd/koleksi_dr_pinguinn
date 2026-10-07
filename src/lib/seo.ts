@@ -50,6 +50,20 @@ export function isMinorCoded(item: { title?: unknown; tags?: unknown } | null | 
   return MINOR_RE.test(`${String(item.title ?? "")} ${tags}`);
 }
 
+const MINOR_RE_NO_TOCIL = new RegExp(MINOR_RE.source.replace("tocil|", ""), "i");
+
+/** Seperti isMinorCoded, tapi mengabaikan kata 'tocil' (slang dewasa, ditampilkan termask). */
+export function isMinorCodedIgnoringTocil(item: { title?: unknown; tags?: unknown } | null | undefined): boolean {
+  if (!item) return false;
+  const tags = Array.isArray(item.tags) ? item.tags.join(" ") : String(item.tags ?? "");
+  return MINOR_RE_NO_TOCIL.test(`${String(item.title ?? "")} ${tags}`);
+}
+
+/** True bila judul tersimpan mengandung 'tocil' (noindex + keluar dari sitemap). */
+export function hasTocilTitle(item: { title?: unknown } | null | undefined): boolean {
+  return /\btocil\b/i.test(String(item?.title ?? ""));
+}
+
 /** Masking kata tertentu di layer tampilan saja (data asli tidak diubah). */
 export function maskDisplayTerms(t: string): string {
   return t.replace(/\btocil\b/gi, "***");
