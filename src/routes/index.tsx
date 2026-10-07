@@ -23,6 +23,11 @@ function parsePage(value: unknown): number | undefined {
   return Math.min(n, 500);
 }
 
+function isSchemaPlaceholder(q?: string): boolean {
+  const t = (q || "").trim().toLowerCase();
+  return t === "{search_term_string}" || t === "search_term_string";
+}
+
 async function loadHome({ search }: { search: HomeSearch }) {
   const page = search.page || 1;
   if (search.q) {
@@ -70,6 +75,9 @@ export const Route = createFileRoute("/")({
     page: parsePage(search.page),
   }),
   beforeLoad: ({ search }) => {
+    if (isSchemaPlaceholder(search.q)) {
+      throw redirect({ href: HOME_CANONICAL, statusCode: 301 });
+    }
     if (search.category) {
       const cat = findCategory(search.category);
       if (cat) {
@@ -89,6 +97,9 @@ export const Route = createFileRoute("/")({
         typeof raw.category === "string" && raw.category.trim() ? raw.category.trim() : undefined,
       page: parsePage(raw.page),
     };
+    if (isSchemaPlaceholder(search.q)) {
+      throw redirect({ href: HOME_CANONICAL, statusCode: 301 });
+    }
     return loadHome({ search });
   },
   head: ({ match }) => {
@@ -96,7 +107,7 @@ export const Route = createFileRoute("/")({
     const page = typeof match.search.page === "number" ? match.search.page : 1;
     const seo = homeSeo(q);
     const url = q
-      ? `${SITE_ORIGIN}/?q=${encodeURIComponent(q)}${page > 1 ? `&page=${page}` : ""}`
+      ? HOME_CANONICAL
       : page > 1
         ? `${HOME_CANONICAL}?page=${page}`
         : HOME_CANONICAL;
@@ -109,6 +120,12 @@ export const Route = createFileRoute("/")({
         { property: "og:url", content: url },
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
+        ...(q
+          ? [
+              { name: "robots", content: "noindex, follow" },
+              { name: "googlebot", content: "noindex, follow" },
+            ]
+          : []),
       ],
       links: [{ rel: "canonical", href: url }],
       scripts: q
@@ -132,13 +149,13 @@ function HomePage() {
   const heroIds = new Set(heroVideos.map((v) => v.id));
   const gridItems = heroIds.size ? feed.items.filter((item) => !heroIds.has(item.id)) : feed.items;
 
-  const title = q ? `Hasil untuk “${q}”` : cat ? cat.label : "Koleksi Dr. Pinguin";
+  const title = q ? `Hasil untuk \u201c${q}\u201d` : cat ? cat.label : "Koleksi Dr. Pinguin";
   const subtitle = feed.total
-    ? `${feed.total.toLocaleString("id-ID")} judul · M.S.B.`
-    : "M.S.B. — Koleksi Dr. Pinguin";
+    ? `${feed.total.toLocaleString("id-ID")} judul \u00b7 M.S.B.`
+    : "M.S.B. \u2014 Koleksi Dr. Pinguin";
   const intro =
     q
-      ? `Hasil pencarian “${q}” di katalog Dr. Pinguin. Konten dewasa 18+.`
+      ? `Hasil pencarian \u201c${q}\u201d di katalog Dr. Pinguin. Konten dewasa 18+.`
       : "Katalog video dewasa 18+ Dr. Pinguin. Streaming embed koleksi Indo, JAV, amatir. Update berkala.";
 
   function setPage(next: number) {
