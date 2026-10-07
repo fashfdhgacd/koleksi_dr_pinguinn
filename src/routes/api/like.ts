@@ -92,11 +92,13 @@ async function applyLike(
 const BOT_UA = /bot|crawl|spider|slurp|headless|curl\/|wget|python-requests|preview/i;
 
 function clientIp(request: Request): string {
-  return (
+  const ip =
     request.headers.get("cf-connecting-ip") ||
     (request.headers.get("x-forwarded-for") || "").split(",")[0].trim() ||
-    "0"
-  );
+    "0";
+  // IPv6 phones rotate privacy addresses inside their /64 — guard on the /64 prefix.
+  if (ip.includes(":")) return ip.split(":").slice(0, 4).join(":") + "::/64";
+  return ip;
 }
 
 export const Route = createFileRoute("/api/like")({
