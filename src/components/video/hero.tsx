@@ -120,15 +120,15 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
 
         {/* Copy stack: none by default so it cannot cover the CTA */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3.5 pb-11 sm:gap-4 sm:p-8 sm:pb-12 lg:max-w-2xl lg:p-10 lg:pb-14">
-          <p className="hidden text-xs font-medium uppercase tracking-[0.18em] text-muted sm:block">
+          <p className="hidden w-fit rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm sm:block">
             Pilihan koleksi
             {usable.length > 1 ? (
-              <span className="ml-2 tabular-nums text-muted/70">
+              <span className="ml-2 tabular-nums text-white/70">
                 {displayIndex + 1}/{usable.length}
               </span>
             ) : null}
           </p>
-          <h1 className="font-display text-[1.35rem] leading-snug text-foreground line-clamp-2 sm:line-clamp-none sm:text-4xl sm:leading-[1.1] lg:text-5xl">
+          <h1 className="font-display text-lg leading-snug text-foreground line-clamp-2 break-words sm:line-clamp-3 sm:text-2xl sm:leading-tight lg:text-3xl">
             {heroTitle}
           </h1>
           {showDescription ? (

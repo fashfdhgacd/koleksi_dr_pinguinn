@@ -45,14 +45,14 @@ const MINOR_RE =
 
 /** Hapus suffix branding situs dari judul tampil (data asli tidak diubah). */
 export function cleanDisplayTitle(raw?: string | null): string {
-  let t = String(raw || "").trim().replace(/\s+/g, " ");
+  let t = String(raw || "").replace(/_+/g, " ").trim().replace(/\s+/g, " ");
   t = t.replace(/\s*[\(\[]\s*(koleksi\s+)?dr\.?\s*pinguin[^\)\]]*[\)\]]\s*$/gi, "");
   for (let i = 0; i < 3; i++) {
     t = t.replace(/[\s\-–—|:·,]*\b(koleksi\s+)?dr\.?\s*pinguin\.?\s*$/gi, "");
     t = t.replace(/\s*[\-|–—,]\s*M\.?S\.?B\.?\s*$/gi, "");
   }
   t = t.replace(/[\s\-–—|:·,]+$/g, "").trim();
-  return t || String(raw || "").trim() || "Video";
+  return t || String(raw || "").replace(/_+/g, " ").replace(/\s+/g, " ").trim() || "Video";
 }
 
 export function videoSeoTitle(title: string, category?: string | null): string {
