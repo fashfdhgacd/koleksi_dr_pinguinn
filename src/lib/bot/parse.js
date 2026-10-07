@@ -19,7 +19,7 @@ const CATEGORY_RULES = [
   ["istri", /\bistri\b|\bsuami\b|selingkuh|berselingkuh|\bhamil\b|\bbinor\b|istri\s*orang|suami\s*orang/i],
   ["tante", /\btante\b|\bjanda\b|\bstw\b|\bmilf\b|ibu\s*tiri|\bemak\b|emak2|mama\s*muda|mbak\s*muda/i],
   ["live", /live\s*stream|livestream|siaran\s*langsung|\blive\b/i],
-  ["18-25", /\b18\s*-\s*25\b/i],
+  ["abg", /\babg\b|\bsma\b|mahasiswi|mahasiswa|\bpelajar\b|\btocil\b/i],
   ["amatir", /amatir|bokep\s*indo|bokepindo|pasutri|\brumahan\b|homemade|\bindo\b/i],
   ["viral", /\bviral\b|\bfyp\b/i],
 ];
