@@ -192,6 +192,12 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
           </div>
         ) : null}
       </div>
+      {started && !useVideo && playUrl && !failed ? (
+        <p className="px-3 py-2 text-[11px] leading-snug text-muted sm:text-xs">
+          Belum jalan? Tap ▶ di pemutar sekali lagi. Kalau muncul tab iklan, tutup lalu kembali ke sini.
+          Layar tetap hitam di data seluler? Coba Wi-Fi atau tombol Buka Sumber.
+        </p>
+      ) : null}
     </div>
   );
 }
