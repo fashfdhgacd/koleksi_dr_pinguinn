@@ -239,7 +239,7 @@ export function toCard(item: RawItem, posters: Record<string, string>, videyNo?:
   const title = isVidey(item)
     ? videyDisplayTitle(item, videyNo?.get(id) || 1)
     : cleanTitle(maskDisplayTerms(item.title || "Video"));
-  const masked = /\btocil\b/i.test(String(item.title || ""));
+  const masked = /(?<![A-Za-z0-9])tocil(?![A-Za-z0-9])/i.test(String(item.title || ""));
   let quality = "HD";
   if (isStreamtape(item)) quality = "Streamtape";
   else if (isPutarin(item)) quality = "Puterin";

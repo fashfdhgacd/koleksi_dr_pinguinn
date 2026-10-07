@@ -1,3 +1,4 @@
+import { isRealMinor } from "../minor-terms";
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos } from "./types";
 import { buildMainSorted } from "./feed-order";
@@ -201,15 +202,20 @@ export async function getUnpublished(): Promise<Set<string>> {
 
 let filtered: { base: CatalogCache; key: string; out: CatalogCache } | null = null;
 
-/** Katalog publik: tanpa item yang di-set 'Tidak publish' oleh pemilik. */
+/** True bila item tidak boleh tampil publik (istilah minor sungguhan, atau 'Tidak publish'). */
+export async function isPublicHidden(id: string): Promise<boolean> {
+  if ((await getUnpublished()).has(id)) return true;
+  const raw = (await loadItemsRaw()).byId.get(id);
+  return Boolean(raw && isRealMinor(raw));
+}
+
+/** Katalog publik: tanpa item istilah minor sungguhan dan tanpa 'Tidak publish'. */
 export async function loadItems(): Promise<CatalogCache> {
   const base = await loadItemsRaw();
-  let off: Set<string>;
-  off = await getUnpublished();
-  if (!off.size) return base;
+  const off = await getUnpublished();
   const key = [...off].sort().join(",");
   if (filtered && filtered.base === base && filtered.key === key) return filtered.out;
-  const items = base.items.filter((x) => !off.has(x.id));
+  const items = base.items.filter((x) => !off.has(x.id) && !isRealMinor(x));
   const out = buildIndexes(items, base.posters, base.videyNo, base.at);
   filtered = { base, key, out };
   return out;
