@@ -136,7 +136,7 @@ export async function listCategory(
     return pageOf([], page, limit, posters, videyNo);
   } else pool = bySlug.get(s) || mainSorted.filter((x) => slugOf(x) === s);
   pool = pool.filter((x) => !isVidey(x));
-  if (s === "lainnya") pool = pool.filter((x) => !isMinorCoded(x));
+  if (s === "lainnya" || s === "18-25") pool = pool.filter((x) => !isMinorCoded(x));
   return pageOf(pool, page, limit, posters, videyNo);
 }
 
