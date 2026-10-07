@@ -15,6 +15,28 @@ function validLikeId(id: unknown): id is string {
   return typeof id === "string" && /^[A-Za-z0-9_-]{3,64}$/.test(id);
 }
 
+/**
+ * KV is eventually consistent (a guard written a moment ago may not be readable yet),
+ * so keep a per-isolate memory of recent guards and latest counts as well.
+ */
+const memGuard = new Map<string, { v: string; exp: number }>();
+const memCount = new Map<string, number>();
+
+function memGet(key: string): string | null {
+  const hit = memGuard.get(key);
+  if (!hit) return null;
+  if (hit.exp < Date.now()) {
+    memGuard.delete(key);
+    return null;
+  }
+  return hit.v;
+}
+
+function memSet(key: string, v: string, ttlSec: number) {
+  if (memGuard.size > 5000) memGuard.clear();
+  memGuard.set(key, { v, exp: Date.now() + ttlSec * 1000 });
+}
+
 async function ipHash(ip: string, id: string): Promise<string> {
   const data = new TextEncoder().encode(`${ip}|${id}|kdp-like`);
   const buf = await crypto.subtle.digest("SHA-256", data);
@@ -28,7 +50,8 @@ async function readLikes(id: string): Promise<number> {
   if (!h) return 0;
   const raw = await h.kv.get(COUNT_PREFIX + id).catch(() => null);
   const n = Number(raw || 0);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  const kvN = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  return Math.max(kvN, memCount.get(id) ?? 0);
 }
 
 async function applyLike(
@@ -45,18 +68,24 @@ async function applyLike(
   ]);
   let count = Number(rawCount || 0);
   if (!Number.isFinite(count) || count < 0) count = 0;
-  const already = guard === "1";
+  if (memCount.has(id)) count = memCount.get(id) as number;
+  const mem = memGet(guardKey);
+  const already = mem != null ? mem === "1" : guard === "1";
   if (action === "like") {
     if (already) return { count, liked: true, changed: false, storage: true };
     count += 1;
+    memSet(guardKey, "1", GUARD_TTL_SEC);
+    memCount.set(id, count);
     await h.kv.put(COUNT_PREFIX + id, String(count));
     await h.kv.put(guardKey, "1", { expirationTtl: GUARD_TTL_SEC });
     return { count, liked: true, changed: true, storage: true };
   }
   if (!already) return { count, liked: false, changed: false, storage: true };
   count = Math.max(0, count - 1);
+  memSet(guardKey, "0", GUARD_TTL_SEC);
+  memCount.set(id, count);
   await h.kv.put(COUNT_PREFIX + id, String(count));
-  await h.kv.put(guardKey, "0", { expirationTtl: 60 });
+  await h.kv.put(guardKey, "0", { expirationTtl: GUARD_TTL_SEC });
   return { count, liked: false, changed: true, storage: true };
 }
 

@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """Refresh views/duration/likes in src/lib/catalog/video-stats.json from the owner's 3 folders.
 
-Only updates stats for ids that already exist in video-stats.json. Never adds or removes videos
-and never touches any catalog file. Polite pacing + retries for 522/5xx.
+Fills/updates stats for any video id that exists in the catalog (bundled JSON files and the
+bot feeds under data/, including future uploads), matched by id or embed id. Never adds or
+removes videos and never touches any catalog file: only video-stats.json is written.
+Our own like counts live in Cloudflare KV (likes:v1:*) and are never touched here.
+Polite pacing + retries for 522/5xx.
 """
-import json, re, subprocess, sys, time
+import glob, json, re, subprocess, sys, time
 
 FOLDERS = [
     "https://tv1.indoav.app/f/9DaQXgw7uFQs",
@@ -53,9 +56,53 @@ def stat(block, icon):
     return m.group(1).strip() if m else ""
 
 
+CATALOG_GLOBS = [
+    "src/lib/catalog/videos.json",
+    "src/lib/catalog/putarin.json",
+    "src/lib/catalog/streamtape*.json",
+    "src/lib/catalog/folder-batch-*.json",
+    "src/lib/catalog/data-*.json",
+    "data/videos-latest*.json",
+    "data/putarin*.json",
+    "data/campur*.json",
+]
+
+
+def catalog_keys():
+    """lowercase id / embed id -> catalog id (read-only)."""
+    out = {}
+    for pattern in CATALOG_GLOBS:
+        for path in sorted(glob.glob(pattern)):
+            if path.endswith("-index.json"):
+                continue
+            try:
+                data = json.load(open(path))
+            except Exception:
+                continue
+            if isinstance(data, dict):
+                data = data.get("items", [])
+            if not isinstance(data, list):
+                continue
+            for it in data:
+                if not isinstance(it, dict):
+                    continue
+                cid = str(it.get("id") or "").strip()
+                if not cid:
+                    continue
+                out.setdefault(cid.lower(), cid)
+                for f in ("embed", "direct"):
+                    m = re.search(r"/(?:e|v|d|f|watch)/([A-Za-z0-9_-]+)", str(it.get(f) or ""))
+                    if m:
+                        out.setdefault(m.group(1).lower(), cid)
+    return out
+
+
 def main():
     stats = json.load(open(PATH))
-    lower = {k.lower(): k for k in stats}
+    lower = catalog_keys()
+    for k in stats:
+        lower.setdefault(k.lower(), k)
+    print("catalog keys", len(lower), flush=True)
     updated = 0
     failed = False
     for base in FOLDERS:
@@ -79,9 +126,10 @@ def main():
                     continue
                 key = lower.get(m.group(1).lower())
                 if not key:
-                    continue  # unknown id: stats only, never add videos
-                new = [num(stat(b, "eye")), dur(stat(b, "clock")) or stats[key][1], num(stat(b, "heart"))]
-                if new != stats[key]:
+                    continue  # not in catalog: stats only, never add videos
+                old = stats.get(key, [0, 0, 0])
+                new = [num(stat(b, "eye")), dur(stat(b, "clock")) or old[1], num(stat(b, "heart"))]
+                if new != stats.get(key):
                     stats[key] = new
                     updated += 1
             p += 1
