@@ -161,7 +161,9 @@ export function slugOf(item: RawItem): string {
   if (isVidey(item)) return "videy";
   if (isPutarin(item)) return "jav";
   if (isStreamtape(item)) return "ai-plus";
-  const raw = (item.category || "").toLowerCase().trim();
+  const raw = (item.category || (typeof item.c === "string" ? item.c : "") || "").toLowerCase().trim();
+  // Kategori tersimpan "lainnya" dihormati (jangan dilempar ke "amatir" oleh fallback sumber).
+  if (raw === "lainnya") return "lainnya";
   const mapped = raw && raw !== "lainnya" ? findCategory(raw) : undefined;
   if (mapped && mapped.slug !== "lainnya") return mapped.slug;
   const hit = classify(item.title || "");

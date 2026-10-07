@@ -13,6 +13,8 @@ import {
   toCard,
 } from "./local-shared";
 import { runtime } from "./local-shared";
+import { CATEGORY_LIST } from "./categories";
+import { isMinorCoded } from "../seo";
 import { loadItems, pageOf, sortByNewest } from "./local-cache";
 
 export { loadItems } from "./local-cache";
@@ -134,7 +136,22 @@ export async function listCategory(
     return pageOf([], page, limit, posters, videyNo);
   } else pool = bySlug.get(s) || mainSorted.filter((x) => slugOf(x) === s);
   pool = pool.filter((x) => !isVidey(x));
+  if (s === "lainnya") pool = pool.filter((x) => !isMinorCoded(x));
   return pageOf(pool, page, limit, posters, videyNo);
+}
+
+/** Slug kategori yang punya minimal 1 judul (untuk menu, sitemap, robots). */
+export async function listNonEmptyCategorySlugs(): Promise<string[]> {
+  const out: string[] = [];
+  for (const c of CATEGORY_LIST) {
+    try {
+      const r = await listCategory(c.slug, 1, 1);
+      if (r.total > 0) out.push(c.slug);
+    } catch {
+      out.push(c.slug);
+    }
+  }
+  return out;
 }
 
 export async function listSearch(

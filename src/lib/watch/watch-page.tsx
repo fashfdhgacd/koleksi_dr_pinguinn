@@ -282,7 +282,7 @@ export function WatchPage() {
                 <noscript>
                   <iframe
                     src={src}
-                    title={item.title}
+                    title={cleanDisplayTitle(item.title)}
                     width="640"
                     height="360"
                     allowFullScreen
@@ -348,7 +348,7 @@ export function WatchPage() {
             <VideoGridSkeleton count={6} />
           )}
           {item ? (
-            <ShareSheet open={shareOpen} title={item.title} id={item.id} onClose={closeShare} />
+            <ShareSheet open={shareOpen} title={cleanDisplayTitle(item.title)} id={item.id} onClose={closeShare} />
           ) : null}
         </article>
       )}
