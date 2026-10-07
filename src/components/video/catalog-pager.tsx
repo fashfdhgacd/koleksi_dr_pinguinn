@@ -14,12 +14,15 @@ export function CatalogPager({
   limit,
   loading,
   onPage,
+  basePath,
 }: {
   page: number;
   total: number;
   limit: number;
   loading?: boolean;
   onPage: (page: number) => void;
+  /** Path for SSR-rendered crawlable page links, e.g. "/kategori/jilbab". */
+  basePath?: string;
 }) {
   const totalPages = Math.max(1, Math.ceil((total || 0) / Math.max(1, limit)));
   if (totalPages <= 1) {
@@ -50,6 +53,31 @@ export function CatalogPager({
     }
   }
 
+  function hrefFor(n: number): string {
+    let path = "/";
+    let params = new URLSearchParams();
+    if (typeof window !== "undefined") {
+      path = window.location.pathname;
+      params = new URLSearchParams(window.location.search);
+    } else if (basePath) {
+      path = basePath;
+    }
+    if (n > 1) params.set("page", String(n));
+    else params.delete("page");
+    const qs = params.toString();
+    return qs ? `${path}?${qs}` : path;
+  }
+
+  function linkProps(n: number) {
+    return {
+      href: hrefFor(n),
+      onClick: (e: { preventDefault: () => void }) => {
+        e.preventDefault();
+        go(n);
+      },
+    };
+  }
+
   return (
     <nav className="relative z-10 mt-8 flex flex-col items-center gap-3" aria-label="Halaman katalog">
       <p className="text-xs text-muted">
@@ -57,54 +85,50 @@ export function CatalogPager({
         {" · "}{page}/{totalPages}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-1.5">
-        <button
-          type="button"
-          disabled={page <= 1}
-          onClick={() => go(page - 1)}
-          className="inline-flex h-11 min-w-11 touch-manipulation items-center justify-center gap-1 rounded-full border border-border px-3 text-sm disabled:opacity-40 sm:h-9"
+        <a
+          {...(page > 1 ? { ...linkProps(page - 1), rel: "prev" } : { "aria-disabled": true })}
+          className="inline-flex h-11 min-w-11 touch-manipulation items-center justify-center gap-1 rounded-full border border-border px-3 text-sm aria-disabled:pointer-events-none aria-disabled:opacity-40 sm:h-9"
           aria-label="Halaman sebelumnya"
         >
           <ChevronLeft className="size-4" />
           <span className="hidden sm:inline">Prev</span>
-        </button>
+        </a>
         {pages[0] > 1 ? (
           <>
-            <button type="button" onClick={() => go(1)} className="h-11 min-w-11 touch-manipulation rounded-full px-2 text-sm hover:bg-secondary sm:h-9 sm:min-w-9">
+            <a {...linkProps(1)} className="h-11 min-w-11 touch-manipulation inline-flex items-center justify-center rounded-full px-2 text-sm hover:bg-secondary sm:h-9 sm:min-w-9">
               1
-            </button>
+            </a>
             {pages[0] > 2 ? <span className="px-1 text-muted">…</span> : null}
           </>
         ) : null}
         {pages.map((n) => (
-          <button
+          <a
             key={n}
-            type="button"
-            onClick={() => go(n)}
-            className={`h-11 min-w-11 touch-manipulation rounded-full px-2 text-sm sm:h-9 sm:min-w-9 ${
+            {...linkProps(n)}
+            aria-current={n === page ? "page" : undefined}
+            className={`h-11 min-w-11 touch-manipulation inline-flex items-center justify-center rounded-full px-2 text-sm sm:h-9 sm:min-w-9 ${
               n === page ? "bg-primary text-primary-foreground" : "hover:bg-secondary"
             }`}
           >
             {n}
-          </button>
+          </a>
         ))}
         {pages[pages.length - 1] < totalPages ? (
           <>
             {pages[pages.length - 1] < totalPages - 1 ? <span className="px-1 text-muted">…</span> : null}
-            <button type="button" onClick={() => go(totalPages)} className="h-11 min-w-11 touch-manipulation rounded-full px-2 text-sm hover:bg-secondary sm:h-9 sm:min-w-9">
+            <a {...linkProps(totalPages)} className="h-11 min-w-11 touch-manipulation inline-flex items-center justify-center rounded-full px-2 text-sm hover:bg-secondary sm:h-9 sm:min-w-9">
               {totalPages}
-            </button>
+            </a>
           </>
         ) : null}
-        <button
-          type="button"
-          disabled={page >= totalPages}
-          onClick={() => go(page + 1)}
-          className="inline-flex h-11 min-w-11 touch-manipulation items-center justify-center gap-1 rounded-full border border-border px-3 text-sm disabled:opacity-40 sm:h-9"
+        <a
+          {...(page < totalPages ? { ...linkProps(page + 1), rel: "next" } : { "aria-disabled": true })}
+          className="inline-flex h-11 min-w-11 touch-manipulation items-center justify-center gap-1 rounded-full border border-border px-3 text-sm aria-disabled:pointer-events-none aria-disabled:opacity-40 sm:h-9"
           aria-label="Halaman berikutnya"
         >
           <span className="hidden sm:inline">Next</span>
           <ChevronRight className="size-4" />
-        </button>
+        </a>
       </div>
     </nav>
   );

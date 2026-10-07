@@ -144,6 +144,7 @@ function CategoryPage() {
         )}
 
         <CatalogPager
+          basePath={`/kategori/${cat.slug}`}
           page={page}
           total={feed.total}
           limit={feed.limit}
