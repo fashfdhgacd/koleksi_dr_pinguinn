@@ -5,6 +5,7 @@ import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { CatalogPager } from "@/components/video/catalog-pager";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { UNLISTED_CATEGORY_SLUGS, findCategory } from "@/lib/catalog/categories";
+import { SafeBoundary } from "@/components/safe-boundary";
 import { rememberCatalog } from "@/lib/catalog/last-catalog";
 import { queryCatalog } from "@/lib/catalog/service";
 import type { VideoCard } from "@/lib/catalog/types";
@@ -82,7 +83,7 @@ function CategoryPage() {
   );
 
   useEffect(() => {
-    if (cat?.slug) rememberCatalog({ type: "category", category: cat.slug, page: feed.page });
+    if (cat?.slug) rememberCatalog();
   }, [cat?.slug, feed.page]);
 
   function setPage(next: number) {
@@ -135,7 +136,9 @@ function CategoryPage() {
         ) : !feed.items.length ? (
           <EmptyState title="Kosong" description="Belum ada video di kategori ini." />
         ) : (
-          <VideoGrid items={feed.items} />
+          <SafeBoundary>
+            <VideoGrid items={feed.items} />
+          </SafeBoundary>
         )}
 
         <CatalogPager

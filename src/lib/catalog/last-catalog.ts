@@ -1,15 +1,16 @@
 const KEY = "kdp:last-catalog";
 
-function isSafeCatalogPath(path: string): boolean {
+function isSafeCatalogPath(path: unknown): path is string {
+  if (typeof path !== "string") return false;
   if (!path.startsWith("/") || path.startsWith("//")) return false;
   if (path.includes("://") || path.includes("\\")) return false;
   if (path.startsWith("/watch") || path.startsWith("/api") || path.startsWith("/pemilik")) return false;
   return path === "/" || path.startsWith("/?") || path.startsWith("/kategori/");
 }
 
-export function rememberCatalog(href?: string): void {
+export function rememberCatalog(href?: unknown): void {
   if (typeof window === "undefined") return;
-  const path = href || `${window.location.pathname}${window.location.search}`;
+  const path = (typeof href === "string" && href) || `${window.location.pathname}${window.location.search}`;
   if (!isSafeCatalogPath(path)) return;
   try {
     sessionStorage.setItem(KEY, path);
@@ -26,5 +27,5 @@ export function lastCatalogHref(fallback = "/"): string {
   } catch {
     /* ignore */
   }
-  return fallback.startsWith("/") ? fallback : "/";
+  return typeof fallback === "string" && fallback.startsWith("/") ? fallback : "/";
 }

@@ -1,3 +1,4 @@
+import { SafeBoundary } from "@/components/safe-boundary";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
@@ -168,7 +169,11 @@ function HomePage() {
   return (
     <Shell>
       <div className="space-y-6">
-        {heroVideos.length ? <Hero videos={heroVideos} /> : null}
+        {heroVideos.length ? (
+          <SafeBoundary>
+            <Hero videos={heroVideos} />
+          </SafeBoundary>
+        ) : null}
 
         <section>
           <div className="mb-3">
@@ -187,7 +192,9 @@ function HomePage() {
               description={q ? "Coba kata kunci lain." : "Belum ada video."}
             />
           ) : (
-            <VideoGrid items={gridItems} />
+            <SafeBoundary>
+              <VideoGrid items={gridItems} />
+            </SafeBoundary>
           )}
 
           <CatalogPager
