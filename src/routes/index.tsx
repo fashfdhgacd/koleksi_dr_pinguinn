@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { SafeBoundary } from "@/components/safe-boundary";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
@@ -151,13 +152,26 @@ function HomePage() {
   const gridItems = heroIds.size ? feed.items.filter((item) => !heroIds.has(item.id)) : feed.items;
 
   const title = q ? `Hasil untuk “${q}”` : cat ? cat.label : "Koleksi Dr. Pinguin";
-  const subtitle = feed.total
+  const subtitle = q
+    ? feed.loading && !feed.items.length
+      ? "Mencari…"
+      : `${(gridItems.length ? feed.total : 0).toLocaleString("id-ID")} hasil`
+    : feed.total
     ? `${feed.total.toLocaleString("id-ID")} judul · M.S.B.`
     : "M.S.B. — Koleksi Dr. Pinguin";
   const intro =
     q
       ? `Hasil pencarian “${q}” di katalog Dr. Pinguin. Konten dewasa 18+.`
       : "Katalog video dewasa 18+ Dr. Pinguin. Streaming embed koleksi Indo, JAV, amatir. Update berkala.";
+
+  // Search result pages past the end (e.g. stale ?page=N kept in the URL) jump back to page 1,
+  // so the count and the grid always come from the same result array.
+  const searchLastPage = q && feed.total > 0 ? Math.max(1, Math.ceil(feed.total / Math.max(1, feed.limit))) : 0;
+  useEffect(() => {
+    if (q && searchLastPage && page > searchLastPage) {
+      navigate({ search: (prev) => ({ ...prev, page: undefined }), replace: true });
+    }
+  }, [q, page, searchLastPage, navigate]);
 
   function setPage(next: number) {
     const current = pageSearch || 1;
@@ -206,8 +220,12 @@ function HomePage() {
             <ErrorState message={feed.error} onRetry={feed.retry} />
           ) : !gridItems.length ? (
             <EmptyState
-              title={q ? "Tidak ketemu" : "Kosong"}
-              description={q ? "Coba kata kunci lain." : "Belum ada video."}
+              title={q ? `Belum ada video untuk “${q}”` : "Kosong"}
+              description={
+                q
+                  ? "Coba kata kunci yang lebih pendek atau umum, misalnya “jilbab”, “indo”, atau “jav”. Bisa juga cek kategori di menu."
+                  : "Belum ada video."
+              }
             />
           ) : (
             <SafeBoundary>

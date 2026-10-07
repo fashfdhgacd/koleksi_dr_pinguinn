@@ -13,6 +13,7 @@ import {
   toCard,
 } from "./local-shared";
 import { runtime } from "./local-shared";
+import { normalizeSearchText, parseSearchQuery, scoreSearch } from "./search-rank";
 import { isPublicHidden, loadItems, pageOf, sortByNewest } from "./local-cache";
 
 export { loadItems } from "./local-cache";
@@ -143,16 +144,21 @@ export async function listSearch(
   limit = DEFAULT_PAGE_SIZE,
   _signal?: AbortSignal,
 ): Promise<PagedVideos> {
-  const key = q.trim().toLowerCase();
-  if (!key) return listLatest(page, limit, _signal);
+  const sq = parseSearchQuery(q);
+  if (!sq.tokens.length) return listLatest(page, limit, _signal);
   const { haystack, posters, videyNo } = await loadItems();
-  const tokens = key.split(/\s+/).filter(Boolean);
-  const matched: RawItem[] = [];
-  for (const row of haystack) {
-    if (isVidey(row.item)) continue;
-    if (tokens.every((t) => row.hay.includes(t))) matched.push(row.item);
+  const scored: { item: RawItem; score: number }[] = [];
+  for (const item of sortByNewest(haystack.map((r) => r.item))) {
+    if (isVidey(item)) continue;
+    const hay = normalizeSearchText(`${item.title || ""} ${item.id || ""}`);
+    const score = scoreSearch(hay, sq);
+    if (score > 0) scored.push({ item, score });
   }
-  return pageOf(sortByNewest(matched), page, limit, posters, videyNo);
+  // Stable sort: same score keeps newest-first order.
+  scored.sort((a, b) => b.score - a.score);
+  const matched = scored.map((x) => x.item);
+  const lastPage = Math.max(1, Math.ceil(matched.length / Math.max(1, limit)));
+  return pageOf(matched, Math.min(Math.max(1, page), lastPage), limit, posters, videyNo);
 }
 
 export async function getDetail(id: string, _signal?: AbortSignal): Promise<VideoDetail> {
