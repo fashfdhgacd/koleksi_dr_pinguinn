@@ -41,7 +41,19 @@ export function pageTitle(parts: Array<string | null | undefined>): string {
 }
 
 const MINOR_RE =
-  /\b(abg|tocil|teen|teens|underage|bocil|anak|smp|sma|smk|loli|lolita|shota|remaja|bocah|pelajar|sekolah|seragam\s+sekolah|perawan\s+kecil|gadis\s+kecil|dedek|adek|adik)\b/i;
+  /\b(abg|tocil|teen|teens|underage|bocil|anak|smp|sma|smk|loli|lolita|shota|remaja|bocah|pelajar|sekolah|seragam\s+sekolah|perawan\s+kecil|gadis\s+kecil|dedek|adek|adik|under\s*-?\s*age|di\s*bawah\s*umur)\b/i;
+
+/** True bila judul/tag item mengandung istilah yang mengarah ke minor (jangan ditampilkan/dipromosikan). */
+export function isMinorCoded(item: { title?: unknown; tags?: unknown } | null | undefined): boolean {
+  if (!item) return false;
+  const tags = Array.isArray(item.tags) ? item.tags.join(" ") : String(item.tags ?? "");
+  return MINOR_RE.test(`${String(item.title ?? "")} ${tags}`);
+}
+
+/** Masking kata tertentu di layer tampilan saja (data asli tidak diubah). */
+export function maskDisplayTerms(t: string): string {
+  return t.replace(/\btocil\b/gi, "***");
+}
 
 /** Hapus suffix branding situs dari judul tampil (data asli tidak diubah). */
 export function cleanDisplayTitle(raw?: string | null): string {
@@ -52,7 +64,7 @@ export function cleanDisplayTitle(raw?: string | null): string {
     t = t.replace(/\s*[\-|–—,]\s*M\.?S\.?B\.?\s*$/gi, "");
   }
   t = t.replace(/[\s\-–—|:·,]+$/g, "").trim();
-  return t || String(raw || "").trim() || "Video";
+  return maskDisplayTerms(t || String(raw || "").trim() || "Video");
 }
 
 export function videoSeoTitle(title: string, category?: string | null): string {
@@ -329,7 +341,7 @@ export function videoJsonLd(input: {
   return {
     "@context": "https://schema.org",
     "@type": "VideoObject",
-    name: (input.title || "Video").trim(),
+    name: cleanDisplayTitle(input.title || "Video"),
     description: (input.description || "").trim().slice(0, 300),
     thumbnailUrl: thumb,
     uploadDate: uploadDateFromId(input.id),
