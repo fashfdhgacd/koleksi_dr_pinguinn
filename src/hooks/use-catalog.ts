@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchCatalog } from "@/lib/catalog/client";
+import { isRealMinor } from "@/lib/minor-terms";
 import type { CatalogResponse, VideoCard } from "@/lib/catalog/types";
 import { DEFAULT_PAGE_SIZE } from "@/lib/catalog/types";
 import { markPosterWarm } from "@/lib/poster-warm";
@@ -33,7 +34,7 @@ const FRESH_MS = 12 * 60 * 60 * 1000;
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
 /** Mobile cellular often hangs TCP; without a budget, inflight coalescing stuck forever. */
 const FETCH_TIMEOUT_MS = 15_000;
-const LS_KEY = "dp_feed_v5";
+const LS_KEY = "dp_feed_v6";
 const feedCache = new Map<string, FeedSnap>();
 
 function ls() {

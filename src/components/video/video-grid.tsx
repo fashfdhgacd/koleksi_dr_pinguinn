@@ -1,6 +1,11 @@
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
+import { isRealMinor } from "@/lib/minor-terms";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VideoCard } from "./video-card";
+
+function visibleCards(items: VideoCardType[]): VideoCardType[] {
+  return items.filter((video) => !isRealMinor({ title: video.title, tags: video.category }));
+}
 
 export function VideoGrid({
   items,
@@ -9,9 +14,10 @@ export function VideoGrid({
   items: VideoCardType[];
   eagerCount?: number;
 }) {
+  const shown = visibleCards(items);
   return (
     <div className="grid grid-cols-2 gap-x-2 gap-y-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-      {items.map((video, index) => (
+      {shown.map((video, index) => (
         <VideoCard key={video.id} video={video} eager={index < eagerCount} />
       ))}
     </div>
