@@ -1,4 +1,4 @@
-import { MINOR_RE_NO_TOCIL_SOURCE, MINOR_RE_SOURCE } from "@/lib/minor-terms";
+import { MINOR_RE_SOURCE, TOCIL_SOURCE, isRealMinorV2, matchedTermsV2 } from "@/lib/minor-terms";
 import { findCategory } from "@/lib/catalog/categories";
 
 export const SITE_ORIGIN = "https://koleksidrpinguin.com";
@@ -43,30 +43,21 @@ export function pageTitle(parts: Array<string | null | undefined>): string {
 
 const MINOR_RE = new RegExp(MINOR_RE_SOURCE, "i");
 
-/** True bila judul/tag item mengandung istilah yang mengarah ke minor (jangan ditampilkan/dipromosikan). */
+/** True bila judul/tag kena istilah minor (termasuk 'tocil'). */
 export function isMinorCoded(item: { title?: unknown; tags?: unknown } | null | undefined): boolean {
   if (!item) return false;
   const tags = Array.isArray(item.tags) ? item.tags.join(" ") : String(item.tags ?? "");
-  return MINOR_RE.test(`${String(item.title ?? "")} ${tags}`);
+  return isRealMinorV2(item) || new RegExp(TOCIL_SOURCE, "i").test(`${String(item.title ?? "")} ${tags}`);
 }
 
-const MINOR_RE_NO_TOCIL = new RegExp(MINOR_RE_NO_TOCIL_SOURCE, "i");
-
-/** Seperti isMinorCoded, tapi mengabaikan kata 'tocil' (slang dewasa, ditampilkan termask). */
+/** Istilah minor sungguhan (kata generik spt 'anak'/'adik' hanya bila ada konteks sekolah/umur). */
 export function isMinorCodedIgnoringTocil(item: { title?: unknown; tags?: unknown } | null | undefined): boolean {
-  if (!item) return false;
-  const tags = Array.isArray(item.tags) ? item.tags.join(" ") : String(item.tags ?? "");
-  return MINOR_RE_NO_TOCIL.test(`${String(item.title ?? "")} ${tags}`);
+  return isRealMinorV2(item);
 }
 
-/** Daftar istilah minor yang cocok di judul/tag (untuk panel pemilik). */
+/** Daftar istilah yang cocok di judul/tag (untuk panel pemilik). */
 export function matchedMinorTerms(item: { title?: unknown; tags?: unknown } | null | undefined): string[] {
-  if (!item) return [];
-  const tags = Array.isArray(item.tags) ? item.tags.join(" ") : String(item.tags ?? "");
-  const re = new RegExp(MINOR_RE.source, "gi");
-  const out = new Set<string>();
-  for (const m of `${String(item.title ?? "")} ${tags}`.matchAll(re)) out.add(m[0].toLowerCase());
-  return [...out];
+  return matchedTermsV2(item);
 }
 
 /** True bila judul tersimpan mengandung 'tocil' (noindex + keluar dari sitemap). */
