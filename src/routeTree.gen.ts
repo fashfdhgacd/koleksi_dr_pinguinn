@@ -24,6 +24,7 @@ import { Route as TermsRouteImport } from './routes/terms'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiEmbedThumbRouteImport } from './routes/api/embed-thumb'
 import { Route as ApiFrameRouteImport } from './routes/api/frame'
+import { Route as ApiHiddenIdsRouteImport } from './routes/api/hidden-ids'
 import { Route as ApiImgProxyRouteImport } from './routes/api/img-proxy'
 import { Route as ApiOgRouteImport } from './routes/api/og'
 import { Route as ApiOnlineRouteImport } from './routes/api/online'
@@ -114,6 +115,11 @@ const ApiEmbedThumbRoute = ApiEmbedThumbRouteImport.update({
 const ApiFrameRoute = ApiFrameRouteImport.update({
   id: '/api/frame',
   path: '/api/frame',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHiddenIdsRoute = ApiHiddenIdsRouteImport.update({
+  id: '/api/hidden-ids',
+  path: '/api/hidden-ids',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiImgProxyRoute = ApiImgProxyRouteImport.update({
@@ -213,6 +219,7 @@ export interface FileRoutesByFullPath {
   '/api/data': typeof ApiDataRoute
   '/api/embed-thumb': typeof ApiEmbedThumbRoute
   '/api/frame': typeof ApiFrameRoute
+  '/api/hidden-ids': typeof ApiHiddenIdsRoute
   '/api/img-proxy': typeof ApiImgProxyRoute
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
@@ -245,6 +252,7 @@ export interface FileRoutesByTo {
   '/api/data': typeof ApiDataRoute
   '/api/embed-thumb': typeof ApiEmbedThumbRoute
   '/api/frame': typeof ApiFrameRoute
+  '/api/hidden-ids': typeof ApiHiddenIdsRoute
   '/api/img-proxy': typeof ApiImgProxyRoute
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
@@ -279,6 +287,7 @@ export interface FileRoutesById {
   '/api/data': typeof ApiDataRoute
   '/api/embed-thumb': typeof ApiEmbedThumbRoute
   '/api/frame': typeof ApiFrameRoute
+  '/api/hidden-ids': typeof ApiHiddenIdsRoute
   '/api/img-proxy': typeof ApiImgProxyRoute
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
@@ -314,6 +323,7 @@ export interface FileRouteTypes {
     | '/api/data'
     | '/api/embed-thumb'
     | '/api/frame'
+    | '/api/hidden-ids'
     | '/api/img-proxy'
     | '/api/og'
     | '/api/online'
@@ -346,6 +356,7 @@ export interface FileRouteTypes {
     | '/api/data'
     | '/api/embed-thumb'
     | '/api/frame'
+    | '/api/hidden-ids'
     | '/api/img-proxy'
     | '/api/og'
     | '/api/online'
@@ -379,6 +390,7 @@ export interface FileRouteTypes {
     | '/api/data'
     | '/api/embed-thumb'
     | '/api/frame'
+    | '/api/hidden-ids'
     | '/api/img-proxy'
     | '/api/og'
     | '/api/online'
@@ -413,6 +425,7 @@ export interface RootRouteChildren {
   ApiDataRoute: typeof ApiDataRoute
   ApiEmbedThumbRoute: typeof ApiEmbedThumbRoute
   ApiFrameRoute: typeof ApiFrameRoute
+  ApiHiddenIdsRoute: typeof ApiHiddenIdsRoute
   ApiImgProxyRoute: typeof ApiImgProxyRoute
   ApiOgRoute: typeof ApiOgRoute
   ApiOnlineRoute: typeof ApiOnlineRoute
@@ -534,6 +547,13 @@ declare module '@tanstack/react-router' {
       path: '/api/frame'
       fullPath: '/api/frame'
       preLoaderRoute: typeof ApiFrameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/hidden-ids': {
+      id: '/api/hidden-ids'
+      path: '/api/hidden-ids'
+      fullPath: '/api/hidden-ids'
+      preLoaderRoute: typeof ApiHiddenIdsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/img-proxy': {
@@ -681,6 +701,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDataRoute: ApiDataRoute,
   ApiEmbedThumbRoute: ApiEmbedThumbRoute,
   ApiFrameRoute: ApiFrameRoute,
+  ApiHiddenIdsRoute: ApiHiddenIdsRoute,
   ApiImgProxyRoute: ApiImgProxyRoute,
   ApiOgRoute: ApiOgRoute,
   ApiOnlineRoute: ApiOnlineRoute,
