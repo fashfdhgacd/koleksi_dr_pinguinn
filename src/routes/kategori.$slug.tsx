@@ -61,25 +61,43 @@ function CategoryPage() {
   const { slug } = Route.useParams();
   const { page: pageSearch } = Route.useSearch();
   const page = pageSearch || 1;
-  const navigate = useNavigate();
+  const navigate = useNavigate({ from: "/kategori/$slug" });
   const cat = findCategory(slug);
   const loaderData = Route.useLoaderData();
 
   const seed =
-    loaderData && loaderData.ok && loaderData.type === "category"
+    loaderData && "ok" in loaderData && loaderData.ok && loaderData.type === "category"
       ? {
           items: loaderData.items as VideoCard[],
-          page: loaderData.page,
-          hasMore: loaderData.hasMore,
+          featured: [] as VideoCard[],
           total: loaderData.total,
+          page: loaderData.page,
+          limit: loaderData.limit,
         }
-      : undefined;
+      : null;
 
-  const feed = useCatalogFeed({ mode: "category", category: cat?.slug || slug, page }, seed);
+  const feed = useCatalogFeed(
+    { mode: "category", category: cat?.slug || slug, page },
+    seed || undefined,
+  );
 
   useEffect(() => {
     if (cat?.slug) rememberCatalog({ type: "category", category: cat.slug, page: feed.page });
   }, [cat?.slug, feed.page]);
+
+  function setPage(next: number) {
+    const current = pageSearch || 1;
+    if (next === current) {
+      feed.retry();
+      return;
+    }
+    navigate({
+      search: (prev) => ({
+        ...prev,
+        page: next > 1 ? next : undefined,
+      }),
+    });
+  }
 
   if (!cat || UNLISTED_CATEGORY_SLUGS.has(cat.slug)) {
     return (
@@ -89,46 +107,46 @@ function CategoryPage() {
     );
   }
 
-  if (loaderData && !loaderData.ok) {
+  if (loaderData && "ok" in loaderData && !loaderData.ok) {
     return (
       <Shell>
-        <ErrorState message={loaderData.error || "Gagal memuat"} onRetry={() => navigate({ to: "/kategori/$slug", params: { slug } })} />
+        <ErrorState
+          message={(loaderData as { error?: string }).error || "Gagal memuat"}
+          onRetry={() => feed.retry()}
+        />
       </Shell>
     );
   }
 
   return (
     <Shell>
-      <div className="mb-4">
-        <h1 className="text-xl font-semibold text-zinc-100">{cat.label}</h1>
-        {typeof feed.total === "number" ? (
-          <p className="mt-1 text-sm text-zinc-500">{feed.total.toLocaleString("id-ID")} video</p>
-        ) : null}
-      </div>
+      <section>
+        <div className="mb-4">
+          <h1 className="text-xl font-semibold text-zinc-100">{cat.label}</h1>
+          {typeof feed.total === "number" ? (
+            <p className="mt-1 text-sm text-zinc-500">{feed.total.toLocaleString("id-ID")} video</p>
+          ) : null}
+        </div>
 
-      {feed.loading && !feed.items.length ? (
-        <VideoGridSkeleton count={12} />
-      ) : feed.error && !feed.items.length ? (
-        <ErrorState message={feed.error} onRetry={feed.retry} />
-      ) : !feed.items.length ? (
-        <EmptyState title="Kosong" description="Belum ada video di kategori ini." />
-      ) : (
-        <>
+        {feed.loading && !feed.items.length ? (
+          <VideoGridSkeleton count={12} />
+        ) : feed.error && !feed.items.length ? (
+          <ErrorState message={feed.error} onRetry={feed.retry} />
+        ) : !feed.items.length ? (
+          <EmptyState title="Kosong" description="Belum ada video di kategori ini." />
+        ) : (
           <VideoGrid items={feed.items} />
-          <CatalogPager
-            page={feed.page}
-            hasMore={feed.hasMore}
-            loadingMore={feed.loadingMore}
-            onPage={(p) =>
-              navigate({
-                to: "/kategori/$slug",
-                params: { slug },
-                search: p > 1 ? { page: p } : {},
-              })
-            }
-          />
-        </>
-      )}
+        )}
+
+        <CatalogPager
+          page={page}
+          total={feed.total}
+          limit={feed.limit}
+          loading={feed.loading}
+          hasMore={feed.hasMore}
+          onPage={setPage}
+        />
+      </section>
     </Shell>
   );
 }
