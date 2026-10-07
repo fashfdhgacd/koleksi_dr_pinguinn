@@ -59,6 +59,16 @@ export function isMinorCodedIgnoringTocil(item: { title?: unknown; tags?: unknow
   return MINOR_RE_NO_TOCIL.test(`${String(item.title ?? "")} ${tags}`);
 }
 
+/** Daftar istilah minor yang cocok di judul/tag (untuk panel pemilik). */
+export function matchedMinorTerms(item: { title?: unknown; tags?: unknown } | null | undefined): string[] {
+  if (!item) return [];
+  const tags = Array.isArray(item.tags) ? item.tags.join(" ") : String(item.tags ?? "");
+  const re = new RegExp(MINOR_RE.source, "gi");
+  const out = new Set<string>();
+  for (const m of `${String(item.title ?? "")} ${tags}`.matchAll(re)) out.add(m[0].toLowerCase());
+  return [...out];
+}
+
 /** True bila judul tersimpan mengandung 'tocil' (noindex + keluar dari sitemap). */
 export function hasTocilTitle(item: { title?: unknown } | null | undefined): boolean {
   return /\btocil\b/i.test(String(item?.title ?? ""));

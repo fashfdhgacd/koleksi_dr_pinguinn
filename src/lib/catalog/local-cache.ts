@@ -158,7 +158,7 @@ export function kickRemoteRefresh(base: { items: RawItem[]; posters: Record<stri
     });
 }
 
-export async function loadItems(): Promise<CatalogCache> {
+export async function loadItemsRaw(): Promise<CatalogCache> {
   const now = Date.now();
   if (runtime.cache && now - runtime.cache.at < CACHE_MS) return runtime.cache;
   if (runtime.cache && now - runtime.cache.at < STALE_MS) {
@@ -178,4 +178,39 @@ export async function loadItems(): Promise<CatalogCache> {
   }
   kickRemoteRefresh({ items: runtime.cache.items, posters: runtime.cache.posters });
   return runtime.cache;
+}
+
+let clientOff: { at: number; ids: Set<string> } | null = null;
+
+/** Id yang di-set 'Tidak publish'. Server: KV langsung; browser: /api/hidden-ids (id saja). */
+export async function getUnpublished(): Promise<Set<string>> {
+  try {
+    if (import.meta.env.SSR) {
+      const { unpublishedIds } = await import("../owner-review-store");
+      return await unpublishedIds();
+    }
+    if (clientOff && Date.now() - clientOff.at < 60_000) return clientOff.ids;
+    const r = await fetch("/api/hidden-ids", { cache: "no-store" });
+    const d = (await r.json()) as { ids?: string[] };
+    clientOff = { at: Date.now(), ids: new Set(d.ids || []) };
+    return clientOff.ids;
+  } catch {
+    return clientOff?.ids || new Set();
+  }
+}
+
+let filtered: { base: CatalogCache; key: string; out: CatalogCache } | null = null;
+
+/** Katalog publik: tanpa item yang di-set 'Tidak publish' oleh pemilik. */
+export async function loadItems(): Promise<CatalogCache> {
+  const base = await loadItemsRaw();
+  let off: Set<string>;
+  off = await getUnpublished();
+  if (!off.size) return base;
+  const key = [...off].sort().join(",");
+  if (filtered && filtered.base === base && filtered.key === key) return filtered.out;
+  const items = base.items.filter((x) => !off.has(x.id));
+  const out = buildIndexes(items, base.posters, base.videyNo, base.at);
+  filtered = { base, key, out };
+  return out;
 }

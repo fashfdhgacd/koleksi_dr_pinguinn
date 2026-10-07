@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, notFound } from "@tanstack/react-router";
+import { getUnpublished } from "@/lib/catalog/local-cache";
 import { queryCatalog } from "@/lib/catalog/service";
 import {
   DEFAULT_OG,
@@ -29,7 +30,10 @@ export const Route = createFileRoute("/watch/$id")({
   loader: async ({ params }) => {
     const id = (params.id || "").trim();
     if (!id) return { ok: false as const, error: "ID kosong", code: "bad_request" as const };
-    return queryCatalog({ type: "detail", id });
+    const res = await queryCatalog({ type: "detail", id });
+    // 'Tidak publish' oleh pemilik → 404 sungguhan (bukan halaman kosong 200).
+    if (!res.ok && res.code === "not_found" && (await getUnpublished()).has(id)) throw notFound();
+    return res;
   },
   head: ({ loaderData }) => {
     const ok = loaderData && loaderData.ok === true && loaderData.type === "detail";
@@ -86,7 +90,7 @@ export const Route = createFileRoute("/watch/$id")({
         { name: "twitter:image:alt", content: "DR. PINGUIN" },
         {
           name: "robots",
-          content: hasTocilTitle(item) ? "noindex,follow" : "index,follow,max-video-preview:120",
+          content: item.noindex || hasTocilTitle(item) ? "noindex,follow" : "index,follow,max-video-preview:120",
         },
         { name: "rating", content: "adult" },
       ],
