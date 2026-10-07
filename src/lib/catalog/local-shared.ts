@@ -145,7 +145,7 @@ export function classify(title: string): string {
   if (/kosan|kontrakan|indekos/.test(t)) return "kosan";
   if (/viral/.test(t)) return "viral";
   if (/\blive\b|bokep live/.test(t)) return "live";
-  if (/abg|\bsma\b|\bsmk\b|mahasisw|tocil|remaja/.test(t)) return "abg";
+  if (/\b18\s*-\s*25\b/.test(t)) return "18-25";
   if (/colmek|\bcoli\b/.test(t)) return "colmek";
   if (/doggy/.test(t)) return "doggy";
   if (/open\s*bo|openbo|\bstw\b|\blc\b|karaoke/.test(t)) return "open-bo";

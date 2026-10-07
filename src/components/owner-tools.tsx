@@ -10,7 +10,7 @@ const CATS = [
   { slug: "jilbab", label: "Jilbab" },
   { slug: "amatir", label: "Amatir" },
   { slug: "tante", label: "Tante" },
-  { slug: "abg", label: "Muda 18+" },
+  { slug: "18-25", label: "18-25" },
   { slug: "ai-plus", label: "AI+" },
   { slug: "viral", label: "Viral" },
 ];

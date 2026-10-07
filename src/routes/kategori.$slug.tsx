@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, notFound, redirect, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { CatalogPager } from "@/components/video/catalog-pager";
@@ -21,9 +21,18 @@ export const Route = createFileRoute("/kategori/$slug")({
   validateSearch: (search: Record<string, unknown>) => ({
     page: parsePage(search.page),
   }),
-  beforeLoad: ({ params }) => {
+  beforeLoad: ({ params, search }) => {
     const cat = findCategory(params.slug);
     if (!cat) throw notFound();
+    if (params.slug !== cat.slug && params.slug.trim().toLowerCase() === "abg") {
+      throw redirect({
+        to: "/kategori/$slug",
+        params: { slug: cat.slug },
+        search: { page: search.page },
+        replace: true,
+        statusCode: 301,
+      });
+    }
     return { cat };
   },
   loader: async ({ params, location }) => {
