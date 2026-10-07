@@ -9,7 +9,7 @@ import { findCategory } from "@/lib/catalog/categories";
 import { queryCatalog } from "@/lib/catalog/service";
 import type { VideoCard } from "@/lib/catalog/types";
 import { useCatalogFeed } from "../hooks/use-catalog";
-import { DEFAULT_OG, HOME_CANONICAL, SITE_ORIGIN, homeSeo, websiteJsonLd } from "@/lib/seo";
+import { DEFAULT_OG, HOME_CANONICAL, homeSeo, websiteJsonLd } from "@/lib/seo";
 
 type HomeSearch = {
   q?: string;
@@ -149,13 +149,13 @@ function HomePage() {
   const heroIds = new Set(heroVideos.map((v) => v.id));
   const gridItems = heroIds.size ? feed.items.filter((item) => !heroIds.has(item.id)) : feed.items;
 
-  const title = q ? `Hasil untuk \u201c${q}\u201d` : cat ? cat.label : "Koleksi Dr. Pinguin";
+  const title = q ? `Hasil untuk “${q}”` : cat ? cat.label : "Koleksi Dr. Pinguin";
   const subtitle = feed.total
-    ? `${feed.total.toLocaleString("id-ID")} judul \u00b7 M.S.B.`
-    : "M.S.B. \u2014 Koleksi Dr. Pinguin";
+    ? `${feed.total.toLocaleString("id-ID")} judul · M.S.B.`
+    : "M.S.B. — Koleksi Dr. Pinguin";
   const intro =
     q
-      ? `Hasil pencarian \u201c${q}\u201d di katalog Dr. Pinguin. Konten dewasa 18+.`
+      ? `Hasil pencarian “${q}” di katalog Dr. Pinguin. Konten dewasa 18+.`
       : "Katalog video dewasa 18+ Dr. Pinguin. Streaming embed koleksi Indo, JAV, amatir. Update berkala.";
 
   function setPage(next: number) {
