@@ -1,3 +1,4 @@
+import { MINOR_RE_NO_TOCIL_SOURCE, MINOR_RE_SOURCE } from "@/lib/minor-terms";
 import { findCategory } from "@/lib/catalog/categories";
 
 export const SITE_ORIGIN = "https://koleksidrpinguin.com";
@@ -40,8 +41,7 @@ export function pageTitle(parts: Array<string | null | undefined>): string {
   return `${unique.join(" | ")} | ${SITE_NAME}`;
 }
 
-const MINOR_RE =
-  /\b(abg|tocil|teen|teens|underage|bocil|anak|smp|sma|smk|loli|lolita|shota|remaja|bocah|pelajar|sekolah|seragam\s+sekolah|perawan\s+kecil|gadis\s+kecil|dedek|adek|adik|under\s*-?\s*age|di\s*bawah\s*umur)\b/i;
+const MINOR_RE = new RegExp(MINOR_RE_SOURCE, "i");
 
 /** True bila judul/tag item mengandung istilah yang mengarah ke minor (jangan ditampilkan/dipromosikan). */
 export function isMinorCoded(item: { title?: unknown; tags?: unknown } | null | undefined): boolean {
@@ -50,7 +50,7 @@ export function isMinorCoded(item: { title?: unknown; tags?: unknown } | null | 
   return MINOR_RE.test(`${String(item.title ?? "")} ${tags}`);
 }
 
-const MINOR_RE_NO_TOCIL = new RegExp(MINOR_RE.source.replace("tocil|", ""), "i");
+const MINOR_RE_NO_TOCIL = new RegExp(MINOR_RE_NO_TOCIL_SOURCE, "i");
 
 /** Seperti isMinorCoded, tapi mengabaikan kata 'tocil' (slang dewasa, ditampilkan termask). */
 export function isMinorCodedIgnoringTocil(item: { title?: unknown; tags?: unknown } | null | undefined): boolean {
@@ -71,12 +71,12 @@ export function matchedMinorTerms(item: { title?: unknown; tags?: unknown } | nu
 
 /** True bila judul tersimpan mengandung 'tocil' (noindex + keluar dari sitemap). */
 export function hasTocilTitle(item: { title?: unknown } | null | undefined): boolean {
-  return /\btocil\b/i.test(String(item?.title ?? ""));
+  return /(?<![A-Za-z0-9])tocil(?![A-Za-z0-9])/i.test(String(item?.title ?? ""));
 }
 
 /** Masking kata tertentu di layer tampilan saja (data asli tidak diubah). */
 export function maskDisplayTerms(t: string): string {
-  return t.replace(/\btocil\b/gi, "***");
+  return t.replace(/(?<![A-Za-z0-9])tocil(?![A-Za-z0-9])/gi, "***");
 }
 
 /** Hapus suffix branding situs dari judul tampil (data asli tidak diubah). */

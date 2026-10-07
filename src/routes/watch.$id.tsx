@@ -1,5 +1,5 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { getUnpublished } from "@/lib/catalog/local-cache";
+import { isPublicHidden } from "@/lib/catalog/local-cache";
 import { queryCatalog } from "@/lib/catalog/service";
 import {
   DEFAULT_OG,
@@ -31,8 +31,8 @@ export const Route = createFileRoute("/watch/$id")({
     const id = (params.id || "").trim();
     if (!id) return { ok: false as const, error: "ID kosong", code: "bad_request" as const };
     const res = await queryCatalog({ type: "detail", id });
-    // 'Tidak publish' oleh pemilik → 404 sungguhan (bukan halaman kosong 200).
-    if (!res.ok && res.code === "not_found" && (await getUnpublished()).has(id)) throw notFound();
+    // Istilah minor / 'Tidak publish' → 404 sungguhan (bukan halaman kosong 200).
+    if (!res.ok && res.code === "not_found" && (await isPublicHidden(id))) throw notFound();
     return res;
   },
   head: ({ loaderData }) => {
