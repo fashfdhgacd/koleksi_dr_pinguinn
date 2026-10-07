@@ -1,3 +1,4 @@
+import { cleanDisplayTitle } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Play } from "lucide-react";
@@ -27,12 +28,7 @@ function isUsableThumb(src: string | null | undefined): boolean {
 }
 
 function cleanHeroTitle(raw: string): string {
-  let t = String(raw || "").trim();
-  t = t.replace(/\s*[\(\[]\s*koleksi\s*dr\.?\s*pinguin[^\)\]]*[\)\]]/gi, "");
-  t = t.replace(/\s*[\-|–]\s*koleksi\s*dr\.?\s*pinguin.*$/gi, "");
-  t = t.replace(/\s*,\s*M\.?S\.?B\.?\s*$/gi, "");
-  t = t.replace(/\s+/g, " ").trim();
-  return t || raw || "Video";
+  return cleanDisplayTitle(raw);
 }
 
 export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {

@@ -4,6 +4,7 @@ import {
   DEFAULT_OG,
   SITE_ORIGIN,
   categoryKeywords,
+  cleanDisplayTitle,
   resolveVideoSeoDescription,
   videoJsonLd,
   videoSeoTitle,
@@ -33,6 +34,7 @@ export const Route = createFileRoute("/watch/$id")({
     const ok = loaderData && loaderData.ok === true && loaderData.type === "detail";
     const item = ok ? loaderData.item : null;
     const title = item ? videoSeoTitle(item.title, item.category) : "Dr. Pinguin — Bokep Indo";
+    const ogTitle = item ? cleanDisplayTitle(item.title) : title;
     const description = item
       ? resolveVideoSeoDescription(item)
       : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
@@ -46,7 +48,7 @@ export const Route = createFileRoute("/watch/$id")({
     const jsonLd = item
       ? videoJsonLd({
           id: item.id,
-          title: item.title,
+          title: cleanDisplayTitle(item.title),
           description,
           thumbnail: item.thumbnail,
           category: item.category,
@@ -68,7 +70,7 @@ export const Route = createFileRoute("/watch/$id")({
         },
         { property: "og:type", content: "video.other" },
         { property: "og:site_name", content: "DR. PINGUIN" },
-        { property: "og:title", content: title },
+        { property: "og:title", content: ogTitle },
         { property: "og:description", content: description },
         { property: "og:url", content: url },
         { property: "og:image", content: image },
@@ -77,7 +79,7 @@ export const Route = createFileRoute("/watch/$id")({
         { property: "og:image:width", content: "1280" },
         { property: "og:image:height", content: "720" },
         { name: "twitter:card", content: "summary_large_image" },
-        { name: "twitter:title", content: title },
+        { name: "twitter:title", content: ogTitle },
         { name: "twitter:description", content: description },
         { name: "twitter:image", content: image },
         { name: "twitter:image:alt", content: "DR. PINGUIN" },
