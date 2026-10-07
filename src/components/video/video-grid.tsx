@@ -1,3 +1,4 @@
+// Grid: 2 / 3 / 4 kolom (mobile / tablet / desktop).
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { isRealMinor } from "@/lib/minor-terms";
 import { Skeleton } from "@/components/ui/skeleton";
