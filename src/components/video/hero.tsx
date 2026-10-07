@@ -34,7 +34,7 @@ function cleanHeroTitle(raw: string): string {
 
 export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
   const incoming = videos && videos.length > 0 ? videos : video ? [video] : [];
-  const list = useMemo(() => incoming.filter((v) => isUsableThumb(v.thumbnail)), [incoming]);
+  const list = useMemo(() => incoming.filter((v) => isUsableThumb(v.thumbnail) && !isRealMinor({ title: v.title, tags: v.category })), [incoming]);
   const listKey = list.map((v) => v.id).join("|");
   const [failedIds, setFailedIds] = useState<Set<string>>(() => new Set());
   const [index, setIndex] = useState(0);
