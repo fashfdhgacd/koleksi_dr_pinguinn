@@ -23,6 +23,7 @@ import localCatalog from "./videos.json";
 import streamtapeBatch from "./streamtape.json";
 import streamtapeBatchSep25 from "./streamtape-batch-20260925.json";
 import putarinBatch from "./putarin.json";
+import folderBatch20261007 from "./folder-batch-20261007.json";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
 import latestVideos from "../../../data/videos-latest.json";
@@ -114,12 +115,14 @@ export function assembleLocal(): { items: RawItem[]; posters: Record<string, str
   const st = withIds(asList(streamtapeBatch)).filter(isUsable);
   const st2 = withIds(asList(streamtapeBatchSep25)).filter(isUsable);
   const pu = withIds(asList(putarinBatch)).filter(isUsable);
+  // Owner folder ingest (IndoAV/UserBokep /f/ folders). Placed last so existing entries always win.
+  const fb = withIds(asList(folderBatch20261007)).filter(isUsable);
   const posters: Record<string, string> = {
     ...(postersMap as Record<string, string>),
     ...asPosterMap(javPosters),
     ...asPosterMap(latestPosters),
   };
-  return { items: uniqById([...latest, ...st, ...st2, ...pu, ...local]), posters };
+  return { items: uniqById([...latest, ...st, ...st2, ...pu, ...local, ...fb]), posters };
 }
 
 export async function refreshRemote(base: { items: RawItem[]; posters: Record<string, string> }): Promise<CatalogCache> {
