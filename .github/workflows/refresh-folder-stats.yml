@@ -1,0 +1,40 @@
+# Refresh views/duration/likes for owner's IndoAV/UserBokep folders (~every 12h).
+# Only rewrites src/lib/catalog/video-stats.json; never adds/removes videos.
+name: Refresh folder stats
+
+on:
+  schedule:
+    - cron: "17 */12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-folder-stats
+  cancel-in-progress: false
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Crawl folders (slow, retries on 522)
+        run: python3 scripts/refresh-folder-stats.py
+      - name: Guard (stats only)
+        run: |
+          changed=$(git status --porcelain | awk '{print $2}')
+          for f in $changed; do
+            if [ "$f" != "src/lib/catalog/video-stats.json" ]; then echo "unexpected change: $f"; exit 1; fi
+          done
+          python3 -c "import json;d=json.load(open('src/lib/catalog/video-stats.json'));assert len(d)>1000;print(len(d))"
+      - name: Commit if changed
+        run: |
+          if git diff --quiet -- src/lib/catalog/video-stats.json; then echo "no changes"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/catalog/video-stats.json
+          git commit -m "stats: refresh folder views/likes"
+          git pull --rebase
+          git push
