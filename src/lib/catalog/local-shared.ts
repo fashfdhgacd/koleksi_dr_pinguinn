@@ -1,3 +1,4 @@
+import { maskDisplayTerms } from "../seo";
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
 import { findCategory } from "./categories";
@@ -237,7 +238,8 @@ export function toCard(item: RawItem, posters: Record<string, string>, videyNo?:
   const id = item.id;
   const title = isVidey(item)
     ? videyDisplayTitle(item, videyNo?.get(id) || 1)
-    : cleanTitle(item.title || "Video");
+    : cleanTitle(maskDisplayTerms(item.title || "Video"));
+  const masked = /\btocil\b/i.test(String(item.title || ""));
   let quality = "HD";
   if (isStreamtape(item)) quality = "Streamtape";
   else if (isPutarin(item)) quality = "Puterin";
@@ -253,5 +255,6 @@ export function toCard(item: RawItem, posters: Record<string, string>, videyNo?:
     year: null,
     creator: sourceLabel(item),
     views: null,
+    ...(masked ? { noindex: true } : {}),
   };
 }

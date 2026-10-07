@@ -1,3 +1,4 @@
+import { matchedMinorTerms } from "@/lib/seo";
 import { parseMessage, detectCategory, cleanTitle } from "@/lib/bot/parse.js";
 import { toRecord } from "@/lib/bot/store.js";
 import { fetchPutarinMeta, fetchStreamtapeMeta, expandPutarinFolder } from "@/lib/bot/providers.js";
@@ -71,6 +72,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   await tgSend(token, chatId, `⏳ Menerima ${parsedMsg.videos.length} link. Sedang diproses…`);
 
   const lines = [];
+  const flagged = [];
   let createdTotal = 0;
   let skippedTotal = 0;
   let failedTotal = 0;
@@ -158,6 +160,10 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
         if (isHttpPoster(poster)) posterBatch[it.record.id] = poster;
         if (createdIds.has(idKey)) {
           lines.push(`✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}`);
+          const terms = matchedMinorTerms({ title: it.title, tags: it.record.tags });
+          if (terms.length) {
+            flagged.push(`🚩 ${it.record.id} — ${it.title} [${terms.join(", ")}]`);
+          }
         } else {
           lines.push(`⏭️ ${it.record.id} — ${it.title} (sudah ada)`);
         }
@@ -190,6 +196,9 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     }
   }
 
+  if (flagged.length) {
+    lines.push("", `🚩 ${flagged.length} video baru masuk "Video disembunyikan (perlu review)" — cek di /pemilik:`, ...flagged);
+  }
   const summary = `✅ ${createdTotal} dibuat · ⏭️ ${skippedTotal} skip · ⚠️ ${failedTotal} gagal`;
   await tgSendChunks(
     token,
