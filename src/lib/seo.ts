@@ -40,8 +40,23 @@ export function pageTitle(parts: Array<string | null | undefined>): string {
   return `${unique.join(" | ")} | ${SITE_NAME}`;
 }
 
+const MINOR_RE =
+  /\b(abg|tocil|teen|teens|underage|bocil|anak|smp|sma|smk|loli|lolita|shota|remaja|bocah|pelajar|sekolah|seragam\s+sekolah|perawan\s+kecil|gadis\s+kecil|dedek|adek|adik)\b/i;
+
+/** Hapus suffix branding situs dari judul tampil (data asli tidak diubah). */
+export function cleanDisplayTitle(raw?: string | null): string {
+  let t = String(raw || "").trim().replace(/\s+/g, " ");
+  t = t.replace(/\s*[\(\[]\s*(koleksi\s+)?dr\.?\s*pinguin[^\)\]]*[\)\]]\s*$/gi, "");
+  for (let i = 0; i < 3; i++) {
+    t = t.replace(/[\s\-–—|:·,]*\b(koleksi\s+)?dr\.?\s*pinguin\.?\s*$/gi, "");
+    t = t.replace(/\s*[\-|–—,]\s*M\.?S\.?B\.?\s*$/gi, "");
+  }
+  t = t.replace(/[\s\-–—|:·,]+$/g, "").trim();
+  return t || String(raw || "").trim() || "Video";
+}
+
 export function videoSeoTitle(title: string, category?: string | null): string {
-  const base = (title || "Video").trim().replace(/\s+/g, " ");
+  const base = cleanDisplayTitle(title);
   const label = safeSeoLabel(category);
   const hasLabel = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(base);
   const head = hasLabel || !label ? base : `${base} — ${label}`;
@@ -51,9 +66,9 @@ export function videoSeoTitle(title: string, category?: string | null): string {
 
 /** Hash stabil biar deskripsi meta tidak berubah tiap load. */
 function stablePick(seed: string, n: number): number {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
-  return Math.abs(h) % n;
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  return Math.abs(h | 0) % n;
 }
 
 function clipAtWord(s: string, max: number): string {
@@ -61,64 +76,154 @@ function clipAtWord(s: string, max: number): string {
   if (t.length <= max) return t;
   const cut = t.slice(0, max - 1);
   const sp = cut.lastIndexOf(" ");
-  return `${(sp > 48 ? cut.slice(0, sp) : cut).trimEnd()}…`;
+  return `${(sp > 48 ? cut.slice(0, sp) : cut).trimEnd().replace(/[,.;:·—-]+$/, "")}…`;
 }
 
-/**
- * Meta description kompetitif: 4 varian natural Bahasa Indonesia,
- * dipilih stabil dari judul+kategori+sumber, target ~130–155 karakter.
- */
-export function videoSeoDescription(
-  title: string,
-  category?: string | null,
-  extra?: { creator?: string | null; source?: string | null },
-): string {
-  const t = (title || "video").trim().replace(/\s+/g, " ");
-  const label = safeSeoLabel(category);
-  const src = (extra?.creator || extra?.source || "").trim();
-  const tagBit =
-    src &&
-    src.toLowerCase() !== label.toLowerCase() &&
-    !/\b(abg|teen|underage|bocil|anak|smp|sma|loli|shota|remap)\b/i.test(src)
-      ? src
-      : "";
-  const shortT = t.length > 72 ? `${t.slice(0, 69).trimEnd()}…` : t;
+/** Catatan internal/dev yang tidak boleh tampil ke pengunjung. */
+const INTERNAL_NOTE_RE =
+  /[\s.,·—-]*(deskripsi natural,?\s*bukan spam(\s+kata(\s+kunci)?)?|bukan spam kata(\s+kunci)?|halaman tonton lengkap biar gampang ketemu di pencarian|todo:?[^.]*|seo:?[^.]*)\.?/gi;
 
-  const variants = [
-    `Nonton ${shortT} di ${SITE_NAME}. Koleksi ${label}${tagBit ? ` dari ${tagBit}` : ""} yang sering dicari, streaming tanpa ribet. Konten dewasa 18+.`,
-    `${shortT} masuk katalog ${label} di ${SITE_NAME}${tagBit ? ` (${tagBit})` : ""}. Halaman tonton lengkap biar gampang ketemu di pencarian. Usia 18+.`,
-    `${shortT} tersedia di ${SITE_NAME}${tagBit ? ` · ${tagBit}` : ""}, kategori ${label}. Deskripsi natural, bukan spam kata kunci. Konten 18+.`,
-    `${shortT} — upload ${label}${tagBit ? ` · ${tagBit}` : ""} di ${SITE_NAME}. Cocok buat yang mau tonton katalog streaming dewasa. 18+.`,
-  ];
-
-  const picked = variants[stablePick(`${t}|${label}|${tagBit}`, variants.length)]!;
-  return clipAtWord(picked, 155);
+export function stripInternalNotes(s?: string | null): string {
+  return String(s || "").replace(INTERNAL_NOTE_RE, ". ").replace(/\s*\.\s*(\.\s*)+/g, ". ").replace(/\s+/g, " ").replace(/^\.\s*/, "").trim();
 }
 
-/** Pakai deskripsi katalog hanya kalau cukup bagus; kalau tipis/ulang judul → generator. */
-export function resolveVideoSeoDescription(item: {
+function durationPhrase(sec?: number | null): string {
+  const s = Number(sec || 0);
+  if (!s || s < 30) return "";
+  const m = Math.round(s / 60);
+  if (m < 1) return "";
+  if (m < 60) return `${m} menit`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  return r ? `${h} jam ${r} menit` : `${h} jam`;
+}
+
+export type SeoVideoInput = {
+  id?: string | null;
   title: string;
   description?: string | null;
   category?: string | null;
   creator?: string | null;
   source?: string | null;
-}): string {
+  duration?: number | null;
+  year?: string | null;
+  quality?: string | null;
+  subjects?: string[] | null;
+};
+
+function safeTags(item: SeoVideoInput, label: string): string[] {
+  const out: string[] = [];
+  for (const raw of item.subjects || []) {
+    const t = String(raw || "").trim();
+    if (!t || t.length > 24 || MINOR_RE.test(t) || /pinguin/i.test(t)) continue;
+    if (t.toLowerCase() === label.toLowerCase()) continue;
+    if (out.some((x) => x.toLowerCase() === t.toLowerCase())) continue;
+    out.push(t);
+    if (out.length >= 2) break;
+  }
+  return out;
+}
+
+/**
+ * Deskripsi unik per video. Varian template dipilih stabil dari hash id,
+ * memakai judul, kategori, tag, durasi, sumber, tahun. Target 140–160 karakter.
+ */
+function buildSentences(item: SeoVideoInput): { lead: string; detail: string; close: string } {
+  const label = safeSeoLabel(item.category);
+  const rawTitle = cleanDisplayTitle(item.title);
+  const titleOk = !MINOR_RE.test(rawTitle);
+  const t = titleOk ? (rawTitle.length > 60 ? `${rawTitle.slice(0, 57).trimEnd()}…` : rawTitle) : "";
+  const src0 = (item.creator || item.source || "").trim();
+  const src = src0 && !MINOR_RE.test(src0) && src0.toLowerCase() !== label.toLowerCase() ? src0 : "";
+  const dur = durationPhrase(item.duration);
+  const year = (item.year || "").trim();
+  const tags = safeTags(item, label);
+  const tagTxt = tags.length ? tags.join(" & ") : "";
+  const seed = `${item.id || ""}|${rawTitle}`;
+  const pick = <T,>(arr: T[], salt: string) => arr[stablePick(seed + salt, arr.length)]!;
+
+  const subj = t ? `“${t}”` : "video ini";
+  const leads = [
+    `${subj} adalah video kategori ${label}${dur ? ` berdurasi sekitar ${dur}` : ""}.`,
+    `${subj} masuk koleksi ${label}${year ? ` tahun ${year}` : ""}${dur ? `, panjangnya kurang lebih ${dur}` : ""}.`,
+    `Tonton ${subj}, salah satu video ${label}${dur ? ` dengan durasi ${dur}` : ""}.`,
+    `Video ${label} ${subj}${dur ? ` berjalan sekitar ${dur}` : " siap diputar"}.`,
+    `${subj} hadir di rak ${label}${year ? ` (${year})` : ""}${dur ? `, durasi ${dur}` : ""}.`,
+  ];
+  const details = [
+    src ? `Diunggah lewat ${src}${tagTxt ? `, bertema ${tagTxt}` : ""}.` : tagTxt ? `Temanya seputar ${tagTxt}.` : "Diputar lewat embed dari hoster pihak ketiga.",
+    tagTxt ? `Nuansanya ${tagTxt}${src ? `, sumber dari ${src}` : ""}.` : src ? `Sumber video dari ${src}.` : "Bisa langsung diputar tanpa daftar akun.",
+    src ? `Streaming via ${src}, bisa dibuka di HP maupun desktop.` : "Bisa dibuka nyaman di HP maupun desktop.",
+    tagTxt ? `Cocok buat penggemar ${tagTxt}.` : `Cocok buat penggemar ${label}.`,
+  ];
+  const closes = [
+    "Khusus penonton 18+.",
+    "Hanya untuk usia 18 tahun ke atas.",
+    "Konten dewasa, 18+ saja.",
+    "Tersedia untuk pengunjung dewasa 18+.",
+  ];
+  const lead0 = pick(leads, "L");
+  return { lead: lead0.charAt(0).toUpperCase() + lead0.slice(1), detail: pick(details, "D"), close: pick(closes, "C") };
+}
+
+function fitLength(parts: string[], min: number, max: number): string {
+  let out = "";
+  for (const p of parts) {
+    const next = out ? `${out} ${p}` : p;
+    if (next.length > max && out.length >= min - 30) break;
+    out = next;
+  }
+  if (out.length < min) {
+    const pad = ["Update koleksi berkala.", "Putar langsung tanpa ribet.", "Gratis, tanpa daftar akun.", "Selamat menonton."];
+    for (const p of pad) {
+      if (out.length >= min) break;
+      if (`${out} ${p}`.length <= max) out = `${out} ${p}`;
+    }
+  }
+  return clipAtWord(out, max);
+}
+
+export function videoSeoDescription(
+  title: string | SeoVideoInput,
+  category?: string | null,
+  extra?: { creator?: string | null; source?: string | null },
+): string {
+  const item: SeoVideoInput =
+    typeof title === "string" ? { title, category, creator: extra?.creator, source: extra?.source } : title;
+  const { lead, detail, close } = buildSentences(item);
+  return fitLength([lead, detail, close], 140, 160);
+}
+
+/** Paragraf tampil di halaman tonton (1–2 kalimat + penutup). */
+export function videoBodyDescription(item: SeoVideoInput): string {
+  const { lead, detail, close } = buildSentences(item);
+  return `${lead} ${detail} ${close}`;
+}
+
+function rawLooksWeak(item: SeoVideoInput, raw: string): boolean {
   const title = (item.title || "").trim();
-  const raw = (item.description || "").trim();
-  const looksWeak =
+  return (
     !raw ||
     raw.length < 60 ||
     raw.toLowerCase() === title.toLowerCase() ||
     /^nonton\s+/i.test(raw) ||
     /streaming amatir, jilbab/i.test(raw) ||
-    raw === `${title} —` ||
-    (title.length > 8 && raw.toLowerCase().startsWith(title.toLowerCase()) && raw.length < title.length + 40);
+    /pinguin/i.test(raw) ||
+    MINOR_RE.test(raw) ||
+    (title.length > 8 && raw.toLowerCase().startsWith(title.toLowerCase()) && raw.length < title.length + 40)
+  );
+}
 
-  if (!looksWeak) return clipAtWord(raw, 155);
-  return videoSeoDescription(title, item.category, {
-    creator: item.creator,
-    source: item.source,
-  });
+export function cleanRawDescription(item: SeoVideoInput): string {
+  const raw = stripInternalNotes(item.description);
+  return rawLooksWeak(item, raw) ? "" : raw;
+}
+
+/** Pakai deskripsi katalog hanya kalau cukup bagus; kalau tipis/ulang judul → generator. */
+export function resolveVideoSeoDescription(item: SeoVideoInput): string {
+  const raw = cleanRawDescription(item);
+  if (raw) return clipAtWord(raw, 158);
+  return videoSeoDescription(item);
 }
 
 export function absoluteThumb(thumbnail?: string | null): string {

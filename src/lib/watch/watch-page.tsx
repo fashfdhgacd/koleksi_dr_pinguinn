@@ -9,6 +9,7 @@ import { fetchCatalog } from "@/lib/catalog/client";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
 import { SITE_ORIGIN } from "@/lib/seo";
 import { watchDescription } from "@/lib/catalog/watch-description";
+import { cleanDisplayTitle } from "@/lib/seo";
 import { CatalogBackLink } from "@/components/video/catalog-back-link";
 
 const routeApi = getRouteApi("/watch/$id");
@@ -295,7 +296,7 @@ export function WatchPage() {
               {item.year ? ` \u00b7 ${item.year}` : ""}
               {item.creator ? ` \u00b7 ${item.creator}` : ""}
             </p>
-            <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{item.title}</h1>
+            <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{cleanDisplayTitle(item.title)}</h1>
             <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>
             <div className="flex flex-wrap gap-3">
               <button
