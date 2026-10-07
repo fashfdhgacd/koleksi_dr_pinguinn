@@ -7,7 +7,7 @@ function compactNumber(n: number): string {
   return String(n);
 }
 
-const LS_PREFIX = "dp_like_";
+const LS_PREFIX = "dp_like2_";
 
 type LocalLike = { liked: boolean; count: number };
 
