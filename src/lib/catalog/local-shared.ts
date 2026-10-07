@@ -124,15 +124,11 @@ export function isSideSilo(item: RawItem): boolean {
   return isPutarin(item) || isStreamtape(item) || isVidey(item);
 }
 /**
- * Halaman Utama / Terbaru = IndoAV + Userbokep SAJA (prioritas monetisasi).
- * AI Streamtape, Putarin/JAV, Videy tetap ada di kategori masing-masing — tidak numpuk di Terbaru.
+ * Halaman Utama / Terbaru = SEMUA item usable (IndoAV, UserBokep, Streamtape, Putarin, dll).
+ * Filter source dihapus supaya homepage menampilkan isi JSON penuh (~7000+).
  */
 export function mainCatalog(items: RawItem[]): RawItem[] {
-  // Hanya IndoAV + Userbokep di beranda; urutan final di buildMainSorted
-  const indo = items.filter((x) => isIndoAv(x));
-  const ub = items.filter((x) => isUserBokep(x) && !isIndoAv(x));
-  const core = [...indo, ...ub];
-  return core.length ? core : items.filter((x) => !isVidey(x));
+  return items.filter((x) => !isVidey(x));
 }
 export function cleanTitle(t: string): string {
   return t.replace(/\s+/g, " ").trim() || "Video";
@@ -227,7 +223,7 @@ export function isUsable(item: RawItem): boolean {
   if (item.id.length < 3) return false;
   const play = String(item.embed || item.direct || "").trim();
   if (!play) return false;
-  if (/^https?:\/\//i.test(play) || play.startsWith("/")) return true;
+  if (/^https?:\/\/i.test(play) || play.startsWith("/")) return true;
   return play.length >= 6;
 }
 
