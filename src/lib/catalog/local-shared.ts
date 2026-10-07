@@ -274,6 +274,14 @@ export function isUsable(item: RawItem): boolean {
   return play.length >= 6;
 }
 
+function fmtDuration(sec: number): string {
+  const s = Math.round(sec);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  return h ? `${h}j ${m}m` : m ? `${m}m ${r}s` : `${r}s`;
+}
+
 export function toCard(item: RawItem, posters: Record<string, string>, videyNo?: Map<string, number>): VideoCard {
   const id = item.id;
   const title = isVidey(item)
@@ -289,10 +297,11 @@ export function toCard(item: RawItem, posters: Record<string, string>, videyNo?:
     description: "",
     category: slugOf(item),
     duration: typeof item.duration === "number" ? item.duration : null,
-    durationLabel: "\u2014",
+    durationLabel: typeof item.duration === "number" && item.duration > 0 ? fmtDuration(item.duration) : "\u2014",
     quality,
     year: null,
     creator: sourceLabel(item),
-    views: null,
+    views: typeof item.views === "number" ? item.views : null,
+    likes: typeof item.likes === "number" ? item.likes : null,
   };
 }

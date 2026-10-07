@@ -24,6 +24,7 @@ import streamtapeBatch from "./streamtape.json";
 import streamtapeBatchSep25 from "./streamtape-batch-20260925.json";
 import putarinBatch from "./putarin.json";
 import folderBatch20261007 from "./folder-batch-20261007.json";
+import videoStats from "./video-stats.json";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
 import latestVideos from "../../../data/videos-latest.json";
@@ -67,6 +68,21 @@ export function buildVideyNo(items: RawItem[]): Map<string, number> {
   return m;
 }
 
+const STATS = videoStats as Record<string, [number, number, number]>;
+
+/** Merge folder stats (views, duration sec, likes) at load; never touches stored item data. */
+function withStats(it: RawItem): RawItem {
+  const st = STATS[it.id];
+  if (!st) return it;
+  const [views, dur, likes] = st;
+  return {
+    ...it,
+    views: typeof it.views === "number" ? it.views : views,
+    likes: typeof it.likes === "number" ? it.likes : likes,
+    duration: typeof it.duration === "number" && it.duration > 0 ? it.duration : dur || undefined,
+  };
+}
+
 export function buildIndexes(
   items: RawItem[],
   posters: Record<string, string>,
@@ -76,6 +92,7 @@ export function buildIndexes(
   const byId = new Map<string, RawItem>();
   const bySlug = new Map<string, RawItem[]>();
   const haystack: { item: RawItem; hay: string }[] = [];
+  items = items.map(withStats);
   for (const it of items) {
     byId.set(it.id, it);
     const slug = slugOf(it);
