@@ -14,7 +14,7 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "percakapan", label: "Percakapan", query: "percakapan" },
   { slug: "kosan", label: "Kosan", query: "kosan" },
   { slug: "colmek", label: "Colmek", query: "colmek" },
-  { slug: "abg", label: "Muda 18+", query: "abg" },
+  { slug: "18-25", label: "18-25", query: "18-25" },
   { slug: "istri", label: "Istri", query: "istri" },
   { slug: "live", label: "Live", query: "live" },
   { slug: "doggy", label: "Doggy", query: "doggy" },
@@ -40,7 +40,7 @@ export const PRIMARY_CATEGORY_SLUGS = [
   "viral",
   "istri",
   "live",
-  "abg",
+  "18-25",
 ] as const;
 
 export const PRIMARY_CATEGORIES: CategoryInfo[] = PRIMARY_CATEGORY_SLUGS.map(
@@ -56,6 +56,10 @@ export function findCategory(slug: string | null | undefined): CategoryDef | und
   const key = slug.trim().toLowerCase();
   if (key === "ai" || key === "ai+") {
     return CATEGORIES.find((c) => c.slug === "ai-plus");
+  }
+  // Slug lama (data tersimpan / URL lama) dipetakan saat baca.
+  if (key === "abg" || key === "18 25" || key === "1825") {
+    return CATEGORIES.find((c) => c.slug === "18-25");
   }
   if (key === "puterin" || key === "putarin") {
     return CATEGORIES.find((c) => c.slug === "jav");

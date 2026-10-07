@@ -1,3 +1,6 @@
 /campur /kategori 301
 /putarin / 301
 /puterin / 301
+/kategori/abg /kategori/18-25 301
+/kategori/abg/ /kategori/18-25 301
+/kategori/abg/* /kategori/18-25 301
