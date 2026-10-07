@@ -42,10 +42,10 @@ function statusOf(it: Parameters<typeof slugOf>[0], publish: PublishState | null
   const minor = isMinorCoded(it);
   const real = isMinorCodedIgnoringTocil(it);
   const tocil = hasTocilTitle(it);
-  if (cat === "18-25" && minor) return "Disembunyikan dari kategori 18-25";
-  if (cat === "lainnya" && real) return "Disembunyikan dari kategori Lainnya";
+  void minor;
+  if (real) return "Disembunyikan dari seluruh situs (404)";
   if (cat === "lainnya") return "Tampil di Lainnya, noindex";
-  return `Tampil di ${cat}${tocil ? ", noindex" : " (tidak difilter)"}`;
+  return `Tampil di ${cat}${tocil ? ", noindex" : ""}`;
 }
 
 /** Daftar item yang kena filter minor / judul 'tocil' + state review. */
