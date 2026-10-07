@@ -31,12 +31,15 @@ export function Shell({
               </p>
               <p className="text-[11px] text-muted/60">Katalog embed. Bukan arsip file video.</p>
             </div>
-            <nav className="flex flex-wrap gap-x-4 gap-y-1" aria-label="Legal">
-              <Link to="/syarat" className="hover:text-foreground hover:underline">
-                Syarat
+            <nav className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Legal">
+              <Link to="/2257" className="hover:text-foreground hover:underline">
+                2257
               </Link>
               <Link to="/privasi" className="hover:text-foreground hover:underline">
                 Privasi
+              </Link>
+              <Link to="/syarat" className="hover:text-foreground hover:underline">
+                Syarat
               </Link>
               <Link to="/dmca" className="hover:text-foreground hover:underline">
                 DMCA
@@ -44,6 +47,15 @@ export function Shell({
               <Link to="/kontak" className="hover:text-foreground hover:underline">
                 Kontak
               </Link>
+              <a
+                href="https://www.rtalabel.org/"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Restricted To Adults (RTA)"
+                className="rounded border border-border px-1.5 py-0.5 text-[10px] font-semibold tracking-wider hover:text-foreground"
+              >
+                RTA
+              </a>
             </nav>
           </div>
         </footer>

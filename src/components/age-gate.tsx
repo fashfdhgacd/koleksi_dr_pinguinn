@@ -59,7 +59,8 @@ export function AgeGate({ children }: { children: ReactNode }) {
         <p>
           Katalog video dewasa 18+ Dr. Pinguin. Aktifkan JavaScript untuk menonton.{" "}
           <a href="/kategori/jav">JAV</a> · <a href="/kategori/jilbab">Jilbab</a> ·{" "}
-          <a href="/syarat">Syarat</a> · <a href="/privasi">Privasi</a> · <a href="/dmca">DMCA</a>
+          <a href="/syarat">Syarat</a> · <a href="/privasi">Privasi</a> · <a href="/dmca">DMCA</a> ·{" "}
+          <a href="/2257">2257</a> · <a href="/kontak">Kontak</a>
         </p>
       </noscript>
       {blocked ? (

@@ -40,6 +40,8 @@ export const Route = createRootRoute({
       { name: "theme-color", content: "#09090b" },
       { name: "robots", content: "index,follow,max-image-preview:large" },
       { name: "rating", content: "adult" },
+      // RTA label (rtalabel.org). Uppercase key so HeadContent does not dedupe it with "rating".
+      { name: "RATING", content: "RTA-5042-1996-1400-1577-RTA" },
       { name: "googlebot", content: "index,follow,max-image-preview:large" },
       { property: "og:site_name", content: "Dr. Pinguin" },
       { property: "og:title", content: "Dr. Pinguin | Katalog Koleksi Dr. Pinguin" },
