@@ -133,7 +133,7 @@ function buildSentences(item: SeoVideoInput): { lead: string; detail: string; cl
   const rawTitle = cleanDisplayTitle(item.title);
   const titleOk = !MINOR_RE.test(rawTitle);
   const t = titleOk ? (rawTitle.length > 60 ? `${rawTitle.slice(0, 57).trimEnd()}…` : rawTitle) : "";
-  const src0 = (item.creator || item.source || "").trim();
+  const src0 = String(item.creator || item.source || "").trim();
   const src = src0 && !MINOR_RE.test(src0) && src0.toLowerCase() !== label.toLowerCase() ? src0 : "";
   const dur = durationPhrase(item.duration);
   const year = (item.year || "").trim();
@@ -201,7 +201,7 @@ export function videoBodyDescription(item: SeoVideoInput): string {
 }
 
 function rawLooksWeak(item: SeoVideoInput, raw: string): boolean {
-  const title = (item.title || "").trim();
+  const title = String(item.title || "").trim();
   return (
     !raw ||
     raw.length < 60 ||
@@ -227,7 +227,7 @@ export function resolveVideoSeoDescription(item: SeoVideoInput): string {
 }
 
 export function absoluteThumb(thumbnail?: string | null): string {
-  const raw = (thumbnail || "").trim();
+  const raw = String(thumbnail || "").trim();
   if (!raw) return DEFAULT_OG;
   if (/^https?:\/\//i.test(raw)) return raw;
   if (raw.startsWith("/")) return `${SITE_ORIGIN}${raw}`;
@@ -255,7 +255,7 @@ export function seoVideoThumbnail(id?: string | null, thumbnail?: string | null)
   if (idClean && /^[A-Za-z0-9_-]{3,64}$/.test(idClean)) {
     return `${SITE_ORIGIN}/api/og?id=${encodeURIComponent(idClean)}&v=13`;
   }
-  const raw = (thumbnail || "").trim();
+  const raw = String(thumbnail || "").trim();
   if (raw && isGoogleVideoThumbFormat(raw)) {
     return absoluteThumb(raw);
   }
@@ -329,7 +329,7 @@ export function videoJsonLd(input: {
   return {
     "@context": "https://schema.org",
     "@type": "VideoObject",
-    name: (input.title || "Video").trim(),
+    name: String(input.title || "Video").trim(),
     description: (input.description || "").trim().slice(0, 300),
     thumbnailUrl: thumb,
     uploadDate: uploadDateFromId(input.id),

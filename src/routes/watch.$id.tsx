@@ -14,7 +14,7 @@ import { WatchPage } from "@/lib/watch/watch-page";
 
 /** Absolute https image for share cards. Never a page or a stream. */
 function shareCardImage(thumbnail: string | null | undefined): string {
-  const raw = (thumbnail || "").trim();
+  const raw = String(thumbnail || "").trim();
   const absolute = raw.startsWith("/")
     ? `${SITE_ORIGIN}${raw}`
     : /^https:\/\//i.test(raw)

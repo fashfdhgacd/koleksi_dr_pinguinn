@@ -15,14 +15,14 @@ type HeroProps = {
   intervalMs?: number;
 };
 
-function isSpamDescription(text: string | null | undefined): boolean {
-  const t = (text || "").trim();
+function isSpamDescription(text: unknown): boolean {
+  const t = typeof text === "string" ? text.trim() : "";
   if (!t) return true;
   return /nonton .+ bokep indo|streaming amatir, jilbab|konten 18\+/i.test(t);
 }
 
-function isUsableThumb(src: string | null | undefined): boolean {
-  if (!src) return false;
+function isUsableThumb(src: unknown): src is string {
+  if (typeof src !== "string" || !src) return false;
   if (src === BRAND_POSTER || /brand-poster/i.test(src)) return false;
   if (/\.(mp4|mov|webm)(\?|$)/i.test(src) || /cdn\.videy\.co\//i.test(src)) return false;
   return /^https?:\/\//i.test(src) || src.startsWith("/");
