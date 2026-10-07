@@ -12,6 +12,7 @@ import { watchDescription } from "@/lib/catalog/watch-description";
 import { cleanDisplayTitle } from "@/lib/seo";
 import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { CatalogBackLink } from "@/components/video/catalog-back-link";
+import { WatchStats } from "@/components/video/watch-stats";
 
 const routeApi = getRouteApi("/watch/$id");
 const SHARE_CARD_VERSION = "13";
@@ -305,6 +306,14 @@ export function WatchPage() {
               })()}
               {item.year ? ` \u00b7 ${item.year}` : ""}
               {item.creator ? ` \u00b7 ${item.creator}` : ""}
+              <span className="ml-3 align-middle text-muted">
+                <WatchStats
+                  id={item.id}
+                  views={item.views}
+                  durationLabel={item.durationLabel}
+                  sourceLikes={item.likes}
+                />
+              </span>
             </p>
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{cleanDisplayTitle(item.title)}</h1>
             <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>

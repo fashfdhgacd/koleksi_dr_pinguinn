@@ -26,6 +26,7 @@ import { Route as ApiEmbedThumbRouteImport } from './routes/api/embed-thumb'
 import { Route as ApiFrameRouteImport } from './routes/api/frame'
 import { Route as ApiHiddenIdsRouteImport } from './routes/api/hidden-ids'
 import { Route as ApiImgProxyRouteImport } from './routes/api/img-proxy'
+import { Route as ApiLikeRouteImport } from './routes/api/like'
 import { Route as ApiOgRouteImport } from './routes/api/og'
 import { Route as ApiOnlineRouteImport } from './routes/api/online'
 import { Route as ApiOwnerToolsRouteImport } from './routes/api/owner-tools'
@@ -127,6 +128,11 @@ const ApiImgProxyRoute = ApiImgProxyRouteImport.update({
   path: '/api/img-proxy',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiLikeRoute = ApiLikeRouteImport.update({
+  id: '/api/like',
+  path: '/api/like',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOgRoute = ApiOgRouteImport.update({
   id: '/api/og',
   path: '/api/og',
@@ -221,6 +227,7 @@ export interface FileRoutesByFullPath {
   '/api/frame': typeof ApiFrameRoute
   '/api/hidden-ids': typeof ApiHiddenIdsRoute
   '/api/img-proxy': typeof ApiImgProxyRoute
+  '/api/like': typeof ApiLikeRoute
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
   '/api/owner-tools': typeof ApiOwnerToolsRoute
@@ -254,6 +261,7 @@ export interface FileRoutesByTo {
   '/api/frame': typeof ApiFrameRoute
   '/api/hidden-ids': typeof ApiHiddenIdsRoute
   '/api/img-proxy': typeof ApiImgProxyRoute
+  '/api/like': typeof ApiLikeRoute
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
   '/api/owner-tools': typeof ApiOwnerToolsRoute
@@ -289,6 +297,7 @@ export interface FileRoutesById {
   '/api/frame': typeof ApiFrameRoute
   '/api/hidden-ids': typeof ApiHiddenIdsRoute
   '/api/img-proxy': typeof ApiImgProxyRoute
+  '/api/like': typeof ApiLikeRoute
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
   '/api/owner-tools': typeof ApiOwnerToolsRoute
@@ -325,6 +334,7 @@ export interface FileRouteTypes {
     | '/api/frame'
     | '/api/hidden-ids'
     | '/api/img-proxy'
+    | '/api/like'
     | '/api/og'
     | '/api/online'
     | '/api/owner-tools'
@@ -358,6 +368,7 @@ export interface FileRouteTypes {
     | '/api/frame'
     | '/api/hidden-ids'
     | '/api/img-proxy'
+    | '/api/like'
     | '/api/og'
     | '/api/online'
     | '/api/owner-tools'
@@ -392,6 +403,7 @@ export interface FileRouteTypes {
     | '/api/frame'
     | '/api/hidden-ids'
     | '/api/img-proxy'
+    | '/api/like'
     | '/api/og'
     | '/api/online'
     | '/api/owner-tools'
@@ -427,6 +439,7 @@ export interface RootRouteChildren {
   ApiFrameRoute: typeof ApiFrameRoute
   ApiHiddenIdsRoute: typeof ApiHiddenIdsRoute
   ApiImgProxyRoute: typeof ApiImgProxyRoute
+  ApiLikeRoute: typeof ApiLikeRoute
   ApiOgRoute: typeof ApiOgRoute
   ApiOnlineRoute: typeof ApiOnlineRoute
   ApiOwnerToolsRoute: typeof ApiOwnerToolsRoute
@@ -561,6 +574,13 @@ declare module '@tanstack/react-router' {
       path: '/api/img-proxy'
       fullPath: '/api/img-proxy'
       preLoaderRoute: typeof ApiImgProxyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/like': {
+      id: '/api/like'
+      path: '/api/like'
+      fullPath: '/api/like'
+      preLoaderRoute: typeof ApiLikeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/og': {
@@ -703,6 +723,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFrameRoute: ApiFrameRoute,
   ApiHiddenIdsRoute: ApiHiddenIdsRoute,
   ApiImgProxyRoute: ApiImgProxyRoute,
+  ApiLikeRoute: ApiLikeRoute,
   ApiOgRoute: ApiOgRoute,
   ApiOnlineRoute: ApiOnlineRoute,
   ApiOwnerToolsRoute: ApiOwnerToolsRoute,
