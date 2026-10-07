@@ -5,6 +5,7 @@ import { isPosterWarm, markPosterWarm } from "@/lib/poster-warm";
 export const BRAND_POSTER = "/brand-poster.jpg";
 
 function isVideoSrc(src: string): boolean {
+  if (!src || typeof src !== "string") return false;
   return /\.(mp4|mov|webm)(\?|$)/i.test(src) || /cdn\.videy\.co\//i.test(src);
 }
 
@@ -30,8 +31,9 @@ export function VideoThumb({
   className?: string;
   onUnavailable?: () => void;
 }) {
+  const srcStr = typeof src === "string" ? src : "";
   const dmm = dmmCoverFromTitle(alt);
-  const real = src && src !== BRAND_POSTER && !isVideoSrc(src) && !src.startsWith("data:") ? src : "";
+  const real = srcStr && srcStr !== BRAND_POSTER && !isVideoSrc(srcStr) && !srcStr.startsWith("data:") ? srcStr : "";
   const local = videoId && real ? `/thumb/${videoId}.jpg` : "";
   const first = local || real || dmm || BRAND_POSTER;
   const [current, setCurrent] = useState(first);
