@@ -37,6 +37,7 @@ export function sanitizeCard(raw: unknown): VideoCard | null {
     year: c.year == null ? null : str(c.year) || null,
     creator: c.creator == null ? null : str(c.creator) || null,
     views: numOrNull(c.views),
+    likes: numOrNull(c.likes),
   } as VideoCard;
 }
 

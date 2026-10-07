@@ -29,6 +29,7 @@ export type VideoCard = {
   year: string | null;
   creator: string | null;
   views: number | null;
+  likes?: number | null;
 };
 
 export type VideoDetail = VideoCard & {
