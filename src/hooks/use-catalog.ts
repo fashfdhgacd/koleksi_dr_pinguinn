@@ -3,6 +3,7 @@ import { fetchCatalog } from "@/lib/catalog/client";
 import { isRealMinor } from "@/lib/minor-terms";
 import type { CatalogResponse, VideoCard } from "@/lib/catalog/types";
 import { DEFAULT_PAGE_SIZE } from "@/lib/catalog/types";
+import { sanitizeCards } from "@/lib/catalog/sanitize-card";
 import { markPosterWarm } from "@/lib/poster-warm";
 
 export type CatalogStatus =
@@ -34,7 +35,7 @@ const FRESH_MS = 12 * 60 * 60 * 1000;
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
 /** Mobile cellular often hangs TCP; without a budget, inflight coalescing stuck forever. */
 const FETCH_TIMEOUT_MS = 15_000;
-const LS_KEY = "dp_feed_v6";
+const LS_KEY = "dp_feed_v7";
 const feedCache = new Map<string, FeedSnap>();
 
 function ls() {
@@ -59,7 +60,7 @@ function hydrateFeeds() {
       const keyPage = Math.floor(Number(String(k).split(":").pop()) || 1);
       const snapPage = Math.floor(Number(v.page) || 1);
       if (keyPage !== snapPage) continue;
-      feedCache.set(k, v);
+      feedCache.set(k, { ...v, items: sanitizeCards(v.items), featured: sanitizeCards(v.featured) });
     }
   } catch {
     /* ignore */

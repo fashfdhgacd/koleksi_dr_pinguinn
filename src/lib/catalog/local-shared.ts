@@ -97,10 +97,51 @@ export function embedKey(embed = ""): string {
   return embedId(embed) || String(embed).slice(0, 64);
 }
 
+/** Coerce any value to a string without throwing (repair, never drop). */
+export function toStr(v: unknown): string {
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "bigint") return Number.isFinite(Number(v)) ? String(v) : "";
+  if (Array.isArray(v)) {
+    for (const x of v) {
+      const s = toStr(x);
+      if (s) return s;
+    }
+    return "";
+  }
+  if (v && typeof v === "object") {
+    const o = v as Record<string, unknown>;
+    return typeof o.url === "string" ? o.url : "";
+  }
+  return "";
+}
+
+const STRING_FIELDS = ["id", "title", "embed", "direct", "category", "source", "poster", "thumbnail", "date", "creator"] as const;
+
+/** Single sanitizer for every raw catalog item: repairs field types so nothing downstream can crash. */
+export function repairItem(raw: unknown): RawItem | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const item: RawItem = { ...(raw as RawItem) };
+  for (const k of STRING_FIELDS) {
+    if (k in item && typeof item[k] !== "string") (item as Record<string, unknown>)[k] = toStr(item[k]);
+  }
+  if ("tags" in item) {
+    const t = item.tags;
+    item.tags = (Array.isArray(t) ? t : t == null ? [] : [t]).map(toStr).filter(Boolean);
+  }
+  if (!item.title || !item.title.trim()) item.title = "Video";
+  if (item.createdAt != null && typeof item.createdAt !== "string" && typeof item.createdAt !== "number") item.createdAt = toStr(item.createdAt);
+  if (item.duration != null && typeof item.duration !== "number") {
+    const n = Number(item.duration);
+    item.duration = Number.isFinite(n) ? n : undefined;
+  }
+  return item;
+}
+
 export function withIds(items: RawItem[]): RawItem[] {
   const out: RawItem[] = [];
-  for (const item of items) {
-    if (!item || typeof item !== "object") continue;
+  for (const rawItem of items) {
+    const item = repairItem(rawItem);
+    if (!item) continue;
     let id = typeof item.id === "string" ? item.id.trim() : "";
     if (!id || id.length < 3) {
       id = embedId(String(item.embed || "")) || embedId(String(item.direct || ""));

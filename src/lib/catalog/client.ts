@@ -1,3 +1,4 @@
+import { sanitizeResponse } from "./sanitize-card";
 import type { CatalogResponse } from "./types";
 
 export type ClientQuery = {
@@ -46,7 +47,7 @@ async function fetchCatalogOnce(path: string, signal?: AbortSignal): Promise<Cat
       } catch {
         body = null;
       }
-      if (body && typeof body === "object" && "ok" in body) return body;
+      if (body && typeof body === "object" && "ok" in body) return sanitizeResponse(body);
 
       if ([499, 502, 503, 504, 408].includes(res.status) && attempt < maxAttempts) {
         await sleep(300 * attempt);
