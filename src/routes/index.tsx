@@ -85,6 +85,7 @@ export const Route = createFileRoute("/")({
           to: "/kategori/$slug",
           params: { slug: cat.slug },
           search: search.page && search.page > 1 ? { page: search.page } : {},
+          statusCode: 301,
         });
       }
     }

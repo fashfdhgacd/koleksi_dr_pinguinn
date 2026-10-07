@@ -1,4 +1,5 @@
 import { loadItems } from "./local";
+import { slugOf } from "./local-shared";
 
 export type SitemapWatchEntry = {
   id: string;
@@ -50,7 +51,8 @@ export async function listSitemapWatchEntries(): Promise<SitemapWatchEntry[]> {
     if (lastmod) entry.lastmod = lastmod;
     const title = str(it.title);
     if (title) entry.title = title;
-    const category = str(it.category);
+    // Sama dengan halaman tonton (toCard → slugOf), bukan field mentah.
+    const category = slugOf(it) || str(it.category);
     if (category) entry.category = category;
     const embed = str(it.embed);
     if (/^https:\/\//i.test(embed)) entry.embed = embed;

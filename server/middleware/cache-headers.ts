@@ -51,6 +51,13 @@ export default async function cacheHeadersMiddleware(
       "public, max-age=604800, s-maxage=604800, stale-while-revalidate=2592000",
     );
   }
+  if (
+    type.includes("text/html") &&
+    result.status === 200 &&
+    (path.startsWith("/watch/") || path === "/kategori" || path.startsWith("/kategori/"))
+  ) {
+    return withHeaders(result, "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400");
+  }
   if (type.includes("text/html") && !result.headers.get("cache-control")) {
     return withHeaders(result, "public, max-age=60, s-maxage=120, stale-while-revalidate=600");
   }
