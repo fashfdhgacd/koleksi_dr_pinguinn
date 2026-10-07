@@ -1,4 +1,3 @@
-import { MINOR_RE_SOURCE, TOCIL_SOURCE, isRealMinorV2, matchedTermsV2 } from "@/lib/minor-terms";
 import { findCategory } from "@/lib/catalog/categories";
 
 export const SITE_ORIGIN = "https://koleksidrpinguin.com";
@@ -41,34 +40,8 @@ export function pageTitle(parts: Array<string | null | undefined>): string {
   return `${unique.join(" | ")} | ${SITE_NAME}`;
 }
 
-const MINOR_RE = new RegExp(MINOR_RE_SOURCE, "i");
-
-/** True bila judul/tag kena istilah minor (termasuk 'tocil'). */
-export function isMinorCoded(item: { title?: unknown; tags?: unknown } | null | undefined): boolean {
-  if (!item) return false;
-  const tags = Array.isArray(item.tags) ? item.tags.join(" ") : String(item.tags ?? "");
-  return isRealMinorV2(item) || new RegExp(TOCIL_SOURCE, "i").test(`${String(item.title ?? "")} ${tags}`);
-}
-
-/** Istilah minor sungguhan (kata generik spt 'anak'/'adik' hanya bila ada konteks sekolah/umur). */
-export function isMinorCodedIgnoringTocil(item: { title?: unknown; tags?: unknown } | null | undefined): boolean {
-  return isRealMinorV2(item);
-}
-
-/** Daftar istilah yang cocok di judul/tag (untuk panel pemilik). */
-export function matchedMinorTerms(item: { title?: unknown; tags?: unknown } | null | undefined): string[] {
-  return matchedTermsV2(item);
-}
-
-/** True bila judul tersimpan mengandung 'tocil' (noindex + keluar dari sitemap). */
-export function hasTocilTitle(item: { title?: unknown } | null | undefined): boolean {
-  return /(?<![A-Za-z0-9])tocil(?![A-Za-z0-9])/i.test(String(item?.title ?? ""));
-}
-
-/** Masking kata tertentu di layer tampilan saja (data asli tidak diubah). */
-export function maskDisplayTerms(t: string): string {
-  return t.replace(/(?<![A-Za-z0-9])tocil(?![A-Za-z0-9])/gi, "***");
-}
+const MINOR_RE =
+  /\b(abg|tocil|teen|teens|underage|bocil|anak|smp|sma|smk|loli|lolita|shota|remaja|bocah|pelajar|sekolah|seragam\s+sekolah|perawan\s+kecil|gadis\s+kecil|dedek|adek|adik)\b/i;
 
 /** Hapus suffix branding situs dari judul tampil (data asli tidak diubah). */
 export function cleanDisplayTitle(raw?: string | null): string {
@@ -79,7 +52,7 @@ export function cleanDisplayTitle(raw?: string | null): string {
     t = t.replace(/\s*[\-|–—,]\s*M\.?S\.?B\.?\s*$/gi, "");
   }
   t = t.replace(/[\s\-–—|:·,]+$/g, "").trim();
-  return maskDisplayTerms(t || String(raw || "").trim() || "Video");
+  return t || String(raw || "").trim() || "Video";
 }
 
 export function videoSeoTitle(title: string, category?: string | null): string {
@@ -356,7 +329,7 @@ export function videoJsonLd(input: {
   return {
     "@context": "https://schema.org",
     "@type": "VideoObject",
-    name: cleanDisplayTitle(input.title || "Video"),
+    name: (input.title || "Video").trim(),
     description: (input.description || "").trim().slice(0, 300),
     thumbnailUrl: thumb,
     uploadDate: uploadDateFromId(input.id),

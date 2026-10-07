@@ -1,10 +1,10 @@
 import { useEffect } from "react";
-import { createFileRoute, notFound, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { CatalogPager } from "@/components/video/catalog-pager";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
-import { findCategory } from "@/lib/catalog/categories";
+import { UNLISTED_CATEGORY_SLUGS, findCategory } from "@/lib/catalog/categories";
 import { rememberCatalog } from "@/lib/catalog/last-catalog";
 import { queryCatalog } from "@/lib/catalog/service";
 import type { VideoCard } from "@/lib/catalog/types";
@@ -21,18 +21,9 @@ export const Route = createFileRoute("/kategori/$slug")({
   validateSearch: (search: Record<string, unknown>) => ({
     page: parsePage(search.page),
   }),
-  beforeLoad: ({ params, search }) => {
+  beforeLoad: ({ params }) => {
     const cat = findCategory(params.slug);
     if (!cat) throw notFound();
-    if (params.slug !== cat.slug && params.slug.trim().toLowerCase() === "abg") {
-      throw redirect({
-        to: "/kategori/$slug",
-        params: { slug: cat.slug },
-        search: { page: search.page },
-        replace: true,
-        statusCode: 301,
-      });
-    }
     return { cat };
   },
   loader: async ({ params, location }) => {
@@ -42,8 +33,7 @@ export const Route = createFileRoute("/kategori/$slug")({
     const page = parsePage(raw.page) || 1;
     return queryCatalog({ type: "category", category: cat.slug, page, limit: 24 });
   },
-  head: ({ params, match, loaderData }) => {
-    const empty = Boolean(loaderData && loaderData.ok && "total" in loaderData && loaderData.total === 0);
+  head: ({ params, match }) => {
     const cat = findCategory(params.slug);
     const page = typeof match.search.page === "number" ? match.search.page : 1;
     const seo = homeSeo(undefined, cat?.slug);
@@ -62,7 +52,10 @@ export const Route = createFileRoute("/kategori/$slug")({
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
         { name: "twitter:image", content: DEFAULT_OG },
-        { name: "robots", content: empty ? "noindex,follow" : page > 1 ? "noindex,follow" : "index,follow" },
+        {
+          name: "robots",
+          content: page > 1 || UNLISTED_CATEGORY_SLUGS.has(cat?.slug || "") ? "noindex,follow" : "index,follow",
+        },
       ],
       links: [{ rel: "canonical", href: url }],
     };

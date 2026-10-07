@@ -1,6 +1,11 @@
 import { loadItemsRaw } from "@/lib/catalog/local-cache";
 import { slugOf, sourceLabel } from "@/lib/catalog/local-shared";
-import { hasTocilTitle, isMinorCoded, isMinorCodedIgnoringTocil, matchedMinorTerms } from "@/lib/seo";
+import { TOCIL_SOURCE, isRealMinor, matchedTermsV2 } from "@/lib/minor-terms";
+
+const hasTocilTitle = (it: { title?: unknown }) => new RegExp(TOCIL_SOURCE, "i").test(String(it?.title ?? ""));
+const isMinorCodedIgnoringTocil = isRealMinor;
+const isMinorCoded = (it: { title?: unknown; tags?: unknown }) => isRealMinor(it) || hasTocilTitle(it);
+const matchedMinorTerms = matchedTermsV2;
 import { readReviewState, writeReviewState, type PublishState } from "@/lib/owner-review-store";
 
 export type HiddenReviewRow = {
@@ -44,8 +49,8 @@ function statusOf(it: Parameters<typeof slugOf>[0], publish: PublishState | null
   const tocil = hasTocilTitle(it);
   void minor;
   if (real) return "Disembunyikan dari seluruh situs (404)";
-  if (cat === "lainnya") return "Tampil di Lainnya, noindex";
-  return `Tampil di ${cat}${tocil ? ", noindex" : ""}`;
+  void tocil;
+  return `Tampil di ${cat}`;
 }
 
 /** Daftar item yang kena filter minor / judul 'tocil' + state review. */
@@ -108,10 +113,8 @@ export async function setReviewMark(body: {
   if (body.publish !== undefined) {
     const p = body.publish;
     if (p === "off") state.publish[id] = "off";
-    else if (p === "on") {
-      if (!isTocilOnly(item)) return { ok: false, error: "publish_not_allowed", status: 403 };
-      state.publish[id] = "on";
-    } else if (p === null || p === "") delete state.publish[id];
+    else if (p === "on") return { ok: false, error: "publish_not_allowed", status: 403 };
+    else if (p === null || p === "") delete state.publish[id];
     else return { ok: false, error: "bad_publish", status: 400 };
   }
   const ok = await writeReviewState(state);

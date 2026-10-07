@@ -29,8 +29,6 @@ export type VideoCard = {
   year: string | null;
   creator: string | null;
   views: number | null;
-  /** Judul asli dimask (mis. 'tocil'): halaman noindex. */
-  noindex?: boolean;
 };
 
 export type VideoDetail = VideoCard & {

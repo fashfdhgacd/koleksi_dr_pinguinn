@@ -15,7 +15,7 @@ import { isRealMinor } from "./src/lib/minor-terms";
 
 /**
  * Client bundle: buang item katalog dengan istilah minor sungguhan dari JSON
- * (server tetap punya data lengkap untuk panel pemilik).
+ * .
  */
 function stripMinorFromClientCatalog(): Plugin {
   return {
@@ -38,8 +38,7 @@ function stripMinorFromClientCatalog(): Plugin {
         const o = data as Record<string, unknown>;
         for (const k of ["items", "videos", "data"]) if (Array.isArray(o[k])) o[k] = strip(o[k]);
       } else return null;
-      // 'tocil' juga dimask di bundle client (server tetap punya judul asli).
-      return { code: JSON.stringify(data).replace(/(?<![A-Za-z0-9])tocil(?![A-Za-z0-9])/gi, "***"), map: null };
+      return { code: JSON.stringify(data), map: null };
     },
   };
 }
