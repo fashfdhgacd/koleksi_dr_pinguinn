@@ -14,7 +14,7 @@ import {
 } from "./local-shared";
 import { runtime } from "./local-shared";
 import { CATEGORY_LIST } from "./categories";
-import { isMinorCoded } from "../seo";
+import { isMinorCoded, isMinorCodedIgnoringTocil } from "../seo";
 import { loadItems, pageOf, sortByNewest } from "./local-cache";
 
 export { loadItems } from "./local-cache";
@@ -136,7 +136,8 @@ export async function listCategory(
     return pageOf([], page, limit, posters, videyNo);
   } else pool = bySlug.get(s) || mainSorted.filter((x) => slugOf(x) === s);
   pool = pool.filter((x) => !isVidey(x));
-  if (s === "lainnya" || s === "18-25") pool = pool.filter((x) => !isMinorCoded(x));
+  if (s === "18-25") pool = pool.filter((x) => !isMinorCoded(x));
+  else if (s === "lainnya") pool = pool.filter((x) => !isMinorCodedIgnoringTocil(x));
   return pageOf(pool, page, limit, posters, videyNo);
 }
 

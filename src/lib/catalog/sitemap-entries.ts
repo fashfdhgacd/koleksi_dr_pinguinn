@@ -1,4 +1,5 @@
 import { loadItems } from "./local";
+import { hasTocilTitle } from "../seo";
 
 export type SitemapWatchEntry = {
   id: string;
@@ -34,7 +35,7 @@ export async function listSitemapWatchEntries(): Promise<SitemapWatchEntry[]> {
   const seen = new Set<string>();
   const out: SitemapWatchEntry[] = [];
   for (const it of items) {
-    if (!it?.id || seen.has(it.id) || isVideyItem(it)) continue;
+    if (!it?.id || seen.has(it.id) || isVideyItem(it) || hasTocilTitle(it)) continue;
     seen.add(it.id);
     const lastmod = toSitemapLastmod(it.createdAt ?? it.date);
     out.push(lastmod ? { id: it.id, lastmod } : { id: it.id });
