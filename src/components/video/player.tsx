@@ -25,8 +25,6 @@ import { VideoThumb } from "./thumb";
  *    visitor taps into a loaded player, or after 8 s at the latest.
  *  - If the host page still has not arrived after 8 s, the same poster stays visible UNDER the
  *    (still empty, transparent) iframe with a seconds counter, plus a small corner label.
- *  - Once the host page is there: a short "Ketuk sekali lagi untuk memutar" label (their players
- *    need their own play tap).
  *  - After 20 s without a sign of life a small hint bar appears BELOW the player (Coba lagi / Buka
  *    di host / Coba server lain / Lapor).
  * The embed page is still only requested after the visitor taps play (Origin counting); before
@@ -78,8 +76,6 @@ const STAYED_MS = 60000;
 const PAINT_GRACE_MS = 700;
 /** ...and never shown longer than this. */
 const COVER_CAP_MS = 8000;
-/** "Ketuk sekali lagi untuk memutar" label duration. */
-const TAP_HINT_MS = 7000;
 
 function displayHost(host: string): string {
   if (host === "Puterin") return "Putarin";
@@ -211,7 +207,6 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const [docReady, setDocReady] = useState(false);
   /** Loading cover above the iframe (pointer-events:none). */
   const [cover, setCover] = useState(true);
-  const [tapHint, setTapHint] = useState(false);
   const [waitSec, setWaitSec] = useState(0);
   const aliveRef = useRef(false);
   const docReadyRef = useRef(false);
@@ -298,7 +293,6 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     setStError(false);
     setDocReady(false);
     setCover(true);
-    setTapHint(false);
     setWaitSec(0);
   }, [frameSrc, attempt]);
 
@@ -323,19 +317,11 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     return () => window.clearInterval(t);
   }, [started, useVideo, docReady, streamtape, markDoc, frameSrc, attempt]);
 
-  // Cover goes away shortly after the host page is there (time to paint its poster), then a short
-  // "tap again" label, because these players need their own play tap.
+  // Cover goes away shortly after the host page is there (time to paint its poster).
   useEffect(() => {
     if (!docReady) return;
-    const t1 = window.setTimeout(() => {
-      setCover(false);
-      setTapHint(true);
-    }, PAINT_GRACE_MS);
-    const t2 = window.setTimeout(() => setTapHint(false), PAINT_GRACE_MS + TAP_HINT_MS);
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-    };
+    const t = window.setTimeout(() => setCover(false), PAINT_GRACE_MS);
+    return () => window.clearTimeout(t);
   }, [docReady]);
 
   // Never cover the iframe longer than 8 s.
@@ -356,7 +342,6 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
         if (!docReadyRef.current) return;
         markAlive();
         setCover(false);
-        setTapHint(false);
       }, 0);
     }
     window.addEventListener("blur", onBlur);
@@ -439,7 +424,6 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
         markDoc(true);
         setStError(false);
         setCover(false);
-        setTapHint(false);
       } else if (msg.event === "error" && !playedRef.current) {
         setStError(true);
         settle("fail2");
@@ -612,11 +596,6 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
                 Masih memuat dari {hostName}… {waitSec} dtk
               </span>
             ) : null}
-            {tapHint && !cover ? (
-              <span className="pointer-events-none absolute inset-x-0 top-2 z-10 mx-auto w-fit rounded bg-black/70 px-2 py-1 text-[11px] text-zinc-100 sm:text-xs">
-                Ketuk sekali lagi untuk memutar
-              </span>
-            ) : null}
           </>
         ) : (
           <video
@@ -706,9 +685,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
           <p className="text-[11px] leading-snug text-foreground sm:text-xs">
             {stError
               ? `${hostName} melaporkan error untuk video ini.`
-              : attempt > 0
-                ? `Server ${hostName} masih lambat. Coba server lain atau buka langsung di ${hostName}:`
-                : `Player ${hostName} lambat merespons. Tunggu sebentar, atau:`}
+              : `Player ${hostName} lambat merespons. Tunggu sebentar, atau:`}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             <button type="button" className={hintBtn} onClick={retryCurrent}>
