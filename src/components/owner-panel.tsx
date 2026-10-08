@@ -194,14 +194,17 @@ type PlayerErrorsData = {
   ok?: boolean;
   error?: string;
   storage?: string;
+  version?: number;
   since?: string;
   hosts?: {
     host: string;
     starts: number;
+    slow?: number;
     fails: number;
     reports: number;
     retries: number;
     openSource: number;
+    alt?: number;
     rate: number | null;
   }[];
   top?: (PlayerErrorRow & { fails: number; starts: number; reports: number; gone: boolean })[];
@@ -327,8 +330,11 @@ function PlayerErrorsSection({ secret }: { secret: string }) {
         </Button>
       </div>
       <p className="mt-1 text-xs text-zinc-500">
-        7 hari terakhir. Gagal = pemutar tidak merespons (Streamtape 8 dtk, lainnya 12 dtk) atau error. Jumlah
-        putar diperkirakan dari sampel 1 dari 4. Sembunyikan tidak menghapus video.
+        Data baru sejak 9 Okt 2026 (versi 2), 7 hari terakhir, tanpa sampel. Lambat = player belum merespons
+        20 dtk tapi akhirnya jalan (atau pengunjung tetap menunggu 60 dtk+). Gagal = pengunjung menekan Coba
+        lagi / Buka sumber / Lapor / Coba server lain, Streamtape melaporkan error, atau pengunjung pergi setelah
+        20 dtk tanpa player merespons. Angka lama (batas 8/12 dtk) tidak dipakai lagi karena juga menghitung
+        player yang sebenarnya jalan. Sembunyikan tidak menghapus video.
       </p>
       {note ? <p className="mt-2 text-xs text-zinc-400">{note}</p> : null}
       {data?.storage === "none" ? <p className="mt-2 text-xs text-amber-400">Database D1 tidak terbaca.</p> : null}
@@ -336,15 +342,18 @@ function PlayerErrorsSection({ secret }: { secret: string }) {
       {data ? (
         <>
           <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[420px] text-left text-xs text-zinc-300">
+            <table className="w-full min-w-[560px] text-left text-xs text-zinc-300">
               <thead className="text-zinc-500">
                 <tr>
                   <th className="py-1 pr-3 font-normal">Host</th>
                   <th className="py-1 pr-3 text-right font-normal">Putar</th>
+                  <th className="py-1 pr-3 text-right font-normal">Lambat</th>
                   <th className="py-1 pr-3 text-right font-normal">Gagal</th>
                   <th className="py-1 pr-3 text-right font-normal">Rasio</th>
                   <th className="py-1 pr-3 text-right font-normal">Lapor</th>
-                  <th className="py-1 text-right font-normal">Buka sumber</th>
+                  <th className="py-1 pr-3 text-right font-normal">Coba lagi</th>
+                  <th className="py-1 pr-3 text-right font-normal">Buka sumber</th>
+                  <th className="py-1 text-right font-normal">Server lain</th>
                 </tr>
               </thead>
               <tbody>
@@ -353,18 +362,21 @@ function PlayerErrorsSection({ secret }: { secret: string }) {
                     <tr key={h.host} className="border-t border-white/[0.06] tabular-nums">
                       <td className="py-1 pr-3">{hostLabel(h.host)}</td>
                       <td className="py-1 pr-3 text-right">{h.starts}</td>
+                      <td className="py-1 pr-3 text-right">{h.slow ?? 0}</td>
                       <td className="py-1 pr-3 text-right">{h.fails}</td>
                       <td className="py-1 pr-3 text-right">
                         {h.rate === null ? "—" : `${(h.rate * 100).toFixed(h.rate < 0.1 ? 1 : 0)}%`}
                       </td>
                       <td className="py-1 pr-3 text-right">{h.reports}</td>
-                      <td className="py-1 text-right">{h.openSource}</td>
+                      <td className="py-1 pr-3 text-right">{h.retries}</td>
+                      <td className="py-1 pr-3 text-right">{h.openSource}</td>
+                      <td className="py-1 text-right">{h.alt ?? 0}</td>
                     </tr>
                   ))
                 ) : (
                   <tr className="border-t border-white/[0.06]">
-                    <td colSpan={6} className="py-2 text-zinc-500">
-                      Belum ada data.
+                    <td colSpan={9} className="py-2 text-zinc-500">
+                      Belum ada data versi 2. Angka muncul setelah ada pengunjung yang memutar video.
                     </td>
                   </tr>
                 )}
