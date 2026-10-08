@@ -15,13 +15,22 @@ import { VideoThumb } from "./thumb";
  *    listener ("ready"/"play"/"error") so we know when the player really came up.
  *
  * Slow players (2026-10-09): IndoAV/UserBokep often take 10-25 s before the iframe "load" event
- * (their player is on screen after ~0.3 s; the event waits for third-party scripts) and their
- * origin is sometimes slow or briefly down (Cloudflare 522). So nothing of ours ever covers a
- * started iframe: while the host is still answering, our poster + "Sedang memuat player..." sit
- * UNDER the transparent iframe (visible only until the host paints), and after 20 s without a sign
- * of life a small hint bar appears BELOW the player (Coba lagi / Buka di host / Coba server lain /
- * Lapor). The embed page is still only requested after the visitor taps play (Origin counting);
- * before that we only preconnect (DNS/TLS, no HTTP request).
+ * (their player is on screen after ~0.3 s; the event waits for third-party scripts), and an
+ * uncached embed page can take ~10 s to arrive from their origin (sometimes Cloudflare 522).
+ * On Android Chrome the iframe then paints a plain black box before the host's poster and play
+ * button show up. So:
+ *  - Our poster + spinner + "Sedang memuat player..." sit ABOVE the iframe with
+ *    pointer-events:none (every tap still reaches the host player). They go away ~0.7 s after the
+ *    host page is there (iframe has child frames, "load", or Streamtape Player.js "ready"), when the
+ *    visitor taps into a loaded player, or after 8 s at the latest.
+ *  - If the host page still has not arrived after 8 s, the same poster stays visible UNDER the
+ *    (still empty, transparent) iframe with a seconds counter, plus a small corner label.
+ *  - Once the host page is there: a short "Ketuk sekali lagi untuk memutar" label (their players
+ *    need their own play tap).
+ *  - After 20 s without a sign of life a small hint bar appears BELOW the player (Coba lagi / Buka
+ *    di host / Coba server lain / Lapor).
+ * The embed page is still only requested after the visitor taps play (Origin counting); before
+ * that we only preconnect (DNS/TLS, no HTTP request).
  */
 
 function sourcesFromItem(item: VideoDetail): ResolvedSource[] {
@@ -65,6 +74,12 @@ const GONE: GoneMap = ((deadSources as { gone?: GoneMap }).gone || {}) as GoneMa
 const SLOW_HINT_MS = 20000;
 /** Visitor stayed this long after tapping play without acting: count as slow, not failed. */
 const STAYED_MS = 60000;
+/** Our loading cover above the iframe: removed this long after the host page is there... */
+const PAINT_GRACE_MS = 700;
+/** ...and never shown longer than this. */
+const COVER_CAP_MS = 8000;
+/** "Ketuk sekali lagi untuk memutar" label duration. */
+const TAP_HINT_MS = 7000;
 
 function displayHost(host: string): string {
   if (host === "Puterin") return "Putarin";
@@ -186,15 +201,21 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const [failed, setFailed] = useState(false);
   const [fallbackAt, setFallbackAt] = useState(0);
   const [attempt, setAttempt] = useState(0);
-  /** Host answered (iframe load / Streamtape ready / tap inside the player). */
-  const [alive, setAlive] = useState(false);
   /** 20 s without a sign of life: show the hint bar under the player. */
   const [slow, setSlow] = useState(false);
   const [stError, setStError] = useState(false);
   const [reported, setReported] = useState(false);
   const [forcePlay, setForcePlay] = useState(false);
   const [alt, setAlt] = useState<AltSource | null>(null);
+  /** Host page arrived in the iframe (child frames / load / Streamtape ready). */
+  const [docReady, setDocReady] = useState(false);
+  /** Loading cover above the iframe (pointer-events:none). */
+  const [cover, setCover] = useState(true);
+  const [tapHint, setTapHint] = useState(false);
+  const [waitSec, setWaitSec] = useState(0);
   const aliveRef = useRef(false);
+  const docReadyRef = useRef(false);
+  const attemptAtRef = useRef(0);
   const playedRef = useRef(false);
   /** Per video: when play was tapped, whether the hint showed, whether we already counted it. */
   const trackRef = useRef({ startedAt: 0, slowShown: false, settled: false });
@@ -225,10 +246,20 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
   const markAlive = useCallback(() => {
     if (aliveRef.current) return;
     aliveRef.current = true;
-    setAlive(true);
     setSlow(false);
     if (trackRef.current.slowShown) settle("slow2");
   }, [settle]);
+
+  /** The host page is in the iframe: count it as alive (not for Streamtape, see onLoad). */
+  const markDoc = useCallback(
+    (countAlive: boolean) => {
+      if (countAlive) markAlive();
+      if (docReadyRef.current) return;
+      docReadyRef.current = true;
+      setDocReady(true);
+    },
+    [markAlive],
+  );
 
   useEffect(() => {
     setActive(0);
@@ -237,7 +268,6 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     setBuffering(false);
     setStarted(false);
     setAttempt(0);
-    setAlive(false);
     setSlow(false);
     setStError(false);
     setReported(false);
@@ -258,22 +288,75 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     return () => window.clearTimeout(t);
   }, [playUrl, useVideo]);
 
-  // New iframe (start, retry, other source): reset the "sign of life" flags.
+  // New iframe (start, retry, other source): reset the "sign of life" flags and the loading cover.
   useEffect(() => {
     aliveRef.current = false;
     playedRef.current = false;
-    setAlive(false);
+    docReadyRef.current = false;
+    attemptAtRef.current = Date.now();
     setSlow(false);
     setStError(false);
+    setDocReady(false);
+    setCover(true);
+    setTapHint(false);
+    setWaitSec(0);
   }, [frameSrc, attempt]);
 
-  // A tap inside the player moves focus into the iframe (window blur): the player is there and
-  // answering, even when its page (ads) is still loading.
+  // Host page arrival: a loaded embed page creates child frames, and window.length is readable
+  // cross-origin (nothing else is read). Also drives the seconds counter while waiting.
+  useEffect(() => {
+    if (!started || useVideo || docReady) return;
+    const t = window.setInterval(() => {
+      const w = frameRef.current?.contentWindow;
+      let n = 0;
+      try {
+        n = w ? w.length : 0;
+      } catch {
+        n = 0;
+      }
+      if (n > 0) {
+        markDoc(!streamtape);
+        return;
+      }
+      setWaitSec(Math.floor((Date.now() - attemptAtRef.current) / 1000));
+    }, 250);
+    return () => window.clearInterval(t);
+  }, [started, useVideo, docReady, streamtape, markDoc, frameSrc, attempt]);
+
+  // Cover goes away shortly after the host page is there (time to paint its poster), then a short
+  // "tap again" label, because these players need their own play tap.
+  useEffect(() => {
+    if (!docReady) return;
+    const t1 = window.setTimeout(() => {
+      setCover(false);
+      setTapHint(true);
+    }, PAINT_GRACE_MS);
+    const t2 = window.setTimeout(() => setTapHint(false), PAINT_GRACE_MS + TAP_HINT_MS);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
+  }, [docReady]);
+
+  // Never cover the iframe longer than 8 s.
+  useEffect(() => {
+    if (!started || useVideo) return;
+    const t = window.setTimeout(() => setCover(false), COVER_CAP_MS);
+    return () => window.clearTimeout(t);
+  }, [started, useVideo, frameSrc, attempt]);
+
+  // A tap inside a loaded player moves focus into the iframe (window blur): the player is there
+  // and answering, even when its page (ads) is still loading. Before the host page arrived, a tap
+  // only focuses the empty iframe, so it does not count.
   useEffect(() => {
     if (!started || useVideo) return;
     function onBlur() {
       window.setTimeout(() => {
-        if (frameRef.current && document.activeElement === frameRef.current) markAlive();
+        if (!frameRef.current || document.activeElement !== frameRef.current) return;
+        if (!docReadyRef.current) return;
+        markAlive();
+        setCover(false);
+        setTapHint(false);
       }, 0);
     }
     window.addEventListener("blur", onBlur);
@@ -344,7 +427,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
       const msg = data as { context?: unknown; event?: unknown } | null;
       if (!msg || msg.context !== "player.js") return;
       if (msg.event === "ready") {
-        markAlive();
+        markDoc(true);
         for (const ev of ["play", "error"]) {
           frame.contentWindow.postMessage(
             JSON.stringify({ context: "player.js", version: "0.0.11", method: "addEventListener", value: ev, listener: `kdp-${ev}` }),
@@ -353,8 +436,10 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
         }
       } else if (msg.event === "play") {
         playedRef.current = true;
-        markAlive();
+        markDoc(true);
         setStError(false);
+        setCover(false);
+        setTapHint(false);
       } else if (msg.event === "error" && !playedRef.current) {
         setStError(true);
         settle("fail2");
@@ -362,7 +447,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     }
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, [started, streamtape, attempt, markAlive, settle]);
+  }, [started, streamtape, attempt, markAlive, markDoc, settle]);
 
   function start() {
     if (!current || !playUrl) {
@@ -432,6 +517,26 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
     "rounded-md border border-white/15 px-2 py-1 text-[11px] text-foreground hover:bg-white/10 disabled:opacity-60 sm:text-xs";
   const showHint = started && !useVideo && Boolean(playUrl) && !failed && (slow || stError);
 
+  /** Our poster + spinner + status text (used above the iframe as a cover, or under it). */
+  function loadingLayer(pos: string) {
+    let line = attempt > 0 ? `Memuat ulang player ${hostName}…` : `Sedang memuat player ${hostName}…`;
+    if (waitSec >= 12) line = `Server ${hostName} sedang lambat, masih menunggu…`;
+    return (
+      <div className={`pointer-events-none ${pos} bg-background`} aria-hidden="true">
+        <VideoThumb src={item.thumbnail} alt="" eager className="size-full object-cover opacity-50" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/30 px-6 text-center">
+          <LoaderCircle className="size-7 animate-spin text-white" />
+          <p className="text-xs text-white sm:text-sm">{line}</p>
+          {waitSec >= 3 ? (
+            <p className="text-[11px] tabular-nums text-zinc-300">
+              {waitSec} dtk{attempt > 0 ? ` · percobaan ${attempt + 1}` : ""}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-hidden rounded-2xl bg-surface">
       <div className="relative aspect-video max-h-[min(70vh,720px)] w-full bg-background sm:mx-auto">
@@ -483,18 +588,8 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
           </>
         ) : !useVideo && frameSrc ? (
           <>
-            {/* UNDER the iframe: visible only until the host paints its player. Never covers it. */}
-            {!alive ? (
-              <div className="pointer-events-none absolute inset-0" aria-hidden="true">
-                <VideoThumb src={item.thumbnail} alt="" eager className="size-full object-cover opacity-40" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
-                  <LoaderCircle className="size-7 animate-spin text-foreground" />
-                  <p className="text-xs text-foreground sm:text-sm">
-                    {slow ? `Player ${hostName} lambat merespons…` : `Sedang memuat player ${hostName}…`}
-                  </p>
-                </div>
-              </div>
-            ) : null}
+            {/* UNDER the iframe: shows through while the host page has not arrived (empty iframe). */}
+            {!docReady && !cover ? loadingLayer("absolute inset-0") : null}
             <iframe
               ref={frameRef}
               key={`${frameSrc}#${attempt}`}
@@ -506,10 +601,22 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
               allowFullScreen
               loading="eager"
               onLoad={() => {
-                // Streamtape: only Player.js "ready" counts (an ISP block page also fires load).
-                if (!streamtape) markAlive();
+                // Streamtape: only Player.js "ready" counts as alive (an ISP block page also fires load).
+                markDoc(!streamtape);
               }}
             />
+            {/* ABOVE the iframe, pointer-events:none: hides the host's blank/black first paint. */}
+            {cover ? loadingLayer("absolute inset-0 z-10") : null}
+            {!cover && !docReady ? (
+              <span className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-black/70 px-2 py-1 text-[11px] text-zinc-100">
+                Masih memuat dari {hostName}… {waitSec} dtk
+              </span>
+            ) : null}
+            {tapHint && !cover ? (
+              <span className="pointer-events-none absolute inset-x-0 top-2 z-10 mx-auto w-fit rounded bg-black/70 px-2 py-1 text-[11px] text-zinc-100 sm:text-xs">
+                Ketuk sekali lagi untuk memutar
+              </span>
+            ) : null}
           </>
         ) : (
           <video
@@ -599,7 +706,9 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
           <p className="text-[11px] leading-snug text-foreground sm:text-xs">
             {stError
               ? `${hostName} melaporkan error untuk video ini.`
-              : `Player ${hostName} lambat merespons. Tunggu sebentar, atau:`}
+              : attempt > 0
+                ? `Server ${hostName} masih lambat. Coba server lain atau buka langsung di ${hostName}:`
+                : `Player ${hostName} lambat merespons. Tunggu sebentar, atau:`}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             <button type="button" className={hintBtn} onClick={retryCurrent}>
