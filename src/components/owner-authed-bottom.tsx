@@ -3,6 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { OwnerChart } from "@/components/owner-chart";
 import { TopVideosSection } from "@/components/owner-top-videos";
+import { HiddenListSection } from "@/components/owner-hidden-list";
 import { fmt, deviceLabel, dayLabel, type OwnerStats, type DeviceKind, type DayRow } from "@/components/owner-dashboard-shared";
 
 type DeviceRow = { device: DeviceKind; views: number; pct: number };
@@ -19,7 +20,8 @@ export function OwnerAuthedBottom(props: {
   const { days, devices, stats, secret, loading, fetchOnline, logout } = props;
   return (
     <>
-      {/* HiddenReviewSection dihapus — fitur review/Tidak publish dinonaktifkan */}
+      {/* Video disembunyikan (minor/sekolah): daftar khusus pemilik + Unhide yang bisa dibatalkan */}
+      <HiddenListSection secret={secret} />
       {days.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
                 <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Grafik 14 hari (WIB)</h2>

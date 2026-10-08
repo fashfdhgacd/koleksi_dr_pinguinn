@@ -81,14 +81,87 @@ const OVERRIDES = itemOverrides as Record<string, ItemOverride>;
  * with `hidden: true`, and any title the shared minor-content detector matches (checked on
  * the raw title, before display renaming). They are dropped from every index, so they never
  * show up in listings, categories, search, related videos, sitemap or /watch.
+ *
+ * Hidden is the default. The only way back is the owner's explicit "Unhide" in /pemilik, which
+ * writes the id to a server-side override list (KV "owner:unhide:v1", see unhide-store.ts).
+ * That list is re-read every UNHIDE_TTL_MS and the indexes are rebuilt when it changes.
  */
-const HIDDEN_IDS = new Set<string>(Object.keys(HIDDEN_ID_REASONS));
+const HIDDEN_REASONS = HIDDEN_ID_REASONS as Record<string, string>;
+const HIDDEN_IDS = new Set<string>(Object.keys(HIDDEN_REASONS));
+
+/** Cache plus the raw (pre-filter, pre-override) item list, so hidden items can be restored. */
+type BuiltCache = CatalogCache & {
+  raw?: RawItem[];
+  hiddenIds?: Set<string>;
+  unhideKey?: string;
+};
+
 let lastHiddenIds = new Set<string>();
+let UNHIDDEN = new Set<string>();
+let unhideKey = "";
+let unhideCheckedAt = 0;
+let unhideInflight: Promise<void> | null = null;
+const UNHIDE_TTL_MS = 30_000;
+
+/** Why an item is hidden by default ("" = not hidden). Ignores owner Unhide overrides. */
+export function hiddenReasonRaw(it: RawItem): string {
+  const listed = HIDDEN_REASONS[it.id];
+  if (listed) return listed;
+  const rec = it as { hidden?: unknown; hidden_reason?: unknown };
+  if (rec.hidden === true) return String(rec.hidden_reason || "bot-flag");
+  return minorContentReason(String(it.title || ""));
+}
 
 function isHiddenRaw(it: RawItem): boolean {
-  if (HIDDEN_IDS.has(it.id)) return true;
-  if ((it as { hidden?: unknown }).hidden === true) return true;
-  return minorContentReason(String(it.title || "")) !== "";
+  if (UNHIDDEN.has(it.id)) return false;
+  return hiddenReasonRaw(it) !== "";
+}
+
+function keyOf(ids: Iterable<string>): string {
+  return [...ids].sort().join(",");
+}
+
+async function fetchUnhiddenIds(): Promise<string[] | null> {
+  try {
+    if (import.meta.env.SSR) {
+      const mod = await import("./unhide-store");
+      const state = await mod.readUnhideState();
+      return Object.keys(state.ids);
+    }
+    const res = await fetch("/api/hidden-ids");
+    if (!res.ok) return null;
+    const data = (await res.json()) as { unhidden?: unknown };
+    return Array.isArray(data?.unhidden) ? data.unhidden.map(String) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Applies a new Unhide list; rebuilds the current indexes when it changed. */
+export function applyUnhidden(ids: Iterable<string>): void {
+  const next = new Set<string>(ids);
+  const key = keyOf(next);
+  unhideCheckedAt = Date.now();
+  if (key === unhideKey) return;
+  UNHIDDEN = next;
+  unhideKey = key;
+  const cur = runtime.cache as BuiltCache | null;
+  if (cur && cur.raw && cur.unhideKey !== key) {
+    runtime.cache = buildIndexes(cur.raw, cur.posters, cur.videyNo, cur.at);
+  }
+}
+
+async function syncUnhidden(force = false): Promise<void> {
+  if (!force && Date.now() - unhideCheckedAt < UNHIDE_TTL_MS) return;
+  if (unhideInflight) return unhideInflight;
+  unhideInflight = (async () => {
+    const ids = await fetchUnhiddenIds();
+    if (ids) applyUnhidden(ids);
+    else unhideCheckedAt = Date.now(); // keep the previous list; retry after the TTL
+  })().finally(() => {
+    unhideInflight = null;
+  });
+  return unhideInflight;
 }
 
 /**
@@ -161,7 +234,8 @@ export function buildIndexes(
   posters: Record<string, string>,
   videyNo: Map<string, number>,
   at: number,
-): CatalogCache {
+): BuiltCache {
+  const raw = items;
   const byId = new Map<string, RawItem>();
   const bySlug = new Map<string, RawItem[]>();
   const haystack: { item: RawItem; hay: string }[] = [];
@@ -192,7 +266,20 @@ export function buildIndexes(
     bySlug.set(slug, sortByNewest(list));
   }
   const terbaruSorted = terbaruOrder(mainSorted);
-  return { at, items, posters, videyNo, byId, bySlug, mainSorted, terbaruSorted, haystack };
+  return {
+    at,
+    items,
+    posters,
+    videyNo,
+    byId,
+    bySlug,
+    mainSorted,
+    terbaruSorted,
+    haystack,
+    raw,
+    hiddenIds,
+    unhideKey,
+  };
 }
 
 export function pageOf(pool: RawItem[], page: number, limit: number, posters: Record<string, string>, videyNo: Map<string, number>): PagedVideos {
@@ -255,11 +342,28 @@ export function kickRemoteRefresh(base: { items: RawItem[]; posters: Record<stri
     });
 }
 
+/** Refresh base: the raw list (hidden items included) so an Unhide can always restore them. */
+function baseOf(cache: CatalogCache): { items: RawItem[]; posters: Record<string, string> } {
+  return { items: (cache as BuiltCache).raw || cache.items, posters: cache.posters };
+}
+
 export async function loadItemsRaw(): Promise<CatalogCache> {
+  await syncUnhidden();
+  const cache = (await loadItemsInner()) as BuiltCache;
+  // A refresh that started before the latest Unhide change: rebuild with the current list.
+  if (cache.raw && cache.unhideKey !== unhideKey) {
+    const next = buildIndexes(cache.raw, cache.posters, cache.videyNo, cache.at);
+    if (runtime.cache === cache) runtime.cache = next;
+    return next;
+  }
+  return cache;
+}
+
+async function loadItemsInner(): Promise<CatalogCache> {
   const now = Date.now();
   if (runtime.cache && now - runtime.cache.at < CACHE_MS) return runtime.cache;
   if (runtime.cache && now - runtime.cache.at < STALE_MS) {
-    kickRemoteRefresh({ items: runtime.cache.items, posters: runtime.cache.posters });
+    kickRemoteRefresh(baseOf(runtime.cache));
     return runtime.cache;
   }
   if (!runtime.cache) runtime.cache = seedLocalCache();
@@ -267,13 +371,13 @@ export async function loadItemsRaw(): Promise<CatalogCache> {
   if (putarinN < 200) {
     try {
       if (runtime.inflight) runtime.cache = await runtime.inflight;
-      else runtime.cache = await refreshRemote({ items: runtime.cache.items, posters: runtime.cache.posters });
+      else runtime.cache = await refreshRemote(baseOf(runtime.cache));
     } catch {
-      kickRemoteRefresh({ items: runtime.cache.items, posters: runtime.cache.posters });
+      kickRemoteRefresh(baseOf(runtime.cache));
     }
     return runtime.cache;
   }
-  kickRemoteRefresh({ items: runtime.cache.items, posters: runtime.cache.posters });
+  kickRemoteRefresh(baseOf(runtime.cache));
   return runtime.cache;
 }
 
@@ -286,9 +390,31 @@ export async function getUnpublished(): Promise<Set<string>> {
 export async function isPublicHidden(id: string): Promise<boolean> {
   const key = String(id || "").trim();
   if (!key) return false;
+  const cache = (await loadItemsRaw()) as BuiltCache;
+  if (UNHIDDEN.has(key)) return false;
   if (HIDDEN_IDS.has(key)) return true;
-  await loadItemsRaw();
-  return lastHiddenIds.has(key);
+  return (cache.hiddenIds || lastHiddenIds).has(key);
+}
+
+export type HiddenCandidate = { item: RawItem; reason: string; unhidden: boolean; unhiddenAt: number };
+
+/**
+ * Owner-only (call from owner-auth endpoints): every item hidden by default, with its reason and
+ * whether the owner has restored it. Always re-reads the Unhide list first.
+ */
+export async function listHiddenCandidates(unhideAt: Record<string, number> = {}): Promise<HiddenCandidate[]> {
+  await syncUnhidden(true);
+  const cache = (await loadItemsRaw()) as BuiltCache;
+  const out: HiddenCandidate[] = [];
+  const seen = new Set<string>();
+  for (const it of cache.raw || cache.items) {
+    if (!it?.id || seen.has(it.id) || isVidey(it)) continue;
+    seen.add(it.id);
+    const reason = hiddenReasonRaw(it);
+    if (!reason) continue;
+    out.push({ item: it, reason, unhidden: UNHIDDEN.has(it.id), unhiddenAt: unhideAt[it.id] || 0 });
+  }
+  return out;
 }
 
 /** Katalog publik = semua item (tanpa filter minor / Tidak publish). */
