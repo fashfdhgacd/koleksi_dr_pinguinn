@@ -5,7 +5,7 @@ import { SITE_ORIGIN } from "@/lib/seo";
 export const Route = createFileRoute("/dmca")({
   head: () => ({
     meta: [
-      { title: "DMCA | Dr. Pinguin" },
+      { title: "DMCA | koleksidrpinguin.com" },
       { name: "description", content: "Prosedur DMCA Dr. Pinguin." },
       { name: "robots", content: "index,follow" },
     ],

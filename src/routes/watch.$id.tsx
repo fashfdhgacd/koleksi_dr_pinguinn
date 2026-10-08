@@ -3,6 +3,7 @@ import { queryCatalog } from "@/lib/catalog/service";
 import { jsonLdString } from "@/lib/json-ld";
 import {
   DEFAULT_OG,
+  OG_SITE_NAME,
   SITE_ORIGIN,
   categoryKeywords,
   cleanDisplayTitle,
@@ -39,7 +40,7 @@ export const Route = createFileRoute("/watch/$id")({
   head: ({ loaderData }) => {
     const ok = loaderData && loaderData.ok === true && loaderData.type === "detail";
     const item = ok ? loaderData.item : null;
-    const title = item ? videoSeoTitle(item.title, item.category) : "Dr. Pinguin — Bokep Indo";
+    const title = item ? videoSeoTitle(item.title, item.category) : "Video tidak ditemukan | koleksidrpinguin.com";
     const ogTitle = item ? cleanDisplayTitle(item.title) : title;
     const description = item
       ? resolveVideoSeoDescription(item)
@@ -75,7 +76,7 @@ export const Route = createFileRoute("/watch/$id")({
             : "bokep indo, dr pinguin, 18+",
         },
         { property: "og:type", content: "video.other" },
-        { property: "og:site_name", content: "DR. PINGUIN" },
+        { property: "og:site_name", content: OG_SITE_NAME },
         { property: "og:title", content: ogTitle },
         { property: "og:description", content: description },
         { property: "og:url", content: url },
@@ -88,7 +89,7 @@ export const Route = createFileRoute("/watch/$id")({
         { name: "twitter:title", content: ogTitle },
         { name: "twitter:description", content: description },
         { name: "twitter:image", content: image },
-        { name: "twitter:image:alt", content: "DR. PINGUIN" },
+        { name: "twitter:image:alt", content: OG_SITE_NAME },
         { name: "robots", content: item ? "index,follow,max-video-preview:120" : "noindex,follow" },
         { name: "rating", content: "adult" },
       ],

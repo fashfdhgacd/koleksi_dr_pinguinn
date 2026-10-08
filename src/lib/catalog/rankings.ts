@@ -77,7 +77,7 @@ export function rankingSeo(def: RankingDef): { title: string; h1: string; descri
   if (def.kind === "views") {
     return {
       h1: "Bokep Indo Paling Banyak Ditonton",
-      title: `Bokep Indo Paling Banyak Ditonton ${year} – Dr. Pinguin`,
+      title: `Bokep Indo Paling Banyak Ditonton ${year} | koleksidrpinguin.com`,
       description:
         "Daftar video paling banyak ditonton di Dr. Pinguin, diurutkan dari jumlah tayangan. Diperbarui otomatis tiap 12 jam. Khusus 18+.",
       intro:
@@ -86,7 +86,7 @@ export function rankingSeo(def: RankingDef): { title: string; h1: string; descri
   }
   return {
     h1: "Bokep Indo Paling Banyak Disukai",
-    title: `Bokep Indo Paling Banyak Disukai ${year} – Dr. Pinguin`,
+    title: `Bokep Indo Paling Banyak Disukai ${year} | koleksidrpinguin.com`,
     description:
       "Daftar video paling banyak disukai di Dr. Pinguin: suka dari sumber ditambah suka pengunjung situs ini. Diperbarui otomatis. Khusus 18+.",
     intro:

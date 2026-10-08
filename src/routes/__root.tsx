@@ -2,7 +2,7 @@ import { createRootRoute, HeadContent, Outlet, Scripts, redirect } from "@tansta
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PresencePing } from "@/components/presence-ping";
-import { DEFAULT_OG, websiteJsonLd } from "@/lib/seo";
+import { DEFAULT_OG, HOME_TITLE, OG_SITE_NAME } from "@/lib/seo";
 import appCss from "../styles.css?url";
 
 const UMAMI_WEBSITE_ID = "b952a905-cb5b-419d-8aa4-534435e5cc8b";
@@ -31,11 +31,11 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { name: "referrer", content: "origin" },
-      { title: "Dr. Pinguin | Katalog Koleksi Dr. Pinguin" },
+      { title: HOME_TITLE },
       {
         name: "description",
         content:
-          "Dr. Pinguin, katalog video dewasa 18+. Koleksi Dr. Pinguin di koleksidrpinguin.com.",
+          "Koleksi Dr. Pinguin Bokep, M.S.B., katalog video dewasa 18+ di koleksidrpinguin.com.",
       },
       { name: "theme-color", content: "#09090b" },
       { name: "robots", content: "index,follow,max-image-preview:large" },
@@ -43,14 +43,16 @@ export const Route = createRootRoute({
       // RTA label (rtalabel.org). Uppercase key so HeadContent does not dedupe it with "rating".
       { name: "RATING", content: "RTA-5042-1996-1400-1577-RTA" },
       { name: "googlebot", content: "index,follow,max-image-preview:large" },
-      { property: "og:site_name", content: "Dr. Pinguin" },
-      { property: "og:title", content: "Dr. Pinguin | Katalog Koleksi Dr. Pinguin" },
+      { property: "og:site_name", content: OG_SITE_NAME },
+      { property: "og:title", content: HOME_TITLE },
       { property: "og:type", content: "website" },
+      { property: "og:locale", content: "id_ID" },
       { property: "og:image", content: DEFAULT_OG },
       { property: "og:image:secure_url", content: DEFAULT_OG },
       { property: "og:image:type", content: "image/jpeg" },
-      { property: "og:image:width", content: "1280" },
-      { property: "og:image:height", content: "720" },
+      // og-v2.jpg is 1200x630.
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:image", content: DEFAULT_OG },
     ],
@@ -91,10 +93,6 @@ function RootComponent() {
         <HeadContent />
       </head>
       <body className="min-h-dvh bg-background font-sans text-foreground">
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd()) }}
-        />
         <PreviewHostBridge />
         <PresencePing />
         <AuthProvider>

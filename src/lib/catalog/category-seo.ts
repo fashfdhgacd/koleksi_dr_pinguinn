@@ -4,6 +4,8 @@ export type CategorySeo = { title: string; h1: string; description: string; intr
 
 const YEAR = 2026;
 const BRAND = "Koleksi Dr. Pinguin";
+/** Suffix judul tab/SERP: domain (keputusan pemilik). */
+const TITLE_SUFFIX = "koleksidrpinguin.com";
 
 const COPY: Record<string, { h1: string; intro: string }> = {
   jav: { h1: "JAV Sub Indo Terbaru", intro: "Kumpulan JAV sub Indo dan film dewasa Jepang pilihan yang diperbarui rutin. Semua video bisa ditonton langsung di HP maupun desktop tanpa unduh. Khusus pengunjung 18 tahun ke atas." },
@@ -42,7 +44,7 @@ export function categorySeo(slug: string): CategorySeo {
   const cat = CATEGORIES.find((c) => c.slug === slug);
   const label = cat?.label || "Video";
   const c = COPY[slug] || { h1: `Bokep ${label} Terbaru`, intro: `Koleksi video ${label} pilihan yang diperbarui berkala. Tonton langsung di HP maupun desktop. Khusus pengunjung 18 tahun ke atas.` };
-  const title = `${c.h1} ${YEAR} – ${BRAND}`;
+  const title = `${c.h1} ${YEAR} | ${TITLE_SUFFIX}`;
   let description = c.intro.replace(/\s*Khusus pengunjung 18 tahun ke atas\.$/, "");
   description = `${c.h1} ${YEAR} di ${BRAND}. ${description}`;
   if (description.length > 160) description = `${description.slice(0, 157).replace(/\s+\S*$/, "")}…`;

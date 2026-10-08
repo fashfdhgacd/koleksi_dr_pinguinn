@@ -128,9 +128,10 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
               </span>
             ) : null}
           </p>
-          <h1 className="font-display text-lg leading-snug text-foreground line-clamp-2 break-words sm:line-clamp-3 sm:text-2xl sm:leading-tight lg:text-3xl">
+          {/* h2, not h1: the page H1 is the brand heading below the hero (one H1 per page). */}
+          <h2 className="font-display text-lg leading-snug text-foreground line-clamp-2 break-words sm:line-clamp-3 sm:text-2xl sm:leading-tight lg:text-3xl">
             {heroTitle}
-          </h1>
+          </h2>
           {showDescription ? (
             <p className="hidden line-clamp-2 max-w-xl text-sm leading-relaxed text-muted sm:block">
               {current.description}

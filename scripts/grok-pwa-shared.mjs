@@ -402,6 +402,21 @@ export function stripShareMetaTags(html) {
   });
 }
 
+/** Lowercased property/name key of a <meta> tag, or "". */
+function metaKey(tag) {
+  const m = String(tag).match(/\b(?:property|name)\s*=\s*["']([^"']+)["']/i);
+  return m ? m[1].toLowerCase() : "";
+}
+
+/** True when the document already has a <meta> with this property/name key. */
+function hasMetaKey(html, key) {
+  if (!key) return false;
+  for (const tag of String(html).match(/<meta\b[^>]*>/gi) || []) {
+    if (metaKey(tag) === key) return true;
+  }
+  return false;
+}
+
 function insertAfterHeadOpen(html, snippet) {
   if (/<head\b[^>]*>/i.test(html)) {
     return html.replace(/<head\b[^>]*>/i, (open) => `${open}${snippet}`);
@@ -436,12 +451,14 @@ export function normalizeHeadContext(ctx = {}) {
     host: ctx.host ?? "",
     cwd,
     site,
+    // site.json `keepShareMeta: true`: routes own their og:/twitter: tags (see injectGrokPwaHead).
+    keepShareMeta: Boolean(ctx.keepShareMeta ?? site?.keepShareMeta),
   };
 }
 
 export function injectGrokPwaHead(html, ctx = {}) {
   if (typeof html !== "string") return html;
-  const { site, projectId, creator, creatorId, host, cwd } = normalizeHeadContext(ctx);
+  const { site, projectId, creator, creatorId, host, cwd, keepShareMeta } = normalizeHeadContext(ctx);
   const documentTitle = titleFromDocument(html);
   const appName = resolveOgTitle(
     site,
@@ -449,7 +466,10 @@ export function injectGrokPwaHead(html, ctx = {}) {
     host,
     documentTitle,
   );
-  let next = stripShareMetaTags(html);
+  // keepShareMeta: the app's routes set their own Open Graph / Twitter tags (title, description,
+  // url, type, site_name). Keep them and only add platform share tags that are missing, instead of
+  // stripping everything and replacing it with the static site.json card.
+  let next = keepShareMeta ? html : stripShareMetaTags(html);
 
   const missing = grokPwaHeadTags(appName)
     .filter(([key]) => {
@@ -459,10 +479,11 @@ export function injectGrokPwaHead(html, ctx = {}) {
     })
     .map(([, tag]) => tag);
 
-  next = insertAfterHeadOpen(
-    next,
-    grokOgHeadTags({ host, appName, site, documentTitle, cwd }).join(""),
-  );
+  const ogTags = grokOgHeadTags({ host, appName, site, documentTitle, cwd });
+  const ogToInsert = keepShareMeta
+    ? ogTags.filter((tag) => !hasMetaKey(next, metaKey(tag)))
+    : ogTags;
+  if (ogToInsert.length > 0) next = insertAfterHeadOpen(next, ogToInsert.join(""));
 
   if (!next.includes("/grok-app-builder/extensions.js")) {
     missing.push(...grokExtensionsHeadTags(projectId));
@@ -515,6 +536,7 @@ export function createHeadInjector(ctx = {}) {
       host: normalized.host,
       cwd: normalized.cwd,
       site: normalized.site,
+      keepShareMeta: normalized.keepShareMeta,
     });
 
   return {

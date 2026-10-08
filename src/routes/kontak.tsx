@@ -5,7 +5,7 @@ import { SITE_ORIGIN } from "@/lib/seo";
 export const Route = createFileRoute("/kontak")({
   head: () => ({
     meta: [
-      { title: "Kontak | Dr. Pinguin" },
+      { title: "Kontak | koleksidrpinguin.com" },
       { name: "description", content: "Hubungi pengelola Dr. Pinguin." },
       { name: "robots", content: "index,follow" },
     ],

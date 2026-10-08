@@ -16,9 +16,9 @@ export const Route = createFileRoute("/kategori/")({
     return { categories: CATEGORY_LIST };
   },
   head: () => {
-    const title = "Kategori | Dr. Pinguin";
+    const title = "Kategori | koleksidrpinguin.com";
     const description =
-      "Pilih kategori di Dr. Pinguin: Jav, AI+, Jilbab, Tante, Selingkuh, Bule, Mahasiswi, Tobrut, Outdoor, Hotel, dan lainnya.";
+      "Pilih kategori di Koleksi Dr. Pinguin: Jav, AI+, Jilbab, Tante, Selingkuh, Bule, Mahasiswi, Tobrut, Outdoor, Hotel, dan lainnya.";
     const url = `${SITE_ORIGIN}/kategori`;
     return {
       meta: [

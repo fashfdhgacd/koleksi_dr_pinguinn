@@ -2,5 +2,6 @@
   "title": "DR. PINGUIN",
   "type": "website",
   "card": "custom",
-  "forceImage": "/og-v2.jpg?v=13"
+  "forceImage": "/og-v2.jpg?v=13",
+  "keepShareMeta": true
 }

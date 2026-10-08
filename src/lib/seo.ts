@@ -1,12 +1,27 @@
 import { findCategory } from "@/lib/catalog/categories";
 
 export const SITE_ORIGIN = "https://koleksidrpinguin.com";
-export const SITE_NAME = "Dr. Pinguin";
+export const SITE_NAME = "Koleksi Dr. Pinguin";
+/** Nama brand persis seperti yang dicari orang di Google (judul video di IndoAV/UserBokep pakai suffix ini). */
+export const BRAND_NAME = "Koleksi Dr. Pinguin Bokep, M.S.B.";
+/** og:site_name: nama situs di kartu share / sinyal nama situs. */
+export const OG_SITE_NAME = "Koleksi Dr. Pinguin Bokep";
+/** Suffix judul halaman: domain (keputusan pemilik), contoh "Judul | koleksidrpinguin.com". */
+export const TITLE_SUFFIX = "koleksidrpinguin.com";
 /** Kartu share: logo situs. Query v= bust cache Telegram/X. */
 export const DEFAULT_OG = `${SITE_ORIGIN}/og-v2.jpg?v=13`;
+/** Logo persegi (ikon pinguin pixel 512x512, dilayani middleware brand-icons). */
+export const SITE_LOGO = `${SITE_ORIGIN}/icon-512.png`;
 
 const HOME_DESCRIPTION =
-  "Katalog video dewasa 18+ Dr. Pinguin. Streaming embed koleksi Indo, JAV, amatir. Update berkala.";
+  "Koleksi Dr. Pinguin Bokep, M.S.B., situs resmi di koleksidrpinguin.com. Katalog video dewasa 18+: bokep Indo, JAV, amatir, AI+. Update berkala.";
+
+/** Judul beranda: frasa brand persis + domain. */
+export const HOME_TITLE = `${BRAND_NAME} | ${TITLE_SUFFIX}`;
+
+/** Kalimat pendek di bawah H1 beranda. */
+export const HOME_INTRO =
+  "Situs resmi Koleksi Dr. Pinguin Bokep, M.S.B. Katalog video dewasa 18+: Indo, JAV, amatir, AI+. Update berkala.";
 
 function categoryLabel(slugOrLabel?: string | null): string {
   const key = (slugOrLabel || "").trim().toLowerCase();
@@ -33,11 +48,12 @@ export function categoryKeywords(slugOrLabel?: string | null): string {
 export function pageTitle(parts: Array<string | null | undefined>): string {
   const clean = parts.map((p) => (p || "").trim()).filter(Boolean);
   const unique = clean.filter((p, i) => clean.findIndex((x) => x.toLowerCase() === p.toLowerCase()) === i);
-  if (!unique.length) return SITE_NAME;
-  if (unique[unique.length - 1]?.toLowerCase() === SITE_NAME.toLowerCase()) {
+  if (!unique.length) return HOME_TITLE;
+  const last = unique[unique.length - 1]?.toLowerCase();
+  if (last === TITLE_SUFFIX.toLowerCase() || last === SITE_NAME.toLowerCase()) {
     return unique.join(" | ");
   }
-  return `${unique.join(" | ")} | ${SITE_NAME}`;
+  return `${unique.join(" | ")} | ${TITLE_SUFFIX}`;
 }
 
 const MINOR_RE =
@@ -283,7 +299,7 @@ export function homeSeo(q?: string, category?: string) {
     };
   }
   return {
-    title: pageTitle(["Bokep Dr. Pinguin", "Koleksi M.S.B."]),
+    title: HOME_TITLE,
     description: HOME_DESCRIPTION,
     keywords: "bokep dr pinguin, koleksi dr pinguin, M.S.B., 18+",
   };
@@ -336,11 +352,13 @@ export function videoJsonLd(input: {
     inLanguage: "id",
     publisher: {
       "@type": "Organization",
-      name: SITE_NAME,
-      url: SITE_ORIGIN,
+      name: BRAND_NAME,
+      url: HOME_CANONICAL,
       logo: {
         "@type": "ImageObject",
-        url: DEFAULT_OG.split("?")[0],
+        url: SITE_LOGO,
+        width: 512,
+        height: 512,
       },
     },
     genre: label,
@@ -359,18 +377,61 @@ export function videoJsonLd(input: {
   };
 }
 
-export function websiteJsonLd() {
+const BRAND_ALT_NAMES = [
+  "Koleksi Dr. Pinguin Bokep",
+  "Koleksi Dr. Pinguin",
+  "Dr. Pinguin",
+  "M.S.B.",
+  "bokep dr pinguin",
+  "koleksidrpinguin.com",
+];
+
+function websiteNode() {
   return {
-    "@context": "https://schema.org",
     "@type": "WebSite",
-    name: SITE_NAME,
-    alternateName: ["Koleksi Dr. Pinguin", "M.S.B.", "bokep dr pinguin"],
+    "@id": `${HOME_CANONICAL}#website`,
+    name: BRAND_NAME,
+    alternateName: BRAND_ALT_NAMES,
     url: HOME_CANONICAL,
+    inLanguage: "id",
     description: HOME_DESCRIPTION,
+    publisher: { "@id": `${HOME_CANONICAL}#organization` },
     potentialAction: {
       "@type": "SearchAction",
       target: `${SITE_ORIGIN}/?q={search_term_string}`,
       "query-input": "required name=search_term_string",
     },
+  };
+}
+
+function organizationNode() {
+  return {
+    "@type": "Organization",
+    "@id": `${HOME_CANONICAL}#organization`,
+    name: BRAND_NAME,
+    alternateName: BRAND_ALT_NAMES,
+    url: HOME_CANONICAL,
+    logo: {
+      "@type": "ImageObject",
+      url: SITE_LOGO,
+      width: 512,
+      height: 512,
+    },
+  };
+}
+
+export function websiteJsonLd() {
+  return { "@context": "https://schema.org", ...websiteNode() };
+}
+
+export function organizationJsonLd() {
+  return { "@context": "https://schema.org", ...organizationNode() };
+}
+
+/** Satu blok JSON-LD beranda (WebSite + Organization). Hanya dipasang di beranda, bukan di root. */
+export function homeJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@graph": [websiteNode(), organizationNode()],
   };
 }

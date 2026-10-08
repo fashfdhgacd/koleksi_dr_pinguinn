@@ -58,10 +58,15 @@ export function Header({
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 pt-[env(safe-area-inset-top)] backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6">
-        <Link to="/" search={{ q: undefined, category: undefined }} className="flex shrink-0 items-center gap-2">
+        <Link
+          to="/"
+          search={{ q: undefined, category: undefined }}
+          aria-label="Koleksi Dr. Pinguin Bokep, M.S.B. (beranda)"
+          className="flex shrink-0 items-center gap-2"
+        >
           <img
             src={BRAND_LOGO_SRC}
-            alt="Dr. Pinguin"
+            alt="Koleksi Dr. Pinguin Bokep"
             width={32}
             height={32}
             style={{ imageRendering: "pixelated" }}

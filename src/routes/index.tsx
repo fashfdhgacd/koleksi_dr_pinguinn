@@ -10,7 +10,8 @@ import { findCategory } from "@/lib/catalog/categories";
 import { queryCatalog } from "@/lib/catalog/service";
 import type { VideoCard } from "@/lib/catalog/types";
 import { useCatalogFeed } from "../hooks/use-catalog";
-import { DEFAULT_OG, HOME_CANONICAL, homeSeo, websiteJsonLd } from "@/lib/seo";
+import { jsonLdString } from "@/lib/json-ld";
+import { BRAND_NAME, DEFAULT_OG, HOME_CANONICAL, HOME_INTRO, homeJsonLd, homeSeo } from "@/lib/seo";
 
 type HomeSearch = {
   q?: string;
@@ -108,6 +109,7 @@ export const Route = createFileRoute("/")({
     const q = typeof match.search.q === "string" ? match.search.q : undefined;
     const page = typeof match.search.page === "number" ? match.search.page : 1;
     const seo = homeSeo(q);
+    const title = !q && page > 1 ? `${seo.title} – Halaman ${page}` : seo.title;
     const url = q
       ? HOME_CANONICAL
       : page > 1
@@ -115,11 +117,12 @@ export const Route = createFileRoute("/")({
         : HOME_CANONICAL;
     return {
       meta: [
-        { title: seo.title },
+        { title },
         { name: "description", content: seo.description },
-        { property: "og:title", content: seo.title },
+        { property: "og:title", content: title },
         { property: "og:description", content: seo.description },
         { property: "og:url", content: url },
+        { property: "og:type", content: "website" },
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
         ...(q
@@ -132,7 +135,7 @@ export const Route = createFileRoute("/")({
       links: [{ rel: "canonical", href: url }],
       scripts: q
         ? []
-        : [{ type: "application/ld+json", children: JSON.stringify(websiteJsonLd()) }],
+        : [{ type: "application/ld+json", children: jsonLdString(homeJsonLd()) }],
     };
   },
   component: HomePage,
@@ -151,18 +154,18 @@ function HomePage() {
   const heroIds = new Set(heroVideos.map((v) => v.id));
   const gridItems = heroIds.size ? feed.items.filter((item) => !heroIds.has(item.id)) : feed.items;
 
-  const title = q ? `Hasil untuk “${q}”` : cat ? cat.label : "Koleksi Dr. Pinguin";
+  const title = q ? `Hasil untuk “${q}”` : cat ? cat.label : BRAND_NAME;
   const subtitle = q
     ? feed.loading && !feed.items.length
       ? "Mencari…"
       : `${(gridItems.length ? feed.total : 0).toLocaleString("id-ID")} hasil`
     : feed.total
-    ? `${feed.total.toLocaleString("id-ID")} judul · M.S.B.`
-    : "M.S.B. — Koleksi Dr. Pinguin";
+    ? `${feed.total.toLocaleString("id-ID")} judul · koleksidrpinguin.com`
+    : "koleksidrpinguin.com";
   const intro =
     q
       ? `Hasil pencarian “${q}” di katalog Dr. Pinguin. Konten dewasa 18+.`
-      : "Katalog video dewasa 18+ Dr. Pinguin. Streaming embed koleksi Indo, JAV, amatir. Update berkala.";
+      : HOME_INTRO;
 
   // Search result pages past the end (e.g. stale ?page=N kept in the URL) jump back to page 1,
   // so the count and the grid always come from the same result array.
