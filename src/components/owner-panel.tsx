@@ -13,6 +13,7 @@ import { OwnerLoginForm } from "@/components/owner-login-form";
 import { OwnerAuthedTop } from "@/components/owner-authed-top";
 import { OwnerAuthedBottom } from "@/components/owner-authed-bottom";
 import { HiddenListSection } from "@/components/owner-hidden-list";
+import { OwnerTelegramStatus } from "@/components/owner-telegram-status";
 
 export function OwnerDashboard() {
   const [secret, setSecret] = useState("");
@@ -147,6 +148,8 @@ export function OwnerDashboard() {
           <>
             {/* Paling atas setelah login: video tersembunyi + badge jumlah + Unhide */}
             <HiddenListSection secret={secret} />
+            {/* Status bot Telegram tepat di bawah daftar tersembunyi */}
+            <OwnerTelegramStatus secret={secret} />
             <OwnerAuthedTop
               online={online}
               stats={stats}

@@ -6,6 +6,9 @@ import { isOwnerRequest } from "@/lib/owner-auth";
 import {
   TELEGRAM_SECRET_HEADER,
   healWebhookSecret,
+  isTelegramIp,
+  markIpFallbackUpdate,
+  webhookHealth,
   markVerifiedUpdate,
   redactToken,
   timingSafeSecretMatch,
@@ -255,14 +258,22 @@ async function handlePost(request: Request): Promise<Response> {
   // 1) Only Telegram knows the secret_token (derived from BOT_TOKEN, set via setWebhook).
   const expected = await webhookSecret(token);
   const given = request.headers.get(TELEGRAM_SECRET_HEADER) || "";
-  if (!expected || !given || !(await timingSafeSecretMatch(given, expected))) {
-    // If the registered webhook is ours but has no/old secret yet, re-register it with the secret
-    // (throttled). 401 makes Telegram keep the update and re-deliver it with the header later.
-    await healWebhookSecret().catch(() => undefined);
-    return new Response("Unauthorized", {
-      status: 401,
-      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
-    });
+  const signed = Boolean(expected && given && (await timingSafeSecretMatch(given, expected)));
+  let viaIpFallback = false;
+  if (!signed) {
+    // Not signed (secret not registered yet, or rotated). Re-register the webhook with the secret
+    // (throttled, same url, pending updates kept) so the next deliveries carry the header.
+    const fromTelegram = isTelegramIp(request);
+    await healWebhookSecret({ fromTelegram }).catch(() => undefined);
+    // Fallback: still serve the update when it demonstrably comes from Telegram's official webhook
+    // IP ranges (CF-Connecting-IP cannot be forged through Cloudflare). Everyone else: 401.
+    if (!fromTelegram) {
+      return new Response("Unauthorized", {
+        status: 401,
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+      });
+    }
+    viaIpFallback = true;
   }
 
   // 2) Deny-all unless an allowlist is configured; only the sender (from.id) counts.
@@ -285,7 +296,8 @@ async function handlePost(request: Request): Promise<Response> {
   // Unknown senders/chats are ignored silently (no reply, so the bot cannot be used to spam).
   if (allowed.size === 0 || !allowed.has(fromId)) return ack();
 
-  await markVerifiedUpdate().catch(() => undefined);
+  if (viaIpFallback) await markIpFallbackUpdate().catch(() => undefined);
+  else await markVerifiedUpdate().catch(() => undefined);
 
   const text = String(msg.text || msg.caption || "").trim();
   if (!text) return Response.json({ ok: true });
@@ -345,6 +357,10 @@ export const Route = createFileRoute("/api/telegram")({
     handlers: {
       // Owner-only minimal status (no GitHub call, no repo/config details). Everyone else: 404.
       GET: async ({ request }) => {
+        // Public health signal: booleans + short error code only (no url, ids, times or secrets).
+        if (new URL(request.url).searchParams.get("health") === "1") {
+          return Response.json(await webhookHealth(), { headers: { "cache-control": "no-store" } });
+        }
         if (!(await isOwnerRequest(request))) return notFound();
         const env = process.env;
         const has = (k: string) => Boolean(String(env[k] || "").trim());

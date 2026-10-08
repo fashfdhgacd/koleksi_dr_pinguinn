@@ -29,6 +29,42 @@ const OUR_HOSTS = new Set([
 const SECRET_LABEL = "kdp-telegram-webhook-v1";
 const KV_LAST_OK = "tg:webhook:last-ok:v1";
 const KV_LAST_SETUP = "tg:webhook:last-setup:v1";
+const KV_LAST_HEAL = "tg:webhook:last-heal:v1";
+const KV_LAST_FALLBACK = "tg:webhook:last-ip-fallback:v1";
+
+/**
+ * Telegram's official webhook source ranges (core.telegram.org/bots/webhooks): 149.154.160.0/20 and
+ * 91.108.4.0/22. CF-Connecting-IP is set by Cloudflare's edge and cannot be forged by the client.
+ */
+const TELEGRAM_RANGES: Array<[number, number]> = [
+  [ipv4ToInt("149.154.160.0"), 20],
+  [ipv4ToInt("91.108.4.0"), 22],
+];
+
+function ipv4ToInt(ip: string): number {
+  const parts = ip.split(".");
+  if (parts.length !== 4) return -1;
+  let n = 0;
+  for (const part of parts) {
+    if (!/^\d{1,3}$/.test(part)) return -1;
+    const v = Number(part);
+    if (v > 255) return -1;
+    n = n * 256 + v;
+  }
+  return n;
+}
+
+/** True when the request comes from Telegram's webhook IP ranges (per CF-Connecting-IP). */
+export function isTelegramIp(request: Request): boolean {
+  const raw = (request.headers.get("cf-connecting-ip") || "").trim();
+  const ip = raw.startsWith("::ffff:") ? raw.slice(7) : raw;
+  const n = ipv4ToInt(ip);
+  if (n < 0) return false;
+  return TELEGRAM_RANGES.some(([base, bits]) => {
+    const size = 2 ** (32 - bits);
+    return n >= base && n < base + size;
+  });
+}
 
 export function botToken(): string {
   return String(process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || "").trim();
@@ -182,9 +218,11 @@ export async function markVerifiedUpdate(): Promise<void> {
  */
 export async function setWebhookWithSecret(
   url: string = WEBHOOK_URL,
-  keep?: { allowedUpdates?: string[] | null; maxConnections?: number | null },
+  keep?: { allowedUpdates?: string[] | null; maxConnections?: number | null; allowAnyUrl?: boolean },
 ): Promise<{ ok: boolean; error?: string }> {
-  if (!isOurWebhookUrl(url)) return { ok: false, error: "url_not_ours" };
+  if (!(keep?.allowAnyUrl ? /^https:\/\//i.test(url) : isOurWebhookUrl(url))) {
+    return { ok: false, error: "url_not_ours" };
+  }
   const secret = await webhookSecret();
   if (!secret) return { ok: false, error: "bot_token_missing" };
   const payload: Record<string, unknown> = {
@@ -221,34 +259,118 @@ export async function setupWebhook(): Promise<{
   return { ok: after.ok, error: after.error, info: after.info, before };
 }
 
-let lastHeal = 0;
+type HealRecord = { at: string; ok: boolean; error: string | null; urlOurs: boolean | null; mode: string };
+
+let lastHealAt = 0;
+let lastHealOk = false;
 let healing: Promise<void> | null = null;
+const HEAL_OK_GAP_MS = 10 * 60_000;
+const HEAL_FAIL_GAP_MS = 30_000;
+
+function safeCode(text: unknown): string {
+  return redactToken(text).replace(/[^A-Za-z0-9 _:.,()'-]/g, " ").slice(0, 120);
+}
+
+async function recordHeal(rec: HealRecord): Promise<void> {
+  await optionalKvPut(KV_LAST_HEAL, JSON.stringify(rec), 60 * 60 * 24 * 30);
+}
 
 /**
- * Self-heal, called when an update arrives without the expected secret header: if (and only if) the
- * webhook registered at Telegram already points at this site, re-register the SAME url with the
- * secret_token. Throttled to one attempt per 10 minutes per isolate. A caller cannot influence the
- * url or the secret, so triggering this is harmless; the unauthenticated request itself is rejected.
+ * Self-heal, called when an update arrives without the expected secret header. Re-registers the SAME
+ * url that is registered at Telegram, now with the secret_token (pending updates are kept).
+ *  - fromTelegram (request came from Telegram's IP ranges): the registered url demonstrably routes to
+ *    this Worker, so any https url is accepted.
+ *  - otherwise: only when the registered url is one of our hosts + /api/telegram.
+ * A caller cannot influence the url or the secret. Throttled per isolate: 10 min after a success,
+ * 30 s after a failure (a failed attempt no longer blocks retries for 10 minutes).
+ * Every attempt is recorded in KV (time, ok, short error, never the token).
  */
-export async function healWebhookSecret(): Promise<void> {
+export async function healWebhookSecret(opts: { fromTelegram?: boolean } = {}): Promise<void> {
   const now = Date.now();
   if (healing) return healing;
-  if (now - lastHeal < 10 * 60_000) return;
-  lastHeal = now;
+  const gap = lastHealOk ? HEAL_OK_GAP_MS : HEAL_FAIL_GAP_MS;
+  if (lastHealAt && now - lastHealAt < gap) return;
+  lastHealAt = now;
+  const mode = opts.fromTelegram ? "telegram-ip" : "other";
   healing = (async () => {
+    let ok = false;
+    let error: string | null = null;
+    let urlOurs: boolean | null = null;
     try {
       const info = await rawWebhookInfo();
-      if (!info.ok || !isOurWebhookUrl(info.result.url)) return;
-      const r = await setWebhookWithSecret(String(info.result.url), {
+      if (!info.ok) {
+        error = `info: ${safeCode(info.error)}`;
+        return;
+      }
+      const url = String(info.result.url || "");
+      urlOurs = isOurWebhookUrl(url);
+      const usable = opts.fromTelegram ? /^https:\/\//i.test(url) : urlOurs;
+      if (!usable) {
+        error = url ? "url_not_ours" : "webhook_not_set";
+        return;
+      }
+      const r = await setWebhookWithSecret(url, {
         allowedUpdates: Array.isArray(info.result.allowed_updates) ? info.result.allowed_updates : null,
         maxConnections: info.result.max_connections ?? null,
+        allowAnyUrl: Boolean(opts.fromTelegram),
       });
-      if (!r.ok) console.error("telegram webhook heal failed:", redactToken(r.error));
+      ok = r.ok;
+      if (!r.ok) error = `set: ${safeCode(r.error)}`;
     } catch (err) {
-      console.error("telegram webhook heal error:", redactToken(err instanceof Error ? err.message : err));
+      error = `exception: ${safeCode(err instanceof Error ? err.message : err)}`;
+    } finally {
+      lastHealOk = ok;
+      if (!ok) console.error("telegram webhook heal failed:", error);
+      await recordHeal({ at: new Date().toISOString(), ok, error, urlOurs, mode }).catch(() => undefined);
     }
   })().finally(() => {
     healing = null;
   });
   return healing;
+}
+
+let lastFallbackWrite = 0;
+/** Record (throttled) that an un-secreted update from Telegram's IP range was accepted. */
+export async function markIpFallbackUpdate(): Promise<void> {
+  const now = Date.now();
+  if (now - lastFallbackWrite < 5 * 60_000) return;
+  lastFallbackWrite = now;
+  await optionalKvPut(KV_LAST_FALLBACK, new Date(now).toISOString(), 60 * 60 * 24 * 30);
+}
+
+function recent(iso: string | null, ms: number): boolean {
+  if (!iso) return false;
+  const t = Date.parse(iso);
+  return Number.isFinite(t) && Date.now() - t < ms;
+}
+
+/**
+ * Public, owner-free health signal: booleans and a short error code only (no url, no ids, no times,
+ * no token/secret).
+ */
+export async function webhookHealth(): Promise<Record<string, unknown>> {
+  const [setupAt, okAt, fallbackAt, healRaw] = await Promise.all([
+    lastSetupAt(),
+    lastVerifiedUpdateAt(),
+    optionalKvGet(KV_LAST_FALLBACK),
+    optionalKvGet(KV_LAST_HEAL),
+  ]);
+  let heal: HealRecord | null = null;
+  try {
+    heal = healRaw ? (JSON.parse(healRaw) as HealRecord) : null;
+  } catch {
+    heal = null;
+  }
+  return {
+    ok: true,
+    secretInstalled: Boolean(setupAt),
+    secretInstalledLastHour: recent(setupAt, 3600_000),
+    signedUpdateLastHour: recent(okAt, 3600_000),
+    ipFallbackUpdateLastHour: recent(fallbackAt, 3600_000),
+    lastHealOk: heal ? Boolean(heal.ok) : null,
+    lastHealLastHour: heal ? recent(heal.at, 3600_000) : false,
+    lastHealError: heal?.error ? safeCode(heal.error) : null,
+    lastHealUrlOurs: heal ? heal.urlOurs : null,
+    lastHealMode: heal?.mode || null,
+  };
 }
