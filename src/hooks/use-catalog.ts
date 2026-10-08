@@ -35,7 +35,7 @@ const FRESH_MS = 12 * 60 * 60 * 1000;
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
 /** Mobile cellular often hangs TCP; without a budget, inflight coalescing stuck forever. */
 const FETCH_TIMEOUT_MS = 15_000;
-const LS_KEY = "dp_feed_v8";
+const LS_KEY = "dp_feed_v9";
 const feedCache = new Map<string, FeedSnap>();
 
 function ls() {

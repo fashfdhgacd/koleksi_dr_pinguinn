@@ -27,6 +27,7 @@ import folderBatch20261007 from "./folder-batch-20261007.json";
 import videoStats from "./video-stats.json";
 import itemOverrides from "./overrides.json";
 import { softenMinorTerms } from "./minor-title-guard";
+import { HIDDEN_IDS as HIDDEN_ID_REASONS, minorContentReason } from "./hidden-ids.js";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
 import latestVideos from "../../../data/videos-latest.json";
@@ -74,6 +75,21 @@ const STATS = videoStats as unknown as Record<string, [number, number, number]>;
 
 type ItemOverride = { title?: string; category?: string; poster?: string };
 const OVERRIDES = itemOverrides as Record<string, ItemOverride>;
+
+/**
+ * Hidden (not deleted) items: reviewed list (hidden-ids.js), records the bot flagged
+ * with `hidden: true`, and any title the shared minor-content detector matches (checked on
+ * the raw title, before display renaming). They are dropped from every index, so they never
+ * show up in listings, categories, search, related videos, sitemap or /watch.
+ */
+const HIDDEN_IDS = new Set<string>(Object.keys(HIDDEN_ID_REASONS));
+let lastHiddenIds = new Set<string>();
+
+function isHiddenRaw(it: RawItem): boolean {
+  if (HIDDEN_IDS.has(it.id)) return true;
+  if ((it as { hidden?: unknown }).hidden === true) return true;
+  return minorContentReason(String(it.title || "")) !== "";
+}
 
 /**
  * Load-time only (stored/bot data is never rewritten):
@@ -149,7 +165,15 @@ export function buildIndexes(
   const byId = new Map<string, RawItem>();
   const bySlug = new Map<string, RawItem[]>();
   const haystack: { item: RawItem; hay: string }[] = [];
-  items = items.map(withStats);
+  const hiddenIds = new Set<string>();
+  items = items
+    .filter((it) => {
+      if (!isHiddenRaw(it)) return true;
+      hiddenIds.add(it.id);
+      return false;
+    })
+    .map(withStats);
+  lastHiddenIds = hiddenIds;
   for (const it of items) {
     byId.set(it.id, it);
     const slug = slugOf(it);
@@ -258,9 +282,13 @@ export async function getUnpublished(): Promise<Set<string>> {
   return new Set();
 }
 
-/** Fitur hidden DINONAKTIFKAN — tidak ada video yang disembunyikan. */
-export async function isPublicHidden(_id: string): Promise<boolean> {
-  return false;
+/** True for hidden ids (minor/school-themed content); /watch answers 404 + noindex for them. */
+export async function isPublicHidden(id: string): Promise<boolean> {
+  const key = String(id || "").trim();
+  if (!key) return false;
+  if (HIDDEN_IDS.has(key)) return true;
+  await loadItemsRaw();
+  return lastHiddenIds.has(key);
 }
 
 /** Katalog publik = semua item (tanpa filter minor / Tidak publish). */

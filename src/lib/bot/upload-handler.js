@@ -3,6 +3,7 @@ import { toRecord } from "@/lib/bot/store.js";
 import { fetchPutarinMeta, fetchStreamtapeMeta, fetchEmbedPageMeta, expandPutarinFolder } from "@/lib/bot/providers.js";
 import { upsertVideosBatch } from "@/lib/bot/github.js";
 import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
+import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
 
 function hasUserTitle(raw) {
   const t = cleanTitle(String(raw || ""));
@@ -141,7 +142,10 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const withPoster = isHttpPoster(meta.thumb)
       ? { ...video, poster: meta.thumb, thumbnail: meta.thumb }
       : video;
-    const record = toRecord({ parsed: withPoster, title, category });
+    const baseRecord = toRecord({ parsed: withPoster, title, category });
+    // School/minor-themed titles are stored but flagged hidden (the catalog never shows them).
+    const hiddenReason = minorContentReason(`${title} ${String(video.title || parsedMsg.title || "")}`);
+    const record = hiddenReason ? { ...baseRecord, hidden: true, hidden_reason: hiddenReason } : baseRecord;
     const fileName = video.file || "videos.json";
     const list = byFile.get(fileName) || [];
     list.push({ video, title, record });
@@ -169,7 +173,9 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
         const poster = String(it.record.poster || it.record.thumbnail || "").trim();
         if (isHttpPoster(poster)) posterBatch[it.record.id] = poster;
         if (createdIds.has(idKey)) {
-          lines.push(`✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}`);
+          lines.push(
+            `✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}${it.record.hidden ? " · 🙈 disembunyikan (judul menyiratkan minor/sekolah)" : ""}`,
+          );
         } else {
           lines.push(`⏭️ ${it.record.id} — ${it.title} (sudah ada)`);
         }

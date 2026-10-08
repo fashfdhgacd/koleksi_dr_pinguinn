@@ -1,6 +1,8 @@
 /**
- * Light display guard: strips wording that implies minors from titles at load time.
- * Videos are never hidden or deleted; only the shown title (and SEO title/search text) changes.
+ * Light display guard: strips wording that implies minors from titles at load time
+ * (mostly machine-translated wording like "teen" → "remaja" on adult videos).
+ * Only the shown title (and SEO title/search text) changes. Content that is itself
+ * school/minor themed is hidden instead (see hidden-ids.js).
  */
 const RULES: [RegExp, string][] = [
   [/\b(?:yang\s+)?masih\s+(?:remaja|sekolah|bocil|kecil|di\s*bawah\s*umur)\b/gi, ""],
@@ -8,6 +10,7 @@ const RULES: [RegExp, string][] = [
   [/\b(?:seragam\s+)?(?:sma|smp)\b/gi, ""],
   [/\b(?:bocil|bocah|di\s*bawah\s*umur|under\s*-?\s*age(?:d)?|lolita|loli|tocil|teen(?:s|ager)?)\b/gi, ""],
   [/\bpelacur\s+muda\b/gi, "pelacur"],
+  [/\blittle\s+(step\s?(?:sister|sis|daughter|brother|son))\b/gi, "$1"],
   [/\bremaja\b/gi, ""],
   [/\bseperti\s+pemula\b/gi, ""],
 ];
