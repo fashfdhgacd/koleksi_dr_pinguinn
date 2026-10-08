@@ -1,3 +1,4 @@
+import { refineCategory } from "@/lib/catalog/title-category.js";
 const STREAMTAPE_HOST = /(^|\.)(streamtape\.com|strcloud[a-z0-9]*)$/i;
 const PUTARIN_HOST = /(^|\.)(putarin\.com|puterin\.[a-z]+)$/i;
 const LULU_HOST = /(^|\.)(luluvdo\.com|lulustream\.com|luluvid\.com|lulu\.st)$/i;
@@ -15,7 +16,7 @@ const CATEGORY_RULES = [
   ["doggy", /\bdoggy\b|\bdogi\b|nungging|menungging/i],
   ["colmek", /colmek|coliin|\bomek\b|dildo|colay/i],
   ["percakapan", /percakapan|\bvcs\b|\bvc\b|ngobrol|telpon|telepon|nelpon|nelfon|video\s*call/i],
-  ["kosan", /kosan|kostan|\bkost\b|\bkos\b|pacar|hotel|check\s*in|nginep|menginap/i],
+  ["kosan", /kosan|kostan|\bkost\b|\bkos\b|kontrakan/i],
   ["istri", /\bistri\b|\bsuami\b|selingkuh|berselingkuh|\bhamil\b|\bbinor\b|istri\s*orang|suami\s*orang/i],
   ["tante", /\btante\b|\bjanda\b|\bstw\b|\bmilf\b|ibu\s*tiri|\bemak\b|emak2|mama\s*muda|mbak\s*muda/i],
   ["live", /live\s*stream|livestream|siaran\s*langsung|\blive\b/i],
@@ -35,10 +36,16 @@ function normText(value = "") {
 export function detectCategory(title = "", fallback = "") {
   const text = normText(`${title} ${fallback}`);
   if (!text) return "lainnya";
+  let base = "lainnya";
   for (const [slug, re] of CATEGORY_RULES) {
-    if (re.test(text)) return slug;
+    if (re.test(text)) {
+      base = slug;
+      break;
+    }
   }
-  return "lainnya";
+  // Shared with the site catalog: generic results (amatir/lainnya) move to the newer
+  // themes (bule, selingkuh, mahasiswi, sepong, hotel, outdoor, ...) when the title matches.
+  return refineCategory(base, text);
 }
 
 export function cleanTitle(raw = "") {
