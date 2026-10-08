@@ -212,12 +212,7 @@ export function slugOf(item: RawItem): string {
   if (isVidey(item)) return "videy";
   const raw = (item.category || "").toLowerCase().trim();
   const title = item.title || "";
-  if (isPutarin(item)) {
-    // Hentai episodes on Puterin are not JAV.
-    return RAW_CATEGORY_ALIASES[raw as keyof typeof RAW_CATEGORY_ALIASES] === "hentai" || /\bhentai\b/i.test(title)
-      ? "hentai"
-      : "jav";
-  }
+  if (isPutarin(item)) return "jav";
   if (isStreamtape(item)) return "ai-plus";
   // Explicit source/bot category naming one of the newer categories (bule, bumil, tobrut, ...).
   const alias = RAW_CATEGORY_ALIASES[raw as keyof typeof RAW_CATEGORY_ALIASES];

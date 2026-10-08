@@ -35,7 +35,6 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "crot-dalam", label: "Crot Dalam", query: "crot-dalam" },
   { slug: "hamil", label: "Hamil", query: "hamil" },
   { slug: "ojol", label: "Ojol", query: "ojol" },
-  { slug: "hentai", label: "Hentai", query: "hentai" },
   { slug: "lainnya", label: "Lainnya", query: "lainnya" },
 ];
 

@@ -29,7 +29,6 @@ const THREESOME = /threesome|\b3some\b|bertiga|foursome|berempat|\bmmf\b|\bffm\b
 
 /** Order matters: first match wins (most specific themes first). */
 export const EXTRA_CATEGORY_RULES = [
-  ["hentai", /\bhentai\b/],
   [
     "jav",
     /\bjav\b|\b(?:ipzz|ipx|ipz|meyd|ssis|ssni|sone|mide|pred|juq|jul|abp|abw|cawd|mird|hnd|waaa|ebod|pppd|miaa|jufe|dass|adn|roe|mimk|snis|sdde|mukd|nacr|hmn|kawd|jux|ure|stars)\s?\d{3,5}\b|\bfc2\s?(?:ppv\s?)?\d{6,7}\b/,
@@ -66,7 +65,6 @@ export const EXTRA_CATEGORY_RULES = [
  */
 export const RAW_CATEGORY_ALIASES = {
   perselingkuhan: "selingkuh",
-  "hentai eng": "hentai",
   bumil: "hamil",
   threesome: "gangbang",
   western: "barat",
