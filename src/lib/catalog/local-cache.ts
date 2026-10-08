@@ -27,7 +27,7 @@ import folderBatch20261007 from "./folder-batch-20261007.json";
 import videoStats from "./video-stats.json";
 import itemOverrides from "./overrides.json";
 import { softenMinorTerms } from "./minor-title-guard";
-import { HIDDEN_IDS as HIDDEN_ID_REASONS, minorContentReason } from "./hidden-ids.js";
+import { HIDDEN_IDS as HIDDEN_ID_REASONS, RESTORED_TITLES, minorContentReason } from "./hidden-ids.js";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
 import latestVideos from "../../../data/videos-latest.json";
@@ -75,6 +75,8 @@ const STATS = videoStats as unknown as Record<string, [number, number, number]>;
 
 type ItemOverride = { title?: string; category?: string; poster?: string };
 const OVERRIDES = itemOverrides as Record<string, ItemOverride>;
+/** Real source titles for stored "***" titles that only masked "tocil" (see hidden-ids.js). */
+const RESTORED = RESTORED_TITLES as Record<string, string>;
 
 /**
  * Hidden (not deleted) items: reviewed list (hidden-ids.js), records the bot flagged
@@ -109,7 +111,9 @@ export function hiddenReasonRaw(it: RawItem): string {
   if (listed) return listed;
   const rec = it as { hidden?: unknown; hidden_reason?: unknown };
   if (rec.hidden === true) return String(rec.hidden_reason || "bot-flag");
-  return minorContentReason(String(it.title || ""));
+  // Reviewed real title (overrides.json, or "***" restored to "Tocil ..." via RESTORED_TITLES)
+  // is checked instead of a masked stored title.
+  return minorContentReason(String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || ""));
 }
 
 function isHiddenRaw(it: RawItem): boolean {
@@ -182,6 +186,8 @@ function withStats(it: RawItem): RawItem {
       duration: typeof it.duration === "number" && it.duration > 0 ? it.duration : dur || undefined,
     };
   }
+  const restored = RESTORED[it.id];
+  if (restored) out = { ...out, title: restored };
   const ov = OVERRIDES[it.id];
   if (ov) {
     out = {

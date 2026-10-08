@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { reviewPriority } from "@/lib/catalog/hidden-ids.js";
 
 type Row = {
   id: string;
@@ -11,6 +12,7 @@ type Row = {
   javCode: string | null;
   reason: string;
   reasonLabel: string;
+  priority?: "check" | "clear";
   unhidden: boolean;
   unhiddenAt: number | null;
   watchUrl: string;
@@ -18,13 +20,36 @@ type Row = {
 
 const PAGE = 20;
 
+/** Label for "masked-school:<words>" / "masked-check:<words>" reasons (resolved "***" titles). */
+function maskedLabel(reason: string): string | null {
+  const m = reason.match(/^masked-(school|check):(.+)$/);
+  if (!m) return null;
+  const words = m[2].split("+").join(", ");
+  return m[1] === "school"
+    ? `Judul asli di sumber (tersensor ***): ${words}`
+    : `Judul asli (tersensor ***) cuma: ${words} — bisa salah tandai (mis. "sma" = "sama")`;
+}
+
+/** Adds review priority ("Cek dulu" first) without touching hidden state. */
+function withPriority(items: Row[]): Row[] {
+  return items
+    .map((r) => ({
+      ...r,
+      priority: r.priority || (reviewPriority(r.reason, r.title) === "check" ? ("check" as const) : ("clear" as const)),
+      reasonLabel:
+        maskedLabel(r.reason) ||
+        (r.reason === "masked-school-term" ? "Kata disensor (***) di judul, sumber tidak bisa dicek" : r.reasonLabel),
+    }))
+    .sort((a, b) => (a.priority === b.priority ? a.title.localeCompare(b.title) : a.priority === "check" ? -1 : 1));
+}
+
 function csvCell(v: unknown): string {
   const s = String(v ?? "");
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 
 function toCsv(rows: Row[]): string {
-  const head = ["id", "title", "source", "source_link", "embed_link", "jav_code", "hide_reason", "hide_reason_label", "status"];
+  const head = ["id", "title", "source", "source_link", "embed_link", "jav_code", "hide_reason", "hide_reason_label", "prioritas", "status"];
   const lines = rows.map((r) =>
     [
       r.id,
@@ -35,6 +60,7 @@ function toCsv(rows: Row[]): string {
       r.javCode || "",
       r.reason,
       r.reasonLabel,
+      r.priority === "check" ? "Cek dulu" : "Jelas",
       r.unhidden ? "unhidden (tampil publik)" : "hidden",
     ]
       .map(csvCell)
@@ -60,6 +86,7 @@ export function HiddenListSection({ secret }: { secret: string }) {
   const [source, setSource] = useState("");
   const [reason, setReason] = useState("");
   const [status, setStatus] = useState("");
+  const [prio, setPrio] = useState("");
   const [limit, setLimit] = useState(PAGE);
   const [busy, setBusy] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
@@ -80,7 +107,7 @@ export function HiddenListSection({ secret }: { secret: string }) {
     setErr(null);
     try {
       const d = await call({ action: "hidden-list" });
-      if (d?.ok) setRows(d.items || []);
+      if (d?.ok) setRows(withPriority(d.items || []));
       else setErr(d?.error || "gagal");
     } catch {
       setErr("gagal");
@@ -129,17 +156,19 @@ export function HiddenListSection({ secret }: { secret: string }) {
         (!source || r.source === source) &&
         (!reason || r.reason === reason) &&
         (!status || (status === "unhidden" ? r.unhidden : !r.unhidden)) &&
+        (!prio || (prio === "check" ? r.priority === "check" : r.priority !== "check")) &&
         (!key ||
           r.title.toLowerCase().includes(key) ||
           r.id.toLowerCase().includes(key) ||
           (r.javCode || "").toLowerCase().includes(key)),
     );
-  }, [rows, q, source, reason, status]);
+  }, [rows, q, source, reason, status, prio]);
 
   const summary = useMemo(() => {
     const all = rows || [];
     const un = all.filter((r) => r.unhidden).length;
-    return { total: all.length, hidden: all.length - un, unhidden: un };
+    const check = all.filter((r) => !r.unhidden && r.priority === "check").length;
+    return { total: all.length, hidden: all.length - un, unhidden: un, check };
   }, [rows]);
 
   function downloadCsv() {
@@ -162,6 +191,21 @@ export function HiddenListSection({ secret }: { secret: string }) {
           <span className="rounded-full border border-amber-400/40 bg-amber-400/15 px-2.5 py-0.5 text-sm tabular-nums text-amber-200">
             Video disembunyikan: {rows ? summary.hidden : err ? "!" : "…"}
           </span>
+          {rows ? (
+            <button
+              type="button"
+              onClick={() => {
+                setPrio("check");
+                setStatus("hidden");
+                setOpen(true);
+                setLimit(PAGE);
+              }}
+              className="rounded-full border border-sky-400/40 bg-sky-400/10 px-2.5 py-0.5 text-sm tabular-nums text-sky-200 hover:bg-sky-400/20"
+              title="Kemungkinan salah tandai: cuma sensor ***, 'sma' tanpa petunjuk sekolah lain, atau frasa 'kecil'"
+            >
+              Cek dulu: {summary.check}
+            </button>
+          ) : null}
           {rows && summary.unhidden ? (
             <span className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-0.5 text-sm tabular-nums text-emerald-200">
               Di-unhide: {summary.unhidden}
@@ -175,7 +219,7 @@ export function HiddenListSection({ secret }: { secret: string }) {
       </div>
       <p className="mt-2 text-[11px] text-zinc-500">
         Judul menyiratkan sekolah/di bawah umur → tidak tampil di listing, kategori, cari, Tonton juga, sitemap; /watch 404 + noindex.
-        Data tidak dihapus. "Unhide" menampilkan lagi (tersimpan di server, bisa dibatalkan dengan "Sembunyikan lagi"; berlaku ±1 menit).
+        "Cek dulu" = kemungkinan salah tandai (diurutkan paling atas); "Jelas" = kata sekolah/minor eksplisit. Data tidak dihapus. "Unhide" menampilkan lagi (tersimpan di server, bisa dibatalkan dengan "Sembunyikan lagi"; berlaku ±1 menit).
       </p>
       {err ? (
         <p className="mt-3 text-xs text-red-400">
@@ -227,6 +271,11 @@ export function HiddenListSection({ secret }: { secret: string }) {
                       {label}
                     </option>
                   ))}
+                </select>
+                <select className={sel} value={prio} onChange={(e) => setPrio(e.target.value)}>
+                  <option value="">Semua prioritas</option>
+                  <option value="check">Cek dulu (kemungkinan salah tandai)</option>
+                  <option value="clear">Jelas</option>
                 </select>
                 <select className={sel} value={status} onChange={(e) => setStatus(e.target.value)}>
                   <option value="">Semua status</option>
@@ -285,7 +334,18 @@ export function HiddenListSection({ secret }: { secret: string }) {
                           ) : null}
                         </td>
                         <td className="py-2 pr-3 whitespace-nowrap tabular-nums text-zinc-300">{r.javCode || "—"}</td>
-                        <td className="py-2 pr-3 text-zinc-400">{r.reasonLabel}</td>
+                        <td className="py-2 pr-3 text-zinc-400">
+                          <span
+                            className={
+                              r.priority === "check"
+                                ? "mr-1.5 inline-block rounded-full border border-sky-400/40 bg-sky-400/10 px-1.5 py-px text-[10px] text-sky-200"
+                                : "mr-1.5 inline-block rounded-full border border-red-400/30 bg-red-400/10 px-1.5 py-px text-[10px] text-red-200"
+                            }
+                          >
+                            {r.priority === "check" ? "Cek dulu" : "Jelas"}
+                          </span>
+                          {r.reasonLabel}
+                        </td>
                         <td className="py-2 text-right whitespace-nowrap">
                           {r.unhidden ? (
                             <button type="button" className={btn} disabled={busy === r.id} onClick={() => void toggle(r, false)}>
