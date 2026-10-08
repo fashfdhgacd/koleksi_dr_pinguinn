@@ -2,6 +2,15 @@ import { createFileRoute } from "@tanstack/react-router";
 import { collectSharePool } from "@/lib/bot/share-pool";
 import { loadShareUsed, saveShareUsed } from "@/lib/bot/share-used";
 import { processUploadBatch } from "@/lib/bot/upload-handler.js";
+import { isOwnerRequest } from "@/lib/owner-auth";
+import {
+  TELEGRAM_SECRET_HEADER,
+  healWebhookSecret,
+  markVerifiedUpdate,
+  redactToken,
+  timingSafeSecretMatch,
+  webhookSecret,
+} from "@/lib/telegram-webhook";
 
 export const maxDuration = 60;
 
@@ -78,12 +87,12 @@ async function tgSend(
     });
     if (!res.ok) {
       const body = await res.text().catch(() => "");
-      console.error("tgSend failed", res.status, body.slice(0, 200));
+      console.error("tgSend failed", res.status, redactToken(body.slice(0, 200), token));
       return false;
     }
     return true;
   } catch (err) {
-    console.error("tgSend error", err);
+    console.error("tgSend error", redactToken(err instanceof Error ? err.message : err, token));
     return false;
   }
 }
@@ -227,30 +236,56 @@ async function handleShare(token: string, chatId: string | number, text: string)
   await tgSendChunks(token, chatId, body, { reply_markup: MAIN_KEYBOARD });
 }
 
+/** Empty 200: Telegram treats the update as delivered; nothing is revealed to the sender. */
+function ack(): Response {
+  return Response.json({ ok: true });
+}
+
+function notFound(): Response {
+  return new Response("Not Found", {
+    status: 404,
+    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+  });
+}
+
 async function handlePost(request: Request): Promise<Response> {
   const token = envToken();
+  if (!token) return notFound();
+
+  // 1) Only Telegram knows the secret_token (derived from BOT_TOKEN, set via setWebhook).
+  const expected = await webhookSecret(token);
+  const given = request.headers.get(TELEGRAM_SECRET_HEADER) || "";
+  if (!expected || !given || !(await timingSafeSecretMatch(given, expected))) {
+    // If the registered webhook is ours but has no/old secret yet, re-register it with the secret
+    // (throttled). 401 makes Telegram keep the update and re-deliver it with the header later.
+    await healWebhookSecret().catch(() => undefined);
+    return new Response("Unauthorized", {
+      status: 401,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+
+  // 2) Deny-all unless an allowlist is configured; only the sender (from.id) counts.
   const allowed = envAdminIds();
   let update: Record<string, unknown> = {};
   try {
     update = (await request.json()) as Record<string, unknown>;
   } catch {
-    update = {};
+    return ack();
   }
 
-  const msg = (update.message || update.channel_post) as
-    | { text?: string; caption?: string; chat?: { id?: number }; from?: { id?: number } }
+  const msg = update.message as
+    | { text?: string; caption?: string; chat?: { id?: number }; from?: { id?: number; is_bot?: boolean } }
     | undefined;
-
-  if (!msg || !token) return Response.json({ ok: true });
+  if (!msg) return ack();
 
   const chatId = msg.chat?.id;
-  const fromId = String(msg.from?.id || "");
-  if (!chatId) return Response.json({ ok: true });
+  const fromId = msg.from?.id != null ? String(msg.from.id) : "";
+  if (!chatId || !fromId || msg.from?.is_bot) return ack();
+  // Unknown senders/chats are ignored silently (no reply, so the bot cannot be used to spam).
+  if (allowed.size === 0 || !allowed.has(fromId)) return ack();
 
-  if (allowed.size > 0 && !allowed.has(fromId) && !allowed.has(String(chatId))) {
-    await tgSend(token, chatId, "\u274c Tidak diizinkan.");
-    return Response.json({ ok: true });
-  }
+  await markVerifiedUpdate().catch(() => undefined);
 
   const text = String(msg.text || msg.caption || "").trim();
   if (!text) return Response.json({ ok: true });
@@ -287,7 +322,7 @@ async function handlePost(request: Request): Promise<Response> {
       tgSend,
       tgSendChunks,
       MAIN_KEYBOARD,
-    }).catch((err) => console.error("handleUpload", err));
+    }).catch((err) => console.error("handleUpload", redactToken(err instanceof Error ? err.message : err, token)));
     if (!(await deferWork(work))) {
       await work;
     }
@@ -308,60 +343,21 @@ async function handlePost(request: Request): Promise<Response> {
 export const Route = createFileRoute("/api/telegram")({
   server: {
     handlers: {
-      GET: async () => {
+      // Owner-only minimal status (no GitHub call, no repo/config details). Everyone else: 404.
+      GET: async ({ request }) => {
+        if (!(await isOwnerRequest(request))) return notFound();
         const env = process.env;
         const has = (k: string) => Boolean(String(env[k] || "").trim());
-        const token = String(env.GH_TOKEN || env.GITHUB_TOKEN || "").trim();
-        const ghOwner = String(env.GH_OWNER || env.GITHUB_OWNER || "").trim() || "fashfdhgacd";
-        let ghRepo = String(env.GH_REPO || env.GITHUB_REPO || "").trim() || "koleksi_dr_pinguinn";
-        if (ghRepo === "koleksi_dr_pinguin" || ghRepo === "koleksi-dr-pinguin") ghRepo = "koleksi_dr_pinguinn";
-        let ghAccess: string = "unknown";
-        let ghPrivate: boolean | null = null;
-        if (token && ghOwner && ghRepo) {
-          try {
-            const r = await fetch(`https://api.github.com/repos/${ghOwner}/${ghRepo}`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: "application/vnd.github+json",
-                "User-Agent": "kdp-bot-diag",
-              },
-            });
-            if (r.status === 200) {
-              const body = (await r.json()) as { private?: boolean; permissions?: { push?: boolean } };
-              ghPrivate = Boolean(body.private);
-              ghAccess = body.permissions?.push ? "push_ok" : "read_only";
-            } else if (r.status === 401) {
-              ghAccess = "bad_token";
-            } else if (r.status === 404) {
-              ghAccess = "repo_not_found_or_no_access";
-            } else {
-              ghAccess = `http_${r.status}`;
-            }
-          } catch {
-            ghAccess = "network_error";
-          }
-        } else {
-          ghAccess = "missing_env";
-        }
-        return Response.json({
-          ok: true,
-          service: "telegram-webhook",
-          host: HOST,
-          modes: ["upload", "share", "keyboard"],
-          ready: Boolean(envToken()),
-          upload: {
-            botToken: has("BOT_TOKEN") || has("TELEGRAM_BOT_TOKEN"),
-            adminId: has("AUTHORIZED_USER_IDS") || has("TELEGRAM_USER_ID") || has("TELEGRAM_ADMIN_ID"),
-            ghToken: Boolean(token),
-            ghOwner: ghOwner || null,
-            ghRepo: ghRepo || null,
-            ghAccess,
-            ghPrivate,
-            streamtape: has("STREAMTAPE_LOGIN") && has("STREAMTAPE_KEY"),
-            putarin: has("PUTARIN_API_KEY"),
-            canWriteJson: ghAccess === "push_ok",
+        return Response.json(
+          {
+            ok: true,
+            service: "telegram-webhook",
+            ready: Boolean(envToken()),
+            adminConfigured: envAdminIds().size > 0,
+            ghTokenConfigured: has("GH_TOKEN") || has("GITHUB_TOKEN"),
           },
-        });
+          { headers: { "cache-control": "no-store" } },
+        );
       },
       POST: async ({ request }) => handlePost(request),
     },

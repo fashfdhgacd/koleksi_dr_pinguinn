@@ -55,6 +55,8 @@ export function cleanTitle(raw = "") {
     .replace(/^judul\s*[:\uff1a-]\s*/i, "")
     .replace(/^title\s*[:\uff1a-]\s*/i, "")
     .replace(/koleksidrpinguin\.(com|site)/gi, "")
+    // No markup in titles: drop < and > (titles end up in HTML/JSON-LD on the site).
+    .replace(/[<>]/g, " ")
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
     .trim()

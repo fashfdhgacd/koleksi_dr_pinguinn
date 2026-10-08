@@ -1,6 +1,6 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { isPublicHidden } from "@/lib/catalog/local-cache";
 import { queryCatalog } from "@/lib/catalog/service";
+import { jsonLdString } from "@/lib/json-ld";
 import {
   DEFAULT_OG,
   SITE_ORIGIN,
@@ -30,8 +30,10 @@ export const Route = createFileRoute("/watch/$id")({
     const id = (params.id || "").trim();
     if (!id) return { ok: false as const, error: "ID kosong", code: "bad_request" as const };
     const res = await queryCatalog({ type: "detail", id });
-    // Istilah minor / 'Tidak publish' → 404 sungguhan.
-    if (!res.ok && res.code === "not_found" && (await isPublicHidden(id))) throw notFound();
+    // ID tidak dikenal, video tersembunyi (minor/sekolah) atau 'Tidak publish' → 404 sungguhan
+    // (+ noindex, lihat head di bawah dan server/middleware/cache-headers.ts). Error lain (sumber
+    // sedang gangguan) tetap tampil sebagai halaman error biasa, bukan 404.
+    if (!res.ok && res.code === "not_found") throw notFound();
     return res;
   },
   head: ({ loaderData }) => {
@@ -92,7 +94,7 @@ export const Route = createFileRoute("/watch/$id")({
       ],
       links: [{ rel: "canonical", href: url }],
       scripts: jsonLd
-        ? [{ type: "application/ld+json", children: JSON.stringify(jsonLd) }]
+        ? [{ type: "application/ld+json", children: jsonLdString(jsonLd) }]
         : [],
     };
   },

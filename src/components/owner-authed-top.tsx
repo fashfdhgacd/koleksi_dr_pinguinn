@@ -2,6 +2,7 @@
 
 import { Stat, fmt, presenceLabel, type OwnerStats } from "@/components/owner-dashboard-shared";
 import { OwnerTools } from "@/components/owner-tools";
+import { OwnerTelegramStatus } from "@/components/owner-telegram-status";
 
 export function OwnerAuthedTop(props: {
   online: number;
@@ -42,6 +43,8 @@ export function OwnerAuthedTop(props: {
             </section>
 
             <OwnerTools secret={secret} />
+
+            <OwnerTelegramStatus secret={secret} />
     </>
   );
 }

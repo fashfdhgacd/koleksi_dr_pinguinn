@@ -13,6 +13,14 @@ import { listHiddenForReview, setReviewMark } from "@/lib/owner-hidden-review";
 import { listHiddenCandidates, applyUnhidden, type HiddenCandidate } from "@/lib/catalog/local-cache";
 import { sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
 import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
+import { isOwnerRequest, ownerSecret } from "@/lib/owner-auth";
+import {
+  getWebhookInfo,
+  lastSetupAt,
+  lastVerifiedUpdateAt,
+  setupWebhook,
+  WEBHOOK_URL,
+} from "@/lib/telegram-webhook";
 
 export const maxDuration = 60;
 
@@ -187,18 +195,6 @@ async function setHiddenOverrideBulk(body: {
 
 const HOST = "https://koleksidrpinguin.com";
 
-function viewSecret(): string {
-  const a = (process.env.ONLINE_VIEW_SECRET || "").trim();
-  if (a) return a;
-  return (process.env.OWNER_SECRET || process.env.PEMILIK_SECRET || "").trim();
-}
-
-function isOwner(request: Request): boolean {
-  const secret = viewSecret();
-  const key = (request.headers.get("x-online-key") || "").trim();
-  return Boolean(secret && key && key === secret);
-}
-
 function json(data: unknown, status = 200): Response {
   return Response.json(data, { status, headers: { "cache-control": "no-store" } });
 }
@@ -298,20 +294,50 @@ type OwnerBody = {
   limit?: number;
   unhide?: boolean;
   ids?: string[];
+  key?: string;
 };
+
+/** Telegram webhook status for the owner: registered url, pending updates, last error, last OK. */
+async function handleTelegramWebhook(install: boolean) {
+  const [result, lastOk, lastSetup] = await Promise.all([
+    install ? setupWebhook() : getWebhookInfo(),
+    lastVerifiedUpdateAt(),
+    lastSetupAt(),
+  ]);
+  const info = result.info;
+  const urlOk = Boolean(info && info.url === WEBHOOK_URL);
+  return json(
+    {
+      ok: result.ok,
+      installed: install ? result.ok : undefined,
+      error: result.error,
+      expectedUrl: WEBHOOK_URL,
+      urlOk,
+      info: info || null,
+      before: "before" in result ? result.before || null : undefined,
+      lastSetupAt: install && result.ok ? new Date().toISOString() : lastSetup,
+      lastVerifiedUpdateAt: lastOk,
+    },
+    result.ok ? 200 : 502,
+  );
+}
 
 export const Route = createFileRoute("/api/owner-tools")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        if (!viewSecret()) return json({ ok: false, error: "not_configured" }, 503);
-        if (!isOwner(request)) return json({ ok: false, error: "forbidden" }, 403);
+        if (!ownerSecret()) return json({ ok: false, error: "not_configured" }, 503);
         let body: OwnerBody = {};
         try {
-          body = (await request.json()) as OwnerBody;
+          body = ((await request.json()) as OwnerBody) || {};
         } catch {
-          return json({ ok: false, error: "bad_json" }, 400);
+          body = {};
         }
+        // Owner key: header x-online-key (or body.key). Never the URL query.
+        if (!(await isOwnerRequest(request, body.key))) return json({ ok: false, error: "forbidden" }, 403);
+        if (typeof body !== "object" || Array.isArray(body)) return json({ ok: false, error: "bad_json" }, 400);
+        if (body.action === "telegram-webhook-info") return handleTelegramWebhook(false);
+        if (body.action === "telegram-webhook-setup") return handleTelegramWebhook(true);
         if (body.action === "hidden-review") {
           const items = await listHiddenForReview();
           return json({ ok: true, count: items.length, items });

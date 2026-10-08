@@ -1,10 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getD1, type D1DatabaseLike } from "@/lib/analytics-d1";
+import { getDetail } from "@/lib/catalog/local";
 
 /**
  * Our own likes, stored in Cloudflare D1 (binding ANALYTICS_DB) for exact counts:
  *  - video_likes:       one row per video, atomic UPSERT n = n + 1
  *  - video_like_guard:  unique (id, visitor, day) row = one like per visitor per video per day
+ *    (rows older than 2 days are deleted opportunistically, at most once per 6 h per isolate)
+ * Only ids of videos that are actually public in the catalog can be liked (no rows for made-up ids),
+ * and storage errors are never echoed to the client.
  * Kept separate from src/lib/catalog/video-stats.json (source stats refreshed by the GitHub
  * workflow), so the workflow can never overwrite these counts.
  */
@@ -23,6 +27,7 @@ const SCHEMA = [
      created_at integer not null,
      primary key (id, visitor, day)
    )`,
+  `create index if not exists video_like_guard_created on video_like_guard (created_at)`,
 ];
 
 const BOT_UA = /bot|crawl|spider|slurp|headless|curl\/|wget|python-requests|preview/i;
@@ -45,6 +50,44 @@ async function likesDb(): Promise<D1DatabaseLike | null> {
 
 function validLikeId(id: unknown): id is string {
   return typeof id === "string" && /^[A-Za-z0-9_-]{3,64}$/.test(id);
+}
+
+/** Small per-isolate memo of catalog lookups (public video ids only). */
+const knownIds = new Map<string, { ok: boolean; at: number }>();
+const KNOWN_TTL_MS = 10 * 60_000;
+const KNOWN_MAX = 5000;
+
+/** True when the id is a public (not hidden) video in the catalog. */
+async function isLikeableId(id: string): Promise<boolean> {
+  const now = Date.now();
+  const hit = knownIds.get(id);
+  if (hit && now - hit.at < KNOWN_TTL_MS) return hit.ok;
+  let ok = false;
+  try {
+    await getDetail(id);
+    ok = true;
+  } catch {
+    ok = false;
+  }
+  if (knownIds.size >= KNOWN_MAX) knownIds.clear();
+  knownIds.set(id, { ok, at: now });
+  return ok;
+}
+
+const GUARD_KEEP_MS = 2 * 24 * 3600_000;
+const CLEANUP_EVERY_MS = 6 * 3600_000;
+let lastCleanup = 0;
+
+/** Delete like-guard rows older than 2 days (one-like-per-day only needs today's rows). */
+async function cleanupGuard(db: D1DatabaseLike): Promise<void> {
+  const now = Date.now();
+  if (now - lastCleanup < CLEANUP_EVERY_MS) return;
+  lastCleanup = now;
+  try {
+    await db.prepare("delete from video_like_guard where created_at < ?").bind(now - GUARD_KEEP_MS).run();
+  } catch {
+    /* best effort */
+  }
 }
 
 function clientIp(request: Request): string {
@@ -130,6 +173,12 @@ export const Route = createFileRoute("/api/like")({
       GET: async ({ request }) => {
         const id = new URL(request.url).searchParams.get("id");
         if (!validLikeId(id)) return Response.json({ ok: false, error: "bad id" }, { status: 400 });
+        if (!(await isLikeableId(id))) {
+          return Response.json(
+            { ok: false, error: "not_found" },
+            { status: 404, headers: { "cache-control": "public, max-age=300" } },
+          );
+        }
         const db = await likesDb().catch(() => null);
         const count = db ? await readCount(db, id).catch(() => 0) : 0;
         return Response.json(
@@ -150,17 +199,22 @@ export const Route = createFileRoute("/api/like")({
         if (BOT_UA.test(ua) && !/Mozilla/.test(ua)) {
           return Response.json({ ok: false, error: "bot" }, { status: 403 });
         }
+        if (!(await isLikeableId(id))) {
+          return Response.json({ ok: false, error: "not_found" }, { status: 404, headers: { "cache-control": "no-store" } });
+        }
         const db = await likesDb().catch(() => null);
         if (!db) return Response.json({ ok: false, error: "storage" }, { status: 503 });
         const action = body.action === "unlike" ? "unlike" : "like";
         try {
           const visitor = await visitorHash(clientIp(request), id);
           const res = await applyLike(db, id, visitor, action);
+          await cleanupGuard(db);
           return Response.json({ ok: true, id, storage: "d1", ...res }, { headers: { "cache-control": "no-store" } });
         } catch (err) {
+          console.error("like failed:", err instanceof Error ? err.message.slice(0, 200) : "d1 error");
           return Response.json(
-            { ok: false, error: err instanceof Error ? err.message.slice(0, 120) : "d1 error" },
-            { status: 500, headers: { "cache-control": "no-store" } },
+            { ok: false, error: "storage" },
+            { status: 503, headers: { "cache-control": "no-store" } },
           );
         }
       },

@@ -6,6 +6,7 @@ import {
   touchOnline,
 } from "@/lib/owner-analytics";
 import { kvCountOnline, kvReadRoll, kvTouchLive, rollToStats } from "@/lib/kv-live";
+import { isOwnerKey, ownerKeyFrom, ownerSecret } from "@/lib/owner-auth";
 
 const BOT_UA =
   /bot|crawl|spider|slurp|headless|webdriver|puppeteer|playwright|scrapy|httpclient|curl\/|wget|python-requests|axios\/|node-fetch|bytespider|gptbot|claudebot|ccbot|semrush|ahrefs|dataforseo|petalbot|facebookexternalhit|preview/i;
@@ -22,29 +23,9 @@ const OWNER_CACHE_MS = 20_000;
 
 let ownerCache: { at: number; data: Record<string, unknown> } | null = null;
 
-function viewSecret(): string {
-  const a = (process.env.ONLINE_VIEW_SECRET || "").trim();
-  if (a) return a;
-  return (process.env.OWNER_SECRET || process.env.PEMILIK_SECRET || "").trim();
-}
-
-function isOwnerKey(key: string | null | undefined): boolean {
-  const secret = viewSecret();
-  if (!secret || !key) return false;
-  return key.trim() === secret;
-}
-
+/** Owner key: header x-online-key or JSON body `key` only — never the URL query string. */
 function extractKey(request: Request, bodyKey?: string): string {
-  const header = request.headers.get("x-online-key") || "";
-  if (header) return header;
-  try {
-    const url = new URL(request.url);
-    const q = url.searchParams.get("key") || url.searchParams.get("k") || "";
-    if (q) return q;
-  } catch {
-    /* ignore */
-  }
-  return bodyKey || "";
+  return ownerKeyFrom(request, bodyKey);
 }
 
 function allowOrigin(request: Request): string {
@@ -167,7 +148,7 @@ async function handlePost(request: Request): Promise<Response> {
     return json(request, { ok: true, skipped: "bad_id" });
   }
 
-  const owner = isOwnerKey(extractKey(request, bodyKey));
+  const owner = await isOwnerKey(extractKey(request, bodyKey));
   const ua = request.headers.get("user-agent") || "";
   if (shouldSkipBot(ua, owner)) {
     return json(request, { ok: true, skipped: "bot" });
@@ -232,7 +213,7 @@ async function handlePost(request: Request): Promise<Response> {
 }
 
 async function handleGet(request: Request): Promise<Response> {
-  const secret = viewSecret();
+  const secret = ownerSecret();
   if (!secret) {
     return json(request, {
       ok: false,
@@ -240,7 +221,7 @@ async function handleGet(request: Request): Promise<Response> {
       hint: "Set ONLINE_VIEW_SECRET di Cloudflare (domain .com) lalu redeploy.",
     });
   }
-  if (!isOwnerKey(extractKey(request))) {
+  if (!(await isOwnerKey(extractKey(request)))) {
     return json(request, { ok: false, error: "forbidden" });
   }
   try {
