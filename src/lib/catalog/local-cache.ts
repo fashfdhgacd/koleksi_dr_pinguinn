@@ -70,7 +70,7 @@ export function buildVideyNo(items: RawItem[]): Map<string, number> {
   return m;
 }
 
-const STATS = videoStats as Record<string, [number, number, number]>;
+const STATS = videoStats as unknown as Record<string, [number, number, number]>;
 
 type ItemOverride = { title?: string; category?: string; poster?: string };
 const OVERRIDES = itemOverrides as Record<string, ItemOverride>;
@@ -108,6 +108,38 @@ function withStats(it: RawItem): RawItem {
   return out;
 }
 
+/**
+ * Terbaru (homepage list) ordering, deterministic for pagination/SEO:
+ *  - positions 1..24 (page 1): IndoAV only, same order as before
+ *  - from page 2: every 3rd card is UserBokep (newest first), the rest IndoAV, until
+ *    UserBokep runs out; then the remaining items keep the existing order.
+ * Category pages and search keep their own ordering (mainSorted / bySlug / ranking).
+ */
+const TERBARU_FIRST_PAGE = DEFAULT_PAGE_SIZE;
+export function terbaruOrder(sorted: RawItem[]): RawItem[] {
+  const indo: RawItem[] = [];
+  const ub: RawItem[] = [];
+  const rest: RawItem[] = [];
+  for (const it of sorted) {
+    if (isIndoAv(it)) indo.push(it);
+    else if (isUserBokep(it)) ub.push(it);
+    else rest.push(it);
+  }
+  const out: RawItem[] = indo.slice(0, TERBARU_FIRST_PAGE);
+  let i = TERBARU_FIRST_PAGE;
+  let u = 0;
+  let slot = 0;
+  while (u < ub.length && i < indo.length) {
+    if (slot % 3 === 2) out.push(ub[u++]);
+    else out.push(indo[i++]);
+    slot++;
+  }
+  while (u < ub.length) out.push(ub[u++]);
+  while (i < indo.length) out.push(indo[i++]);
+  out.push(...rest);
+  return out;
+}
+
 export function buildIndexes(
   items: RawItem[],
   posters: Record<string, string>,
@@ -135,7 +167,8 @@ export function buildIndexes(
   for (const [slug, list] of bySlug) {
     bySlug.set(slug, sortByNewest(list));
   }
-  return { at, items, posters, videyNo, byId, bySlug, mainSorted, haystack };
+  const terbaruSorted = terbaruOrder(mainSorted);
+  return { at, items, posters, videyNo, byId, bySlug, mainSorted, terbaruSorted, haystack };
 }
 
 export function pageOf(pool: RawItem[], page: number, limit: number, posters: Record<string, string>, videyNo: Map<string, number>): PagedVideos {

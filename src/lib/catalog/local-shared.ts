@@ -40,6 +40,8 @@ export type CatalogCache = {
   byId: Map<string, RawItem>;
   bySlug: Map<string, RawItem[]>;
   mainSorted: RawItem[];
+  /** Terbaru order: page 1 IndoAV-only, then UserBokep interleaved 1:2 with IndoAV. */
+  terbaruSorted: RawItem[];
   haystack: { item: RawItem; hay: string }[];
 };
 

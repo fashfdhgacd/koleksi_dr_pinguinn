@@ -89,8 +89,8 @@ function mixIndoHeavy(items: RawItem[], excludeId: string, limit: number, seed: 
 }
 
 export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
-  const { mainSorted, posters, videyNo } = await loadItems();
-  return pageOf(mainSorted, page, limit, posters, videyNo);
+  const { terbaruSorted, posters, videyNo } = await loadItems();
+  return pageOf(terbaruSorted, page, limit, posters, videyNo);
 }
 
 export async function listFeatured(page = 1, limit = 8, _signal?: AbortSignal): Promise<PagedVideos> {
