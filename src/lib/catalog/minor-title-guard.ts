@@ -13,8 +13,9 @@ const RULES: [RegExp, string][] = [
 ];
 
 export function softenMinorTerms(title: string): string {
-  let t = String(title || "");
-  if (!t) return t;
+  // Underscore-joined titles ("Ngewe_Remaja_...") must match word boundaries too.
+  let t = String(title || "").replace(/_+/g, " ");
+  if (!t.trim()) return title;
   let changed = false;
   for (const [re, rep] of RULES) {
     const next = t.replace(re, rep);
