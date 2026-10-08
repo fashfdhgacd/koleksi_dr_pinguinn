@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import { OwnerChart } from "@/components/owner-chart";
 import { TopVideosSection } from "@/components/owner-top-videos";
@@ -15,11 +16,13 @@ export function OwnerAuthedBottom(props: {
   loading: boolean;
   fetchOnline: (key: string, quiet?: boolean) => Promise<void>;
   logout: () => void;
+  /** Rendered at the very bottom, just above the Refresh/Keluar footer (hidden videos + bot cards). */
+  beforeFooter?: ReactNode;
 }) {
-  const { days, devices, stats, secret, loading, fetchOnline, logout } = props;
+  const { days, devices, stats, secret, loading, fetchOnline, logout, beforeFooter } = props;
   return (
     <>
-      {/* Video disembunyikan: dipindah ke paling atas dashboard (owner-panel.tsx) */}
+      {/* Video disembunyikan + Bot Telegram: paling bawah, lewat prop beforeFooter (owner-panel.tsx) */}
       {days.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
                 <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Grafik 14 hari (WIB)</h2>
@@ -109,6 +112,8 @@ export function OwnerAuthedBottom(props: {
                 </ul>
               </section>
             ) : null}
+
+            {beforeFooter}
 
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[11px] text-zinc-600">Ping pengunjung 90 dtk · panel refresh 25 dtk · tab tersembunyi tidak dihitung</p>

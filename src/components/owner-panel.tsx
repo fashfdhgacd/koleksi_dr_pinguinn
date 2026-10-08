@@ -146,10 +146,6 @@ export function OwnerDashboard() {
           />
         ) : (
           <>
-            {/* Paling atas setelah login: video tersembunyi + badge jumlah + Unhide */}
-            <HiddenListSection secret={secret} />
-            {/* Status bot Telegram tepat di bawah daftar tersembunyi */}
-            <OwnerTelegramStatus secret={secret} />
             <OwnerAuthedTop
               online={online}
               stats={stats}
@@ -167,6 +163,13 @@ export function OwnerDashboard() {
               loading={loading}
               fetchOnline={fetchOnline}
               logout={logout}
+              beforeFooter={
+                <>
+                  {/* Paling bawah (di atas Refresh/Keluar): video tersembunyi + Unhide, lalu status bot Telegram */}
+                  <HiddenListSection secret={secret} />
+                  <OwnerTelegramStatus secret={secret} />
+                </>
+              }
             />
           </>
         )}
