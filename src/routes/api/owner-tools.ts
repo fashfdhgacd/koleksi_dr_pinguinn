@@ -12,7 +12,7 @@ import {
 import { listHiddenForReview, setReviewMark } from "@/lib/owner-hidden-review";
 import { listHiddenCandidates, applyUnhidden, type HiddenCandidate } from "@/lib/catalog/local-cache";
 import { sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
-import { readUnhideState, setUnhidden } from "@/lib/catalog/unhide-store";
+import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
 
 export const maxDuration = 60;
 
@@ -139,6 +139,52 @@ async function setHiddenOverride(body: {
   }
 }
 
+/**
+ * Bulk Unhide / hide again: one KV read-modify-write of owner:unhide:v1. Every id must be a
+ * flagged (hidden-by-default) item; unknown ids are rejected and reported, nothing is deleted.
+ */
+async function setHiddenOverrideBulk(body: {
+  ids?: unknown;
+  unhide?: unknown;
+}): Promise<{
+  ok: boolean;
+  error?: string;
+  status?: number;
+  unhidden?: boolean;
+  changed?: number;
+  applied?: string[];
+  rejected?: string[];
+  total?: number;
+}> {
+  if (typeof body.unhide !== "boolean") return { ok: false, error: "bad_unhide", status: 400 };
+  if (!Array.isArray(body.ids) || !body.ids.length) return { ok: false, error: "no_ids", status: 400 };
+  if (body.ids.length > 2000) return { ok: false, error: "too_many_ids", status: 400 };
+  const ids = [...new Set(body.ids.map((x) => String(x || "").trim()))];
+  const flagged = new Set((await listHiddenCandidates()).map((c) => c.item.id));
+  const applied = ids.filter((id) => /^[A-Za-z0-9_-]{3,64}$/.test(id) && flagged.has(id));
+  const rejected = ids.filter((id) => !applied.includes(id));
+  if (!applied.length) return { ok: false, error: "not_hidden_item", status: 404, rejected };
+  try {
+    const state = await readUnhideState();
+    let changed = 0;
+    const now = Date.now();
+    for (const id of applied) {
+      if (body.unhide) {
+        if (!state.ids[id]) changed++;
+        state.ids[id] = { at: now };
+      } else if (state.ids[id]) {
+        delete state.ids[id];
+        changed++;
+      }
+    }
+    await writeUnhideState(state);
+    applyUnhidden(Object.keys(state.ids));
+    return { ok: true, unhidden: body.unhide, changed, applied, rejected, total: Object.keys(state.ids).length };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "kv_error", status: 503 };
+  }
+}
+
 const HOST = "https://koleksidrpinguin.com";
 
 function viewSecret(): string {
@@ -251,6 +297,7 @@ type OwnerBody = {
   url?: string;
   limit?: number;
   unhide?: boolean;
+  ids?: string[];
 };
 
 export const Route = createFileRoute("/api/owner-tools")({
@@ -281,6 +328,10 @@ export const Route = createFileRoute("/api/owner-tools")({
         }
         if (body.action === "unhide") {
           const r = await setHiddenOverride(body);
+          return json(r, r.status || 200);
+        }
+        if (body.action === "unhide-bulk") {
+          const r = await setHiddenOverrideBulk(body);
           return json(r, r.status || 200);
         }
         if (body.action === "review-mark") {

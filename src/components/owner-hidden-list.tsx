@@ -89,6 +89,8 @@ export function HiddenListSection({ secret }: { secret: string }) {
   const [prio, setPrio] = useState("");
   const [limit, setLimit] = useState(PAGE);
   const [busy, setBusy] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [bulkMsg, setBulkMsg] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
 
   const call = useCallback(
@@ -118,6 +120,45 @@ export function HiddenListSection({ secret }: { secret: string }) {
     // Load right after login (not only when expanded) so the count badge is always visible.
     if (secret && !rows) void load();
   }, [secret, rows, load]);
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  /** Bulk: one confirmation, one API call (owner key), one KV write. Reversible. */
+  async function bulk(unhide: boolean) {
+    const ids = [...selected];
+    if (!ids.length) return;
+    const verb = unhide ? "Tampilkan lagi di situs publik" : "Sembunyikan lagi dari situs publik";
+    if (!window.confirm(`${verb}: ${ids.length} video?\n\nBisa dibatalkan kapan saja (tidak ada yang dihapus).`)) return;
+    setBusy("bulk");
+    setErr(null);
+    setBulkMsg(null);
+    try {
+      const d = await call({ action: "unhide-bulk", ids, unhide });
+      if (!d?.ok) {
+        setErr(d?.error || "gagal");
+        return;
+      }
+      const applied = new Set<string>(d.applied || []);
+      const now = Date.now();
+      setRows((prev) =>
+        (prev || []).map((r) => (applied.has(r.id) ? { ...r, unhidden: unhide, unhiddenAt: unhide ? now : null } : r)),
+      );
+      setSelected(new Set());
+      const rej = (d.rejected || []).length;
+      setBulkMsg(`${unhide ? "Ditampilkan" : "Disembunyikan"}: ${applied.size} video${rej ? ` · ${rej} id ditolak (bukan video yang ditandai)` : ""}.`);
+    } catch {
+      setErr("gagal");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function toggle(row: Row, unhide: boolean) {
     if (unhide && !window.confirm(`Tampilkan lagi di situs publik?\n\n${row.title}\n\nBisa dibatalkan dengan "Sembunyikan lagi".`)) return;
@@ -179,6 +220,16 @@ export function HiddenListSection({ secret }: { secret: string }) {
     a.download = "hidden-list.csv";
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  const allShownSelected = shown.length > 0 && shown.every((r) => selected.has(r.id));
+  function toggleSelectAll() {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allShownSelected) shown.forEach((r) => next.delete(r.id));
+      else shown.forEach((r) => next.add(r.id));
+      return next;
+    });
   }
 
   const sel = "rounded-md border border-white/[0.08] bg-[#0f0f11] px-2 py-1 text-xs text-zinc-200";
@@ -289,10 +340,45 @@ export function HiddenListSection({ secret }: { secret: string }) {
                   Muat ulang
                 </button>
               </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-white/[0.06] bg-[#0f0f11] px-3 py-2 text-xs text-zinc-300">
+                <label className="flex cursor-pointer items-center gap-2">
+                  <input type="checkbox" checked={allShownSelected} onChange={toggleSelectAll} disabled={!shown.length} />
+                  Pilih semua (yang tampil di filter: {shown.length})
+                </label>
+                <span className="tabular-nums text-zinc-400">· Dipilih: {selected.size}</span>
+                {selected.size ? (
+                  <button type="button" className="text-[11px] text-zinc-500 underline" onClick={() => setSelected(new Set())}>
+                    batal pilih
+                  </button>
+                ) : null}
+                <span className="ml-auto flex gap-2">
+                  <button
+                    type="button"
+                    className={`${btn} border-amber-400/40 text-amber-200`}
+                    disabled={!selected.size || busy === "bulk"}
+                    onClick={() => void bulk(true)}
+                  >
+                    {busy === "bulk" ? "…" : `Tampilkan lagi (${selected.size})`}
+                  </button>
+                  <button type="button" className={btn} disabled={!selected.size || busy === "bulk"} onClick={() => void bulk(false)}>
+                    {busy === "bulk" ? "…" : `Sembunyikan lagi (${selected.size})`}
+                  </button>
+                </span>
+              </div>
+              {bulkMsg ? <p className="mt-2 text-xs text-emerald-300">{bulkMsg}</p> : null}
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left text-xs">
                   <thead className="text-[10px] uppercase tracking-wide text-zinc-600">
                     <tr>
+                      <th className="w-6 pb-2 font-medium">
+                        <input
+                          type="checkbox"
+                          aria-label="Pilih semua yang tampil di filter"
+                          checked={allShownSelected}
+                          onChange={toggleSelectAll}
+                          disabled={!shown.length}
+                        />
+                      </th>
                       <th className="pb-2 font-medium">Judul</th>
                       <th className="pb-2 font-medium">Sumber</th>
                       <th className="pb-2 font-medium">Kode JAV</th>
@@ -302,7 +388,10 @@ export function HiddenListSection({ secret }: { secret: string }) {
                   </thead>
                   <tbody>
                     {shown.slice(0, limit).map((r) => (
-                      <tr key={r.id} className="border-t border-white/[0.06] align-top">
+                      <tr key={r.id} className={`border-t border-white/[0.06] align-top${selected.has(r.id) ? " bg-white/[0.03]" : ""}`}>
+                        <td className="py-2 pr-2">
+                          <input type="checkbox" aria-label={`Pilih ${r.title}`} checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} />
+                        </td>
                         <td className="py-2 pr-3 text-zinc-200">
                           <div className="break-words">{r.title}</div>
                           <div className="mt-0.5 text-[10px] text-zinc-600">
