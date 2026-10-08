@@ -8,6 +8,9 @@ import {
   listRelated,
   listSearch,
 } from "./local";
+import { fetchCatalog } from "./client";
+import { listRanking } from "./ranking-list";
+import { parseRankingKey } from "./rankings";
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./types";
 import type { CatalogError, CatalogResponse, CatalogType, VideoCard } from "./types";
 
@@ -107,6 +110,16 @@ export async function queryCatalog(query: CatalogQuery, signal?: AbortSignal): P
       case "category": {
         const slug = (query.category || "").trim();
         if (!slug) return { ok: false, error: "Kategori wajib diisi.", code: "bad_request" };
+        // Ranking pages (paling-ditonton / paling-disukai, optional "~minggu" / "~bulan").
+        const rank = parseRankingKey(slug);
+        if (rank) {
+          // D1/KV likes only exist on the server: in the browser ask /api/data (edge cached).
+          if (typeof window !== "undefined") {
+            return fetchCatalog({ type: "category", category: slug, page: page ?? 1, limit: limit ?? DEFAULT_PAGE_SIZE }, signal);
+          }
+          const data = await listRanking(rank.def.kind, rank.period.period, page ?? 1, limit ?? DEFAULT_PAGE_SIZE);
+          return { ok: true, type, ...data };
+        }
         if (!findCategory(slug)) return { ok: false, error: "Kategori tidak dikenal.", code: "bad_request" };
         const data = await listCategory(slug, page, limit, signal);
         return { ok: true, type, ...data };

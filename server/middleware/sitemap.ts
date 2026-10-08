@@ -40,6 +40,9 @@ function pageEntries(categories: CategoryInfo[]): string[] {
   const out: string[] = [
     urlEntry(`${SITE_ORIGIN}/`, { changefreq: "hourly", priority: "1.0" }),
     urlEntry(`${SITE_ORIGIN}/kategori`, { changefreq: "daily", priority: "0.8" }),
+    // Ranking pages (src/lib/catalog/rankings.ts), refreshed with the 12-hourly stats.
+    urlEntry(`${SITE_ORIGIN}/kategori/paling-ditonton`, { changefreq: "daily", priority: "0.8" }),
+    urlEntry(`${SITE_ORIGIN}/kategori/paling-disukai`, { changefreq: "daily", priority: "0.8" }),
   ];
   for (const c of categories) {
     out.push(

@@ -12,6 +12,8 @@ import { DEFAULT_PAGE_SIZE } from "@/lib/catalog/types";
 const QUICK_CATS = [
   { slug: "jav", label: "Jav" },
   { slug: "ai-plus", label: "AI+" },
+  { slug: "paling-ditonton", label: "Paling Ditonton" },
+  { slug: "paling-disukai", label: "Paling Disukai" },
 ] as const;
 
 export function Header({

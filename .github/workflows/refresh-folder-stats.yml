@@ -1,5 +1,6 @@
 # Refresh views/duration/likes for owner's IndoAV/UserBokep folders (~every 12h).
-# Only rewrites src/lib/catalog/video-stats.json; never adds/removes videos.
+# Rewrites src/lib/catalog/video-stats.json, then stores a daily snapshot (stats-history/) and the
+# week/month deltas for the ranking pages (scripts/stats-snapshot.py). Never adds/removes videos.
 name: Refresh folder stats
 
 on:
@@ -22,19 +23,23 @@ jobs:
       - uses: actions/checkout@v4
       - name: Crawl folders (slow, retries on 522)
         run: python3 scripts/refresh-folder-stats.py
-      - name: Guard (stats only)
+      - name: Daily snapshot + week/month deltas (ranking pages)
+        run: python3 scripts/stats-snapshot.py
+      - name: Guard (stats + ranking snapshots only)
         run: |
-          changed=$(git status --porcelain | awk '{print $2}')
-          for f in $changed; do
-            if [ "$f" != "src/lib/catalog/video-stats.json" ]; then echo "unexpected change: $f"; exit 1; fi
+          git status --porcelain --untracked-files=all | awk '{print $2}' | while read -r f; do
+            case "$f" in
+              src/lib/catalog/video-stats.json|src/lib/catalog/rank-periods.json|src/lib/catalog/rank-periods-meta.json|stats-history/*.json) ;;
+              *) echo "unexpected change: $f"; exit 1 ;;
+            esac
           done
           python3 -c "import json;d=json.load(open('src/lib/catalog/video-stats.json'));assert len(d)>1000;print(len(d))"
       - name: Commit if changed
         run: |
-          if git diff --quiet -- src/lib/catalog/video-stats.json; then echo "no changes"; exit 0; fi
+          git add -A src/lib/catalog/video-stats.json src/lib/catalog/rank-periods.json src/lib/catalog/rank-periods-meta.json stats-history
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/lib/catalog/video-stats.json
-          git commit -m "stats: refresh folder views/likes"
+          git commit -m "stats: refresh folder views/likes + daily ranking snapshot"
           git pull --rebase
           git push
