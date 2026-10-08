@@ -64,9 +64,12 @@ export const Route = createFileRoute("/kategori/$slug")({
     const page = typeof match.search.page === "number" ? match.search.page : 1;
     const periode = rank ? parsePeriode(match.search.periode) : undefined;
     const seo = rank ? rankingSeo(rank) : cat ? categorySeo(cat.slug) : homeSeo(undefined, undefined);
+    // A period tab without data yet (Minggu/Bulan ini "segera"): noindex,follow + canonical to the
+    // Sepanjang-masa page. Becomes indexable automatically once rank-periods-meta.json has the period.
+    const emptyPeriod = Boolean(rank && periode && !periodAvailable(periodFromKey(periode).period));
     const qs = new URLSearchParams();
-    if (periode) qs.set("periode", periode);
-    if (page > 1) qs.set("page", String(page));
+    if (periode && !emptyPeriod) qs.set("periode", periode);
+    if (page > 1 && !emptyPeriod) qs.set("page", String(page));
     const url = `${SITE_ORIGIN}/kategori/${params.slug}${qs.toString() ? `?${qs.toString()}` : ""}`;
     return {
       meta: [
@@ -77,6 +80,7 @@ export const Route = createFileRoute("/kategori/$slug")({
         { property: "og:url", content: url },
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
+        ...(emptyPeriod ? [{ name: "robots", content: "noindex,follow" }] : []),
       ],
       links: [{ rel: "canonical", href: url }],
     };
