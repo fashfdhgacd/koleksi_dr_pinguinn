@@ -42,7 +42,14 @@ export default async function cacheHeadersMiddleware(
   const path = event.url.pathname;
   const type = result.headers.get("content-type") || "";
 
-  if (isHashedAsset(path)) {
+  // Owner dashboard + owner APIs: never cached (browser/CDN), never indexed. A cached /pemilik
+  // HTML would keep pointing at the previous deploy's dashboard chunk.
+  if (path === "/pemilik" || path.startsWith("/pemilik/") || path.startsWith("/api/owner")) {
+    const res = withHeaders(result, "private, no-store, max-age=0");
+    res.headers.set("x-robots-tag", "noindex, nofollow, noarchive");
+    return res;
+  }
+    if (isHashedAsset(path)) {
     return withHeaders(result, "public, max-age=31536000, immutable");
   }
   if (isStaticMedia(path)) {

@@ -16,7 +16,7 @@ type Row = {
   watchUrl: string;
 };
 
-const PAGE = 100;
+const PAGE = 20;
 
 function csvCell(v: unknown): string {
   const s = String(v ?? "");
@@ -62,7 +62,7 @@ export function HiddenListSection({ secret }: { secret: string }) {
   const [status, setStatus] = useState("");
   const [limit, setLimit] = useState(PAGE);
   const [busy, setBusy] = useState<string | null>(null);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const call = useCallback(
     async (body: Record<string, unknown>) => {
@@ -88,8 +88,9 @@ export function HiddenListSection({ secret }: { secret: string }) {
   }, [call]);
 
   useEffect(() => {
-    if (secret && open && !rows) void load();
-  }, [secret, open, rows, load]);
+    // Load right after login (not only when expanded) so the count badge is always visible.
+    if (secret && !rows) void load();
+  }, [secret, rows, load]);
 
   async function toggle(row: Row, unhide: boolean) {
     if (unhide && !window.confirm(`Tampilkan lagi di situs publik?\n\n${row.title}\n\nBisa dibatalkan dengan "Sembunyikan lagi".`)) return;
@@ -155,20 +156,37 @@ export function HiddenListSection({ secret }: { secret: string }) {
   const btn = "rounded-md border border-white/[0.12] px-2 py-1 text-[11px] text-zinc-200 hover:bg-white/[0.06] disabled:opacity-50";
 
   return (
-    <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+    <section id="video-disembunyikan" className="rounded-2xl border border-amber-400/30 bg-[#17140f] p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Video disembunyikan (khusus pemilik)</h2>
+        <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold text-zinc-50">
+          <span className="rounded-full border border-amber-400/40 bg-amber-400/15 px-2.5 py-0.5 text-sm tabular-nums text-amber-200">
+            Video disembunyikan: {rows ? summary.hidden : err ? "!" : "…"}
+          </span>
+          {rows && summary.unhidden ? (
+            <span className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2.5 py-0.5 text-sm tabular-nums text-emerald-200">
+              Di-unhide: {summary.unhidden}
+            </span>
+          ) : null}
+          <span className="text-[10px] font-normal uppercase tracking-[0.16em] text-zinc-500">khusus pemilik</span>
+        </h2>
         <button type="button" className={btn} onClick={() => setOpen((v) => !v)}>
-          {open ? "Tutup" : "Buka daftar"}
+          {open ? "Ciutkan daftar" : "Buka daftar"}
         </button>
       </div>
       <p className="mt-2 text-[11px] text-zinc-500">
         Judul menyiratkan sekolah/di bawah umur → tidak tampil di listing, kategori, cari, Tonton juga, sitemap; /watch 404 + noindex.
         Data tidak dihapus. "Unhide" menampilkan lagi (tersimpan di server, bisa dibatalkan dengan "Sembunyikan lagi"; berlaku ±1 menit).
       </p>
+      {err ? (
+        <p className="mt-3 text-xs text-red-400">
+          Error: {err}{" "}
+          <button type="button" className="underline" onClick={() => void load()}>
+            coba lagi
+          </button>
+        </p>
+      ) : null}
       {open ? (
         <>
-          {err ? <p className="mt-3 text-xs text-red-400">Error: {err}</p> : null}
           {!rows && !err ? <p className="mt-3 text-xs text-zinc-500">Memuat…</p> : null}
           {rows ? (
             <>
