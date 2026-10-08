@@ -1,6 +1,12 @@
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
 import { findCategory } from "./categories";
+import {
+  GENERIC_CATEGORY_SLUGS,
+  RAW_CATEGORY_ALIASES,
+  SOFT_RAW_CATEGORY_ALIASES,
+  refineCategory,
+} from "./title-category.js";
 
 export const CACHE_MS = 10 * 60 * 1000;
 export const STALE_MS = 30 * 60 * 1000;
@@ -204,12 +210,31 @@ export function classify(title: string): string {
 }
 export function slugOf(item: RawItem): string {
   if (isVidey(item)) return "videy";
-  if (isPutarin(item)) return "jav";
-  if (isStreamtape(item)) return "ai-plus";
   const raw = (item.category || "").toLowerCase().trim();
-  const mapped = raw && raw !== "lainnya" ? findCategory(raw) : undefined;
-  if (mapped && mapped.slug !== "lainnya") return mapped.slug;
-  const hit = classify(item.title || "");
+  const title = item.title || "";
+  if (isPutarin(item)) {
+    // Hentai episodes on Puterin are not JAV.
+    return RAW_CATEGORY_ALIASES[raw as keyof typeof RAW_CATEGORY_ALIASES] === "hentai" || /\bhentai\b/i.test(title)
+      ? "hentai"
+      : "jav";
+  }
+  if (isStreamtape(item)) return "ai-plus";
+  // Explicit source/bot category naming one of the newer categories (bule, bumil, tobrut, ...).
+  const alias = RAW_CATEGORY_ALIASES[raw as keyof typeof RAW_CATEGORY_ALIASES];
+  if (alias && findCategory(alias)) return alias;
+  // Loose source-folder labels (stw, bule, tobrut, outdoor, ...) are hints, not explicit categories.
+  const isSoft = Object.prototype.hasOwnProperty.call(SOFT_RAW_CATEGORY_ALIASES, raw);
+  const mapped = raw && raw !== "lainnya" && !isSoft ? findCategory(raw) : undefined;
+  if (mapped && mapped.slug !== "lainnya") {
+    // Explicit categories stay; only the generic / unlisted buckets can be refined.
+    return mapped.slug === "amatir" || mapped.slug === "abg" ? refineCategory(mapped.slug, title) : mapped.slug;
+  }
+  const base = classify(title);
+  if (!GENERIC_CATEGORY_SLUGS.has(base)) return refineCategory(base, title);
+  // Source hints (stw → tante, artis → selebgram, toilet → kamar mandi) before generic title themes.
+  const soft = SOFT_RAW_CATEGORY_ALIASES[raw as keyof typeof SOFT_RAW_CATEGORY_ALIASES];
+  if (soft && findCategory(soft)) return soft;
+  const hit = refineCategory(base, title);
   if (hit !== "lainnya") return hit;
   if (isIndoAv(item) || isUserBokep(item)) return "amatir";
   return "lainnya";

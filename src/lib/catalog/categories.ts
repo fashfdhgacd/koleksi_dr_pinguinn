@@ -21,7 +21,21 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "open-bo", label: "Open BO", query: "open-bo" },
   { slug: "malaysia", label: "Malaysia", query: "malaysia" },
   { slug: "chindo", label: "Chindo", query: "chindo" },
-  { slug: "gangbang", label: "Gangbang", query: "gangbang" },
+  { slug: "gangbang", label: "Threesome & Gangbang", query: "gangbang" },
+  { slug: "selingkuh", label: "Selingkuh", query: "selingkuh" },
+  { slug: "barat", label: "Bule", query: "barat" },
+  { slug: "mahasiswi", label: "Mahasiswi", query: "mahasiswi" },
+  { slug: "sepong", label: "Sepong", query: "sepong" },
+  { slug: "tobrut", label: "Tobrut", query: "tobrut" },
+  { slug: "selebgram", label: "Selebgram", query: "selebgram" },
+  { slug: "outdoor", label: "Outdoor", query: "outdoor" },
+  { slug: "hotel", label: "Hotel", query: "hotel" },
+  { slug: "kamar-mandi", label: "Kamar Mandi", query: "kamar-mandi" },
+  { slug: "wot", label: "Goyang WOT", query: "wot" },
+  { slug: "crot-dalam", label: "Crot Dalam", query: "crot-dalam" },
+  { slug: "hamil", label: "Hamil", query: "hamil" },
+  { slug: "ojol", label: "Ojol", query: "ojol" },
+  { slug: "hentai", label: "Hentai", query: "hentai" },
   { slug: "lainnya", label: "Lainnya", query: "lainnya" },
 ];
 
@@ -31,6 +45,9 @@ export const UNLISTED_CATEGORY_SLUGS = new Set<string>(["abg"]);
 export const CATEGORY_LIST: CategoryInfo[] = CATEGORIES.filter((c) => !UNLISTED_CATEGORY_SLUGS.has(c.slug)).map(
   ({ slug, label }) => ({ slug, label }),
 );
+
+/** Kategori dengan video lebih sedikit dari ini tidak tampil di /kategori dan sitemap (halaman tetap bisa dibuka). */
+export const MIN_LISTED_CATEGORY_COUNT = 20;
 
 /** Chip utama di header; sisanya di menu "Lainnya". */
 export const PRIMARY_CATEGORY_SLUGS = [
