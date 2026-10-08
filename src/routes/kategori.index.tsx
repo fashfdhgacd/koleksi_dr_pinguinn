@@ -46,24 +46,18 @@ function CategoriesPage() {
           <p className="mt-1 text-sm text-muted">Pilih kategori tanpa scroll panjang di header.</p>
         </div>
 
-        <ul className="grid grid-cols-2 gap-3" aria-label="Peringkat">
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {RANKINGS.map((r) => (
             <li key={r.slug}>
               <Link
                 to="/kategori/$slug"
                 params={{ slug: r.slug }}
-                className="flex h-20 flex-col items-center justify-center rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 text-center text-base font-semibold leading-tight text-foreground active:scale-[0.98]"
+                className="flex h-14 items-center justify-center rounded-xl border border-border bg-secondary/40 px-3 text-center text-sm font-medium leading-tight text-foreground active:scale-[0.98]"
               >
-                <span>{r.kind === "views" ? "\u{1F525}" : "\u2764\uFE0F"} {r.label}</span>
-                <span className="mt-1 text-[11px] font-normal text-muted">
-                  {r.kind === "views" ? "Urut jumlah tayangan" : "Urut jumlah suka"}
-                </span>
+                {r.label}
               </Link>
             </li>
           ))}
-        </ul>
-
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           <li>
             <Link
               to="/"
