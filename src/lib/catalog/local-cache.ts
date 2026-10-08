@@ -109,7 +109,9 @@ export function hiddenReasonRaw(it: RawItem): string {
   if (listed) return listed;
   const rec = it as { hidden?: unknown; hidden_reason?: unknown };
   if (rec.hidden === true) return String(rec.hidden_reason || "bot-flag");
-  return minorContentReason(String(it.title || ""));
+  // overrides.json title = reviewed real source title (e.g. "***" restored to "Tocil ..."), so
+  // check that instead of a masked stored title.
+  return minorContentReason(String(OVERRIDES[it.id]?.title || it.title || ""));
 }
 
 function isHiddenRaw(it: RawItem): boolean {

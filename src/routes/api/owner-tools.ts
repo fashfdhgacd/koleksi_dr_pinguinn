@@ -13,6 +13,7 @@ import { listHiddenForReview, setReviewMark } from "@/lib/owner-hidden-review";
 import { listHiddenCandidates, applyUnhidden, type HiddenCandidate } from "@/lib/catalog/local-cache";
 import { sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
 import { readUnhideState, setUnhidden } from "@/lib/catalog/unhide-store";
+import { reviewPriority } from "@/lib/catalog/hidden-ids.js";
 
 export const maxDuration = 60;
 
@@ -30,13 +31,15 @@ type HiddenListRow = {
   javCode: string | null;
   reason: string;
   reasonLabel: string;
+  /** "check" = Cek dulu (kemungkinan salah tandai), "clear" = Jelas. Tidak mengubah status hidden. */
+  priority: "check" | "clear";
   unhidden: boolean;
   unhiddenAt: number | null;
   watchUrl: string;
 };
 
 const HIDE_REASON_LABELS: Record<string, string> = {
-  "masked-school-term": "Kata bertema sekolah disensor (***) di judul sumber",
+  "masked-school-term": "Kata disensor (***) di judul, sumber tidak bisa dicek",
   school: "Kata sekolah (SMA/SMP/siswi/pelajar/sekolah…)",
   "school-uniform": "Seragam sekolah",
   minor: "Menyiratkan di bawah umur (bocil/loli/anak kecil…)",
@@ -48,6 +51,13 @@ const HIDE_REASON_LABELS: Record<string, string> = {
 };
 
 function reasonLabel(reason: string): string {
+  const m = reason.match(/^masked-(school|check):(.+)$/);
+  if (m) {
+    const words = m[2].split("+").join(", ");
+    return m[1] === "school"
+      ? `Judul asli di sumber (tersensor ***): ${words}`
+      : `Judul asli (tersensor ***) cuma: ${words} — bisa salah tandai (mis. "sma" = "sama")`;
+  }
   return HIDE_REASON_LABELS[reason] || reason;
 }
 
@@ -102,6 +112,7 @@ function toHiddenRow(c: HiddenCandidate): HiddenListRow {
     javCode: javCodeOf(title),
     reason: c.reason,
     reasonLabel: reasonLabel(c.reason),
+    priority: reviewPriority(c.reason, title) === "check" ? "check" : "clear",
     unhidden: c.unhidden,
     unhiddenAt: c.unhiddenAt || null,
     watchUrl: `/watch/${it.id}`,
@@ -117,7 +128,8 @@ async function listHiddenVideos(): Promise<HiddenListRow[]> {
     at = {};
   }
   const rows = (await listHiddenCandidates(at)).map(toHiddenRow);
-  return rows.sort((a, b) => a.title.localeCompare(b.title));
+  // "Cek dulu" first, then title.
+  return rows.sort((a, b) => (a.priority === b.priority ? a.title.localeCompare(b.title) : a.priority === "check" ? -1 : 1));
 }
 
 /** unhide=true → public again; unhide=false → hidden again (default). */
@@ -276,6 +288,7 @@ export const Route = createFileRoute("/api/owner-tools")({
             ok: true,
             count: items.length,
             unhidden: items.filter((r) => r.unhidden).length,
+            check: items.filter((r) => r.priority === "check" && !r.unhidden).length,
             items,
           });
         }
