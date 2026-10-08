@@ -291,7 +291,7 @@ export async function healWebhookSecret(opts: { fromTelegram?: boolean } = {}): 
   const gap = lastHealOk ? HEAL_OK_GAP_MS : HEAL_FAIL_GAP_MS;
   if (lastHealAt && now - lastHealAt < gap) return;
   lastHealAt = now;
-  const mode = opts.fromTelegram ? "telegram-ip" : "other";
+  let mode = opts.fromTelegram ? "telegram-ip" : "other";
   healing = (async () => {
     let ok = false;
     let error: string | null = null;
@@ -302,11 +302,16 @@ export async function healWebhookSecret(opts: { fromTelegram?: boolean } = {}): 
         error = `info: ${safeCode(info.error)}`;
         return;
       }
-      const url = String(info.result.url || "");
+      const registered = String(info.result.url || "");
+      // No webhook registered at all: this Worker is the bot's only update handler, so register our
+      // own fixed WEBHOOK_URL (caller cannot influence url or secret). A webhook that points somewhere
+      // else is never touched unless the request itself came from Telegram's IP ranges.
+      const url = registered || WEBHOOK_URL;
+      if (!registered) mode = `${mode}+register`;
       urlOurs = isOurWebhookUrl(url);
       const usable = opts.fromTelegram ? /^https:\/\//i.test(url) : urlOurs;
       if (!usable) {
-        error = url ? "url_not_ours" : "webhook_not_set";
+        error = "url_not_ours";
         return;
       }
       const r = await setWebhookWithSecret(url, {
