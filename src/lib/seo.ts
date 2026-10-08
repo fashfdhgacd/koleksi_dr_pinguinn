@@ -41,7 +41,7 @@ export function pageTitle(parts: Array<string | null | undefined>): string {
 }
 
 const MINOR_RE =
-  /\b(abg|tocil|teen|teens|underage|bocil|anak|smp|sma|smk|loli|lolita|shota|remaja|bocah|pelajar|sekolah|seragam\s+sekolah|perawan\s+kecil|gadis\s+kecil|dedek|adek|adik)\b/i;
+  /\b(abg|teen|teens|underage|bocil|anak|smp|sma|smk|loli|lolita|shota|remaja|bocah|pelajar|sekolah|seragam\s+sekolah|perawan\s+kecil|gadis\s+kecil|dedek|adek|adik)\b/i;
 
 /** Hapus suffix branding situs dari judul tampil (data asli tidak diubah). */
 export function cleanDisplayTitle(raw?: string | null): string {
