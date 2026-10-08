@@ -1,4 +1,5 @@
 import { refineCategory } from "@/lib/catalog/title-category.js";
+import { cleanUploadTitle, brandUploadTitle } from "./title-brand.js";
 const STREAMTAPE_HOST = /(^|\.)(streamtape\.com|strcloud[a-z0-9]*)$/i;
 const PUTARIN_HOST = /(^|\.)(putarin\.com|puterin\.[a-z]+)$/i;
 const LULU_HOST = /(^|\.)(luluvdo\.com|lulustream\.com|luluvid\.com|lulu\.st)$/i;
@@ -48,19 +49,18 @@ export function detectCategory(title = "", fallback = "") {
   return refineCategory(base, text);
 }
 
+/**
+ * Judul dasar: tanpa branding situs/channel lain dan tanpa branding pinguin lama; '<' '>' dibuang.
+ * Akhiran " - koleksidrpinguin.com" dipasang sekali saat record dibuat (brandTitle, upload-handler).
+ * Aturan + daftar nama situs: src/lib/bot/title-brand.js. Tes: node scripts/test-title-brand.mjs
+ */
 export function cleanTitle(raw = "") {
-  return String(raw)
-    .replace(/^\u25b6\s*/, "")
-    .replace(/^[\u{1F4C1}\u{1F4C2}\u{1F3AC}\u{1F3A5}\u{1F4F9}]\s*/u, "")
-    .replace(/^judul\s*[:\uff1a-]\s*/i, "")
-    .replace(/^title\s*[:\uff1a-]\s*/i, "")
-    .replace(/koleksidrpinguin\.(com|site)/gi, "")
-    // No markup in titles: drop < and > (titles end up in HTML/JSON-LD on the site).
-    .replace(/[<>]/g, " ")
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/^[\-|]+|[\-|]+$/g, "") || "Video";
+  return cleanUploadTitle(raw);
+}
+
+/** Judul final upload baru: judul dasar + tepat satu " - koleksidrpinguin.com". */
+export function brandTitle(raw = "") {
+  return brandUploadTitle(raw);
 }
 
 export function extractUrls(text = "") {

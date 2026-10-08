@@ -71,8 +71,22 @@ export function cleanDisplayTitle(raw?: string | null): string {
   return t || String(raw || "").replace(/_+/g, " ").replace(/\s+/g, " ").trim() || "Video";
 }
 
+/**
+ * Upload bot baru menyimpan judul "Judul - koleksidrpinguin.com" (keputusan pemilik; tetap tampil
+ * di kartu/H1/og:title). Untuk <title> dan kalimat deskripsi, akhiran domain itu dilepas supaya
+ * tidak jadi "… - koleksidrpinguin.com | koleksidrpinguin.com": pageTitle() memasang domain sekali,
+ * dan tetap utuh walau judul panjang dipotong.
+ */
+export function withoutDomainSuffix(raw?: string | null): string {
+  const t = String(raw || "");
+  const cut = t
+    .replace(/\s*[-–—|·:]?\s*(?:https?:\/\/)?(?:www\.)?koleksidrpinguin\.(?:com|site)\/?\s*$/i, "")
+    .trim();
+  return cut || t.trim();
+}
+
 export function videoSeoTitle(title: string, category?: string | null): string {
-  const base = cleanDisplayTitle(title);
+  const base = withoutDomainSuffix(cleanDisplayTitle(title));
   const label = safeSeoLabel(category);
   const hasLabel = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(base);
   const head = !label ? base : hasLabel ? `${base} – Bokep` : `${base} – Bokep ${label}`;
@@ -146,7 +160,7 @@ function safeTags(item: SeoVideoInput, label: string): string[] {
  */
 function buildSentences(item: SeoVideoInput): { lead: string; detail: string; close: string } {
   const label = safeSeoLabel(item.category);
-  const rawTitle = cleanDisplayTitle(item.title);
+  const rawTitle = withoutDomainSuffix(cleanDisplayTitle(item.title));
   const titleOk = !MINOR_RE.test(rawTitle);
   const t = titleOk ? (rawTitle.length > 60 ? `${rawTitle.slice(0, 57).trimEnd()}…` : rawTitle) : "";
   const src0 = String(item.creator || item.source || "").trim();

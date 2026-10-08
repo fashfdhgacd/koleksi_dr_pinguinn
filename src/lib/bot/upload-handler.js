@@ -1,4 +1,4 @@
-import { parseMessage, detectCategory, cleanTitle } from "@/lib/bot/parse.js";
+import { parseMessage, detectCategory, cleanTitle, brandTitle } from "@/lib/bot/parse.js";
 import { toRecord } from "@/lib/bot/store.js";
 import { fetchPutarinMeta, fetchStreamtapeMeta, fetchEmbedPageMeta, expandPutarinFolder } from "@/lib/bot/providers.js";
 import { upsertVideosBatch } from "@/lib/bot/github.js";
@@ -123,12 +123,15 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   for (let i = 0; i < queue.length; i++) {
     const video = queue[i];
     const meta = metas[i] || { title: `Video ${video.id}`, thumb: "" };
-    const title = meta.title || `Video ${video.id}`;
+    // Judul dasar (branding situs lain + pinguin lama sudah dibuang) untuk kategori & filter minor;
+    // yang disimpan/ditampilkan: judul dasar + tepat satu " - koleksidrpinguin.com" (keputusan pemilik).
+    const baseTitle = cleanTitle(meta.title || `Video ${video.id}`);
+    const title = brandTitle(baseTitle === "Video" ? `Video ${video.id}` : baseTitle);
     // A specific category from the message wins; a generic one ("amatir"/"umum"/"lainnya",
     // e.g. pasted from the source page) only applies when title detection finds nothing better.
     const given = String(parsedMsg.category || "").toLowerCase().trim();
     const generic = !given || ["amatir", "umum", "lainnya", "bokep"].includes(given);
-    const detected = detectCategory(title);
+    const detected = detectCategory(baseTitle);
     const category =
       video.host === "putarin" || video.host === "putarin-folder"
         ? parsedMsg.category || "jav"
@@ -144,7 +147,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
       : video;
     const baseRecord = toRecord({ parsed: withPoster, title, category });
     // School/minor-themed titles are stored but flagged hidden (the catalog never shows them).
-    const hiddenReason = minorContentReason(`${title} ${String(video.title || parsedMsg.title || "")}`);
+    const hiddenReason = minorContentReason(`${baseTitle} ${String(video.title || parsedMsg.title || "")} ${String(meta.title || "")}`);
     const record = hiddenReason ? { ...baseRecord, hidden: true, hidden_reason: hiddenReason } : baseRecord;
     const fileName = video.file || "videos.json";
     const list = byFile.get(fileName) || [];
