@@ -1,6 +1,6 @@
 import { parseMessage, detectCategory, cleanTitle } from "@/lib/bot/parse.js";
 import { toRecord } from "@/lib/bot/store.js";
-import { fetchPutarinMeta, fetchStreamtapeMeta, expandPutarinFolder } from "@/lib/bot/providers.js";
+import { fetchPutarinMeta, fetchStreamtapeMeta, fetchEmbedPageMeta, expandPutarinFolder } from "@/lib/bot/providers.js";
 import { upsertVideosBatch } from "@/lib/bot/github.js";
 import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
 
@@ -24,6 +24,10 @@ async function resolveMetaFast(video, givenTitle, env) {
       if (!thumb && isHttpPoster(meta.thumb)) thumb = meta.thumb;
     } else if (video.host === "streamtape") {
       const meta = await fetchStreamtapeMeta(video.id, env);
+      if (!title && meta.title) title = cleanTitle(meta.title);
+      if (!thumb && isHttpPoster(meta.thumb)) thumb = meta.thumb;
+    } else if ((video.host === "indoav" || video.host === "userbokep") && (!thumb || !title)) {
+      const meta = await fetchEmbedPageMeta(video.embed, video.id);
       if (!title && meta.title) title = cleanTitle(meta.title);
       if (!thumb && isHttpPoster(meta.thumb)) thumb = meta.thumb;
     }
@@ -119,13 +123,21 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const video = queue[i];
     const meta = metas[i] || { title: `Video ${video.id}`, thumb: "" };
     const title = meta.title || `Video ${video.id}`;
+    // A specific category from the message wins; a generic one ("amatir"/"umum"/"lainnya",
+    // e.g. pasted from the source page) only applies when title detection finds nothing better.
+    const given = String(parsedMsg.category || "").toLowerCase().trim();
+    const generic = !given || ["amatir", "umum", "lainnya", "bokep"].includes(given);
+    const detected = detectCategory(title);
     const category =
-      parsedMsg.category ||
-      (video.host === "putarin" || video.host === "putarin-folder"
-        ? "jav"
+      video.host === "putarin" || video.host === "putarin-folder"
+        ? parsedMsg.category || "jav"
         : video.host === "streamtape"
-          ? "ai-plus"
-          : detectCategory(title));
+          ? parsedMsg.category || "ai-plus"
+          : !generic
+            ? given
+            : detected !== "lainnya"
+              ? detected
+              : given || (video.host === "indoav" || video.host === "userbokep" ? "amatir" : "lainnya");
     const withPoster = isHttpPoster(meta.thumb)
       ? { ...video, poster: meta.thumb, thumbnail: meta.thumb }
       : video;

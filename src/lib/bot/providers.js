@@ -10,13 +10,14 @@ async function getJson(url, headers = {}) {
 
 function decodeEntities(s = "") {
   return String(s)
-    .replace(/&/g, "&")
-    .replace(/</g, "<")
-    .replace(/>/g, ">")
-    .replace(/"/g, '"')
-    .replace(/&#039;/g, "'")
-    .replace(/'/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0*39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16)))
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&amp;/g, "&")
     .trim();
 }
 
@@ -85,6 +86,48 @@ export async function fetchPutarinTitle(code, env) {
     }
   }
   return withTimeout(scrapePutarinTitle(code), 3000, "");
+}
+
+/**
+ * IndoAV / UserBokep: read og:image (+ og:title) from the public /d/<id> page.
+ * Short timeout so the batch stays fast; returns empty strings on any failure.
+ */
+export async function fetchEmbedPageMeta(embedUrl, id) {
+  let origin = "";
+  try {
+    origin = new URL(String(embedUrl || "")).origin;
+  } catch {
+    return { title: "", thumb: "" };
+  }
+  if (!origin || !id || !/indoav\.|userbokep\./i.test(origin)) return { title: "", thumb: "" };
+  const run = async () => {
+    for (const path of [`/d/${encodeURIComponent(id)}`, `/e/${encodeURIComponent(id)}`]) {
+      try {
+        const res = await fetch(origin + path, {
+          headers: { accept: "text/html", "user-agent": "Mozilla/5.0 (compatible; kdp-bot/1.0)" },
+          redirect: "follow",
+          signal: AbortSignal.timeout(3500),
+        });
+        if (!res.ok) continue;
+        const html = await res.text();
+        const img = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+          || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+        const ttl = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i);
+        const thumb = img ? decodeEntities(img[1]) : "";
+        const title = ttl ? decodeEntities(ttl[1]) : "";
+        if (thumb || title) {
+          return {
+            title,
+            thumb: /^https:\/\//i.test(thumb) && !/placeholder|logo|favicon/i.test(thumb) ? thumb : "",
+          };
+        }
+      } catch {
+        /* try next */
+      }
+    }
+    return { title: "", thumb: "" };
+  };
+  return withTimeout(run(), 6000, { title: "", thumb: "" });
 }
 
 export async function fetchPutarinMeta(code, env) {
