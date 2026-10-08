@@ -25,6 +25,8 @@ import streamtapeBatchSep25 from "./streamtape-batch-20260925.json";
 import putarinBatch from "./putarin.json";
 import folderBatch20261007 from "./folder-batch-20261007.json";
 import videoStats from "./video-stats.json";
+import itemOverrides from "./overrides.json";
+import { softenMinorTerms } from "./minor-title-guard";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
 import latestVideos from "../../../data/videos-latest.json";
@@ -70,17 +72,40 @@ export function buildVideyNo(items: RawItem[]): Map<string, number> {
 
 const STATS = videoStats as Record<string, [number, number, number]>;
 
-/** Merge folder stats (views, duration sec, likes) at load; never touches stored item data. */
+type ItemOverride = { title?: string; category?: string; poster?: string };
+const OVERRIDES = itemOverrides as Record<string, ItemOverride>;
+
+/**
+ * Load-time only (stored/bot data is never rewritten):
+ *  - folder stats (views, duration sec, likes)
+ *  - manual overrides (src/lib/catalog/overrides.json: title / category / poster per id)
+ *  - light title guard that strips minor-implying wording from display titles
+ */
 function withStats(it: RawItem): RawItem {
+  let out = it;
   const st = STATS[it.id];
-  if (!st) return it;
-  const [views, dur, likes] = st;
-  return {
-    ...it,
-    views: typeof it.views === "number" ? it.views : views,
-    likes: typeof it.likes === "number" ? it.likes : likes,
-    duration: typeof it.duration === "number" && it.duration > 0 ? it.duration : dur || undefined,
-  };
+  if (st) {
+    const [views, dur, likes] = st;
+    out = {
+      ...out,
+      views: typeof it.views === "number" ? it.views : views,
+      likes: typeof it.likes === "number" ? it.likes : likes,
+      duration: typeof it.duration === "number" && it.duration > 0 ? it.duration : dur || undefined,
+    };
+  }
+  const ov = OVERRIDES[it.id];
+  if (ov) {
+    out = {
+      ...out,
+      ...(ov.title ? { title: ov.title } : {}),
+      ...(ov.category ? { category: ov.category } : {}),
+      ...(ov.poster && !out.poster ? { poster: ov.poster } : {}),
+    };
+  }
+  const title = typeof out.title === "string" ? out.title : "";
+  const safe = title ? softenMinorTerms(title) : title;
+  if (safe !== title) out = { ...out, title: safe };
+  return out;
 }
 
 export function buildIndexes(

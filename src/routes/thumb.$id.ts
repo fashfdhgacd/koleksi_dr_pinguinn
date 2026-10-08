@@ -3,6 +3,7 @@ import posters from "@/lib/catalog/posters.json";
 import javPosters from "@/lib/catalog/jav-posters.json";
 import latestPosters from "../../data/latest-posters.json";
 import folderBatch20261007 from "@/lib/catalog/folder-batch-20261007.json";
+import itemOverrides from "@/lib/catalog/overrides.json";
 import { resolvePostersBucket } from "@/lib/poster-r2";
 
 function sourceFor(id: string): string {
@@ -11,6 +12,8 @@ function sourceFor(id: string): string {
     const url = map?.[id];
     if (typeof url === "string" && url.startsWith("http")) return url;
   }
+  const ov = (itemOverrides as Record<string, { poster?: string }>)[id];
+  if (ov && typeof ov.poster === "string" && ov.poster.startsWith("http")) return ov.poster;
   // Folder-ingest batches carry their poster on the item itself.
   for (const it of folderBatch20261007 as Array<{ id?: string; poster?: string }>) {
     if (it?.id === id && typeof it.poster === "string" && it.poster.startsWith("http")) return it.poster;
