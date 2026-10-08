@@ -42,6 +42,8 @@ export type VideoDetail = VideoCard & {
 export type CategoryInfo = {
   slug: string;
   label: string;
+  /** Jumlah video (hanya diisi oleh daftar kategori /kategori). */
+  count?: number;
 };
 
 export type PagedVideos = {

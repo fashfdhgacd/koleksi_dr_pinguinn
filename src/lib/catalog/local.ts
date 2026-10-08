@@ -1,6 +1,7 @@
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
-import { findCategory } from "./categories";
+import { CATEGORY_LIST, MIN_LISTED_CATEGORY_COUNT, findCategory } from "./categories";
+import type { CategoryInfo } from "./types";
 import {
   type RawItem,
   isIndoAv,
@@ -207,4 +208,20 @@ export async function listCategories(): Promise<{ slug: string; label: string; c
     out.push({ slug, label: cat?.label || slug, count: nonVidey.length });
   }
   return out.sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Public category list with live counts; categories with fewer than
+ * MIN_LISTED_CATEGORY_COUNT videos are left out (their pages still work).
+ */
+export async function listListedCategories(): Promise<CategoryInfo[]> {
+  const { bySlug } = await loadItems();
+  const out: CategoryInfo[] = [];
+  for (const c of CATEGORY_LIST) {
+    const pool = bySlug.get(c.slug) || [];
+    let count = 0;
+    for (const it of pool) if (!isVidey(it)) count++;
+    if (count >= MIN_LISTED_CATEGORY_COUNT) out.push({ slug: c.slug, label: c.label, count });
+  }
+  return out;
 }

@@ -4,6 +4,7 @@ import {
   listCategory,
   listFeatured,
   listLatest,
+  listListedCategories,
   listRelated,
   listSearch,
 } from "./local";
@@ -94,7 +95,7 @@ export async function queryCatalog(query: CatalogQuery, signal?: AbortSignal): P
 
     switch (type) {
       case "categories":
-        return { ok: true, type, categories: CATEGORY_LIST };
+        return { ok: true, type, categories: await listListedCategories() };
       case "latest": {
         const data = await listLatest(page, limit, signal);
         return { ok: true, type, ...data };
