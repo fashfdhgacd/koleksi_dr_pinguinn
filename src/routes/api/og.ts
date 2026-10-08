@@ -59,7 +59,7 @@ async function fetchImage(target: string, requestUrl: string): Promise<Response 
     if (!res.ok) return null;
 
     const finalUrl = new URL(res.url || url.toString());
-    if (finalUrl.pathname === "/og.jpg") return null;
+    if (finalUrl.pathname === "/og.jpg" || finalUrl.pathname === "/og-v2.jpg") return null;
 
     const type = (res.headers.get("content-type") || "image/jpeg").split(";")[0].trim().toLowerCase();
     if (!type.startsWith("image/")) return null;
@@ -96,7 +96,7 @@ function redirectTo(path: string): Response {
 
 async function fallbackOg(_requestUrl: string, id?: string): Promise<Response> {
   if (id) return redirectTo(`/thumb/${encodeURIComponent(id)}.jpg`);
-  return redirectTo("/og.jpg");
+  return redirectTo("/og-v2.jpg?v=13");
 }
 
 export const Route = createFileRoute("/api/og")({

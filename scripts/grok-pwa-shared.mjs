@@ -253,6 +253,16 @@ export function readOgSite(cwd = process.cwd()) {
   }
 }
 
+/**
+ * site.json `forceImage` (e.g. "/og-v2.jpg?v=13", same-origin path): a share card served by the app (not a file in
+ * public/). When set it wins over public/og.jpg|png everywhere, so a replaced card can't be shadowed by
+ * the old on-disk file.
+ */
+export function forcedOgImage(site = {}) {
+  const v = String(site?.forceImage ?? "").trim();
+  return v.startsWith("/") ? v : "";
+}
+
 /** Public path of an on-disk share card, or "" if neither file exists. */
 export function ogCardPublicPath(cwd = process.cwd()) {
   if (existsSync(join(cwd, "public/og.jpg"))) return "/og.jpg";
@@ -269,8 +279,12 @@ function detectCustomOgCard(cwd = process.cwd(), site = {}) {
 /** Snapshot for Vite/Nitro to bake into the server bundle (Vercel has no workspace FS). */
 export function snapshotOgIdentity(cwd = process.cwd()) {
   const site = { ...readOgSite(cwd) };
+  const forced = forcedOgImage(site);
   const disk = ogCardPublicPath(cwd);
-  if (disk) {
+  if (forced) {
+    site.card = "custom";
+    site.image = forced;
+  } else if (disk) {
     site.card = "custom";
     site.image = disk;
   } else {
@@ -324,11 +338,13 @@ export function siteHasCustomCard(site = {}) {
  * Otherwise empty — caller emits the og.grok.me placeholder.
  */
 export function resolveOgCardAsset(site = {}, cwd = process.cwd()) {
-  return ogCardPublicPath(cwd) || (detectCustomOgCard(cwd, site) ? String(site.image ?? "").trim() || "/og.jpg" : "");
+  return forcedOgImage(site) || ogCardPublicPath(cwd) || (detectCustomOgCard(cwd, site) ? String(site.image ?? "").trim() || "/og.jpg" : "");
 }
 
 /** Stamp `card=custom` when public/og.jpg or public/og.png is on disk. */
 function applyCustomCardFromFs(site, cwd) {
+  const forced = forcedOgImage(site);
+  if (forced) return { ...site, card: "custom", image: forced };
   const disk = ogCardPublicPath(cwd);
   if (!disk) return site;
   return { ...site, card: "custom", image: disk };

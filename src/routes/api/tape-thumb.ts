@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import postersMap from "../../lib/catalog/posters.json";
 import latestPosters from "../../../data/latest-posters.json";
+import { BRAND_POSTER_PATH, brandAssetBytes } from "@/lib/brand-icons-data";
 
 /**
  * Streamtape thumbnail proxy — prioritaskan gambar nyata, fallback berlapis.
@@ -8,15 +9,13 @@ import latestPosters from "../../../data/latest-posters.json";
  *  1) getsplash (butuh STREAMTAPE_LOGIN + STREAMTAPE_KEY)
  *  2) file/info → result.thumb (sering jalan tanpa key)
  *  3) posters.json / latest-posters.json
- *  4) brand poster (selalu 200 image, jangan 302/gif kosong)
+ *  4) brand poster pixel-art v2 dari bundle (selalu 200 image, jangan 302/gif kosong)
  */
 
 const TRANSPARENT_GIF = Buffer.from(
   "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",
   "base64",
 );
-
-const BRAND_URL = "https://koleksidrpinguin.com/brand-poster.jpg";
 
 const POSTERS: Record<string, string> = {
   ...(typeof postersMap === "object" && postersMap && !Array.isArray(postersMap)
@@ -130,12 +129,12 @@ async function proxyImage(url: string): Promise<{ body: ArrayBuffer; type: strin
 }
 
 async function brandImage(): Promise<Response> {
-  const proxied = await proxyImage(BRAND_URL);
-  if (proxied) {
-    return new Response(proxied.body, {
+  const bytes = brandAssetBytes(BRAND_POSTER_PATH);
+  if (bytes) {
+    return new Response(bytes, {
       status: 200,
       headers: {
-        "content-type": proxied.type,
+        "content-type": "image/jpeg",
         "cache-control": "public, max-age=3600",
         "x-thumb-source": "brand",
       },

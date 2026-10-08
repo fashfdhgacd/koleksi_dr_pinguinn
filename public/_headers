@@ -5,7 +5,7 @@
   Referrer-Policy: origin
 
 /brand-poster.jpg
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: public, max-age=86400
 
 /og.jpg
   Cache-Control: public, max-age=86400

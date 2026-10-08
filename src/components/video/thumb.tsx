@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { isPosterWarm, markPosterWarm } from "@/lib/poster-warm";
 
-export const BRAND_POSTER = "/brand-poster.jpg";
+export const BRAND_POSTER = "/brand-poster-v2.jpg";
 
 function isVideoSrc(src: string): boolean {
   if (!src || typeof src !== "string") return false;

@@ -3,7 +3,7 @@ import { findCategory } from "@/lib/catalog/categories";
 export const SITE_ORIGIN = "https://koleksidrpinguin.com";
 export const SITE_NAME = "Dr. Pinguin";
 /** Kartu share: logo situs. Query v= bust cache Telegram/X. */
-export const DEFAULT_OG = `${SITE_ORIGIN}/og.jpg?v=12`;
+export const DEFAULT_OG = `${SITE_ORIGIN}/og-v2.jpg?v=13`;
 
 const HOME_DESCRIPTION =
   "Katalog video dewasa 18+ Dr. Pinguin. Streaming embed koleksi Indo, JAV, amatir. Update berkala.";
@@ -240,7 +240,7 @@ export function isGoogleVideoThumbFormat(url: string): boolean {
   if (/\.(webp|avif|svg|gif|bmp|ico)($|\/)/i.test(path)) return false;
   if (/\.(jpe?g|png)($|\/)/i.test(path)) return true;
   // same-origin OG/proxy endpoints that we force to JPEG
-  if (/\/api\/og(\?|$)/i.test(url) || /\/og\.jpg(\?|$)/i.test(url) || /\/brand-poster\.jpg(\?|$)/i.test(url)) {
+  if (/\/api\/og(\?|$)/i.test(url) || /\/og(-v2)?\.jpg(\?|$)/i.test(url) || /\/brand-poster(-v2)?\.jpg(\?|$)/i.test(url)) {
     return true;
   }
   return false;
