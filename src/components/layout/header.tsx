@@ -12,8 +12,8 @@ import { DEFAULT_PAGE_SIZE } from "@/lib/catalog/types";
 const QUICK_CATS = [
   { slug: "jav", label: "Jav" },
   { slug: "ai-plus", label: "AI+" },
-  { slug: "paling-ditonton", label: "Paling Ditonton" },
-  { slug: "paling-disukai", label: "Paling Disukai" },
+  { slug: "paling-ditonton", label: "Paling Banyak Ditonton" },
+  { slug: "paling-disukai", label: "Paling Banyak Disukai" },
 ] as const;
 
 export function Header({
@@ -166,7 +166,7 @@ export function Header({
 
 function chipClass(active: boolean) {
   return cn(
-    "inline-flex h-8 shrink-0 items-center rounded-full px-3 text-sm transition-colors duration-150 sm:h-9 sm:rounded-md",
+    "inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full px-3 text-sm transition-colors duration-150 sm:h-9 sm:rounded-md",
     active ? "bg-secondary text-foreground" : "text-muted hover:text-foreground",
   );
 }

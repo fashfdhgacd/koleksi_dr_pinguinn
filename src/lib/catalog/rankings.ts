@@ -16,8 +16,8 @@ export type RankingDef = { slug: string; label: string; kind: RankKind };
 export type PeriodDef = { key: "" | "minggu" | "bulan"; period: RankPeriod; label: string; days: number };
 
 export const RANKINGS: RankingDef[] = [
-  { slug: "paling-ditonton", label: "Paling Ditonton", kind: "views" },
-  { slug: "paling-disukai", label: "Paling Disukai", kind: "likes" },
+  { slug: "paling-ditonton", label: "Paling Banyak Ditonton", kind: "views" },
+  { slug: "paling-disukai", label: "Paling Banyak Disukai", kind: "likes" },
 ];
 
 export const RANK_PERIODS: PeriodDef[] = [
@@ -76,8 +76,8 @@ export function rankingSeo(def: RankingDef): { title: string; h1: string; descri
   const year = new Date().getFullYear();
   if (def.kind === "views") {
     return {
-      h1: "Bokep Indo Paling Ditonton",
-      title: `Bokep Indo Paling Ditonton ${year} – Dr. Pinguin`,
+      h1: "Bokep Indo Paling Banyak Ditonton",
+      title: `Bokep Indo Paling Banyak Ditonton ${year} – Dr. Pinguin`,
       description:
         "Daftar video paling banyak ditonton di Dr. Pinguin, diurutkan dari jumlah tayangan. Diperbarui otomatis tiap 12 jam. Khusus 18+.",
       intro:
@@ -85,8 +85,8 @@ export function rankingSeo(def: RankingDef): { title: string; h1: string; descri
     };
   }
   return {
-    h1: "Bokep Indo Paling Disukai",
-    title: `Bokep Indo Paling Disukai ${year} – Dr. Pinguin`,
+    h1: "Bokep Indo Paling Banyak Disukai",
+    title: `Bokep Indo Paling Banyak Disukai ${year} – Dr. Pinguin`,
     description:
       "Daftar video paling banyak disukai di Dr. Pinguin: suka dari sumber ditambah suka pengunjung situs ini. Diperbarui otomatis. Khusus 18+.",
     intro:
