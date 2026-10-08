@@ -28,7 +28,10 @@ async function listFeaturedWithArt(page = 1, limit = 8, signal?: AbortSignal) {
   const want = Math.max(1, limit);
   // Over-fetch so we can drop speculative embed-thumb leftovers and still fill `limit`.
   const raw = await listFeatured(page, Math.max(want * 8, 64), signal);
-  const items = raw.items.filter((x) => isRealFeaturedThumb(x.thumbnail)).slice(0, want);
+  const withArt = raw.items.filter((x) => isRealFeaturedThumb(x.thumbnail));
+  // Homepage page 1 (hero included) is IndoAV-only; UserBokep starts from Terbaru page 2.
+  const indo = withArt.filter((x) => x.creator === "IndoAV");
+  const items = (indo.length >= want ? indo : withArt).slice(0, want);
   return {
     ...raw,
     limit: want,
