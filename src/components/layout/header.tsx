@@ -62,9 +62,10 @@ export function Header({
           <img
             src={BRAND_LOGO_SRC}
             alt="Dr. Pinguin"
-            width={36}
-            height={36}
-            className="size-8 rounded-md bg-white object-cover object-[center_20%] ring-1 ring-border sm:size-10 sm:rounded-lg"
+            width={32}
+            height={32}
+            style={{ imageRendering: "pixelated" }}
+            className="size-8 rounded-md bg-white object-cover ring-1 ring-border [image-rendering:pixelated] sm:size-10 sm:rounded-lg"
           />
           <span className="hidden font-display text-[1.2rem] leading-none tracking-tight text-foreground min-[400px]:inline sm:text-[1.35rem]">
             DR. PINGUIN
