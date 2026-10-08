@@ -100,6 +100,8 @@ type BuiltCache = CatalogCache & {
 
 let lastHiddenIds = new Set<string>();
 let UNHIDDEN = new Set<string>();
+/** Owner "Sembunyikan" from the Player error card (KV owner:hide:v1, owner-hide-store.ts). Wins over Unhide. */
+let OWNER_HIDDEN = new Set<string>();
 let unhideKey = "";
 let unhideCheckedAt = 0;
 let unhideInflight: Promise<void> | null = null;
@@ -117,6 +119,7 @@ export function hiddenReasonRaw(it: RawItem): string {
 }
 
 function isHiddenRaw(it: RawItem): boolean {
+  if (OWNER_HIDDEN.has(it.id)) return true;
   if (UNHIDDEN.has(it.id)) return false;
   return hiddenReasonRaw(it) !== "";
 }
@@ -125,29 +128,48 @@ function keyOf(ids: Iterable<string>): string {
   return [...ids].sort().join(",");
 }
 
-async function fetchUnhiddenIds(): Promise<string[] | null> {
+/** Unhide list + owner hide list (null = could not read it; keep the previous one). */
+type HideLists = { unhidden: string[]; ownerHidden: string[] | null };
+
+async function fetchUnhiddenIds(): Promise<HideLists | null> {
   try {
     if (import.meta.env.SSR) {
       const mod = await import("./unhide-store");
       const state = await mod.readUnhideState();
-      return Object.keys(state.ids);
+      let ownerHidden: string[] | null = null;
+      try {
+        const hideMod = await import("./owner-hide-store");
+        ownerHidden = Object.keys((await hideMod.readOwnerHideState()).ids);
+      } catch {
+        ownerHidden = null;
+      }
+      return { unhidden: Object.keys(state.ids), ownerHidden };
     }
     const res = await fetch("/api/hidden-ids");
     if (!res.ok) return null;
-    const data = (await res.json()) as { unhidden?: unknown };
-    return Array.isArray(data?.unhidden) ? data.unhidden.map(String) : null;
+    const data = (await res.json()) as { unhidden?: unknown; ownerHidden?: unknown };
+    if (!Array.isArray(data?.unhidden)) return null;
+    return {
+      unhidden: data.unhidden.map(String),
+      ownerHidden: Array.isArray(data.ownerHidden) ? data.ownerHidden.map(String) : null,
+    };
   } catch {
     return null;
   }
 }
 
-/** Applies a new Unhide list; rebuilds the current indexes when it changed. */
-export function applyUnhidden(ids: Iterable<string>): void {
+/**
+ * Applies a new Unhide list (and, when given, a new owner hide list); rebuilds the current indexes
+ * when either changed. Callers that only know the Unhide list leave the owner hide list as it is.
+ */
+export function applyUnhidden(ids: Iterable<string>, ownerHidden?: Iterable<string> | null): void {
   const next = new Set<string>(ids);
-  const key = keyOf(next);
+  const nextHidden = ownerHidden ? new Set<string>(ownerHidden) : OWNER_HIDDEN;
+  const key = keyOf(next) + (nextHidden.size ? `|hide:${keyOf(nextHidden)}` : "");
   unhideCheckedAt = Date.now();
   if (key === unhideKey) return;
   UNHIDDEN = next;
+  OWNER_HIDDEN = nextHidden;
   unhideKey = key;
   const cur = runtime.cache as BuiltCache | null;
   if (cur && cur.raw && cur.unhideKey !== key) {
@@ -159,8 +181,8 @@ async function syncUnhidden(force = false): Promise<void> {
   if (!force && Date.now() - unhideCheckedAt < UNHIDE_TTL_MS) return;
   if (unhideInflight) return unhideInflight;
   unhideInflight = (async () => {
-    const ids = await fetchUnhiddenIds();
-    if (ids) applyUnhidden(ids);
+    const lists = await fetchUnhiddenIds();
+    if (lists) applyUnhidden(lists.unhidden, lists.ownerHidden);
     else unhideCheckedAt = Date.now(); // keep the previous list; retry after the TTL
   })().finally(() => {
     unhideInflight = null;
@@ -397,6 +419,7 @@ export async function isPublicHidden(id: string): Promise<boolean> {
   const key = String(id || "").trim();
   if (!key) return false;
   const cache = (await loadItemsRaw()) as BuiltCache;
+  if (OWNER_HIDDEN.has(key)) return true;
   if (UNHIDDEN.has(key)) return false;
   if (HIDDEN_IDS.has(key)) return true;
   return (cache.hiddenIds || lastHiddenIds).has(key);

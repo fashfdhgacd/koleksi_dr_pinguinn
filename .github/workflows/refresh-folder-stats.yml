@@ -1,6 +1,8 @@
 # Refresh views/duration/likes for owner's IndoAV/UserBokep folders (~every 12h).
 # Rewrites src/lib/catalog/video-stats.json, then stores a daily snapshot (stats-history/) and the
-# week/month deltas for the ranking pages (scripts/stats-snapshot.py). Never adds/removes videos.
+# week/month deltas for the ranking pages (scripts/stats-snapshot.py), and runs the dead-video check
+# for Streamtape/Putarin (scripts/dead-sources.py -> src/lib/catalog/dead-sources.json, list only).
+# Never adds/removes/hides videos.
 name: Refresh folder stats
 
 on:
@@ -25,21 +27,31 @@ jobs:
         run: python3 scripts/refresh-folder-stats.py
       - name: Daily snapshot + week/month deltas (ranking pages)
         run: python3 scripts/stats-snapshot.py
-      - name: Guard (stats + ranking snapshots only)
+      - name: Dead-video check (Streamtape + Putarin, list only)
+        continue-on-error: true
+        timeout-minutes: 20
+        env:
+          PUTARIN_API_KEY: ${{ secrets.PUTARIN_API_KEY }}
+          STREAMTAPE_LOGIN: ${{ secrets.STREAMTAPE_LOGIN }}
+          STREAMTAPE_KEY: ${{ secrets.STREAMTAPE_KEY }}
+        run: |
+          python3 scripts/dead-sources.py || git checkout -- src/lib/catalog/dead-sources.json
+      - name: Guard (stats + ranking snapshots + dead-video list only)
         run: |
           git status --porcelain --untracked-files=all | awk '{print $2}' | while read -r f; do
             case "$f" in
-              src/lib/catalog/video-stats.json|src/lib/catalog/rank-periods.json|src/lib/catalog/rank-periods-meta.json|stats-history/*.json) ;;
+              src/lib/catalog/video-stats.json|src/lib/catalog/rank-periods.json|src/lib/catalog/rank-periods-meta.json|src/lib/catalog/dead-sources.json|stats-history/*.json) ;;
               *) echo "unexpected change: $f"; exit 1 ;;
             esac
           done
           python3 -c "import json;d=json.load(open('src/lib/catalog/video-stats.json'));assert len(d)>1000;print(len(d))"
+          python3 -c "import json;d=json.load(open('src/lib/catalog/dead-sources.json'));assert isinstance(d.get('gone'),dict) and isinstance(d.get('suspect'),dict);print('dead-sources', len(d['gone']), 'gone', len(d['suspect']), 'suspect')"
       - name: Commit if changed
         run: |
-          git add -A src/lib/catalog/video-stats.json src/lib/catalog/rank-periods.json src/lib/catalog/rank-periods-meta.json stats-history
+          git add -A src/lib/catalog/video-stats.json src/lib/catalog/rank-periods.json src/lib/catalog/rank-periods-meta.json src/lib/catalog/dead-sources.json stats-history
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "stats: refresh folder views/likes + daily ranking snapshot"
+          git commit -m "stats: refresh folder views/likes + daily ranking snapshot + dead-video check"
           git pull --rebase
           git push
