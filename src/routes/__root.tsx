@@ -55,7 +55,9 @@ export const Route = createRootRoute({
       { name: "twitter:image", content: DEFAULT_OG },
     ],
     links: [
-      { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+      { rel: "icon", href: "/favicon.ico?v=2", sizes: "16x16 32x32 48x48" },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32.png?v=2" },
+      { rel: "icon", type: "image/png", sizes: "192x192", href: "/icon-192.png?v=2" },
       { rel: "image_src", href: DEFAULT_OG },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
@@ -69,7 +71,7 @@ export const Route = createRootRoute({
       },
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/site.webmanifest" },
-      { rel: "apple-touch-icon", href: "/favicon.svg" },
+      { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png?v=2" },
     ],
     scripts: [
       {
