@@ -22,14 +22,17 @@ FOLDERS = [
 ]
 PATH = "src/lib/catalog/video-stats.json"
 FEED = os.environ.get("FOLDER_FEED") or "https://koleksidrpinguin.com/api/folder-stats"
+# Our own zone challenges a bare "Mozilla/5.0" from datacenter IPs ("Just a moment...");
+# an honest bot UA passes (same UA as scripts/source-stats.py, which reads /api/site-likes fine).
+FEED_UA = "Mozilla/5.0 (compatible; kdp-stats/1.0; +https://koleksidrpinguin.com)"
 ART = re.compile(r'<article class="video-card.*?</article>', re.S)
 
 
-def fetch(url, tries=8):
+def fetch(url, tries=8, ua="Mozilla/5.0"):
     """(status, body). status 403 is returned at once (blocked runner: use the feed instead)."""
     code = "0"
     for a in range(tries):
-        r = subprocess.run(["curl", "-s", "--max-time", "60", "-A", "Mozilla/5.0", "-w", "\n%{http_code}", url],
+        r = subprocess.run(["curl", "-s", "--max-time", "60", "-A", ua, "-w", "\n%{http_code}", url],
                            capture_output=True, text=True, errors="replace")
         body, _, code = r.stdout.rpartition("\n")
         if code in ("200", "404", "403"):
@@ -126,7 +129,7 @@ def parse_blocks(html):
 def feed_page(folder_id, p):
     """Same page through the site's Worker feed. None = failed."""
     for a in range(5):
-        code, body = fetch(f"{FEED}?f={folder_id}&p={p}", tries=1)
+        code, body = fetch(f"{FEED}?f={folder_id}&p={p}", tries=1, ua=FEED_UA)
         if code == "200" and body:
             try:
                 d = json.loads(body)
