@@ -13,7 +13,7 @@ When a folder answers 403 directly, the page is read through the site's own read
 (GET https://koleksidrpinguin.com/api/folder-stats?f=<folder>&p=<page>, server/middleware/stats-feed.ts),
 which fetches the same public folder page from the Cloudflare Worker and returns only the numbers.
 """
-import glob, json, os, re, subprocess, sys, time
+import glob, json, os, re, subprocess, sys, time, urllib.error, urllib.request
 
 FOLDERS = [
     "https://tv1.indoav.app/f/9DaQXgw7uFQs",
@@ -22,8 +22,9 @@ FOLDERS = [
 ]
 PATH = "src/lib/catalog/video-stats.json"
 FEED = os.environ.get("FOLDER_FEED") or "https://koleksidrpinguin.com/api/folder-stats"
-# Our own zone challenges a bare "Mozilla/5.0" from datacenter IPs ("Just a moment...");
-# an honest bot UA passes (same UA as scripts/source-stats.py, which reads /api/site-likes fine).
+# Our own zone answers curl from runner IPs with a challenge page ("Just a moment..."), while
+# Python urllib with this UA + Accept: application/json passes (scripts/source-stats.py reads
+# /api/site-likes that way in the same run), so the feed is read with urllib, not curl.
 FEED_UA = "Mozilla/5.0 (compatible; kdp-stats/1.0; +https://koleksidrpinguin.com)"
 ART = re.compile(r'<article class="video-card.*?</article>', re.S)
 
@@ -126,10 +127,22 @@ def parse_blocks(html):
     return out
 
 
+def feed_get(url):
+    """(status, body) via urllib (see FEED_UA)."""
+    req = urllib.request.Request(url, headers={"User-Agent": FEED_UA, "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return str(r.status), r.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        return str(e.code), e.read().decode("utf-8", "replace")
+    except Exception as e:
+        return "0", type(e).__name__
+
+
 def feed_page(folder_id, p):
     """Same page through the site's Worker feed. None = failed."""
     for a in range(5):
-        code, body = fetch(f"{FEED}?f={folder_id}&p={p}", tries=1, ua=FEED_UA)
+        code, body = feed_get(f"{FEED}?f={folder_id}&p={p}")
         if code == "200" and body:
             try:
                 d = json.loads(body)
