@@ -116,11 +116,30 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
             onUnavailable={onThumbUnavailable}
           />
         </div>
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background via-background/55 to-transparent sm:via-background/50 sm:to-background/10" />
 
-        {/* Copy stack: none by default so it cannot cover the CTA */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col gap-2 p-3.5 pb-11 sm:gap-4 sm:p-8 sm:pb-12 lg:max-w-2xl lg:p-10 lg:pb-14">
-          <p className="hidden w-fit rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm sm:block">
+        {/* Text-legibility gradient: desktop only. Mobile is image + play, no overlay copy. */}
+        <div className="pointer-events-none absolute inset-0 hidden bg-gradient-to-t from-background via-background/50 to-background/10 md:block" />
+
+        {/* Mobile (< md): whole hero tappable, centered modest play (48px). Title kept as sr-only for SEO/a11y. */}
+        <Link
+          to="/watch/$id"
+          params={{ id: current.id }}
+          className="absolute inset-0 z-10 flex items-center justify-center touch-manipulation md:hidden"
+          aria-label={`Putar ${heroTitle}`}
+        >
+          <span
+            className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_0_1px_color-mix(in_oklab,#f3efe6_12%,transparent)]"
+            aria-hidden="true"
+          >
+            <Play className="size-4 fill-current" style={{ marginLeft: 2 }} />
+          </span>
+        </Link>
+        {/* h2, not h1: the page H1 is the brand heading below the hero (one H1 per page). */}
+        <h2 className="sr-only md:hidden">{heroTitle}</h2>
+
+        {/* Desktop (md+): same copy stack as before (label, title, meta, Putar sekarang). */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden flex-col gap-4 p-8 pb-12 md:flex lg:max-w-2xl lg:p-10 lg:pb-14">
+          <p className="w-fit rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm">
             Pilihan koleksi
             {usable.length > 1 ? (
               <span className="ml-2 tabular-nums text-white/70">
@@ -128,24 +147,23 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
               </span>
             ) : null}
           </p>
-          {/* h2, not h1: the page H1 is the brand heading below the hero (one H1 per page). */}
-          <h2 className="font-display text-lg leading-snug text-foreground line-clamp-2 break-words sm:line-clamp-3 sm:text-2xl sm:leading-tight lg:text-3xl">
+          <h2 className="font-display text-2xl leading-tight text-foreground line-clamp-3 break-words lg:text-3xl">
             {heroTitle}
           </h2>
           {showDescription ? (
-            <p className="hidden line-clamp-2 max-w-xl text-sm leading-relaxed text-muted sm:block">
+            <p className="line-clamp-2 max-w-xl text-sm leading-relaxed text-muted">
               {current.description}
             </p>
           ) : null}
-          <div className="hidden flex-wrap items-center gap-3 text-xs text-muted sm:flex">
+          <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
             {current.year ? <span>{current.year}</span> : null}
             {showDuration ? <span>{current.durationLabel}</span> : null}
             {current.category ? <span>{current.category}</span> : null}
           </div>
           <div className="pointer-events-auto pt-0.5">
-            <Button asChild size="default" className="h-10 rounded-full px-4 text-sm sm:h-11 sm:rounded-lg sm:px-5 sm:text-base">
+            <Button asChild size="default" className="h-11 rounded-lg px-5 text-base">
               <Link to="/watch/$id" params={{ id: current.id }}>
-                <Play className="size-3.5 fill-current sm:size-4" style={{ marginLeft: 2 }} />
+                <Play className="size-4 fill-current" style={{ marginLeft: 2 }} />
                 Putar sekarang
               </Link>
             </Button>
