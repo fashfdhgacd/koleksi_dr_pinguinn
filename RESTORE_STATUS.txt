@@ -1,1 +1,3 @@
-restoring watch+local — push in progress
+done 2026-10-09 12:40 WIB — restore watch+local tidak dilanjutkan (push sebelumnya putus).
+Situs dicek hidup: / dan /watch/0sJkwHBEmRnH 200, /api/data ok (7772), /api/telegram?health=1 ok.
+local.ts di main sudah lengkap (listFeatured + getDetail). Jangan jalankan emergency-restore-local / restore-local: itu menimpa local.ts dari commit lama dan bisa bikin web error.
