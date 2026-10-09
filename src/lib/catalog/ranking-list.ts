@@ -184,7 +184,8 @@ export async function listRanking(
   );
   if (kind === "likes") {
     // Cards show the combined like count (source + our visitors).
-    res.items = res.items.map((c) => ({ ...c, likes: (c.likes || 0) + (site[c.id] || 0) }));
+    // siteLikes (12-hour snapshot) is cleared here so the card does not count our likes twice.
+    res.items = res.items.map((c) => ({ ...c, likes: (c.likes || 0) + (site[c.id] || 0), siteLikes: null }));
   }
   return res;
 }

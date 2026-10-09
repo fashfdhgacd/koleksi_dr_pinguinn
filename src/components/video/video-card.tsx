@@ -23,9 +23,12 @@ export function VideoCard({
   preload?: VideoCardPreload;
 }) {
   const views = typeof video.views === "number" && video.views > 0 ? video.views : null;
-  const likes = typeof video.likes === "number" && video.likes > 0 ? video.likes : null;
+  // Likes = source likes (folder stats) + our own D1 likes (site-likes.json snapshot), 0 when none.
+  // Always shown, so every card has the same plain stats row (never a bare category label).
+  const likes =
+    Math.max(0, typeof video.likes === "number" ? video.likes : 0) +
+    Math.max(0, typeof video.siteLikes === "number" ? video.siteLikes : 0);
   const showDuration = Boolean(video.durationLabel && video.durationLabel !== "\u2014");
-  const hasStats = views != null || likes != null || showDuration;
 
   return (
     <Link
@@ -53,30 +56,24 @@ export function VideoCard({
         <h3 className="line-clamp-2 min-h-[2.5em] text-[13px] font-medium leading-snug text-foreground sm:text-[15px]">
           {cleanDisplayTitle(video.title)}
         </h3>
-        {hasStats ? (
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] tabular-nums text-muted sm:text-xs">
-            {views != null ? (
-              <span className="inline-flex items-center gap-1" aria-label={`${views} kali ditonton`}>
-                <Eye className="size-3.5" aria-hidden="true" />
-                {compactNumber(views)}
-              </span>
-            ) : null}
-            {showDuration ? (
-              <span className="inline-flex items-center gap-1" aria-label="Durasi">
-                <Clock className="size-3.5" aria-hidden="true" />
-                {video.durationLabel}
-              </span>
-            ) : null}
-            {likes != null ? (
-              <span className="inline-flex items-center gap-1" aria-label={`${likes} suka`}>
-                <Heart className="size-3.5" aria-hidden="true" />
-                {compactNumber(likes)}
-              </span>
-            ) : null}
-          </div>
-        ) : (
-          <p className="mt-1 truncate text-[11px] text-muted sm:text-xs">{video.category}</p>
-        )}
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] tabular-nums text-muted sm:text-xs">
+          {views != null ? (
+            <span className="inline-flex items-center gap-1" aria-label={`${views} kali ditonton`}>
+              <Eye className="size-3.5" aria-hidden="true" />
+              {compactNumber(views)}
+            </span>
+          ) : null}
+          {showDuration ? (
+            <span className="inline-flex items-center gap-1" aria-label="Durasi">
+              <Clock className="size-3.5" aria-hidden="true" />
+              {video.durationLabel}
+            </span>
+          ) : null}
+          <span className="inline-flex items-center gap-1" aria-label={`${likes} suka`}>
+            <Heart className="size-3.5" aria-hidden="true" />
+            {compactNumber(likes)}
+          </span>
+        </div>
       </div>
     </Link>
   );

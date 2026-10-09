@@ -7,6 +7,10 @@ import {
   SOFT_RAW_CATEGORY_ALIASES,
   refineCategory,
 } from "./title-category.js";
+import siteLikesSnapshot from "./site-likes.json";
+
+/** Our own D1 likes (video_likes), 12-hour snapshot written by the stats workflow. Cards only. */
+const SITE_LIKES = siteLikesSnapshot as unknown as Record<string, number>;
 
 export const CACHE_MS = 10 * 60 * 1000;
 export const STALE_MS = 30 * 60 * 1000;
@@ -325,5 +329,6 @@ export function toCard(item: RawItem, posters: Record<string, string>, videyNo?:
     creator: sourceLabel(item),
     views: typeof item.views === "number" ? item.views : null,
     likes: typeof item.likes === "number" ? item.likes : null,
+    siteLikes: typeof SITE_LIKES[id] === "number" && SITE_LIKES[id] > 0 ? SITE_LIKES[id] : null,
   };
 }

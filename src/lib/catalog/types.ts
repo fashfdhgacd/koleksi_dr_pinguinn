@@ -30,6 +30,8 @@ export type VideoCard = {
   creator: string | null;
   views: number | null;
   likes?: number | null;
+  /** Our own likes (D1 video_likes, 12-hour snapshot in site-likes.json). Cards only; the watch page reads D1 live. */
+  siteLikes?: number | null;
 };
 
 export type VideoDetail = VideoCard & {

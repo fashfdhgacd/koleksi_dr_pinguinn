@@ -2,6 +2,10 @@
 # Rewrites src/lib/catalog/video-stats.json, then stores a daily snapshot (stats-history/) and the
 # week/month deltas for the ranking pages (scripts/stats-snapshot.py), and runs the dead-video check
 # for Streamtape/Putarin (scripts/dead-sources.py -> src/lib/catalog/dead-sources.json, list only).
+# IndoAV/UserBokep answer 403 to GitHub runners: the crawl then reads the same public folder pages
+# through the site's read-only feed (/api/folder-stats, server/middleware/stats-feed.ts).
+# scripts/source-stats.py adds our own D1 likes (site-likes.json) and Putarin duration/views when
+# the Putarin dev API provides them.
 # Never adds/removes/hides videos.
 name: Refresh folder stats
 
@@ -25,6 +29,13 @@ jobs:
       - uses: actions/checkout@v4
       - name: Crawl folders (slow, retries on 522)
         run: python3 scripts/refresh-folder-stats.py
+      - name: Our likes + Putarin duration/views
+        continue-on-error: true
+        timeout-minutes: 15
+        env:
+          PUTARIN_API_KEY: ${{ secrets.PUTARIN_API_KEY }}
+        run: |
+          python3 scripts/source-stats.py || git checkout -- src/lib/catalog/site-likes.json src/lib/catalog/video-stats.json
       - name: Daily snapshot + week/month deltas (ranking pages)
         run: python3 scripts/stats-snapshot.py
       - name: Dead-video check (Streamtape + Putarin, list only)
@@ -38,17 +49,38 @@ jobs:
           python3 scripts/dead-sources.py || git checkout -- src/lib/catalog/dead-sources.json
       - name: Guard (stats + ranking snapshots + dead-video list only)
         run: |
-          git status --porcelain --untracked-files=all | awk '{print $2}' | while read -r f; do
-            case "$f" in
-              src/lib/catalog/video-stats.json|src/lib/catalog/rank-periods.json|src/lib/catalog/rank-periods-meta.json|src/lib/catalog/dead-sources.json|stats-history/*.json) ;;
-              *) echo "unexpected change: $f"; exit 1 ;;
-            esac
-          done
+          # Only these generated files may change (rename/quoted paths included); anything else
+          # (local.ts, catalog JSON, data/, code) fails the job before the commit step.
+          python3 - <<'PY'
+          import subprocess, sys, fnmatch
+          ALLOWED = {
+              "src/lib/catalog/video-stats.json", "src/lib/catalog/site-likes.json",
+              "src/lib/catalog/rank-periods.json", "src/lib/catalog/rank-periods-meta.json",
+              "src/lib/catalog/dead-sources.json",
+          }
+          out = subprocess.run(["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+                               capture_output=True, check=True).stdout.decode("utf-8", "replace")
+          parts = [x for x in out.split("\0") if x]
+          paths, i = [], 0
+          while i < len(parts):
+              entry = parts[i]
+              paths.append(entry[3:])
+              if entry[0] in "RC":
+                  i += 1
+                  paths.append(parts[i])
+              i += 1
+          bad = [f for f in paths if f not in ALLOWED and not fnmatch.fnmatch(f, "stats-history/*.json")]
+          if bad:
+              print("unexpected change:", bad)
+              sys.exit(1)
+          print("changed:", paths)
+          PY
           python3 -c "import json;d=json.load(open('src/lib/catalog/video-stats.json'));assert len(d)>1000;print(len(d))"
+          python3 -c "import json;d=json.load(open('src/lib/catalog/site-likes.json'));assert isinstance(d,dict) and all(isinstance(v,int) for v in d.values());print('site-likes', len(d))"
           python3 -c "import json;d=json.load(open('src/lib/catalog/dead-sources.json'));assert isinstance(d.get('gone'),dict) and isinstance(d.get('suspect'),dict);print('dead-sources', len(d['gone']), 'gone', len(d['suspect']), 'suspect')"
       - name: Commit if changed
         run: |
-          git add -A src/lib/catalog/video-stats.json src/lib/catalog/rank-periods.json src/lib/catalog/rank-periods-meta.json src/lib/catalog/dead-sources.json stats-history
+          git add -A src/lib/catalog/video-stats.json src/lib/catalog/site-likes.json src/lib/catalog/rank-periods.json src/lib/catalog/rank-periods-meta.json src/lib/catalog/dead-sources.json stats-history
           if git diff --cached --quiet; then echo "no changes"; exit 0; fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
