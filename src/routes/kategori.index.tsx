@@ -9,123 +9,125 @@ import { SITE_ORIGIN } from "@/lib/seo";
 
 const countFmt = new Intl.NumberFormat("id-ID");
 
-function Px({ children }: { children: ReactNode }) {
+function Icon({ d, extra }: { d: string; extra?: ReactNode }) {
   return (
-    <svg viewBox="0 0 32 32" className="size-10" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="square" aria-hidden>
-      {children}
+    <svg viewBox="0 0 48 48" className="size-11 text-foreground" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="miter" aria-hidden>
+      <path d={d} />
+      {extra}
     </svg>
   );
 }
 
 const ICONS: Record<string, ReactNode> = {
   "paling-ditonton": (
-    <Px>
-      <ellipse cx="16" cy="16" rx="10" ry="6" />
-      <circle cx="16" cy="16" r="3" />
-      <path d="M8 8l1.5 1.5M24 8l-1.5 1.5M8 24l1.5-1.5M24 24l-1.5-1.5" />
-    </Px>
+    <Icon
+      d="M8 24c6-10 26-10 32 0-6 10-26 10-32 0zM24 18a6 6 0 1 1 0 12 6 6 0 0 1 0-12z"
+      extra={
+        <>
+          <circle cx="24" cy="24" r="2.2" fill="currentColor" stroke="none" />
+          <path d="M6 10l2 2M42 10l-2 2M6 38l2-2M42 38l-2-2" />
+        </>
+      }
+    />
   ),
   "paling-disukai": (
-    <Px>
-      <path d="M10 14v10h4v-8h3l5 1v-6l-5 1h-3V10a2 2 0 0 0-4 0v4z" />
-      <path d="M22 8l1-2M26 12l2-1M24 18l2 1" />
-    </Px>
+    <Icon
+      d="M14 20v16h6V22h5l8 2V12l-8 2h-5V16a3 3 0 0 0-6 0v4z"
+      extra={
+        <path d="M36 8l1.5-3M42 16l3-1.5M40 26l3 1.5M34 14l2-2" />
+      }
+    />
   ),
   terbaru: (
-    <Px>
-      <rect x="6" y="8" width="20" height="18" />
-      <path d="M6 13h20M11 6v4M21 6v4" />
-      <circle cx="22" cy="22" r="4" />
-      <path d="M22 20.5V22l1.5 1" />
-    </Px>
+    <Icon
+      d="M10 14h28v24H10zM10 20h28M16 10v6M32 10v6"
+      extra={
+        <>
+          <circle cx="34" cy="32" r="6" />
+          <path d="M34 29.5V32l2 1.5" />
+        </>
+      }
+    />
   ),
   jav: (
-    <Px>
-      <circle cx="16" cy="16" r="10" />
-      <text x="16" y="19" textAnchor="middle" fill="currentColor" stroke="none" fontSize="7" fontFamily="Silkscreen, monospace">JAV</text>
-    </Px>
+    <svg viewBox="0 0 48 48" className="size-11 text-foreground" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+      <circle cx="24" cy="24" r="16" />
+      <text x="24" y="27" textAnchor="middle" fill="currentColor" stroke="none" fontSize="9" fontFamily="Silkscreen, monospace">JAV</text>
+      <path d="M36 10l2-2M38 14l2-1" />
+    </svg>
   ),
   "ai-plus": (
-    <Px>
-      <rect x="9" y="9" width="14" height="14" />
-      <path d="M13 16h6M16 13v6M6 12h3M6 20h3M23 12h3M23 20h3M12 6v3M20 6v3M12 23v3M20 23v3" />
-      <text x="16" y="18.5" textAnchor="middle" fill="currentColor" stroke="none" fontSize="6" fontFamily="Silkscreen, monospace">AI</text>
-    </Px>
+    <svg viewBox="0 0 48 48" className="size-11 text-foreground" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+      <rect x="14" y="14" width="20" height="20" />
+      <path d="M14 20h-6M14 28h-6M34 20h6M34 28h6M20 14v-6M28 14v-6M20 34v6M28 34v6" />
+      <text x="24" y="27" textAnchor="middle" fill="currentColor" stroke="none" fontSize="8" fontFamily="Silkscreen, monospace">AI</text>
+    </svg>
   ),
   jilbab: (
-    <Px>
-      <path d="M8 26c2-8 4-12 8-14 4 2 6 6 8 14" />
-      <path d="M11 14c1-4 3-6 5-6s4 2 5 6" />
-      <path d="M14 16c.5 2 1.5 3 2 3s1.5-1 2-3" />
-      <path d="M22 10l2-2M24 14l2-1" />
-    </Px>
+    <Icon
+      d="M10 38c2-12 6-18 14-20 8 2 12 8 14 20M16 20c1-6 4-9 8-9s7 3 8 9M18 24c1 3 2.5 4 6 4s5-1 6-4"
+      extra={<path d="M34 12l2.5-2.5M36 18l2.5-1" />} />
   ),
   tante: (
-    <Px>
-      <path d="M16 10c-3 0-5 3-5 6v2c0 4 2 8 5 8s5-4 5-8v-2c0-3-2-6-5-6z" />
-      <path d="M12 12c-2-1-4 0-5 2M20 12c2-1 4 0 5 2" />
-      <path d="M22 8l2-2M25 12l2 1" />
-    </Px>
+    <Icon
+      d="M24 12c-5 0-8 5-8 10v3c0 7 3 13 8 13s8-6 8-13v-3c0-5-3-10-8-10zM16 16c-3-1-6 1-7 4M32 16c3-1 6 1 7 4"
+      extra={<path d="M34 8l2.5-2.5M38 14l2.5 1" />} />
   ),
   amatir: (
-    <Px>
-      <rect x="5" y="12" width="16" height="12" />
-      <path d="M21 16h4l2 2v6h-6" />
-      <circle cx="12" cy="18" r="3" />
-      <circle cx="26" cy="14" r="1.5" fill="currentColor" />
-    </Px>
+    <Icon
+      d="M6 18h22v16H6zM28 24h6l4 3v7h-10"
+      extra={
+        <>
+          <circle cx="17" cy="26" r="4" />
+          <circle cx="40" cy="20" r="2" fill="#c45c4a" stroke="none" />
+        </>
+      }
+    />
   ),
   viral: (
-    <Px>
-      <path d="M16 26c-4 0-7-3-7-7 0-3 2-5 3-7 0 2 1 3 2 3 0-4 2-8 6-10 0 4 2 6 3 8 2 1 3 3 3 6 0 4-3 7-6 7z" />
-    </Px>
+    <Icon d="M24 40c-6 0-10-5-10-11 0-5 3-8 4-11 0 3 2 4 3 4 0-6 3-12 9-15 0 6 3 9 5 12 3 1 4 4 4 9 0 7-5 12-9 12z" />
   ),
   percakapan: (
-    <Px>
-      <path d="M6 8h14v10H12l-4 4v-4H6z" />
-      <path d="M12 14h14v8h-3l-3 3v-3h-4v-4" />
-      <circle cx="10" cy="13" r="1" fill="currentColor" />
-      <circle cx="13" cy="13" r="1" fill="currentColor" />
-      <circle cx="16" cy="13" r="1" fill="currentColor" />
-    </Px>
+    <Icon
+      d="M6 10h20v14H14l-6 6v-6H6zM16 20h22v12h-5l-4 5v-5h-8v-6"
+      extra={
+        <>
+          <circle cx="12" cy="17" r="1.2" fill="currentColor" stroke="none" />
+          <circle cx="16" cy="17" r="1.2" fill="currentColor" stroke="none" />
+          <circle cx="20" cy="17" r="1.2" fill="currentColor" stroke="none" />
+        </>
+      }
+    />
   ),
   kosan: (
-    <Px>
-      <path d="M6 16L16 7l10 9" />
-      <path d="M8 15v11h16V15" />
-      <path d="M14 26v-7h4v7" />
-      <path d="M22 12c1 1 2 1 3 0l1 3" />
-    </Px>
+    <Icon
+      d="M6 22L24 8l18 14M10 21v18h28V21M20 39v-10h8v10"
+      extra={<path d="M34 16c2 2 4 2 6 0l2 5" />} />
   ),
 };
 
-const FALLBACK = (
-  <Px>
-    <rect x="7" y="7" width="18" height="18" />
-    <path d="M12 16h8M16 12v8" />
-  </Px>
-);
+const FALLBACK = <Icon d="M12 12h24v24H12zM20 24h8M24 20v8" />;
 
 function Sparkle() {
   return (
-    <svg viewBox="0 0 80 24" className="h-6 w-24 text-foreground/80" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
-      <path d="M12 2v8M8 6h8M12 6l3 3M12 6l-3 3M12 6l3-3M12 6l-3-3" />
-      <path d="M28 12h6M38 12h4M46 12h3M53 12h2" />
+    <svg viewBox="0 0 90 28" className="h-7 w-28 text-foreground/80" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
+      <path d="M14 2v10M9 7h10M14 7l4 4M14 7l-4 4M14 7l4-4M14 7l-4-4" />
+      <path d="M34 14h8M46 14h5M55 14h4M63 14h3" />
     </svg>
   );
 }
 
 function Drip() {
   return (
-    <svg viewBox="0 0 64 48" className="h-16 w-20 text-foreground/70" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
-      <path d="M4 8c6 0 8 6 12 6s6-6 12-6 8 6 12 6 6-6 12-6 8 6 8 6" />
-      <path d="M14 14v10c0 3 2 5 2 5M28 14v14c0 3-2 5-2 5M42 14v8M50 14v12" />
+    <svg viewBox="0 0 72 52" className="h-16 w-24 text-foreground/70" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
+      <path d="M2 10c8 0 10 8 16 8s8-8 16-8 10 8 16 8 8-8 16-8" />
+      <path d="M16 18v12c0 4 3 6 3 6M34 18v16c0 4-3 6-3 6M48 18v10M56 18v14" />
     </svg>
   );
 }
 
 const cardClass =
-  "pixel flex min-h-[9.5rem] flex-col items-center justify-center gap-2.5 border border-foreground/40 bg-[#0e0e11] px-3 py-6 text-center text-foreground hover:border-foreground hover:bg-[#16161a] active:scale-[0.99]";
+  "pixel flex min-h-[10rem] flex-col items-center justify-center gap-2.5 border border-foreground/35 bg-[#0d0d10] px-3 py-6 text-center text-foreground hover:border-foreground/80 hover:bg-[#141418] active:scale-[0.99]";
 
 export const Route = createFileRoute("/kategori/")({
   loader: async (): Promise<{ categories: CategoryInfo[] }> => {
