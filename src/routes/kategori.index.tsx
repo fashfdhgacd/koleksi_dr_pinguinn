@@ -8,20 +8,7 @@ import { SITE_ORIGIN } from "@/lib/seo";
 
 const countFmt = new Intl.NumberFormat("id-ID");
 
-const ICONS: Record<string, string> = {
-  "jav": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAeklEQVR4nO2V2woAIQhEc9n//2X3SYgl81Ig0Zy3bjbaVK0BcDvkncjMrAYhcsf582QX7gICzLObnb17k4lHyivweieOsuirY40vC7ACS1/0SqYECP1mWa+EPaBlKu2okHITnidAK3WJCXc8UikBoypkf0Q8xQAAUM4Ht9w4JqW4jeoAAAAASUVORK5CYII=",
-  "ai-plus": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAW0lEQVR4nO3VOQ4AIAgFUTHe/8pY2bmgmBDjvJoI/AJTAvA7WRWoqrqbiAz7ZO/jXsVaONtixJLeOwk0lq120gpPgAEYgAHCB9g+RCcneeadBG58yz3hCQAIVwEUdxAq0WhryQAAAABJRU5ErkJggg==",
-  "amatir": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAeklEQVR4nO2V2woAIQhEc9n//2X3SYgl81Ig0Zy3bjbaVK0BcDvkncjMrAYhcsf582QX7gICzLObnb17k4lHyivweieOsuirY40vC7ACS1/0SqYECP1mWa+EPaBlKu2okHITnidAK3WJCXc8UikBoypkf0Q8xQAAUM4Ht9w4JqW4jeoAAAAASUVORK5CYII=",
-  "viral": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAnUlEQVR4nO2WSwrAMAhEtfT+V7arQij56IxtCcnsAjE+v0Rka4uUmRljf/zpnAbIAIEBMqKHAWrOUaCUEjAKA/QiRTJzRgG88pZE33xcRERVuz7m64F1Acq6j+pau9fqm9AU3I94ATw2aZsQvecGiEQdsZ2nCVGtvYg8fTNXBmoRtaL0Tg2VgdsJM6IwwNNpeWaAhhptt6zP6tZnugAUDUwqfsU7PQAAAABJRU5ErkJggg==",
-  "percakapan": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAbklEQVR4nO2UMQ7AIAwDE9T/fznsiIRiGTrUtyLwyUDMhBB/x6vFiAhakPs0q90Ir857Vhszc0a4WdHALSQgAQl8LrAcROyJOJI2wJiAb86DQrJWEGnaG0AbgwSY1wM3wJKgXAH7wW5x+psKcZwOifEcLxEwhv8AAAAASUVORK5CYII=",
-  "kosan": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAfklEQVR4nO2USw4AIQhDxcz9r4wrNwYnBSRs+tYz9Fk/YxBCkqiqZv6fL8IzEmGBMzQqIdlgc6gIPNfVALpKTxuwgLdi9HtIILq/0HZVBJtBl3NxbeBl+N88+LRGhJDb8FUMLbkFVbgb2Fir9DxAm/YGKECBdoH2l7C9AULaWdViS/UiR8kUAAAAAElFTkSuQmCC",
-  "live": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAeklEQVR4nO2V2woAIQhEc9n//2X3SYgl81Ig0Zy3bjbaVK0BcDvkncjMrAYhcsf582QX7gICzLObnb17k4lHyivweieOsuirY40vC7ACS1/0SqYECP1mWa+EPaBlKu2okHITnidAK3WJCXc8UikBoypkf0Q8xQAAUM4Ht9w4JqW4jeoAAAAASUVORK5CYII=",
-  "selebgram": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAeklEQVR4nO2V2woAIQhEc9n//2X3SYgl81Ig0Zy3bjbaVK0BcDvkncjMrAYhcsf582QX7gICzLObnb17k4lHyivweieOsuirY40vC7ACS1/0SqYECP1mWa+EPaBlKu2okHITnidAK3WJCXc8UikBoypkf0Q8xQAAUM4Ht9w4JqW4jeoAAAAASUVORK5CYII=",
-  "outdoor": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAfklEQVR4nO2USw4AIQhDxcz9r4wrNwYnBSRs+tYz9Fk/YxBCkqiqZv6fL8IzEmGBMzQqIdlgc6gIPNfVALpKTxuwgLdi9HtIILq/0HZVBJtBl3NxbeBl+N88+LRGhJDb8FUMLbkFVbgb2Fir9DxAm/YGKECBdoH2l7C9AULaWdViS/UiR8kUAAAAAElFTkSuQmCC",
-  "hotel": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAfklEQVR4nO2USw4AIQhDxcz9r4wrNwYnBSRs+tYz9Fk/YxBCkqiqZv6fL8IzEmGBMzQqIdlgc6gIPNfVALpKTxuwgLdi9HtIILq/0HZVBJtBl3NxbeBl+N88+LRGhJDb8FUMLbkFVbgb2Fir9DxAm/YGKECBdoH2l7C9AULaWdViS/UiR8kUAAAAAElFTkSuQmCC",
-  "kamar-mandi": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAfklEQVR4nO2USw4AIQhDxcz9r4wrNwYnBSRs+tYz9Fk/YxBCkqiqZv6fL8IzEmGBMzQqIdlgc6gIPNfVALpKTxuwgLdi9HtIILq/0HZVBJtBl3NxbeBl+N88+LRGhJDb8FUMLbkFVbgb2Fir9DxAm/YGKECBdoH2l7C9AULaWdViS/UiR8kUAAAAAElFTkSuQmCC",
-  "ojol": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAjElEQVR4nO1VQQ6AIAxjxv9/eZ4wxAztOhGN65GMtoMVSkn8HRLZrKq6E4mEuNzCrXhvbagBz/oj4qyJJWYnjukGKNw5A/QJWClgeOjsWoLMWzB9BtJAGljRQvTn8/6QUGzQyDHRvDTAPDBVtO49M/GdGWi7sDpDujV5kaKRMwBdwZGkR4rWJRKJV2EDgGJgBi/7RIoAAAAASUVORK5CYII=",
-};
+
 
 
 
@@ -69,20 +56,9 @@ function CatCard({
   label: string;
   count?: number;
 }) {
-  const src = ICONS[slug];
   return (
     <li>
       <Link to={to} params={params} search={search} className={cardClass}>
-        {src ? (
-          <img
-            src={src}
-            alt=""
-            width={28}
-            height={28}
-            className="mb-1 size-7 [image-rendering:pixelated] opacity-80"
-            style={{ imageRendering: "pixelated" }}
-          />
-        ) : null}
         <span className="text-[13px] font-medium leading-tight sm:text-sm">{label}</span>
         {typeof count === "number" ? (
           <span className="mt-0.5 text-[11px] text-white/40">{countFmt.format(count)} video</span>
