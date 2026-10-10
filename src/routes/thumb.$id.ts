@@ -5,7 +5,6 @@ import latestPosters from "../../data/latest-posters.json";
 import folderBatch20261007 from "@/lib/catalog/folder-batch-20261007.json";
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { resolvePostersBucket } from "@/lib/poster-r2";
-import { BRAND_OG_PATH, brandAssetBytes } from "@/lib/brand-icons-data";
 
 function sourceFor(id: string): string {
   const maps = [posters, javPosters, latestPosters] as Array<Record<string, string>>;
@@ -38,7 +37,7 @@ function imageResponse(body: BodyInit, type: string): Response {
   return new Response(body, {
     headers: {
       "content-type": type,
-      "cache-control": "public, max-age=31536000, immutable",
+      "cache-control": "public, max-age=86400",
     },
   });
 }
@@ -81,17 +80,8 @@ export const Route = createFileRoute("/thumb/$id")({
           }).catch(() => null);
           if (!remote?.ok) return new Response(null, { status: 404 });
           const buf = await remote.arrayBuffer().catch(() => null);
-          let type = buf ? sniffType(buf) : "";
+          const type = buf ? sniffType(buf) : "";
           if (!buf || !type || buf.byteLength < 800) return new Response(null, { status: 404 });
-          const wantJpeg = /\.(jpe?g)$/i.test(String(params.id || ""));
-          // GSC video thumbs: if client asked for .jpg but source is webp, serve brand JPEG instead
-          // (bundled bytes — no self-fetch).
-          if (wantJpeg && type === "image/webp") {
-            const fb = brandAssetBytes(BRAND_OG_PATH);
-            if (fb && fb.byteLength > 2000) {
-              return imageResponse(fb, "image/jpeg");
-            }
-          }
           if (bucket) {
             await bucket.put(key, buf, { httpMetadata: { contentType: type } }).catch(() => undefined);
           }

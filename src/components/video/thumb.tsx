@@ -34,7 +34,8 @@ export function VideoThumb({
   const srcStr = typeof src === "string" ? src : "";
   const dmm = dmmCoverFromTitle(alt);
   const real = srcStr && srcStr !== BRAND_POSTER && !isVideoSrc(srcStr) && !srcStr.startsWith("data:") ? srcStr : "";
-  const local = videoId && real ? `/thumb/${videoId}.jpg` : "";
+  // No .jpg suffix: old /thumb/{id}.jpg responses are cached as the brand penguin (immutable).
+  const local = videoId && real ? `/thumb/${videoId}` : "";
   const first = local || real || dmm || BRAND_POSTER;
   const [current, setCurrent] = useState(first);
   const [step, setStep] = useState(0);
