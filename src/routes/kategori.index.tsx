@@ -10,7 +10,7 @@ const countFmt = new Intl.NumberFormat("id-ID");
 
 
 
-const cardClass = "flex flex-col items-center justify-center gap-1.5 rounded-lg border border-foreground/20 bg-[#111113] px-4 py-5 text-center text-foreground transition-colors hover:border-foreground/50 hover:bg-[#18181b] active:scale-[0.98]";
+const cardClass = "flex flex-col items-center justify-center gap-1 min-h-[88px] rounded-xl border border-white/10 bg-[#111113] px-3 py-4 text-center text-foreground transition-all hover:border-white/30 hover:bg-[#1a1a1d] active:scale-[0.98]";
 
 export const Route = createFileRoute("/kategori/")({
   loader: async (): Promise<{ categories: CategoryInfo[] }> => {
@@ -57,9 +57,9 @@ function CatCard({
   return (
     <li>
       <Link to={to} params={params} search={search} className={cardClass}>
-        <span className="text-sm font-medium leading-snug sm:text-base">{label}</span>
+        <span className="text-[13px] font-medium leading-tight sm:text-sm">{label}</span>
         {typeof count === "number" ? (
-          <span className="text-xs text-muted/80">{countFmt.format(count)} video</span>
+          <span className="mt-0.5 text-[11px] text-white/40">{countFmt.format(count)} video</span>
         ) : null}
       </Link>
     </li>
@@ -79,13 +79,13 @@ function CategoriesPage() {
   const { categories } = Route.useLoaderData();
   return (
     <Shell>
-      <section className="relative space-y-7">
+      <section className="relative space-y-6">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Kategori</h1>
           <p className="mt-1.5 text-sm text-muted">Jelajahi koleksi video berdasarkan kategori</p>
         </div>
 
-        <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {RANKINGS.map((r) => (
             <CatCard key={r.slug} to="/kategori/$slug" params={{ slug: r.slug }} slug={r.slug} label={r.label} />
           ))}
