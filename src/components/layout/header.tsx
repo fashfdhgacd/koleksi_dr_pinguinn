@@ -39,8 +39,6 @@ export function Header({
     const current = (query ?? "").trim();
     if (next === current) return;
     if (next.length === 1) return;
-    // Functional update keeps unrelated search params from clobbering an in-flight
-    // pagination click that landed between keystroke and debounce flush.
     void navigate({
       to: "/",
       search: (prev) => {
@@ -70,12 +68,12 @@ export function Header({
             width={32}
             height={32}
             style={{ imageRendering: "pixelated" }}
-            className="size-8 rounded-md bg-white object-cover ring-1 ring-border [image-rendering:pixelated] sm:size-10 sm:rounded-lg"
+            className="size-8 rounded-none bg-white object-cover ring-1 ring-border [image-rendering:pixelated] sm:size-10"
           />
-          <span className="hidden font-display text-[1.2rem] leading-none tracking-tight text-foreground min-[400px]:inline sm:text-[1.35rem]">
+          <span className="pixel hidden text-[0.7rem] leading-none text-foreground min-[400px]:inline sm:text-xs">
             DR. PINGUIN
           </span>
-          <span className="hidden rounded-full border border-border px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-muted sm:inline">
+          <span className="pixel hidden border border-foreground/40 px-1.5 py-0.5 text-[9px] text-muted sm:inline">
             18+
           </span>
         </Link>
