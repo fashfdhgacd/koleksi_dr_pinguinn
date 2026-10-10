@@ -10,7 +10,7 @@ const countFmt = new Intl.NumberFormat("id-ID");
 
 
 
-const cardClass = "flex flex-col items-center justify-center gap-2.5 border border-foreground/35 bg-[#0d0d10] px-3 py-6 text-center text-foreground hover:border-foreground/80 hover:bg-[#141418] active:scale-[0.99]";
+const cardClass = "flex flex-col items-center justify-center gap-1.5 rounded-lg border border-foreground/20 bg-[#111113] px-4 py-5 text-center text-foreground transition-colors hover:border-foreground/50 hover:bg-[#18181b] active:scale-[0.98]";
 
 export const Route = createFileRoute("/kategori/")({
   loader: async (): Promise<{ categories: CategoryInfo[] }> => {
@@ -57,9 +57,9 @@ function CatCard({
   return (
     <li>
       <Link to={to} params={params} search={search} className={cardClass}>
-        <span className="text-sm font-medium leading-tight">{label}</span>
+        <span className="text-sm font-medium leading-snug sm:text-base">{label}</span>
         {typeof count === "number" ? (
-          <span className="text-[11px] text-muted">{countFmt.format(count)} video</span>
+          <span className="text-xs text-muted/80">{countFmt.format(count)} video</span>
         ) : null}
       </Link>
     </li>
@@ -80,15 +80,12 @@ function CategoriesPage() {
   return (
     <Shell>
       <section className="relative space-y-7">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="pixel text-3xl text-foreground sm:text-5xl">Kategori</h1>
-            <p className="pixel mt-2 text-xs text-muted sm:text-sm">Jelajahi koleksi video berdasarkan kategori</p>
-          </div>
-          <Sparkle />
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Kategori</h1>
+          <p className="mt-1.5 text-sm text-muted">Jelajahi koleksi video berdasarkan kategori</p>
         </div>
 
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
           {RANKINGS.map((r) => (
             <CatCard key={r.slug} to="/kategori/$slug" params={{ slug: r.slug }} slug={r.slug} label={r.label} />
           ))}
