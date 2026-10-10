@@ -180,7 +180,7 @@ async function fetchAlt(id: string): Promise<AltSource | null> {
 /** Amber pixel play button (16x16 grid, drawn at 4x / 5x so the pixels stay crisp). */
 function PixelPlayButton() {
   return (
-    <svg viewBox="0 0 16 16" className="size-16 sm:size-20" shapeRendering="crispEdges" aria-hidden="true">
+    <svg viewBox="0 0 16 16" className="size-10 sm:size-14 md:size-16" shapeRendering="crispEdges" aria-hidden="true">
       <path fill="#ecb43c" d="M2 0h12v1h1v1h1v12h-1v1h-1v1H2v-1H1v-1H0V2h1V1h1z" />
       <path fill="#16130e" d="M7 4h1v8H7zM8 5h1v6H8zM9 6h1v4H9zM10 7h1v2h-1z" />
     </svg>
