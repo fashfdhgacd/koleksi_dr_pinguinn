@@ -2,8 +2,8 @@
 @import "tw-animate-css";
 
 @theme {
-  --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
+  --font-sans: "Silkscreen", ui-monospace, monospace;
+  --font-display: "Press Start 2P", ui-monospace, monospace;
 
   --color-background: #09090b;
   --color-foreground: #f3efe6;
@@ -13,7 +13,7 @@
   --color-muted-foreground: #9a958c;
   --color-accent: #c5ccd6;
   --color-accent-foreground: #09090b;
-  --color-border: color-mix(in oklab, #f3efe6 12%, transparent);
+  --color-border: #f3efe6;
   --color-ring: #c5ccd6;
   --color-card: #121214;
   --color-card-foreground: #f3efe6;
@@ -26,21 +26,21 @@
   --color-popover: #121214;
   --color-popover-foreground: #f3efe6;
 
-  --radius-xs: 4px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-  --radius: 12px;
+  --radius-xs: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius: 0px;
 
-  --shadow-border: 0 0 0 1px color-mix(in oklab, #f3efe6 8%, transparent);
-  --shadow-border-hover: 0 0 0 1px color-mix(in oklab, #f3efe6 16%, transparent);
+  --shadow-border: 2px 2px 0 0 #f3efe6;
+  --shadow-border-hover: 3px 3px 0 0 #f3efe6;
 }
 
 @layer base {
   html {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    -webkit-font-smoothing: none;
+    -moz-osx-font-smoothing: unset;
     overflow-x: clip;
   }
 
@@ -54,8 +54,10 @@
 
   body {
     font-family: var(--font-sans);
-    line-height: 1.5;
+    font-size: 16px;
+    line-height: 1.45;
     overflow-x: clip;
+    letter-spacing: 0;
   }
 
   button:not(:disabled),
@@ -66,22 +68,37 @@
   h1,
   h2,
   h3 {
+    font-family: var(--font-display);
     text-wrap: balance;
-    letter-spacing: -0.03em;
+    letter-spacing: 0;
+    line-height: 1.35;
   }
 
   p {
     text-wrap: pretty;
   }
 
+  button,
+  input,
+  [role="button"] {
+    border-radius: 0;
+  }
+
   ::selection {
-    background: color-mix(in oklab, var(--color-accent) 30%, transparent);
-    color: var(--color-foreground);
+    background: #f3efe6;
+    color: #09090b;
   }
 
   img.media-thumb {
-    outline: 1px solid color-mix(in oklab, #f3efe6 10%, transparent);
-    outline-offset: -1px;
+    outline: 2px solid #f3efe6;
+    outline-offset: -2px;
+    border-radius: 0;
+    image-rendering: auto;
+  }
+
+  img:not(.media-thumb) {
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
   }
 }
 
