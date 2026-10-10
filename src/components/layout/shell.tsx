@@ -19,18 +19,18 @@ export function Shell({
         <main className="mx-auto w-full max-w-[1440px] flex-1 px-3 pb-16 pt-4 sm:px-6 sm:pb-14 sm:pt-6">
           {children}
         </main>
-        <footer className="mt-auto border-t border-border pb-[env(safe-area-inset-bottom)]">
+        <footer className="pixel mt-auto border-t border-foreground/20 pb-[env(safe-area-inset-bottom)]">
           <div className="mx-auto flex max-w-[1440px] flex-col gap-3 px-3 py-6 text-xs text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-8">
             <div className="space-y-1.5">
-              <p className="font-medium text-foreground/80">
+              <p className="text-foreground/90">
                 DR. PINGUIN ·{" "}
                 <a href="https://koleksidrpinguin.com" className="underline-offset-2 hover:underline">
                   koleksidrpinguin.com
                 </a>{" "}
                 · 18+
               </p>
-              <p className="text-[11px] text-muted/60">Video diputar dari server pihak ketiga · Khusus 18+</p>
-              <p className="text-[11px] text-muted/60">Videos are streamed from third-party hosts · Adults 18+ only</p>
+              <p className="text-[11px] text-muted/70">Video diputar dari server pihak ketiga · Khusus 18+</p>
+              <p className="text-[11px] text-muted/70">Videos are streamed from third-party hosts · Adults 18+ only</p>
             </div>
             <nav className="flex flex-wrap items-center gap-x-4 gap-y-1" aria-label="Legal">
               <Link to="/2257" className="hover:text-foreground hover:underline">
@@ -53,7 +53,7 @@ export function Shell({
                 target="_blank"
                 rel="noopener noreferrer"
                 title="Restricted To Adults (RTA)"
-                className="rounded border border-border px-1.5 py-0.5 text-[10px] font-semibold tracking-wider hover:text-foreground"
+                className="border border-foreground/40 px-1.5 py-0.5 text-[10px] tracking-wider hover:bg-foreground hover:text-background"
               >
                 RTA
               </a>

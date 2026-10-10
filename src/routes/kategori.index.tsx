@@ -8,6 +8,9 @@ import { SITE_ORIGIN } from "@/lib/seo";
 
 const countFmt = new Intl.NumberFormat("id-ID");
 
+const cardClass =
+  "pixel flex min-h-[4.5rem] flex-col items-center justify-center border border-foreground/30 bg-secondary/40 px-3 py-3 text-center text-sm leading-tight text-foreground hover:border-foreground/60 hover:bg-secondary/70 active:scale-[0.99]";
+
 export const Route = createFileRoute("/kategori/")({
   // Live counts; categories with too few videos are left out by the service.
   loader: async (): Promise<{ categories: CategoryInfo[] }> => {
@@ -42,41 +45,29 @@ function CategoriesPage() {
     <Shell>
       <section className="space-y-6">
         <div>
-          <h1 className="font-display text-3xl text-foreground sm:text-4xl">Kategori</h1>
-          <p className="mt-1 text-sm text-muted">Pilih kategori tanpa scroll panjang di header.</p>
+          <h1 className="pixel text-2xl text-foreground sm:text-3xl">Kategori</h1>
+          <p className="pixel mt-1 text-xs text-muted">Pilih kategori tanpa scroll panjang di header.</p>
         </div>
 
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
           {RANKINGS.map((r) => (
             <li key={r.slug}>
-              <Link
-                to="/kategori/$slug"
-                params={{ slug: r.slug }}
-                className="flex h-14 items-center justify-center rounded-xl border border-border bg-secondary/40 px-3 text-center text-sm font-medium leading-tight text-foreground active:scale-[0.98]"
-              >
+              <Link to="/kategori/$slug" params={{ slug: r.slug }} className={cardClass}>
                 {r.label}
               </Link>
             </li>
           ))}
           <li>
-            <Link
-              to="/"
-              search={{ q: undefined, category: undefined }}
-              className="flex h-14 items-center justify-center rounded-xl border border-border bg-secondary/40 px-3 text-center text-sm font-medium text-foreground active:scale-[0.98]"
-            >
+            <Link to="/" search={{ q: undefined, category: undefined }} className={cardClass}>
               Terbaru
             </Link>
           </li>
           {categories.map((cat) => (
             <li key={cat.slug}>
-              <Link
-                to="/kategori/$slug"
-                params={{ slug: cat.slug }}
-                className="flex h-14 flex-col items-center justify-center rounded-xl border border-border bg-secondary/40 px-3 text-center text-sm font-medium leading-tight text-foreground active:scale-[0.98]"
-              >
+              <Link to="/kategori/$slug" params={{ slug: cat.slug }} className={cardClass}>
                 <span>{cat.label}</span>
                 {typeof cat.count === "number" ? (
-                  <span className="mt-0.5 text-[11px] font-normal text-muted">{countFmt.format(cat.count)} video</span>
+                  <span className="mt-1 text-[11px] text-muted">{countFmt.format(cat.count)} video</span>
                 ) : null}
               </Link>
             </li>

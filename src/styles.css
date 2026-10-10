@@ -4,6 +4,7 @@
 @theme {
   --font-sans: "Figtree", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Instrument Serif", ui-serif, Georgia, "Times New Roman", serif;
+  --font-pixel: "Silkscreen", ui-monospace, monospace;
 
   --color-background: #09090b;
   --color-foreground: #f3efe6;
@@ -83,6 +84,12 @@
     outline: 1px solid color-mix(in oklab, #f3efe6 10%, transparent);
     outline-offset: -1px;
   }
+}
+
+.pixel {
+  font-family: var(--font-pixel);
+  letter-spacing: 0;
+  -webkit-font-smoothing: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

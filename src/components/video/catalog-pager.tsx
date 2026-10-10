@@ -8,11 +8,13 @@ function windowPages(current: number, totalPages: number, span = 1): number[] {
   return out;
 }
 
+const btn =
+  "pixel inline-flex h-10 min-w-10 touch-manipulation items-center justify-center border border-foreground/40 px-2.5 text-sm text-foreground hover:bg-foreground hover:text-background aria-disabled:pointer-events-none aria-disabled:opacity-30 sm:h-9";
+
 export function CatalogPager({
   page,
   total,
   limit,
-  loading,
   onPage,
   basePath,
 }: {
@@ -27,7 +29,7 @@ export function CatalogPager({
   const totalPages = Math.max(1, Math.ceil((total || 0) / Math.max(1, limit)));
   if (totalPages <= 1) {
     return total > 0 ? (
-      <p className="mt-8 text-center text-xs text-muted">{total.toLocaleString("id-ID")} judul</p>
+      <p className="pixel mt-8 text-center text-xs text-muted">{total.toLocaleString("id-ID")} judul</p>
     ) : null;
   }
 
@@ -35,12 +37,9 @@ export function CatalogPager({
 
   function go(next: number) {
     if (next < 1 || next > totalPages) return;
-    // Do not gate on `loading` — a stalled fetch must not swallow further page clicks.
     onPage(next);
     if (next !== page) {
       try {
-        // Coarse pointers (phones): instant jump — smooth + scrollRestoration races on Android
-        // Chrome and can leave the viewport mid-page while the grid already swapped.
         const coarse =
           typeof window.matchMedia === "function" &&
           window.matchMedia("(pointer: coarse)").matches;
@@ -78,7 +77,7 @@ export function CatalogPager({
 
   return (
     <nav className="relative z-10 mt-8 flex flex-col items-center gap-3" aria-label="Halaman katalog">
-      <p className="text-xs tracking-wide text-muted">
+      <p className="pixel text-xs text-muted">
         Halaman {page.toLocaleString("id-ID")} dari {totalPages.toLocaleString("id-ID")}
         {" · "}
         {total.toLocaleString("id-ID")} video
@@ -86,18 +85,18 @@ export function CatalogPager({
       <div className="flex flex-wrap items-center justify-center gap-1.5">
         <a
           {...(page > 1 ? { ...linkProps(page - 1), rel: "prev" } : { "aria-disabled": true })}
-          className="inline-flex h-11 min-w-11 touch-manipulation items-center justify-center gap-1 rounded-full border border-border px-3 text-sm aria-disabled:pointer-events-none aria-disabled:opacity-40 sm:h-9"
+          className={`${btn} gap-1 px-3`}
           aria-label="Halaman sebelumnya"
         >
-          <ChevronLeft className="size-4" />
+          <ChevronLeft className="size-3.5" />
           <span className="hidden sm:inline">Sebelumnya</span>
         </a>
         {pages[0] > 1 ? (
           <>
-            <a {...linkProps(1)} className="h-11 min-w-11 touch-manipulation inline-flex items-center justify-center rounded-full px-2 text-sm hover:bg-secondary sm:h-9 sm:min-w-9">
+            <a {...linkProps(1)} className={btn}>
               1
             </a>
-            {pages[0] > 2 ? <span className="px-1 text-muted">…</span> : null}
+            {pages[0] > 2 ? <span className="pixel px-1 text-muted">…</span> : null}
           </>
         ) : null}
         {pages.map((n) => (
@@ -105,8 +104,8 @@ export function CatalogPager({
             key={n}
             {...linkProps(n)}
             aria-current={n === page ? "page" : undefined}
-            className={`h-11 min-w-11 touch-manipulation inline-flex items-center justify-center rounded-full px-2 text-sm sm:h-9 sm:min-w-9 ${
-              n === page ? "bg-primary font-semibold text-primary-foreground" : "hover:bg-secondary"
+            className={`${btn} ${
+              n === page ? "border-foreground bg-foreground font-bold text-background hover:bg-foreground hover:text-background" : ""
             }`}
           >
             {n}
@@ -114,19 +113,19 @@ export function CatalogPager({
         ))}
         {pages[pages.length - 1] < totalPages ? (
           <>
-            {pages[pages.length - 1] < totalPages - 1 ? <span className="px-1 text-muted">…</span> : null}
-            <a {...linkProps(totalPages)} className="h-11 min-w-11 touch-manipulation inline-flex items-center justify-center rounded-full px-2 text-sm hover:bg-secondary sm:h-9 sm:min-w-9">
+            {pages[pages.length - 1] < totalPages - 1 ? <span className="pixel px-1 text-muted">…</span> : null}
+            <a {...linkProps(totalPages)} className={btn}>
               {totalPages}
             </a>
           </>
         ) : null}
         <a
           {...(page < totalPages ? { ...linkProps(page + 1), rel: "next" } : { "aria-disabled": true })}
-          className="inline-flex h-11 min-w-11 touch-manipulation items-center justify-center gap-1 rounded-full border border-border px-3 text-sm aria-disabled:pointer-events-none aria-disabled:opacity-40 sm:h-9"
+          className={`${btn} gap-1 px-3`}
           aria-label="Halaman berikutnya"
         >
           <span className="hidden sm:inline">Berikutnya</span>
-          <ChevronRight className="size-4" />
+          <ChevronRight className="size-3.5" />
         </a>
       </div>
     </nav>
