@@ -3,7 +3,7 @@
  * Catalog + /thumb/$id prefer this map over empty video.poster fields.
  */
 import { fetchJsonFromGithub } from "@/lib/bot/github.js";
-import { fetchPutarinMeta, fetchStreamtapeMeta } from "@/lib/bot/providers.js";
+import { fetchPutarinMeta, fetchStreamtapeMeta, fetchEmbedPageMeta } from "@/lib/bot/providers.js";
 
 const POSTERS_FILE = "latest-posters.json";
 
@@ -193,6 +193,7 @@ function hostOf(item) {
   const embed = String(item?.embed || item?.direct || "").toLowerCase();
   if (src.includes("streamtape") || /streamtape\.|strcloud/.test(embed)) return "streamtape";
   if (src.includes("putarin") || src.includes("puterin") || /putarin\.|puterin\./.test(embed)) return "putarin";
+  if (src.includes("indoav") || src.includes("userbokep") || /indoav\.|userbokep\.|tv1\./.test(embed)) return "indoav";
   return "";
 }
 
@@ -217,7 +218,7 @@ async function mapPool(items, limit, fn) {
 }
 
 /**
- * Fill posters for catalog items that lack thumbs (Streamtape / Putarin).
+ * Fill posters for catalog items that lack thumbs (Streamtape / Putarin / IndoAV).
  * Writes to latest-posters.json only (catalog reads that map).
  */
 export async function refreshMissingPosters(env, { limit = 25 } = {}) {
@@ -246,8 +247,8 @@ export async function refreshMissingPosters(env, { limit = 25 } = {}) {
     seen.add(id);
     if (itemHasPoster(item, loaded.map)) continue;
     const host = hostOf(item);
-    if (host !== "streamtape" && host !== "putarin") continue;
-    missing.push({ id, host, title: String(item.title || id) });
+    if (host !== "streamtape" && host !== "putarin" && host !== "indoav") continue;
+    missing.push({ id, host, title: String(item.title || id), embed: item.embed || item.direct || "" });
     if (missing.length >= n) break;
   }
 
@@ -258,7 +259,7 @@ export async function refreshMissingPosters(env, { limit = 25 } = {}) {
       filled: 0,
       skipped: 0,
       remaining: 0,
-      text: "Tidak ada video Streamtape/Putarin tanpa poster (batas batch).",
+      text: "Tidak ada video Streamtape/Putarin/IndoAV tanpa poster (batas batch).",
     };
   }
 
@@ -284,6 +285,17 @@ export async function refreshMissingPosters(env, { limit = 25 } = {}) {
           return;
         }
         notes.push(`⏭️ ${item.id} — putarin tanpa thumb`);
+        return;
+      }
+      if (item.host === "indoav") {
+        const embed = item.embed || item.direct || `https://tv1.indoav.app/e/${item.id}`;
+        const meta = await fetchEmbedPageMeta(embed, item.id);
+        if (isHttpPoster(meta.thumb)) {
+          found[item.id] = meta.thumb;
+          notes.push(`✅ ${item.id} — indoav/userbokep`);
+          return;
+        }
+        notes.push(`⏭️ ${item.id} — indoav tanpa thumb`);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
