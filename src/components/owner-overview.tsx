@@ -10,7 +10,75 @@ import { fmt, type OwnerStats, type DayRow } from "@/components/owner-dashboard-
 const SITE_ORIGIN = "https://koleksidrpinguin.com";
 
 type HourRow = { hour: string; views: number };
-type Stats = OwnerStats & { hourly?: HourRow[] };
+type Stats = OwnerStats & {
+  hourly?: HourRow[];
+  browsers?: { browser: string; views: number }[];
+  countries?: { country: string; views: number }[];
+};
+
+type CountRow = { key: string; label: string; views: number };
+
+const DEVICE_NAMES: Record<string, string> = { mobile: "HP", desktop: "Desktop", tablet: "Tablet", other: "Lainnya" };
+const BROWSER_NAMES: Record<string, string> = {
+  chrome: "Chrome",
+  safari: "Safari",
+  firefox: "Firefox",
+  edge: "Edge",
+  opera: "Opera",
+  samsung: "Samsung Internet",
+  uc: "UC Browser",
+  other: "Lainnya",
+};
+
+function refName(ref: string): string {
+  const r = String(ref || "").trim();
+  if (!r || r === "(direct)") return "Langsung";
+  try {
+    return new URL(r.includes("://") ? r : `https://${r}`).hostname.replace(/^www\./, "");
+  } catch {
+    return r;
+  }
+}
+
+function countryName(code: string): string {
+  if (!code) return "Tidak diketahui";
+  try {
+    return new Intl.DisplayNames(["id"], { type: "region" }).of(code) || code;
+  } catch {
+    return code;
+  }
+}
+
+/** Merges rows with the same label (e.g. two referrer URLs on one host) and sorts by count. */
+function mergeRows(rows: CountRow[], limit = 6): CountRow[] {
+  const m = new Map<string, CountRow>();
+  for (const r of rows) {
+    const cur = m.get(r.label);
+    if (cur) cur.views += r.views;
+    else m.set(r.label, { ...r });
+  }
+  return [...m.values()].filter((r) => r.views > 0).sort((a, b) => b.views - a.views).slice(0, limit);
+}
+
+function CountList({ title, rows }: { title: string; rows: CountRow[] }) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[10px] uppercase tracking-[0.12em] text-[#2dd4bf]/80">{title}</p>
+      {rows.length ? (
+        <ul className="mt-2 space-y-1 text-xs">
+          {rows.map((r) => (
+            <li key={r.key} className="flex items-baseline justify-between gap-3">
+              <span className="truncate text-zinc-300">{r.label}</span>
+              <span className="shrink-0 tabular-nums text-zinc-500">{fmt(r.views)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="mt-2 text-xs text-zinc-600">Belum ada.</p>
+      )}
+    </div>
+  );
+}
 
 export type CatalogRow = {
   id: string;
@@ -483,6 +551,26 @@ export function OwnerOverview(props: {
   const mobile = devices.find((d) => d.device === "mobile");
   const deviceTotal = devices.reduce((s, d) => s + (Number(d.views) || 0), 0);
 
+  const breakdown = useMemo(() => {
+    const sources = mergeRows(
+      (stats?.topRefs || []).map((r) => ({ key: r.ref, label: refName(r.ref), views: Number(r.views) || 0 })),
+    );
+    const deviceRows = mergeRows(
+      devices.map((d) => ({ key: d.device, label: DEVICE_NAMES[d.device] || d.device, views: Number(d.views) || 0 })),
+    );
+    const browsers = mergeRows(
+      (stats?.browsers || []).map((b) => ({
+        key: b.browser,
+        label: BROWSER_NAMES[b.browser] || b.browser,
+        views: Number(b.views) || 0,
+      })),
+    );
+    const countries = mergeRows(
+      (stats?.countries || []).map((c) => ({ key: c.country || "-", label: countryName(c.country), views: Number(c.views) || 0 })),
+    );
+    return { sources, deviceRows, browsers, countries };
+  }, [stats, devices]);
+
   const cats = useMemo(() => {
     const m = new Map<string, number>();
     for (const v of stats?.topVideos || []) {
@@ -533,6 +621,18 @@ export function OwnerOverview(props: {
               Dari HP: <b className="font-medium text-[#2dd4bf]">{fmt(mobile.views)}</b> dari {fmt(deviceTotal)}
             </span>
           ) : null}
+        </div>
+      </section>
+
+      <section className={card}>
+        <div className={h2}>
+          <span>Pengunjung hari ini</span>
+        </div>
+        <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">
+          <CountList title="Sumber" rows={breakdown.sources} />
+          <CountList title="Perangkat" rows={breakdown.deviceRows} />
+          <CountList title="Browser" rows={breakdown.browsers} />
+          <CountList title="Negara" rows={breakdown.countries} />
         </div>
       </section>
 

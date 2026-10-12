@@ -191,6 +191,7 @@ async function handlePost(request: Request): Promise<Response> {
           sessionId: id,
           visitorId: id,
           eventId,
+          country: request.headers.get("cf-ipcountry") || "",
         });
       }
       // PG presence + peak for every presence touch and every pageview (SPA nav).
