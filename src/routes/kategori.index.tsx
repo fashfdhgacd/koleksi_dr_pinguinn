@@ -8,10 +8,6 @@ import { SITE_ORIGIN } from "@/lib/seo";
 
 const countFmt = new Intl.NumberFormat("id-ID");
 
-
-
-
-
 const cardClass = "flex flex-col items-center justify-center gap-1 min-h-[88px] rounded-xl border border-white/10 bg-[#111113] px-3 py-4 text-center text-foreground transition-all hover:border-white/30 hover:bg-[#1a1a1d] active:scale-[0.98]";
 
 export const Route = createFileRoute("/kategori/")({
@@ -68,15 +64,6 @@ function CatCard({
   );
 }
 
-function Sparkle() {
-  return (
-    <svg viewBox="0 0 90 28" className="h-7 w-28 text-foreground/80" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden>
-      <path d="M14 2v10M9 7h10M14 7l4 4M14 7l-4 4M14 7l4-4M14 7l-4-4" />
-      <path d="M34 14h8M46 14h5M55 14h4M63 14h3" />
-    </svg>
-  );
-}
-
 function CategoriesPage() {
   const { categories } = Route.useLoaderData();
   return (
@@ -103,8 +90,6 @@ function CategoriesPage() {
             />
           ))}
         </ul>
-
-
       </section>
     </Shell>
   );
