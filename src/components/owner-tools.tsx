@@ -151,8 +151,8 @@ export function OwnerTools({ secret, part = "main" }: { secret: string; part?: "
 
   if (part === "poster") {
     return (
-      <section className="rounded-xl border border-white/[0.07] bg-[#121215] p-4 min-w-0">
-        <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Poster video</h2>
+      <section className="rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/35 bg-[#121215] p-4 min-w-0">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]">Poster video</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <input
             value={posterId}
@@ -180,8 +180,8 @@ export function OwnerTools({ secret, part = "main" }: { secret: string; part?: "
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <section className="rounded-xl border border-white/[0.07] bg-[#121215] p-4 min-w-0">
-        <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Tambah video</h2>
+      <section className="rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/35 bg-[#121215] p-4 min-w-0">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]">Tambah video</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <select
             value={uploadCat}
@@ -207,8 +207,8 @@ export function OwnerTools({ secret, part = "main" }: { secret: string; part?: "
         />
         {uploadNote ? <pre className="mt-2 whitespace-pre-wrap text-xs text-zinc-400">{uploadNote}</pre> : null}
       </section>
-      <section className="rounded-xl border border-white/[0.07] bg-[#121215] p-4 min-w-0">
-        <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Ambil link</h2>
+      <section className="rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/35 bg-[#121215] p-4 min-w-0">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]">Ambil link</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <select
             value={cat}

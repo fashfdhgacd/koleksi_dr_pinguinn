@@ -152,8 +152,11 @@ export function OwnerDashboard() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6 sm:py-8">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Dr. Pinguin</p>
-            <h1 className="mt-1 font-mono text-2xl font-bold tracking-wide text-zinc-50">PEMILIK</h1>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Dr. Pinguin</p>
+            <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight text-zinc-50">
+              Pemilik
+              <span className="size-2 bg-[#2dd4bf]" aria-hidden="true" />
+            </h1>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
             {authed ? (
@@ -236,8 +239,8 @@ const headBtn =
 
 function Pill({ ok, label }: { ok: boolean | null; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border border-white/[0.08] px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-400">
-      <span className={`size-1.5 ${ok == null ? "bg-zinc-600" : ok ? "bg-emerald-400" : "bg-amber-400"}`} />
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border border-white/[0.08] px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-zinc-400">
+      <span className={`size-1.5 ${ok == null ? "bg-zinc-600" : ok ? "bg-[#2dd4bf]" : "bg-amber-400"}`} />
       {label}
     </span>
   );
@@ -247,12 +250,12 @@ function Pill({ ok, label }: { ok: boolean | null; label: string }) {
 function Collapse({ title, children }: { title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className="rounded-xl border border-white/[0.07] bg-[#121215]">
+    <div className="rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/35 bg-[#121215]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between px-4 py-3 text-left font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400"
+        className="flex w-full items-center justify-between px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]"
       >
         {title}
         <span className="text-zinc-600">{open ? "-" : "+"}</span>

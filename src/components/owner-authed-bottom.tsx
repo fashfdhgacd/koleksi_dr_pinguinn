@@ -22,12 +22,12 @@ export function OwnerAuthedBottom(props: {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <div className="rounded-xl border border-white/[0.07] bg-[#121215]">
+      <div className="rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/35 bg-[#121215]">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex w-full items-center justify-between px-4 py-3 text-left font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400"
+          className="flex w-full items-center justify-between px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]"
         >
           Statistik 14 hari · perangkat · halaman · sumber
           <span className="text-zinc-600">{open ? "-" : "+"}</span>

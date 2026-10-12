@@ -35,8 +35,8 @@ type Overview = {
 
 type HostRow = { host: string; starts: number; fails: number; rate: number | null };
 
-const card = "min-w-0 rounded-xl border border-white/[0.07] bg-[#121215] p-4";
-const h2 = "flex items-center justify-between gap-2 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400";
+const card = "min-w-0 rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/35 bg-[#121215] p-4";
+const h2 = "flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]";
 const btn =
   "shrink-0 whitespace-nowrap rounded-md border border-white/[0.12] bg-[#16161a] px-2 py-1 text-[11px] text-zinc-200 hover:bg-white/[0.06] disabled:opacity-50";
 const input = "rounded-md border border-white/[0.1] bg-[#0c0c0e] px-2 py-1.5 text-xs text-zinc-200";
@@ -90,13 +90,13 @@ async function ownerPost<T>(secret: string, body: Record<string, unknown>): Prom
   }
 }
 
-function StatCell({ label, value, sub, tone }: { label: string; value: string; sub?: string | null; tone?: "up" | "down" }) {
+function StatCell({ label, value, sub }: { label: string; value: string; sub?: string | null }) {
   return (
     <div className="min-w-0 px-3 py-1 first:pl-0">
-      <p className="truncate font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-500">{label}</p>
-      <p className="mt-1 font-mono text-xl tabular-nums text-zinc-50 sm:text-[22px]">{value}</p>
+      <p className="truncate text-[10px] uppercase tracking-[0.12em] text-[#2dd4bf]/80">{label}</p>
+      <p className="mt-1 text-xl tabular-nums text-zinc-50 sm:text-[22px]">{value}</p>
       {sub ? (
-        <p className={`truncate text-[11px] ${tone === "up" ? "text-emerald-400" : tone === "down" ? "text-red-400" : "text-zinc-500"}`}>
+        <p className="truncate text-[11px] text-zinc-500">
           {sub}
         </p>
       ) : null}
@@ -104,12 +104,6 @@ function StatCell({ label, value, sub, tone }: { label: string; value: string; s
   );
 }
 
-function toneOf(hint: string | null): "up" | "down" | undefined {
-  if (!hint) return undefined;
-  if (hint.startsWith("+")) return "up";
-  if (hint.startsWith("-")) return "down";
-  return undefined;
-}
 
 function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
   const [mode, setMode] = useState<"days" | "hours">("days");
@@ -141,16 +135,22 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
         <span>Tayang</span>
         <span className="flex gap-1">
           {hasHours ? (
-            <button type="button" className={`${btn} ${mode === "hours" ? "bg-zinc-200 text-zinc-900" : ""}`} onClick={() => setMode("hours")}>
+            <button type="button" className={`${btn} ${mode === "hours" ? "border-[#2dd4bf] bg-[#2dd4bf] text-zinc-950" : ""}`} onClick={() => setMode("hours")}>
               24 jam
             </button>
           ) : null}
-          <button type="button" className={`${btn} ${mode === "days" ? "bg-zinc-200 text-zinc-900" : ""}`} onClick={() => setMode("days")}>
+          <button type="button" className={`${btn} ${mode === "days" ? "border-[#2dd4bf] bg-[#2dd4bf] text-zinc-950" : ""}`} onClick={() => setMode("days")}>
             14 hari
           </button>
         </span>
       </div>
       <svg viewBox={`0 -4 ${W} ${H + 22}`} className="mt-3 block h-auto w-full" role="img" aria-label="Grafik tayang">
+        <defs>
+          <linearGradient id="owner-bar-now" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="#2dd4bf" />
+            <stop offset="1" stopColor="#14b8a6" stopOpacity="0.35" />
+          </linearGradient>
+        </defs>
         {[0, 1, 2, 3].map((k) => (
           <line key={k} x1={0} x2={W} y1={(H * k) / 4} y2={(H * k) / 4} stroke="#232326" strokeDasharray="2 4" />
         ))}
@@ -163,13 +163,13 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
                 y={H - h}
                 width={bw * 0.7}
                 height={h}
-                fill={s.now ? "#e4e4e7" : "#3f3f46"}
+                fill={s.now ? "url(#owner-bar-now)" : "#1f3d3a"}
                 shapeRendering="crispEdges"
               >
                 <title>{`${s.label}: ${fmt(s.value)}`}</title>
               </rect>
               {s.show ? (
-                <text x={i * bw + bw / 2} y={H + 15} textAnchor="middle" className="fill-zinc-600 font-mono" fontSize={10}>
+                <text x={i * bw + bw / 2} y={H + 15} textAnchor="middle" className="fill-zinc-600" fontSize={10}>
                   {s.label}
                 </text>
               ) : null}
@@ -218,7 +218,7 @@ function EditRow({
           </option>
         ))}
       </select>
-      <button type="button" className={`${btn} bg-zinc-200 text-zinc-900`} disabled={busy} onClick={() => void save()}>
+      <button type="button" className={`${btn} border-[#2dd4bf] bg-[#2dd4bf] text-zinc-950`} disabled={busy} onClick={() => void save()}>
         {busy ? "..." : "Simpan"}
       </button>
     </div>
@@ -377,13 +377,13 @@ function TopVideos({ videos }: { videos: NonNullable<OwnerStats["topVideos"]> })
         <ul className="mt-2">
           {videos.slice(0, 10).map((v, i) => (
             <li key={v.id} className="flex items-center gap-3 border-t border-white/[0.05] py-2">
-              <span className="w-4 shrink-0 font-mono text-[11px] text-zinc-600">{i + 1}</span>
+              <span className="w-4 shrink-0 text-[11px] text-[#2dd4bf]/60">{i + 1}</span>
               <img src={`/thumb/${v.id}`} alt="" loading="lazy" decoding="async" className="h-9 w-16 shrink-0 rounded bg-zinc-900 object-cover" />
               <a href={v.path} target="_blank" rel="noopener" className="min-w-0 flex-1">
                 <span className="block truncate text-xs text-zinc-100">{v.title || v.id}</span>
                 {v.category ? <span className="block truncate text-[11px] text-zinc-500">{v.category}</span> : null}
               </a>
-              <span className="shrink-0 font-mono text-[11px] tabular-nums text-zinc-400">{fmt(v.views)}</span>
+              <span className="shrink-0 text-[11px] tabular-nums text-zinc-400">{fmt(v.views)}</span>
             </li>
           ))}
         </ul>
@@ -405,7 +405,7 @@ export function OwnerOverview(props: {
   vsUniq: string | null;
   vsViews: string | null;
 }) {
-  const { secret, online, days, devices, tickAt, error, vsUniq, vsViews } = props;
+  const { secret, online, days, devices, tickAt, error } = props;
   const stats = props.stats as Stats | null;
   const [ov, setOv] = useState<Overview | null>(null);
   const [hosts, setHosts] = useState<HostRow[] | null>(null);
@@ -468,9 +468,9 @@ export function OwnerOverview(props: {
       <section className={card}>
         <div className="grid grid-cols-4 gap-y-3 divide-white/[0.06] sm:grid-cols-8 sm:divide-x">
           <StatCell label="Online" value={fmt(online)} sub={`puncak ${fmt(stats?.peakToday)}`} />
-          <StatCell label="Unik" value={fmt(stats?.uniqueToday)} sub={vsUniq} tone={toneOf(vsUniq)} />
-          <StatCell label="Tayang" value={fmt(stats?.viewsToday)} sub={vsViews} tone={toneOf(vsViews)} />
-          <StatCell label="7 hari" value={compact(stats?.views7d || 0)} sub={`kmrn ${fmt(stats?.yesterdayViews)}`} />
+          <StatCell label="Unik" value={fmt(stats?.uniqueToday)} sub={`kemarin ${fmt(stats?.yesterdayUnique)}`} />
+          <StatCell label="Tayang" value={fmt(stats?.viewsToday)} sub={`kemarin ${fmt(stats?.yesterdayViews)}`} />
+          <StatCell label="7 hari" value={compact(stats?.views7d || 0)} sub="tayang" />
           <StatCell label="Total video" value={ov?.total != null ? fmt(ov.total) : "-"} sub="katalog" />
           <StatCell label="Hari ini" value={ov?.uploadedToday != null ? fmt(ov.uploadedToday) : "-"} sub="upload" />
           <StatCell label="Minggu ini" value={ov?.uploadedWeek != null ? fmt(ov.uploadedWeek) : "-"} sub="upload" />
@@ -487,16 +487,16 @@ export function OwnerOverview(props: {
         <Chart days={days} hourly={hourly} />
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
           <span>
-            <b className="mr-1 font-mono text-[13px] font-medium text-zinc-200">{fmt(stats?.viewsToday)}</b>hari ini
+            <b className="mr-1 text-[13px] font-medium text-[#2dd4bf]">{fmt(stats?.viewsToday)}</b>hari ini
           </span>
           {busiest ? (
             <span>
-              <b className="mr-1 font-mono text-[13px] font-medium text-zinc-200">{busiest}</b>jam ramai
+              <b className="mr-1 text-[13px] font-medium text-[#2dd4bf]">{busiest}</b>jam ramai
             </span>
           ) : null}
           {mobile ? (
             <span>
-              <b className="mr-1 font-mono text-[13px] font-medium text-zinc-200">{mobile.pct}%</b>HP
+              <b className="mr-1 text-[13px] font-medium text-[#2dd4bf]">{mobile.pct}%</b>HP
             </span>
           ) : null}
         </div>
@@ -529,9 +529,9 @@ export function OwnerOverview(props: {
                   <li key={c} className="flex items-center gap-2 text-[11px]">
                     <span className="w-20 shrink-0 truncate text-zinc-400">{c}</span>
                     <span className="h-1.5 flex-1 bg-white/[0.05]">
-                      <span className="block h-full bg-zinc-400" style={{ width: `${(n / catMax) * 100}%` }} />
+                      <span className="block h-full bg-gradient-to-r from-[#14b8a6]/40 to-[#2dd4bf]" style={{ width: `${(n / catMax) * 100}%` }} />
                     </span>
-                    <span className="w-10 shrink-0 text-right font-mono tabular-nums text-zinc-400">{fmt(n)}</span>
+                    <span className="w-10 shrink-0 text-right tabular-nums text-zinc-400">{fmt(n)}</span>
                   </li>
                 ))}
               </ul>
@@ -555,8 +555,8 @@ export function OwnerOverview(props: {
                     <li key={h.host} className="flex items-center gap-2 text-[11px]">
                       <span className={`size-1.5 shrink-0 ${bad ? "bg-red-400" : "bg-emerald-400"}`} />
                       <span className="flex-1 truncate text-zinc-300">{h.label}</span>
-                      <span className="font-mono tabular-nums text-zinc-500">{fmt(h.starts)} putar</span>
-                      <span className={`w-16 text-right font-mono tabular-nums ${bad ? "text-red-400" : "text-zinc-400"}`}>
+                      <span className="tabular-nums text-zinc-500">{fmt(h.starts)} putar</span>
+                      <span className={`w-16 text-right tabular-nums ${bad ? "text-red-400" : "text-zinc-400"}`}>
                         {pct == null ? "-" : `${pct.toFixed(1)}%`}
                       </span>
                     </li>
