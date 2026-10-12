@@ -61,6 +61,11 @@ function hourText(label: string): string {
   return m ? `${m[1].padStart(2, "0")}.00` : String(label);
 }
 
+function barNum(n: number): string {
+  if (n >= 10_000) return `${(n / 1000).toLocaleString("id-ID", { maximumFractionDigits: 1 })}rb`;
+  return fmt(n);
+}
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
 // DayRow.day is the WIB calendar date (YYYY-MM-DD).
@@ -155,7 +160,7 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
           </button>
         </span>
       </div>
-      <svg viewBox={`0 -4 ${W} ${H + 22}`} className="mt-3 block h-auto w-full" role="img" aria-label="Grafik tayang">
+      <svg viewBox={`0 -16 ${W} ${H + 34}`} className="mt-3 block h-auto w-full" role="img" aria-label="Grafik tayang">
         <defs>
           <linearGradient id="owner-bar-now" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#2dd4bf" />
@@ -179,6 +184,17 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
               >
                 <title>{`${s.label}: ${fmt(s.value)}`}</title>
               </rect>
+              {s.value > 0 ? (
+                <text
+                  x={i * bw + bw / 2}
+                  y={H - h - 4}
+                  textAnchor="middle"
+                  className={s.now ? "fill-[#2dd4bf]" : "fill-zinc-400"}
+                  fontSize={bw < 40 ? 9 : 10}
+                >
+                  {barNum(s.value)}
+                </text>
+              ) : null}
               {s.show ? (
                 <text x={i * bw + bw / 2} y={H + 15} textAnchor="middle" className="fill-zinc-600" fontSize={10}>
                   {s.label}
