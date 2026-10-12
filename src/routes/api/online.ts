@@ -22,6 +22,48 @@ const IP_MAX = 20;
 const OWNER_CACHE_MS = 20_000;
 
 let ownerCache: { at: number; data: Record<string, unknown> } | null = null;
+/**
+ * getOwnerStats scans 14–30 days of analytics_events in D1, so its result is also shared across
+ * isolates in this data centre for SHARED_STATS_SEC via the Cache API. The key sits under
+ * /api/owner…, which the worker entry never serves from cache, so it can't leak publicly.
+ * Online count and peak are still recomputed from KV on every owner poll.
+ */
+const SHARED_STATS_SEC = 60;
+const SHARED_STATS_PATH = "/api/owner-stats-cache-v1";
+
+type OwnerStatsResult = Awaited<ReturnType<typeof getOwnerStats>>;
+
+async function sharedOwnerStats(origin: string): Promise<OwnerStatsResult> {
+  let cache: Cache | null = null;
+  try {
+    cache = (caches as unknown as { default?: Cache }).default || null;
+  } catch {
+    cache = null;
+  }
+  const key = new Request(`${origin}${SHARED_STATS_PATH}`);
+  if (cache) {
+    try {
+      const hit = await cache.match(key);
+      if (hit) return (await hit.json()) as OwnerStatsResult;
+    } catch {
+      /* fall through to a fresh read */
+    }
+  }
+  const stats = await getOwnerStats();
+  if (cache) {
+    try {
+      await cache.put(
+        key,
+        new Response(JSON.stringify(stats), {
+          headers: { "content-type": "application/json", "cache-control": `public, max-age=${SHARED_STATS_SEC}` },
+        }),
+      );
+    } catch {
+      /* cache optional */
+    }
+  }
+  return stats;
+}
 
 /** Owner key: header x-online-key or JSON body `key` only — never the URL query string. */
 function extractKey(request: Request, bodyKey?: string): string {
@@ -85,12 +127,12 @@ function shouldSkipBot(ua: string, owner: boolean): boolean {
   return classifyDevice(ua) === "bot";
 }
 
-async function liveOwnerPayload() {
+async function liveOwnerPayload(origin: string) {
   const now = Date.now();
   if (ownerCache && now - ownerCache.at < OWNER_CACHE_MS) return ownerCache.data;
   // Single source of truth: getOwnerStats builds days[] (Postgres events, or KV
   // daystats when DB is down) and derives today/yesterday/7d cards from it.
-  const stats = await getOwnerStats();
+  const stats = await sharedOwnerStats(origin);
   const [kvN, roll] = await Promise.all([kvCountOnline(), kvReadRoll()]);
   const online = Math.max(Number(stats.online) || 0, Number(stats.count) || 0, kvN);
   const live = rollToStats(roll, online);
@@ -207,7 +249,7 @@ async function handlePost(request: Request): Promise<Response> {
 
   if (!owner) return json(request, { ok: true });
   try {
-    return json(request, { ok: true, owner: true, ...(await liveOwnerPayload()) });
+    return json(request, { ok: true, owner: true, ...(await liveOwnerPayload(new URL(request.url).origin)) });
   } catch {
     return json(request, { ok: true, owner: true, online: 0 });
   }
@@ -226,7 +268,7 @@ async function handleGet(request: Request): Promise<Response> {
     return json(request, { ok: false, error: "forbidden" });
   }
   try {
-    return json(request, { ok: true, owner: true, ...(await liveOwnerPayload()) });
+    return json(request, { ok: true, owner: true, ...(await liveOwnerPayload(new URL(request.url).origin)) });
   } catch {
     return json(request, { ok: true, owner: true, online: 0, hint: "Statistik sibuk, coba lagi." });
   }
