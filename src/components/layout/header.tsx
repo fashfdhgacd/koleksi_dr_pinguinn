@@ -94,7 +94,7 @@ export function Header({
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Cari judul…"
-            className="h-10 pl-9 pr-9 text-sm sm:h-11 sm:pl-10 sm:pr-10"
+            className="pixel h-10 rounded-none border border-white/40 bg-black pl-9 pr-9 text-xs shadow-none placeholder:text-white/45 focus-visible:border-white/80 focus-visible:ring-0 sm:h-11 sm:pl-10 sm:pr-10 sm:text-sm"
             type="search"
             enterKeyHint="search"
             autoComplete="off"
@@ -112,7 +112,7 @@ export function Header({
           ) : null}
         </form>
 
-        <Button variant="ghost" size="icon" asChild aria-label="Semua kategori" className="size-10 shrink-0">
+        <Button variant="ghost" size="icon" asChild aria-label="Semua kategori" className="size-10 shrink-0 rounded-none border border-white/40 hover:border-white/80 hover:bg-transparent sm:size-11">
           <Link to="/kategori">
             <LayoutGrid className="size-5" />
           </Link>
@@ -120,7 +120,7 @@ export function Header({
       </div>
 
       <nav className="mx-auto max-w-[1440px] px-3 sm:px-6" aria-label="Navigasi cepat">
-        <ul className="-mx-3 flex gap-1 overflow-x-auto px-3 py-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
+        <ul className="-mx-3 flex gap-1.5 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
           <li className="shrink-0">
             <Link
               to="/"
@@ -170,7 +170,7 @@ export function Header({
 
 function chipClass(active: boolean) {
   return cn(
-    "inline-flex h-8 shrink-0 items-center whitespace-nowrap rounded-full px-3 text-sm transition-colors duration-150 sm:h-9 sm:rounded-md",
-    active ? "bg-secondary text-foreground" : "text-muted hover:text-foreground",
+    "pixel inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-none border px-3 text-[11px] transition-colors duration-150 sm:text-xs",
+    active ? "border-[#c8c8c8] bg-[#c8c8c8] text-black" : "border-white/35 text-white/75 hover:border-white/80 hover:text-white",
   );
 }

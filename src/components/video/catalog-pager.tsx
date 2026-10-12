@@ -1,15 +1,15 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
-
-function windowPages(current: number, totalPages: number, span = 1): number[] {
-  const start = Math.max(1, current - span);
-  const end = Math.min(totalPages, current + span);
+function windowPages(current: number, totalPages: number, span = 2): number[] {
+  const size = span * 2 + 1;
+  let start = Math.max(1, current - span);
+  const end = Math.min(totalPages, start + size - 1);
+  start = Math.max(1, end - size + 1);
   const out: number[] = [];
   for (let i = start; i <= end; i++) out.push(i);
   return out;
 }
 
 const btn =
-  "pixel inline-flex h-10 min-w-10 touch-manipulation items-center justify-center border border-foreground/40 px-2.5 text-sm text-foreground hover:bg-foreground hover:text-background aria-disabled:pointer-events-none aria-disabled:opacity-30 sm:h-9";
+  "pixel inline-flex h-11 min-w-11 touch-manipulation items-center justify-center rounded-none border border-white/55 bg-black px-2 text-sm text-white transition-colors hover:border-white aria-disabled:pointer-events-none aria-disabled:opacity-30 sm:h-14 sm:min-w-14 sm:text-base";
 
 export function CatalogPager({
   page,
@@ -76,36 +76,36 @@ export function CatalogPager({
   }
 
   return (
-    <nav className="relative z-10 mt-8 flex flex-col items-center gap-3" aria-label="Halaman katalog">
-      <p className="pixel text-xs text-muted">
+    <nav className="relative z-10 mt-10 flex flex-col items-center gap-5 sm:mt-14 sm:gap-7" aria-label="Halaman katalog">
+      <p className="pixel text-center text-xs text-white/85 sm:text-base">
         Halaman {page.toLocaleString("id-ID")} dari {totalPages.toLocaleString("id-ID")}
         {" · "}
         {total.toLocaleString("id-ID")} video
       </p>
-      <div className="flex flex-wrap items-center justify-center gap-1.5">
+      <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3.5">
         <a
           {...(page > 1 ? { ...linkProps(page - 1), rel: "prev" } : { "aria-disabled": true })}
-          className={`${btn} gap-1 px-3`}
+          className={`${btn} px-3 sm:px-5`}
           aria-label="Halaman sebelumnya"
         >
-          <ChevronLeft className="size-3.5" />
-          <span className="hidden sm:inline">Sebelumnya</span>
+          <span aria-hidden="true" className="text-lg leading-none sm:text-2xl">←</span>
         </a>
         {pages[0] > 1 ? (
           <>
-            <a {...linkProps(1)} className={btn}>
+            <a {...linkProps(1)} className={`${btn} hidden sm:inline-flex`}>
               1
             </a>
-            {pages[0] > 2 ? <span className="pixel px-1 text-muted">…</span> : null}
+            {pages[0] > 2 ? <span className="pixel hidden px-1 text-white/50 sm:inline">…</span> : null}
           </>
         ) : null}
         {pages.map((n) => (
           <a
             key={n}
+            data-far={Math.abs(n - page) > 1 && !(page <= 2 && n <= 3) && !(page >= totalPages - 1 && n >= totalPages - 2) ? "" : undefined}
             {...linkProps(n)}
             aria-current={n === page ? "page" : undefined}
-            className={`${btn} ${
-              n === page ? "border-foreground bg-foreground font-bold text-background hover:bg-foreground hover:text-background" : ""
+            className={`${btn} data-[far]:hidden sm:data-[far]:inline-flex ${
+              n === page ? "border-[#c8c8c8] bg-[#c8c8c8] text-black hover:border-[#c8c8c8]" : ""
             }`}
           >
             {n}
@@ -113,19 +113,19 @@ export function CatalogPager({
         ))}
         {pages[pages.length - 1] < totalPages ? (
           <>
-            {pages[pages.length - 1] < totalPages - 1 ? <span className="pixel px-1 text-muted">…</span> : null}
-            <a {...linkProps(totalPages)} className={btn}>
+            {pages[pages.length - 1] < totalPages - 1 ? <span className="pixel hidden px-1 text-white/50 sm:inline">…</span> : null}
+            <a {...linkProps(totalPages)} className={`${btn} hidden sm:inline-flex`}>
               {totalPages}
             </a>
           </>
         ) : null}
         <a
           {...(page < totalPages ? { ...linkProps(page + 1), rel: "next" } : { "aria-disabled": true })}
-          className={`${btn} gap-1 px-3`}
+          className={`${btn} gap-2 px-3 sm:gap-3 sm:px-5`}
           aria-label="Halaman berikutnya"
         >
-          <span className="hidden sm:inline">Berikutnya</span>
-          <ChevronRight className="size-3.5" />
+          <span>Next</span>
+          <span aria-hidden="true" className="text-lg leading-none sm:text-2xl">→</span>
         </a>
       </div>
     </nav>
