@@ -1,6 +1,7 @@
 // Grid: 2 / 3 / 4 kolom (mobile / tablet / desktop).
 // Catalog grids (ads): fluid columns filling the content width (1 / 3 / 4), card thumbs 300:250
-// like the ad card, one ExoClick ad card after the 4th video. The watch page keeps the default grid.
+// like the ad card, one ExoClick ad card in a middle row. Pages hold 35 videos (DEFAULT_PAGE_SIZE),
+// so videos + ad = 36 cells and every row is full at 4 and 3 columns. The watch page keeps the default grid.
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { isRealMinor } from "@/lib/minor-terms";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,7 +12,11 @@ const DEFAULT_GRID =
   "grid grid-cols-2 gap-x-2.5 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 lg:grid-cols-4";
 const AD_GRID =
   "grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-3 sm:gap-y-7 lg:grid-cols-4 [&>a>div:first-child]:aspect-[300/250]";
-const AD_AFTER = 4;
+/** Ad cell index: first cell of a middle row (a multiple of 12, so column 1 at 4 and at 3 columns). */
+function adIndex(count: number): number {
+  const cells = count + 1;
+  return Math.max(0, Math.min(count, Math.floor(cells / 2 / 12) * 12 || Math.min(4, count)));
+}
 
 function visibleCards(items: VideoCardType[]): VideoCardType[] {
   return items.filter((video) => !isRealMinor({ title: video.title, tags: video.category }));
@@ -27,6 +32,7 @@ export function VideoGrid({
   ads?: boolean;
 }) {
   const shown = visibleCards(items);
+  const at = adIndex(shown.length);
   return (
     <div className={ads ? AD_GRID : DEFAULT_GRID}>
       {shown.map((video, index) => (
@@ -34,10 +40,10 @@ export function VideoGrid({
           key={video.id}
           video={video}
           eager={index < eagerCount}
-          adBefore={ads && index === AD_AFTER}
+          adBefore={ads && index === at}
         />
       ))}
-      {ads && shown.length > 0 && shown.length <= AD_AFTER ? <AdSlot /> : null}
+      {ads && shown.length > 0 && at >= shown.length ? <AdSlot /> : null}
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { Hero } from "@/components/video/hero";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { findCategory } from "@/lib/catalog/categories";
 import { queryCatalog } from "@/lib/catalog/service";
-import type { VideoCard } from "@/lib/catalog/types";
+import { DEFAULT_PAGE_SIZE, type VideoCard } from "@/lib/catalog/types";
 import { useCatalogFeed } from "../hooks/use-catalog";
 import { jsonLdString } from "@/lib/json-ld";
 import { BRAND_NAME, DEFAULT_OG, HOME_CANONICAL, HOME_INTRO, homeJsonLd, homeSeo } from "@/lib/seo";
@@ -33,9 +33,9 @@ function isSchemaPlaceholder(q?: string): boolean {
 async function loadHome({ search }: { search: HomeSearch }) {
   const page = search.page || 1;
   if (search.q) {
-    return queryCatalog({ type: "search", q: search.q, page, limit: 24 });
+    return queryCatalog({ type: "search", q: search.q, page, limit: DEFAULT_PAGE_SIZE });
   }
-  return queryCatalog({ type: "home", page, limit: 24 });
+  return queryCatalog({ type: "home", page, limit: DEFAULT_PAGE_SIZE });
 }
 
 function seedFromLoader(loaderData: Awaited<ReturnType<typeof loadHome>>): {

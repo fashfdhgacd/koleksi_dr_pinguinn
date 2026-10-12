@@ -1,4 +1,5 @@
-export const DEFAULT_PAGE_SIZE = 24;
+// 35 videos + 1 ad card = 36 grid cells: full rows at 4 and 3 columns (video-grid.tsx).
+export const DEFAULT_PAGE_SIZE = 35;
 export const MAX_PAGE_SIZE = 48;
 
 export type CatalogType =

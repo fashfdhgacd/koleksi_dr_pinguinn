@@ -20,7 +20,7 @@ import {
   rankingKey,
   rankingSeo,
 } from "@/lib/catalog/rankings";
-import type { VideoCard } from "@/lib/catalog/types";
+import { DEFAULT_PAGE_SIZE, type VideoCard } from "@/lib/catalog/types";
 import { useCatalogFeed } from "../hooks/use-catalog";
 import { DEFAULT_OG, SITE_ORIGIN, homeSeo } from "@/lib/seo";
 
@@ -49,14 +49,14 @@ export const Route = createFileRoute("/kategori/$slug")({
         type: "category",
         category: rankingKey(rank.slug, parsePeriode(raw.periode)),
         page: parsePage(raw.page) || 1,
-        limit: 24,
+        limit: DEFAULT_PAGE_SIZE,
       });
     }
     const cat = findCategory(params.slug);
     if (!cat) return { ok: false as const, error: "not found", code: "not_found" as const };
     const raw = location.search as Record<string, unknown>;
     const page = parsePage(raw.page) || 1;
-    return queryCatalog({ type: "category", category: cat.slug, page, limit: 24 });
+    return queryCatalog({ type: "category", category: cat.slug, page, limit: DEFAULT_PAGE_SIZE });
   },
   head: ({ params, match }) => {
     const rank = findRanking(params.slug);
