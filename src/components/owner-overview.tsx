@@ -119,7 +119,7 @@ function StatCell({ label, value, sub }: { label: string; value: string; sub?: s
 
 
 function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
-  const [mode, setMode] = useState<"days" | "hours">("days");
+  const [mode, setMode] = useState<"days" | "hours">("hours");
   const hasHours = hourly.some((r) => (Number(r.views) || 0) > 0);
   const showHours = mode === "hours" && hasHours;
   const W = 720;
