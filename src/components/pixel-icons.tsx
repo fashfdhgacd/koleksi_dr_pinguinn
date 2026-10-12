@@ -5,7 +5,7 @@ import { useEffect, useRef } from "react";
  * Each icon is 32 rows of 32 chars: "#" = white pixel, "r" = red pixel, "." = empty.
  * Pixels become integer-coordinate rects (merged per row run), and the SVG is always drawn at an
  * exact multiple of the grid (64px = 2x), so there is no fractional scaling or anti-aliasing.
- * Drawn with scripts in the agent box (PIL, aliased); edit the rows directly to tweak a pixel.
+ * Drawn with an aliased rasterizer (no anti-aliasing); edit the rows directly to tweak a pixel.
  */
 const ICONS: Record<string, string[]> = {
   eye: [
