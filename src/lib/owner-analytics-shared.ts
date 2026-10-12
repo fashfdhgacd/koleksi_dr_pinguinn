@@ -48,6 +48,8 @@ export type OwnerStats = {
   topVideos: TopVideo[];
   topRefs: { ref: string; views: number }[];
   devices: { device: DeviceKind; views: number }[];
+  browsers?: { browser: string; views: number }[];
+  countries?: { country: string; views: number }[];
   hosts: { host: string; views: number }[];
   storage: "d1" | "postgres" | "pglite" | "kv" | "kv-rest" | "memory" | "error";
   persistOk: boolean;
@@ -119,6 +121,9 @@ export function classifyDevice(ua: string): DeviceKind {
 export function classifyBrowser(ua: string): string {
   const u = ua.toLowerCase();
   if (/edg\//.test(u)) return "edge";
+  if (/opr\/|opera/.test(u)) return "opera";
+  if (/samsungbrowser/.test(u)) return "samsung";
+  if (/ucbrowser/.test(u)) return "uc";
   if (/chrome|crios/.test(u)) return "chrome";
   if (/safari/.test(u) && !/chrome|crios/.test(u)) return "safari";
   if (/firefox|fxios/.test(u)) return "firefox";
@@ -298,4 +303,11 @@ export async function getKV() {
 export function n(v: unknown): number {
   const x = Number(v);
   return Number.isFinite(x) && x > 0 ? x : 0;
+}
+
+/** Two-letter country from Cloudflare's CF-IPCountry header; "XX"/"T1" and junk become "". */
+export function normalizeCountry(raw: string | null | undefined): string {
+  const c = String(raw || "").trim().toUpperCase();
+  if (!/^[A-Z]{2}$/.test(c) || c === "XX" || c === "T1") return "";
+  return c;
 }

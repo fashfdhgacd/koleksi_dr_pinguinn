@@ -128,6 +128,14 @@ const g = globalThis as typeof globalThis & { __d1SchemaPromise__?: Promise<void
 export function ensureD1Schema(db: D1DatabaseLike): Promise<void> {
   g.__d1SchemaPromise__ ??= db
     .batch(SCHEMA.map((s) => db.prepare(s)))
+    // Older tables lack the country column; SQLite has no "add column if not exists",
+    // so the duplicate-column error on already-migrated tables is ignored.
+    .then(() =>
+      db
+        .prepare(`alter table analytics_events add column country text`)
+        .all()
+        .catch(() => undefined),
+    )
     .then(() => undefined)
     .catch((err) => {
       g.__d1SchemaPromise__ = undefined;
@@ -231,6 +239,7 @@ export async function d1RecordHit(
     ua: string;
     device: string;
     browser: string;
+    country?: string;
     host: string;
     now: number;
     hourUtc: string;
@@ -240,8 +249,8 @@ export async function d1RecordHit(
     db
       .prepare(
         `insert into analytics_events
-          (id, event_type, visitor_id, session_id, page, path, referrer, user_agent, device_type, browser, host, created_at)
-         values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12)
+          (id, event_type, visitor_id, session_id, page, path, referrer, user_agent, device_type, browser, host, created_at, country)
+         values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)
          on conflict (id) do nothing`,
       )
       .bind(
@@ -257,6 +266,7 @@ export async function d1RecordHit(
         e.browser,
         e.host,
         e.now,
+        e.country || null,
       ),
     db
       .prepare(
@@ -374,7 +384,36 @@ export async function d1StatsParts(db: D1DatabaseLike, today: string, now = Date
         TOP_VIDEOS_LIMIT,
       ),
     ]);
-  return { online, views24, views30d, hourlyRows, pathRows, refRows, deviceRows, hostRows, videoRows };
+  // Browser/country lists are optional extras: a failure here must not break the stats.
+  const [browserRows, countryRows] = await Promise.all([
+    all<{ browser: string; views: number }>(
+      db,
+      `select coalesce(browser,'other') as browser, count(*) as views from analytics_events where ${TODAY}
+       group by 1 order by views desc limit 8`,
+      t0,
+      t1,
+    ).catch(() => []),
+    all<{ country: string; views: number }>(
+      db,
+      `select coalesce(country,'') as country, count(*) as views from analytics_events where ${TODAY}
+       group by 1 order by views desc limit 8`,
+      t0,
+      t1,
+    ).catch(() => []),
+  ]);
+  return {
+    online,
+    views24,
+    views30d,
+    hourlyRows,
+    pathRows,
+    refRows,
+    deviceRows,
+    hostRows,
+    videoRows,
+    browserRows,
+    countryRows,
+  };
 }
 
 /** Events older than 90 days, sessions older than 2 days. */

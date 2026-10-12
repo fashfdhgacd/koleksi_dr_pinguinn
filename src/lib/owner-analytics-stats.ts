@@ -192,6 +192,8 @@ export async function getOwnerStats(): Promise<OwnerStats> {
     let deviceRows: { device: DeviceKind; views: number }[];
     let hostRows: { host: string; views: number }[];
     let videoRows: { path: string; views: number; uniq: number }[];
+    let browserRows: { browser: string; views: number }[] = [];
+    let countryRows: { country: string; views: number }[] = [];
     if (d1) {
       await maybePruneD1(d1, now);
       const [parts, histRows] = await Promise.all([
@@ -208,6 +210,8 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       deviceRows = parts.deviceRows as { device: DeviceKind; views: number }[];
       hostRows = parts.hostRows;
       videoRows = parts.videoRows;
+      browserRows = parts.browserRows;
+      countryRows = parts.countryRows;
     } else {
       const sql = await getSql();
       [
@@ -267,6 +271,25 @@ export async function getOwnerStats(): Promise<OwnerStats> {
           [dk, TOP_VIDEOS_LIMIT],
         ),
       ]);
+      // Optional extras: older databases may lack the country column; never fail the stats for them.
+      [browserRows, countryRows] = await Promise.all([
+        sql
+          .query<{ browser: string; views: number }>(
+            `select coalesce(browser,'other') as browser, count(*)::int as views from analytics_events
+           where ${TODAY_WINDOW} and event_type = 'pageview'
+           group by 1 order by views desc limit 8`,
+            [dk],
+          )
+          .catch(() => []),
+        sql
+          .query<{ country: string; views: number }>(
+            `select coalesce(country,'') as country, count(*)::int as views from analytics_events
+           where ${TODAY_WINDOW} and event_type = 'pageview'
+           group by 1 order by views desc limit 8`,
+            [dk],
+          )
+          .catch(() => []),
+      ]);
     }
 
     const topVideos = await withVideoTitles(toTopVideos(videoRows, TOP_VIDEOS_LIMIT));
@@ -313,6 +336,8 @@ export async function getOwnerStats(): Promise<OwnerStats> {
       topRefs: refRows.map((r) => ({ ref: r.ref || "(direct)", views: n(r.views) })),
       devices: deviceRows.map((r) => ({ device: r.device || "other", views: n(r.views) })),
       hosts: hostRows.map((r) => ({ host: r.host || "(unknown)", views: n(r.views) })),
+      browsers: browserRows.map((r) => ({ browser: r.browser || "other", views: n(r.views) })),
+      countries: countryRows.map((r) => ({ country: r.country || "", views: n(r.views) })),
       storage: source,
       persistOk,
       database: "connected",

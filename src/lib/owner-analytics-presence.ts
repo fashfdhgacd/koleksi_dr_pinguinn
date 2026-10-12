@@ -21,6 +21,7 @@ import {
   bumpPeakKv,
   classifyBrowser,
   classifyDevice,
+  normalizeCountry,
   dayKey,
   hourUtcBucket,
   mem,
@@ -220,6 +221,20 @@ export async function touchOnline(id: string, opts: { skipKv?: boolean } = {}): 
   }
 }
 
+const pgCountryState = globalThis as typeof globalThis & { __pgCountryReady__?: Promise<boolean> };
+
+/**
+ * Adds analytics_events.country on Postgres once per isolate (idempotent).
+ * Resolves false when the column can't be added, so hits are still recorded without it.
+ */
+function ensurePgCountry(sql: { query: (q: string, p: unknown[]) => Promise<unknown> }): Promise<boolean> {
+  pgCountryState.__pgCountryReady__ ??= sql
+    .query(`alter table analytics_events add column if not exists country text`, [])
+    .then(() => true)
+    .catch(() => false);
+  return pgCountryState.__pgCountryReady__;
+}
+
 export async function recordHit(input: {
   path: string;
   ref?: string;
@@ -229,12 +244,14 @@ export async function recordHit(input: {
   sessionId?: string;
   eventId?: string;
   eventType?: string;
+  country?: string;
 }): Promise<void> {
   const now = Date.now();
   const path = normalizePath(input.path);
   const ref = normalizeRef(input.ref || "");
   const device = classifyDevice(input.ua || "");
   const browser = classifyBrowser(input.ua || "");
+  const country = normalizeCountry(input.country);
   const host = (input.host || "").replace(/^www\./, "").slice(0, 80) || "(unknown)";
   const sessionId = safeId(input.sessionId || input.visitorId || "");
   const visitorId = safeId(input.visitorId || sessionId);
@@ -259,6 +276,7 @@ export async function recordHit(input: {
         ua: (input.ua || "").slice(0, 300),
         device,
         browser,
+        country,
         host,
         now,
         hourUtc: hourUtcBucket(now).toISOString(),
@@ -267,25 +285,37 @@ export async function recordHit(input: {
       return;
     }
     const sql = await getSql();
-    await sql.query(
-      `insert into analytics_events
-        (id, event_type, visitor_id, session_id, page, path, referrer, user_agent, device_type, browser, host, created_at)
-       values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
-       on conflict (id) do nothing`,
-      [
-        eventId,
-        eventType,
-        visitorId || null,
-        sessionId || null,
-        path,
-        path,
-        ref,
-        (input.ua || "").slice(0, 300),
-        device,
-        browser,
-        host,
-      ],
-    );
+    const withCountry = await ensurePgCountry(sql);
+    const baseParams = [
+      eventId,
+      eventType,
+      visitorId || null,
+      sessionId || null,
+      path,
+      path,
+      ref,
+      (input.ua || "").slice(0, 300),
+      device,
+      browser,
+      host,
+    ];
+    if (withCountry) {
+      await sql.query(
+        `insert into analytics_events
+          (id, event_type, visitor_id, session_id, page, path, referrer, user_agent, device_type, browser, host, created_at, country)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now(), $12)
+         on conflict (id) do nothing`,
+        [...baseParams, country || null],
+      );
+    } else {
+      await sql.query(
+        `insert into analytics_events
+          (id, event_type, visitor_id, session_id, page, path, referrer, user_agent, device_type, browser, host, created_at)
+         values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11, now())
+         on conflict (id) do nothing`,
+        baseParams,
+      );
+    }
     const bucket = hourUtcBucket(now);
     await sql.query(
       `insert into analytics_hourly (hour_utc, page_views, unique_visitors, sessions)
