@@ -1,10 +1,11 @@
-// ExoClick 300x250 banner (zone 6053856) as a grid cell in listing grids.
-// - Fixed 300x250 box (no layout shift); server + client render identical markup (hydration safe).
+// ExoClick 300x250 banner (zone 6053864) as one card in catalog grids.
+// - Same shell as a video card (rounded box 300:250, "iklan" / "sponsor" where the title goes).
+// - Server + client render identical markup (hydration safe); no layout shift.
 // - ad-provider.js loaded once, async, only when the slot nears the viewport.
 // - serve pushed once per mounted slot (SPA remount => new push). Ad blockers: fails silently.
 import { useEffect, useRef } from "react";
 
-const ZONE_ID = "6053856";
+const ZONE_ID = "6053864";
 const SCRIPT_ID = "exo-ad-provider";
 const SCRIPT_SRC = "https://a.magsrv.com/ad-provider.js";
 
@@ -56,13 +57,18 @@ export function AdSlot() {
   }, []);
 
   return (
-    <div className="col-span-full flex flex-col items-center py-1" aria-label="Iklan">
-      <span className="mb-1 text-[10px] uppercase tracking-widest text-neutral-500">Iklan</span>
+    <div className="block rounded-xl p-1 sm:p-1.5" aria-label="Iklan">
       <div
         ref={ref}
-        className="h-[250px] w-[300px] overflow-hidden border border-neutral-800 bg-neutral-950"
+        className="relative flex aspect-[300/250] items-center justify-center overflow-hidden rounded-xl bg-surface-2"
       >
-        <ins className="eas6a97888e17" data-zoneid={ZONE_ID} />
+        <ins className="eas6a97888e2" data-zoneid={ZONE_ID} />
+      </div>
+      <div className="px-1 pb-1 pt-2.5 sm:px-1.5 sm:pt-3">
+        <h3 className="line-clamp-2 min-h-[2.5em] text-[13px] font-medium leading-snug text-foreground sm:text-[15px]">
+          iklan
+        </h3>
+        <div className="mt-1.5 text-[11px] text-muted sm:text-xs">sponsor</div>
       </div>
     </div>
   );

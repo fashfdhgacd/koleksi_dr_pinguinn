@@ -218,7 +218,7 @@ function HomePage() {
           </div>
 
           {feed.loading && !feed.items.length ? (
-            <VideoGridSkeleton count={12} />
+            <VideoGridSkeleton count={12} ads />
           ) : feed.error && !feed.items.length ? (
             <ErrorState message={feed.error} onRetry={feed.retry} />
           ) : !gridItems.length ? (
@@ -232,7 +232,7 @@ function HomePage() {
             />
           ) : (
             <SafeBoundary>
-              <VideoGrid items={gridItems} />
+              <VideoGrid items={gridItems} ads />
             </SafeBoundary>
           )}
 

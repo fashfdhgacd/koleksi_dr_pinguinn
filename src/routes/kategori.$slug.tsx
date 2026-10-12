@@ -192,14 +192,14 @@ function RankingPage({ rank }: { rank: RankingDef }) {
             }
           />
         ) : feed.loading && !feed.items.length ? (
-          <VideoGridSkeleton count={12} />
+          <VideoGridSkeleton count={12} ads />
         ) : feed.error && !feed.items.length ? (
           <ErrorState message={feed.error} onRetry={feed.retry} />
         ) : !feed.items.length ? (
           <EmptyState title="Kosong" description="Belum ada data untuk periode ini." />
         ) : (
           <SafeBoundary>
-            <VideoGrid items={feed.items} />
+            <VideoGrid items={feed.items} ads />
           </SafeBoundary>
         )}
 
@@ -291,14 +291,14 @@ function PlainCategoryPage({ slug }: { slug: string }) {
         </div>
 
         {feed.loading && !feed.items.length ? (
-          <VideoGridSkeleton count={12} />
+          <VideoGridSkeleton count={12} ads />
         ) : feed.error && !feed.items.length ? (
           <ErrorState message={feed.error} onRetry={feed.retry} />
         ) : !feed.items.length ? (
           <EmptyState title="Kosong" description="Belum ada video di kategori ini." />
         ) : (
           <SafeBoundary>
-            <VideoGrid items={feed.items} />
+            <VideoGrid items={feed.items} ads />
           </SafeBoundary>
         )}
 
