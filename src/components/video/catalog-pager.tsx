@@ -9,7 +9,7 @@ function windowPages(current: number, totalPages: number, span = 2): number[] {
 }
 
 const btn =
-  "pixel inline-flex h-11 min-w-11 touch-manipulation items-center justify-center rounded-none border border-white/55 px-2 text-sm text-white transition-colors hover:border-white aria-disabled:pointer-events-none aria-disabled:opacity-30 sm:h-14 sm:min-w-14 sm:text-base";
+  "pixel inline-flex h-11 min-w-11 touch-manipulation items-center justify-center rounded-none border border-white/55 px-2 text-sm transition-colors hover:border-white aria-disabled:pointer-events-none aria-disabled:opacity-30 sm:h-14 sm:min-w-14 sm:text-base";
 
 export function CatalogPager({
   page,
@@ -85,14 +85,14 @@ export function CatalogPager({
       <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3.5">
         <a
           {...(page > 1 ? { ...linkProps(page - 1), rel: "prev" } : { "aria-disabled": true })}
-          className={`${btn} px-3 sm:px-5`}
+          className={`${btn} px-3 text-white sm:px-5`}
           aria-label="Halaman sebelumnya"
         >
           <span aria-hidden="true" className="text-lg leading-none sm:text-2xl">←</span>
         </a>
         {pages[0] > 1 ? (
           <>
-            <a {...linkProps(1)} className={`${btn} max-sm:hidden`}>
+            <a {...linkProps(1)} className={`${btn} text-white max-sm:hidden`}>
               1
             </a>
             {pages[0] > 2 ? <span className="pixel hidden px-1 text-white/50 sm:inline">…</span> : null}
@@ -105,7 +105,7 @@ export function CatalogPager({
             {...linkProps(n)}
             aria-current={n === page ? "page" : undefined}
             className={`${btn} max-sm:data-[far]:hidden ${
-              n === page ? "border-[#c8c8c8] bg-[#c8c8c8] text-black hover:border-[#c8c8c8]" : ""
+              n === page ? "border-[#c8c8c8] bg-[#c8c8c8] text-black hover:border-[#c8c8c8]" : "text-white"
             }`}
           >
             {n}
@@ -114,14 +114,14 @@ export function CatalogPager({
         {pages[pages.length - 1] < totalPages ? (
           <>
             {pages[pages.length - 1] < totalPages - 1 ? <span className="pixel hidden px-1 text-white/50 sm:inline">…</span> : null}
-            <a {...linkProps(totalPages)} className={`${btn} max-sm:hidden`}>
+            <a {...linkProps(totalPages)} className={`${btn} text-white max-sm:hidden`}>
               {totalPages}
             </a>
           </>
         ) : null}
         <a
           {...(page < totalPages ? { ...linkProps(page + 1), rel: "next" } : { "aria-disabled": true })}
-          className={`${btn} gap-2 px-3 sm:gap-3 sm:px-5`}
+          className={`${btn} gap-2 px-3 text-white sm:gap-3 sm:px-5`}
           aria-label="Halaman berikutnya"
         >
           <span>Next</span>
