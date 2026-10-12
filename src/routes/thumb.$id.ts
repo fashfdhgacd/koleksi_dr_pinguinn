@@ -42,6 +42,35 @@ function imageResponse(body: BodyInit, type: string): Response {
   });
 }
 
+/**
+ * No stored/remote poster (or the host is dead): serve the site's own brand poster
+ * (1280x720 JPEG) instead of a 404, so Google's video indexing never sees an
+ * unreachable thumbnail. Short cache + not saved to R2, so a real poster added
+ * later still takes over.
+ */
+async function fallback(request: Request): Promise<Response> {
+  try {
+    const res = await fetch(new URL("/brand-poster-v2.jpg", request.url).toString(), {
+      signal: AbortSignal.timeout(5000),
+    });
+    if (res.ok) {
+      const buf = await res.arrayBuffer();
+      if (sniffType(buf)) {
+        return new Response(buf, {
+          headers: {
+            "content-type": "image/jpeg",
+            "cache-control": "public, max-age=3600",
+            "x-thumb-fallback": "1",
+          },
+        });
+      }
+    }
+  } catch {
+    /* fall through */
+  }
+  return new Response(null, { status: 404 });
+}
+
 export const Route = createFileRoute("/thumb/$id")({
   server: {
     handlers: {
@@ -73,15 +102,15 @@ export const Route = createFileRoute("/thumb/$id")({
           }
 
           const source = sourceFor(id);
-          if (!source) return new Response(null, { status: 404 });
+          if (!source) return fallback(request);
           const remote = await fetch(source, {
             headers: { "user-agent": "kdp-poster/1" },
             signal: AbortSignal.timeout(8000),
           }).catch(() => null);
-          if (!remote?.ok) return new Response(null, { status: 404 });
+          if (!remote?.ok) return fallback(request);
           const buf = await remote.arrayBuffer().catch(() => null);
           const type = buf ? sniffType(buf) : "";
-          if (!buf || !type || buf.byteLength < 800) return new Response(null, { status: 404 });
+          if (!buf || !type || buf.byteLength < 800) return fallback(request);
           if (bucket) {
             await bucket.put(key, buf, { httpMetadata: { contentType: type } }).catch(() => undefined);
           }
@@ -93,7 +122,7 @@ export const Route = createFileRoute("/thumb/$id")({
           }
           return res;
         } catch {
-          return new Response(null, { status: 404 });
+          return fallback(request);
         }
       },
     },
