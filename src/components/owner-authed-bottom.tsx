@@ -1,9 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import { OwnerChart } from "@/components/owner-chart";
-import { TopVideosSection } from "@/components/owner-top-videos";
 import { fmt, deviceLabel, dayLabel, type OwnerStats, type DeviceKind, type DayRow } from "@/components/owner-dashboard-shared";
 
 type DeviceRow = { device: DeviceKind; views: number; pct: number };
@@ -16,13 +15,25 @@ export function OwnerAuthedBottom(props: {
   loading: boolean;
   fetchOnline: (key: string, quiet?: boolean) => Promise<void>;
   logout: () => void;
-  /** Rendered at the very bottom, just above the Refresh/Keluar footer (hidden videos + bot cards). */
+  /** Collapsed owner sections rendered after the statistics block (player error, hidden list, poster, bot). */
   beforeFooter?: ReactNode;
 }) {
-  const { days, devices, stats, secret, loading, fetchOnline, logout, beforeFooter } = props;
+  const { days, devices, stats, beforeFooter } = props;
+  const [open, setOpen] = useState(false);
   return (
     <>
-      {/* Video disembunyikan + Bot Telegram: paling bawah, lewat prop beforeFooter (owner-panel.tsx) */}
+      <div className="rounded-xl border border-white/[0.07] bg-[#121215]">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="flex w-full items-center justify-between px-4 py-3 text-left font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400"
+        >
+          Statistik 14 hari · perangkat · halaman · sumber
+          <span className="text-zinc-600">{open ? "-" : "+"}</span>
+        </button>
+        {open ? (
+          <div className="flex flex-col gap-3 border-t border-white/[0.06] p-2 sm:p-3">
       {days.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
                 <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Grafik 14 hari (WIB)</h2>
@@ -60,9 +71,6 @@ export function OwnerAuthedBottom(props: {
                     </tbody>
                   </table>
                 </div>
-                <p className="mt-3 text-[11px] text-zinc-600">
-                  Kartu atas dan baris "Hari ini" memakai sumber yang sama (Postgres pageview / KV daystats). Hari yang sudah tersimpan salah tidak bisa di-backfill otomatis.
-                </p>
               </section>
             ) : null}
 
@@ -82,8 +90,6 @@ export function OwnerAuthedBottom(props: {
                 </ul>
               </section>
             ) : null}
-
-            <TopVideosSection videos={stats?.topVideos || []} />
 
             {stats?.topPaths?.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
@@ -113,19 +119,11 @@ export function OwnerAuthedBottom(props: {
               </section>
             ) : null}
 
-            {beforeFooter}
+          </div>
+        ) : null}
+      </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] text-zinc-600">Ping pengunjung 90 dtk · panel refresh 25 dtk · tab tersembunyi tidak dihitung</p>
-              <div className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => void fetchOnline(secret)} disabled={loading}>
-                  {loading ? "..." : "Refresh"}
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={logout}>
-                  Keluar
-                </Button>
-              </div>
-            </div>
+      {beforeFooter}
     </>
   );
 }

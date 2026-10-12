@@ -4,19 +4,15 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CATEGORY_LIST } from "@/lib/catalog/categories";
 
+// Ambil link: same category list as the rest of the site (plus "Semua" and "Terbaru").
 const CATS = [
   { slug: "", label: "Semua" },
   { slug: "terbaru", label: "Terbaru" },
-  { slug: "jav", label: "Jav" },
-  { slug: "jilbab", label: "Jilbab" },
-  { slug: "amatir", label: "Amatir" },
-  { slug: "tante", label: "Tante" },
-  { slug: "abg", label: "Muda 18+" },
-  { slug: "ai-plus", label: "AI+" },
-  { slug: "viral", label: "Viral" },
+  ...CATEGORY_LIST.map((c) => ({ slug: c.slug, label: c.label })),
 ];
 
-export function OwnerTools({ secret }: { secret: string }) {
+/** part "main": Tambah video + Ambil link. part "poster": Poster video (collapsed in /pemilik). */
+export function OwnerTools({ secret, part = "main" }: { secret: string; part?: "main" | "poster" }) {
   const [cat, setCat] = useState("");
   const [shareText, setShareText] = useState("");
   const [shareNote, setShareNote] = useState("");
@@ -153,11 +149,66 @@ export function OwnerTools({ secret }: { secret: string }) {
     }
   }
 
+  if (part === "poster") {
+    return (
+      <section className="rounded-xl border border-white/[0.07] bg-[#121215] p-4 min-w-0">
+        <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Poster video</h2>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <input
+            value={posterId}
+            onChange={(e) => setPosterId(e.target.value)}
+            placeholder="ID video"
+            className="h-10 min-w-[9rem] flex-1 rounded-lg border border-white/[0.08] bg-[#0f0f11] px-3 text-sm text-zinc-200"
+          />
+          <input
+            value={posterUrl}
+            onChange={(e) => setPosterUrl(e.target.value)}
+            placeholder="https://…/thumb.jpg"
+            className="h-10 min-w-[14rem] flex-[2] rounded-lg border border-white/[0.08] bg-[#0f0f11] px-3 text-sm text-zinc-200"
+          />
+          <Button type="button" size="sm" disabled={posterBusy} onClick={() => void savePoster()}>
+            Simpan poster
+          </Button>
+          <Button type="button" variant="outline" size="sm" disabled={posterBusy} onClick={() => void refreshPosters()}>
+            {posterBusy ? "Memproses..." : "Refresh posters"}
+          </Button>
+        </div>
+        {posterNote ? <pre className="mt-2 whitespace-pre-wrap text-xs text-zinc-400">{posterNote}</pre> : null}
+      </section>
+    );
+  }
+
   return (
-    <>
-      <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-        <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Ambil link</h2>
-        <p className="mt-1 text-xs text-zinc-500">Acak, tidak diulang hari ini. Sama dengan bot, tanpa commit.</p>
+    <div className="grid gap-4 lg:grid-cols-2">
+      <section className="rounded-xl border border-white/[0.07] bg-[#121215] p-4 min-w-0">
+        <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Tambah video</h2>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <select
+            value={uploadCat}
+            onChange={(e) => setUploadCat(e.target.value)}
+            className="h-10 rounded-lg border border-white/[0.08] bg-[#0f0f11] px-3 text-sm text-zinc-200"
+          >
+            <option value="">Otomatis (dari judul)</option>
+            {CATEGORY_LIST.map((c) => (
+              <option key={c.slug} value={c.slug}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+          <Button type="button" size="sm" disabled={uploadBusy} onClick={() => void upload()}>
+            {uploadBusy ? "Memproses..." : "Simpan batch"}
+          </Button>
+        </div>
+        <textarea
+          value={uploadText}
+          onChange={(e) => setUploadText(e.target.value)}
+          placeholder={"Judul opsional di atas link\nhttps://tv1.indoav.app/e/..."}
+          className="mt-3 h-36 w-full resize-y rounded-lg border border-white/[0.08] bg-[#0f0f11] p-3 text-xs text-zinc-200"
+        />
+        {uploadNote ? <pre className="mt-2 whitespace-pre-wrap text-xs text-zinc-400">{uploadNote}</pre> : null}
+      </section>
+      <section className="rounded-xl border border-white/[0.07] bg-[#121215] p-4 min-w-0">
+        <h2 className="font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">Ambil link</h2>
         <div className="mt-3 flex flex-wrap gap-2">
           <select
             value={cat}
@@ -191,67 +242,6 @@ export function OwnerTools({ secret }: { secret: string }) {
           className="mt-3 h-40 w-full resize-y rounded-lg border border-white/[0.08] bg-[#0f0f11] p-3 text-xs text-zinc-200"
         />
       </section>
-
-      <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-        <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Tambah video</h2>
-        <p className="mt-1 text-xs text-zinc-500">
-          Tempel banyak link. Satu kirim = satu commit. IndoAV, Putarin, Streamtape, Lulu, Videy. Thumb API (jika
-          ada) otomatis masuk poster + latest-posters.json.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <select
-            value={uploadCat}
-            onChange={(e) => setUploadCat(e.target.value)}
-            className="h-10 rounded-lg border border-white/[0.08] bg-[#0f0f11] px-3 text-sm text-zinc-200"
-          >
-            <option value="">Otomatis (dari judul)</option>
-            {CATEGORY_LIST.map((c) => (
-              <option key={c.slug} value={c.slug}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-          <Button type="button" size="sm" disabled={uploadBusy} onClick={() => void upload()}>
-            {uploadBusy ? "Memproses..." : "Simpan batch"}
-          </Button>
-        </div>
-        <textarea
-          value={uploadText}
-          onChange={(e) => setUploadText(e.target.value)}
-          placeholder={"Judul opsional di atas link\nhttps://tv1.indoav.app/e/..."}
-          className="mt-3 h-36 w-full resize-y rounded-lg border border-white/[0.08] bg-[#0f0f11] p-3 text-xs text-zinc-200"
-        />
-        {uploadNote ? <pre className="mt-2 whitespace-pre-wrap text-xs text-zinc-400">{uploadNote}</pre> : null}
-      </section>
-
-      <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-        <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Poster video</h2>
-        <p className="mt-1 text-xs text-zinc-500">
-          Kartu hitam = belum ada thumb. Tempel URL gambar per ID, atau refresh otomatis via Streamtape
-          file/info · getsplash / Putarin API. Disimpan ke data/latest-posters.json.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <input
-            value={posterId}
-            onChange={(e) => setPosterId(e.target.value)}
-            placeholder="ID video"
-            className="h-10 min-w-[9rem] flex-1 rounded-lg border border-white/[0.08] bg-[#0f0f11] px-3 text-sm text-zinc-200"
-          />
-          <input
-            value={posterUrl}
-            onChange={(e) => setPosterUrl(e.target.value)}
-            placeholder="https://…/thumb.jpg"
-            className="h-10 min-w-[14rem] flex-[2] rounded-lg border border-white/[0.08] bg-[#0f0f11] px-3 text-sm text-zinc-200"
-          />
-          <Button type="button" size="sm" disabled={posterBusy} onClick={() => void savePoster()}>
-            Simpan poster
-          </Button>
-          <Button type="button" variant="outline" size="sm" disabled={posterBusy} onClick={() => void refreshPosters()}>
-            {posterBusy ? "Memproses..." : "Refresh posters"}
-          </Button>
-        </div>
-        {posterNote ? <pre className="mt-2 whitespace-pre-wrap text-xs text-zinc-400">{posterNote}</pre> : null}
-      </section>
-    </>
+    </div>
   );
 }

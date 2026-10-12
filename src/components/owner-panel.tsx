@@ -11,6 +11,7 @@ import {
 } from "@/components/owner-dashboard-shared";
 import { OwnerLoginForm } from "@/components/owner-login-form";
 import { OwnerAuthedTop } from "@/components/owner-authed-top";
+import { OwnerTools } from "@/components/owner-tools";
 import { OwnerAuthedBottom } from "@/components/owner-authed-bottom";
 import { HiddenListSection } from "@/components/owner-hidden-list";
 import { OwnerTelegramStatus } from "@/components/owner-telegram-status";
@@ -106,6 +107,32 @@ export function OwnerDashboard() {
     setError(null);
   }
 
+  const [botOk, setBotOk] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!authed || !secret) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const res = await fetch("/api/owner-tools", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-online-key": secret },
+          body: JSON.stringify({ action: "telegram-webhook-info" }),
+        });
+        const d = (await res.json().catch(() => null)) as {
+          ok?: boolean;
+          urlOk?: boolean;
+          info?: { lastErrorMessage?: string } | null;
+        } | null;
+        if (alive) setBotOk(Boolean(d?.ok && d.urlOk && d.info && !d.info.lastErrorMessage));
+      } catch {
+        if (alive) setBotOk(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [authed, secret]);
+
   const online = Math.max(0, stats?.online ?? stats?.count ?? 0);
   const devices = useMemo(() => {
     const rows = (stats?.devices || []).filter((d) => d.device !== "bot");
@@ -121,20 +148,34 @@ export function OwnerDashboard() {
   const vsUniq = deltaPct(stats?.uniqueToday || 0, stats?.yesterdayUnique || 0);
 
   return (
-    <div className="min-h-dvh text-zinc-100" style={{ backgroundColor: "#0f0f11" }}>
-      <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 px-4 py-8">
-        <header className="flex items-start justify-between gap-4">
+    <div className="min-h-dvh text-zinc-100" style={{ backgroundColor: "#0c0c0e" }}>
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6 sm:py-8">
+        <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Dr. Pinguin</p>
-            <h1 className="mt-1 font-display text-3xl tracking-tight text-zinc-50">Pengunjung live</h1>
-            <p className="mt-1 text-xs text-zinc-500">Hanya orang yang lagi buka tab situs ±2 menit (TTL online ~3 menit). Bot tidak dihitung.</p>
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Dr. Pinguin</p>
+            <h1 className="mt-1 font-mono text-2xl font-bold tracking-wide text-zinc-50">PEMILIK</h1>
           </div>
-          <Link
-            to="/"
-            className="rounded-lg border border-white/[0.08] px-3 py-1.5 text-xs text-zinc-500 transition hover:text-zinc-200"
-          >
-            Katalog
-          </Link>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {authed ? (
+              <>
+                <Pill ok={botOk} label={botOk == null ? "Bot ..." : botOk ? "Bot aktif" : "Bot perlu dicek"} />
+                <Pill ok label={`Live ${online}`} />
+              </>
+            ) : null}
+            <Link to="/" className={headBtn}>
+              Katalog
+            </Link>
+            {authed ? (
+              <>
+                <button type="button" className={headBtn} onClick={() => void fetchOnline(secret)} disabled={loading}>
+                  {loading ? "..." : "Refresh"}
+                </button>
+                <button type="button" className={headBtn} onClick={logout}>
+                  Keluar
+                </button>
+              </>
+            ) : null}
+          </div>
         </header>
 
         {!authed ? (
@@ -155,6 +196,8 @@ export function OwnerDashboard() {
               vsUniq={vsUniq}
               vsViews={vsViews}
               secret={secret}
+              days={days}
+              devices={devices}
             />
             <OwnerAuthedBottom
               days={days}
@@ -166,16 +209,55 @@ export function OwnerDashboard() {
               logout={logout}
               beforeFooter={
                 <>
-                  {/* Paling bawah (di atas Refresh/Keluar): video tersembunyi + Unhide, status bot Telegram, lalu Player error */}
-                  <HiddenListSection secret={secret} />
-                  <OwnerTelegramStatus secret={secret} />
-                  <PlayerErrorsSection secret={secret} />
+                  <Collapse title="Player error">
+                    <PlayerErrorsSection secret={secret} />
+                  </Collapse>
+                  <Collapse title="Video disembunyikan">
+                    <HiddenListSection secret={secret} />
+                  </Collapse>
+                  <Collapse title="Poster video">
+                    <OwnerTools secret={secret} part="poster" />
+                  </Collapse>
+                  <Collapse title="Bot Telegram">
+                    <OwnerTelegramStatus secret={secret} />
+                  </Collapse>
                 </>
               }
             />
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+const headBtn =
+  "whitespace-nowrap rounded-md border border-white/[0.1] bg-[#16161a] px-2.5 py-1 text-xs text-zinc-300 transition hover:text-zinc-50 disabled:opacity-50";
+
+function Pill({ ok, label }: { ok: boolean | null; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border border-white/[0.08] px-2 py-1 font-mono text-[10px] uppercase tracking-[0.12em] text-zinc-400">
+      <span className={`size-1.5 ${ok == null ? "bg-zinc-600" : ok ? "bg-emerald-400" : "bg-amber-400"}`} />
+      {label}
+    </span>
+  );
+}
+
+/** Collapsed-by-default block for less used owner sections. Content mounts only when opened. */
+function Collapse({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="rounded-xl border border-white/[0.07] bg-[#121215]">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full items-center justify-between px-4 py-3 text-left font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400"
+      >
+        {title}
+        <span className="text-zinc-600">{open ? "-" : "+"}</span>
+      </button>
+      {open ? <div className="border-t border-white/[0.06] p-2 sm:p-3">{children}</div> : null}
     </div>
   );
 }
@@ -329,13 +411,6 @@ function PlayerErrorsSection({ secret }: { secret: string }) {
           {busy ? "Memuat…" : "Muat ulang"}
         </Button>
       </div>
-      <p className="mt-1 text-xs text-zinc-500">
-        Data baru sejak 9 Okt 2026 (versi 2), 7 hari terakhir, tanpa sampel. Lambat = player belum merespons
-        20 dtk tapi akhirnya jalan (atau pengunjung tetap menunggu 60 dtk+). Gagal = pengunjung menekan Coba
-        lagi / Buka sumber / Lapor / Coba server lain, Streamtape melaporkan error, atau pengunjung pergi setelah
-        20 dtk tanpa player merespons. Angka lama (batas 8/12 dtk) tidak dipakai lagi karena juga menghitung
-        player yang sebenarnya jalan. Sembunyikan tidak menghapus video.
-      </p>
       {note ? <p className="mt-2 text-xs text-zinc-400">{note}</p> : null}
       {data?.storage === "none" ? <p className="mt-2 text-xs text-amber-400">Database D1 tidak terbaca.</p> : null}
 
