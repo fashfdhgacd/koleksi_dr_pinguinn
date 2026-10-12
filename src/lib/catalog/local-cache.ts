@@ -28,7 +28,7 @@ import videoStats from "./video-stats.json";
 import itemOverrides from "./overrides.json";
 import { softenMinorTerms } from "./minor-title-guard";
 import { HIDDEN_IDS as HIDDEN_ID_REASONS, RESTORED_TITLES, minorContentReason } from "./hidden-ids.js";
-import { lockedMinorReason } from "./minor-lock.js";
+import { isLockedMinorId, lockedMinorReason } from "./minor-lock.js";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
 import latestVideos from "../../../data/videos-latest.json";
@@ -122,6 +122,7 @@ export function hiddenReasonRaw(it: RawItem): string {
 
 /** Clear school/minor theme (minor-lock.js): hidden even when the owner pressed Unhide. */
 function isLockedMinor(it: RawItem): boolean {
+  if (isLockedMinorId(it.id)) return true;
   return lockedMinorReason(String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "")) !== "";
 }
 

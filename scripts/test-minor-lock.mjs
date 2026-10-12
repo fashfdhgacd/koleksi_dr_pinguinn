@@ -1,6 +1,6 @@
 // Tes kunci judul sekolah/minor yang JELAS (tidak bisa di-Unhide): node scripts/test-minor-lock.mjs
 // Exit 1 kalau ada yang gagal. Murni kode, tanpa jaringan.
-import { lockedMinorReason } from "../src/lib/catalog/minor-lock.js";
+import { isLockedMinorId, lockedMinorReason } from "../src/lib/catalog/minor-lock.js";
 
 const locked = [
   "SISWI *** COLMEK",
@@ -55,6 +55,16 @@ for (const t of open) {
     console.log(`GAGAL (tidak boleh dikunci) ${JSON.stringify(t)} → ${r}`);
   }
 }
-const total = locked.length + open.length;
+for (const id of ["4RBCLH2sf4Xe", "jC8azqC8RWMa", "arSsxIQ0WMp9"]) {
+  if (!isLockedMinorId(id)) {
+    fail++;
+    console.log(`GAGAL (id harus dikunci) ${id}`);
+  }
+}
+if (isLockedMinorId("4ZXhcgRSVCT3qX")) {
+  fail++;
+  console.log("GAGAL (id lain tidak boleh dikunci)");
+}
+const total = locked.length + open.length + 4;
 console.log(`${total - fail}/${total} lulus`);
 process.exit(fail ? 1 : 0);

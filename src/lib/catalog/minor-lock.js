@@ -81,6 +81,21 @@ export function lockedMinorReason(title = "") {
   return "";
 }
 
+/**
+ * Individually reviewed videos whose titles suggest minors but that the word rules above leave
+ * to review ("kecil"/"muda"/"abege" phrases). Locked by exact id only, never by broad words.
+ */
+export const LOCKED_MINOR_IDS = {
+  "4RBCLH2sf4Xe": "Adek kecil sudah open bo",
+  jC8azqC8RWMa: "masih abege sudah pandai",
+  arSsxIQ0WMp9: "Umur Masih Muda Body Orang Dewasa Meki Masih Sempit",
+};
+
+/** @param {string} id */
+export function isLockedMinorId(id = "") {
+  return Object.prototype.hasOwnProperty.call(LOCKED_MINOR_IDS, String(id || "").trim());
+}
+
 /** @param {string} title */
 export function isLockedMinorTitle(title = "") {
   return lockedMinorReason(title) !== "";
