@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { CATEGORY_LIST } from "@/lib/catalog/categories";
 
 const CATS = [
   { slug: "", label: "Semua" },
@@ -21,7 +22,8 @@ export function OwnerTools({ secret }: { secret: string }) {
   const [shareNote, setShareNote] = useState("");
   const [shareBusy, setShareBusy] = useState(false);
   const [uploadText, setUploadText] = useState("");
-  const [uploadCat, setUploadCat] = useState("jilbab");
+  // "" = otomatis dari judul (bot detectCategory). Pilihan manual selalu menang.
+  const [uploadCat, setUploadCat] = useState("");
   const [uploadNote, setUploadNote] = useState("");
   const [uploadBusy, setUploadBusy] = useState(false);
   const [posterId, setPosterId] = useState("");
@@ -202,7 +204,8 @@ export function OwnerTools({ secret }: { secret: string }) {
             onChange={(e) => setUploadCat(e.target.value)}
             className="h-10 rounded-lg border border-white/[0.08] bg-[#0f0f11] px-3 text-sm text-zinc-200"
           >
-            {CATS.filter((c) => c.slug && c.slug !== "terbaru").map((c) => (
+            <option value="">Otomatis (dari judul)</option>
+            {CATEGORY_LIST.map((c) => (
               <option key={c.slug} value={c.slug}>
                 {c.label}
               </option>

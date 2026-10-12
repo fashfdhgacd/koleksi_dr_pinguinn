@@ -1,4 +1,4 @@
-import { refineCategory } from "@/lib/catalog/title-category.js";
+import { refineCategory } from "../catalog/title-category.js";
 import { cleanUploadTitle, brandUploadTitle } from "./title-brand.js";
 const STREAMTAPE_HOST = /(^|\.)(streamtape\.com|strcloud[a-z0-9]*)$/i;
 const PUTARIN_HOST = /(^|\.)(putarin\.com|puterin\.[a-z]+)$/i;
@@ -7,7 +7,7 @@ const INDOAV_HOST = /indoav\./i;
 const USERBOKEP_HOST = /userbokep\./i;
 const VIDEY_HOST = /(^|\.)videy\.co$/i;
 
-/** Spesifik dulu. Imbuhan Indonesia (ber-, di-, nge-) ikut. Viral paling akhir. */
+/** Spesifik dulu. Imbuhan Indonesia (ber-, di-, nge-) ikut. Amatir (umum) paling akhir. */
 const CATEGORY_RULES = [
   ["jilbab", /(ber|di)?(jilbab|hijab)|ukht[iy]|tudung|cadar|berkerudung/i],
   ["chindo", /\b(chindo|cindo|tionghoa|chinese indo)\b/i],
@@ -22,8 +22,9 @@ const CATEGORY_RULES = [
   ["tante", /\btante\b|\bjanda\b|\bstw\b|\bmilf\b|ibu\s*tiri|\bemak\b|emak2|mama\s*muda|mbak\s*muda/i],
   ["live", /live\s*stream|livestream|siaran\s*langsung|\blive\b/i],
   ["abg", /\babg\b|\bsma\b|mahasiswi|mahasiswa|\bpelajar\b/i], // not "tocil": adult slang (small breasts)
-  ["amatir", /amatir|bokep\s*indo|bokepindo|pasutri|\brumahan\b|homemade|\bindo\b/i],
+  // Viral sebelum amatir: "Bokep Indo Viral ..." masuk Viral, bukan bucket umum Amatir.
   ["viral", /\bviral\b|\bfyp\b/i],
+  ["amatir", /amatir|bokep\s*indo|bokepindo|pasutri|\brumahan\b|homemade|\bindo\b/i],
 ];
 
 function normText(value = "") {
