@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { Clock, Eye, Heart, Play } from "lucide-react";
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { rememberCatalog } from "@/lib/catalog/last-catalog";
+import { useSiteLikes } from "@/lib/live-likes";
 import { VideoThumb } from "./thumb";
 
 function compactNumber(n: number): string {
@@ -23,11 +24,11 @@ export function VideoCard({
   preload?: VideoCardPreload;
 }) {
   const views = typeof video.views === "number" && video.views > 0 ? video.views : null;
-  // Likes = source likes (folder stats) + our own D1 likes (site-likes.json snapshot), 0 when none.
+  // Likes = source likes (folder stats) + our own D1 likes, 0 when none. Our likes start from the
+  // 12-hour snapshot and switch to the live count (/api/likes-live, ~60 s) once the page has loaded.
   // Always shown, so every card has the same plain stats row (never a bare category label).
-  const likes =
-    Math.max(0, typeof video.likes === "number" ? video.likes : 0) +
-    Math.max(0, typeof video.siteLikes === "number" ? video.siteLikes : 0);
+  const ours = useSiteLikes(video.id, video.siteLikes);
+  const likes = Math.max(0, typeof video.likes === "number" ? video.likes : 0) + ours;
   const showDuration = Boolean(video.durationLabel && video.durationLabel !== "\u2014");
 
   return (

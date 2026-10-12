@@ -119,7 +119,8 @@ async function likesLiveFeed(url: URL): Promise<Response> {
   const key = new Request(`${url.origin}/api/likes-live`);
   if (edge) {
     const hit = await edge.match(key).catch(() => undefined);
-    if (hit) return hit;
+    // The zone's browser-cache TTL rewrites max-age on cached copies (seen: 14400); keep it short.
+    if (hit) return new Response(hit.body, { status: hit.status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=30", "x-robots-tag": "noindex" } });
   }
   try {
     const { siteLikesLive } = await import("../../src/lib/catalog/ranking-list");

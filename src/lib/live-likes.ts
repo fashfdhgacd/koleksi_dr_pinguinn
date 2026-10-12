@@ -30,7 +30,7 @@ function emit(): void {
 function loadLive(): void {
   if (typeof window === "undefined" || inflight) return;
   if (live && Date.now() - liveAt < REFRESH_MS) return;
-  inflight = fetch("/api/likes-live", { headers: { accept: "application/json" } })
+  inflight = fetch("/api/likes-live", { cache: "no-cache", headers: { accept: "application/json" } })
     .then((r) => (r.ok ? r.json() : null))
     .then((d: { ok?: boolean; likes?: LikeMap } | null) => {
       if (d?.ok && d.likes && typeof d.likes === "object") {

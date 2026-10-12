@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Clock, Eye, Heart } from "lucide-react";
+import { noteSiteLike } from "@/lib/live-likes";
 
 function compactNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(n >= 10_000_000 ? 0 : 1).replace(/\.0$/, "")}M`;
@@ -75,6 +76,7 @@ export function WatchStats({
     setLiked(next);
     setOurs(optimistic);
     writeLocal(id, { liked: next, count: optimistic });
+    noteSiteLike(id, optimistic);
     if (next) {
       setPop(true);
       window.setTimeout(() => setPop(false), 350);
@@ -90,6 +92,7 @@ export function WatchStats({
       if (d?.ok && typeof d.count === "number") {
         setOurs(d.count);
         writeLocal(id, { liked: next, count: d.count });
+        noteSiteLike(id, d.count);
       }
     } catch {
       /* keep optimistic state */
