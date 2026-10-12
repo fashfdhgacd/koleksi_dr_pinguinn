@@ -5,6 +5,7 @@ import latestPosters from "../../data/latest-posters.json";
 import folderBatch20261007 from "@/lib/catalog/folder-batch-20261007.json";
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { resolvePostersBucket } from "@/lib/poster-r2";
+import brandPosterDataUrl from "../../public/brand-poster.jpg?inline";
 
 function sourceFor(id: string): string {
   const maps = [posters, javPosters, latestPosters] as Array<Record<string, string>>;
@@ -44,26 +45,34 @@ function imageResponse(body: BodyInit, type: string): Response {
 
 /**
  * No stored/remote poster (or the host is dead): serve the site's own brand poster
- * (1280x720 JPEG) instead of a 404, so Google's video indexing never sees an
- * unreachable thumbnail. Short cache + not saved to R2, so a real poster added
- * later still takes over.
+ * (public/brand-poster.jpg, inlined at build time) instead of a 404, so Google's video
+ * indexing never sees an unreachable thumbnail. A Worker can't reliably fetch its own
+ * hostname, hence the inline copy. Short cache + not saved to R2, so a real poster
+ * added later still takes over.
  */
-async function fallback(request: Request): Promise<Response> {
+let fallbackBytes: Uint8Array | null = null;
+function fallbackImage(): Uint8Array {
+  if (!fallbackBytes) {
+    const b64 = String(brandPosterDataUrl).split(",")[1] || "";
+    const bin = atob(b64);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    fallbackBytes = out;
+  }
+  return fallbackBytes;
+}
+
+async function fallback(_request: Request): Promise<Response> {
   try {
-    const res = await fetch(new URL("/brand-poster-v2.jpg", request.url).toString(), {
-      signal: AbortSignal.timeout(5000),
-    });
-    if (res.ok) {
-      const buf = await res.arrayBuffer();
-      if (sniffType(buf)) {
-        return new Response(buf, {
-          headers: {
-            "content-type": "image/jpeg",
-            "cache-control": "public, max-age=3600",
-            "x-thumb-fallback": "1",
-          },
-        });
-      }
+    const bytes = fallbackImage();
+    if (bytes.byteLength > 800) {
+      return new Response(bytes, {
+        headers: {
+          "content-type": "image/jpeg",
+          "cache-control": "public, max-age=3600",
+          "x-thumb-fallback": "1",
+        },
+      });
     }
   } catch {
     /* fall through */
