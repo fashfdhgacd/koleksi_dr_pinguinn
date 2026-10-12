@@ -55,7 +55,7 @@ export function Header({
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 pt-[env(safe-area-inset-top)] backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-[1440px] items-center gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6">
+      <div className="mx-auto flex h-14 max-w-[1600px] items-center gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6">
         <Link
           to="/"
           search={{ q: undefined, category: undefined }}
@@ -119,7 +119,7 @@ export function Header({
         </Button>
       </div>
 
-      <nav className="mx-auto max-w-[1440px] px-3 sm:px-6" aria-label="Navigasi cepat">
+      <nav className="mx-auto max-w-[1600px] px-3 sm:px-6" aria-label="Navigasi cepat">
         <ul className="-mx-3 flex gap-1.5 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
           <li className="shrink-0">
             <Link

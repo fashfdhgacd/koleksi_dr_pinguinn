@@ -16,11 +16,11 @@ export function Shell({
     <AgeGate>
       <div className="flex min-h-dvh flex-col bg-background text-foreground">
         <Header query={query} category={category} />
-        <main className="mx-auto w-full max-w-[1440px] flex-1 px-3 pb-16 pt-4 sm:px-6 sm:pb-14 sm:pt-6">
+        <main className="mx-auto w-full max-w-[1600px] flex-1 px-3 pb-16 pt-4 sm:px-6 sm:pb-14 sm:pt-6">
           {children}
         </main>
         <footer className="mt-auto border-t border-white/25 pb-[env(safe-area-inset-bottom)]">
-          <div className="mx-auto flex max-w-[1440px] flex-col gap-5 px-4 py-7 text-white/80 sm:flex-row sm:items-center sm:justify-between sm:px-8 sm:py-9">
+          <div className="mx-auto flex max-w-[1600px] flex-col gap-5 px-4 py-7 text-white/80 sm:flex-row sm:items-center sm:justify-between sm:px-8 sm:py-9">
             <div className="space-y-2">
               <p className="pixel text-sm text-white sm:text-lg">
                 DR. PINGUIN ·{" "}
