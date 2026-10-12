@@ -232,7 +232,7 @@ function HomePage() {
             />
           ) : (
             <SafeBoundary>
-              <VideoGrid items={gridItems} />
+              <VideoGrid items={gridItems} withAd />
             </SafeBoundary>
           )}
 

@@ -199,7 +199,7 @@ function RankingPage({ rank }: { rank: RankingDef }) {
           <EmptyState title="Kosong" description="Belum ada data untuk periode ini." />
         ) : (
           <SafeBoundary>
-            <VideoGrid items={feed.items} />
+            <VideoGrid items={feed.items} withAd />
           </SafeBoundary>
         )}
 
@@ -298,7 +298,7 @@ function PlainCategoryPage({ slug }: { slug: string }) {
           <EmptyState title="Kosong" description="Belum ada video di kategori ini." />
         ) : (
           <SafeBoundary>
-            <VideoGrid items={feed.items} />
+            <VideoGrid items={feed.items} withAd />
           </SafeBoundary>
         )}
 
