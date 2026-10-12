@@ -71,7 +71,7 @@ function CatCard({
   return (
     <li>
       <Link to={to} params={params} search={search} className={cardClass}>
-        <PixelIcon slug={slug} className="mb-1 size-10 sm:size-12" />
+        <PixelIcon slug={slug} className="mb-1" />
         <span className="pixel text-[11px] leading-tight sm:text-[13px]">{label}</span>
         {typeof count === "number" ? (
           <span className="pixel text-[10px] text-white/50 sm:text-xs">{countFmt.format(count)} video</span>
@@ -89,7 +89,7 @@ function CategoriesPage() {
         <div className="relative">
           <h1 className="font-display text-5xl leading-none text-foreground sm:text-7xl">Kategori</h1>
           <p className="pixel mt-2 text-[11px] text-white/55 sm:text-sm">Jelajahi koleksi video berdasarkan kategori</p>
-          <PixelSparkle className="absolute right-0 top-2 hidden h-[22px] w-[160px] sm:block" />
+          <PixelSparkle className="absolute right-0 top-2 hidden h-[18px] w-[128px] sm:block" />
         </div>
 
         <ul className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4">
