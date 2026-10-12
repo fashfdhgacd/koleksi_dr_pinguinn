@@ -74,9 +74,6 @@ export function OwnerTelegramStatus({ secret }: { secret: string }) {
   return (
     <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
       <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Bot Telegram</h2>
-      <p className="mt-1 text-xs text-zinc-500">
-        Webhook bot hanya menerima pesan yang membawa kode rahasia dari Telegram, dan hanya dari ID admin.
-      </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => void call("telegram-webhook-info")}>
           Cek status
@@ -92,7 +89,7 @@ export function OwnerTelegramStatus({ secret }: { secret: string }) {
           <dd className={healthy ? "text-emerald-400" : "text-amber-400"}>{healthy ? "Aman & aktif" : "Perlu dicek"}</dd>
           <dt className="text-zinc-500">URL webhook</dt>
           <dd className="break-all">
-            {info?.url || "—"} {data.urlOk ? "✓" : `(harusnya ${data.expectedUrl || "/api/telegram"})`}
+            {info?.url || "—"} {data.urlOk ? "(ok)" : `(harusnya ${data.expectedUrl || "/api/telegram"})`}
           </dd>
           <dt className="text-zinc-500">Antrian</dt>
           <dd>{info ? info.pendingUpdateCount : "—"}</dd>

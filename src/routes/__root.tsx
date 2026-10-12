@@ -5,7 +5,6 @@ import { PresencePing } from "@/components/presence-ping";
 import { DEFAULT_OG, HOME_TITLE, OG_SITE_NAME } from "@/lib/seo";
 import appCss from "../styles.css?url";
 
-const UMAMI_WEBSITE_ID = "b952a905-cb5b-419d-8aa4-534435e5cc8b";
 const CANONICAL_HOST = "koleksidrpinguin.com";
 
 function shouldRedirectHost(host: string) {
@@ -74,13 +73,6 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/site.webmanifest" },
       { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png?v=2" },
-    ],
-    scripts: [
-      {
-        defer: true,
-        src: "https://cloud.umami.is/script.js",
-        "data-website-id": UMAMI_WEBSITE_ID,
-      },
     ],
   }),
   component: RootComponent,
