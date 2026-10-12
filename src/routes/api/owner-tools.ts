@@ -64,6 +64,7 @@ const HIDE_REASON_LABELS: Record<string, string> = {
   classroom: "Ruang kelas",
   "incest-child": "Inses dengan anak",
   "bot-flag": "Ditandai bot saat upload",
+  "source-gone": "Dihapus di sumber",
 };
 
 function reasonLabel(reason: string): string {

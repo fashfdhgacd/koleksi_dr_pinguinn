@@ -74,7 +74,8 @@ export function buildVideyNo(items: RawItem[]): Map<string, number> {
 
 const STATS = videoStats as unknown as Record<string, [number, number, number]>;
 
-type ItemOverride = { title?: string; category?: string; poster?: string };
+/** hidden: reason string (e.g. "source-gone") hides the item without deleting it; Unhide can restore it. */
+type ItemOverride = { title?: string; category?: string; poster?: string; hidden?: string };
 const OVERRIDES = itemOverrides as Record<string, ItemOverride>;
 /** Real source titles for stored "***" titles that only masked "tocil" (see hidden-ids.js). */
 const RESTORED = RESTORED_TITLES as Record<string, string>;
@@ -114,6 +115,8 @@ export function hiddenReasonRaw(it: RawItem): string {
   if (listed) return listed;
   const rec = it as { hidden?: unknown; hidden_reason?: unknown };
   if (rec.hidden === true) return String(rec.hidden_reason || "bot-flag");
+  const ovHidden = OVERRIDES[it.id]?.hidden;
+  if (ovHidden) return String(ovHidden);
   // Reviewed real title (overrides.json, or "***" restored to "Tocil ..." via RESTORED_TITLES)
   // is checked instead of a masked stored title.
   const title = String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "");
