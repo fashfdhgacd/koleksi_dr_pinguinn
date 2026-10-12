@@ -12,6 +12,12 @@
  *   Our own visitor likes per video id (D1 video_likes, same KV-cached aggregate the ranking pages
  *   use). The workflow snapshots it into src/lib/catalog/site-likes.json so every card can show
  *   source likes + our likes. Public numbers only (the watch page shows the same counts).
+ *
+ * GET /api/likes-live
+ *   Same numbers straight from D1 for the cards (src/lib/live-likes.ts), so a like shows on the
+ *   home/catalog cards within about a minute instead of after the next 12-hour snapshot. Kept cheap:
+ *   one fixed cache key in the Cloudflare edge cache for 60 s (query strings are ignored, so it
+ *   cannot be cache-busted), i.e. at most about one small D1 read per minute per location.
  */
 
 interface FeedEvent {
@@ -106,12 +112,34 @@ async function siteLikesFeed(): Promise<Response> {
   }
 }
 
+type EdgeCache = { match(req: Request): Promise<Response | undefined>; put(req: Request, res: Response): Promise<void> };
+
+async function likesLiveFeed(url: URL): Promise<Response> {
+  const edge = (globalThis as unknown as { caches?: { default?: EdgeCache } }).caches?.default;
+  const key = new Request(`${url.origin}/api/likes-live`);
+  if (edge) {
+    const hit = await edge.match(key).catch(() => undefined);
+    if (hit) return hit;
+  }
+  try {
+    const { siteLikesLive } = await import("../../src/lib/catalog/ranking-list");
+    const likes = await siteLikesLive();
+    if (!likes) return json({ ok: false, error: "unavailable" }, 503, "public, max-age=15");
+    const res = json({ ok: true, likes }, 200, "public, max-age=30, s-maxage=60");
+    if (edge) await edge.put(key, res.clone()).catch(() => undefined);
+    return res;
+  } catch {
+    return json({ ok: false, error: "unavailable" }, 503, "public, max-age=15");
+  }
+}
+
 export default function statsFeedMiddleware(
   event: FeedEvent,
   next: () => unknown | Promise<unknown>,
 ): unknown | Promise<unknown> {
   const path = event.url.pathname;
-  if (path !== "/api/folder-stats" && path !== "/api/site-likes") return next();
+  if (path !== "/api/folder-stats" && path !== "/api/site-likes" && path !== "/api/likes-live") return next();
   if (event.req.method !== "GET" && event.req.method !== "HEAD") return json({ ok: false, error: "method" }, 405);
+  if (path === "/api/likes-live") return likesLiveFeed(event.url);
   return path === "/api/folder-stats" ? folderStats(event.url) : siteLikesFeed();
 }

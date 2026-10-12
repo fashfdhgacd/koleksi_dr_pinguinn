@@ -68,6 +68,11 @@ async function readD1Likes(): Promise<LikeMap | null> {
   }
 }
 
+/** Live D1 likes for /api/likes-live (that endpoint is edge-cached ~60 s). null = D1 unavailable. */
+export async function siteLikesLive(): Promise<LikeMap | null> {
+  return readD1Likes();
+}
+
 let likesMemo: { at: number; likes: LikeMap } | null = null;
 let likesInflight: Promise<LikeMap> | null = null;
 
@@ -183,9 +188,9 @@ export async function listRanking(
     videyNo,
   );
   if (kind === "likes") {
-    // Cards show the combined like count (source + our visitors).
-    // siteLikes (12-hour snapshot) is cleared here so the card does not count our likes twice.
-    res.items = res.items.map((c) => ({ ...c, likes: (c.likes || 0) + (site[c.id] || 0), siteLikes: null }));
+    // Cards show the combined like count (source likes + our visitors). Our part goes in siteLikes
+    // (current KV/D1 value, not the 12-hour snapshot) so the card can swap it for the live count.
+    res.items = res.items.map((c) => ({ ...c, siteLikes: site[c.id] || null }));
   }
   return res;
 }
