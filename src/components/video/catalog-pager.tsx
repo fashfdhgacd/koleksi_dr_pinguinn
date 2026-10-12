@@ -9,7 +9,7 @@ function windowPages(current: number, totalPages: number, span = 2): number[] {
 }
 
 const btn =
-  "pixel inline-flex h-11 min-w-11 touch-manipulation items-center justify-center rounded-none border border-white/55 bg-black px-2 text-sm text-white transition-colors hover:border-white aria-disabled:pointer-events-none aria-disabled:opacity-30 sm:h-14 sm:min-w-14 sm:text-base";
+  "pixel inline-flex h-11 min-w-11 touch-manipulation items-center justify-center rounded-none border border-white/55 px-2 text-sm text-white transition-colors hover:border-white aria-disabled:pointer-events-none aria-disabled:opacity-30 sm:h-14 sm:min-w-14 sm:text-base";
 
 export function CatalogPager({
   page,
@@ -92,7 +92,7 @@ export function CatalogPager({
         </a>
         {pages[0] > 1 ? (
           <>
-            <a {...linkProps(1)} className={`${btn} hidden sm:inline-flex`}>
+            <a {...linkProps(1)} className={`${btn} max-sm:hidden`}>
               1
             </a>
             {pages[0] > 2 ? <span className="pixel hidden px-1 text-white/50 sm:inline">…</span> : null}
@@ -104,7 +104,7 @@ export function CatalogPager({
             data-far={Math.abs(n - page) > 1 && !(page <= 2 && n <= 3) && !(page >= totalPages - 1 && n >= totalPages - 2) ? "" : undefined}
             {...linkProps(n)}
             aria-current={n === page ? "page" : undefined}
-            className={`${btn} data-[far]:hidden sm:data-[far]:inline-flex ${
+            className={`${btn} max-sm:data-[far]:hidden ${
               n === page ? "border-[#c8c8c8] bg-[#c8c8c8] text-black hover:border-[#c8c8c8]" : ""
             }`}
           >
@@ -114,7 +114,7 @@ export function CatalogPager({
         {pages[pages.length - 1] < totalPages ? (
           <>
             {pages[pages.length - 1] < totalPages - 1 ? <span className="pixel hidden px-1 text-white/50 sm:inline">…</span> : null}
-            <a {...linkProps(totalPages)} className={`${btn} hidden sm:inline-flex`}>
+            <a {...linkProps(totalPages)} className={`${btn} max-sm:hidden`}>
               {totalPages}
             </a>
           </>
