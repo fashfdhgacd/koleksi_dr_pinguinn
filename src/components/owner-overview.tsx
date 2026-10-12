@@ -39,6 +39,13 @@ const card = "min-w-0 rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/3
 const h2 = "flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]";
 const btn =
   "shrink-0 whitespace-nowrap rounded-md border border-white/[0.12] bg-[#16161a] px-2 py-1 text-[11px] text-zinc-200 hover:bg-white/[0.06] disabled:opacity-50";
+// Separate classes per state so the active background never competes with the base bg in CSS order.
+function toggleCls(active: boolean): string {
+  const base = "shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-[11px]";
+  return active
+    ? `${base} border-[#2dd4bf] bg-[#2dd4bf] font-medium text-zinc-950`
+    : `${base} border-white/[0.12] bg-transparent text-zinc-400 hover:text-zinc-200`;
+}
 const input = "rounded-md border border-white/[0.1] bg-[#0c0c0e] px-2 py-1.5 text-xs text-zinc-200";
 
 function compact(n: number): string {
@@ -151,11 +158,11 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
         <span>Tayang</span>
         <span className="flex gap-1">
           {hasHours ? (
-            <button type="button" className={`${btn} ${showHours ? "border-[#2dd4bf] bg-[#2dd4bf] text-zinc-950" : ""}`} onClick={() => setMode("hours")}>
+            <button type="button" className={toggleCls(showHours)} aria-pressed={showHours} onClick={() => setMode("hours")}>
               24 jam
             </button>
           ) : null}
-          <button type="button" className={`${btn} ${!showHours ? "border-[#2dd4bf] bg-[#2dd4bf] text-zinc-950" : ""}`} onClick={() => setMode("days")}>
+          <button type="button" className={toggleCls(!showHours)} aria-pressed={!showHours} onClick={() => setMode("days")}>
             14 hari
           </button>
         </span>
@@ -245,7 +252,7 @@ function EditRow({
           </option>
         ))}
       </select>
-      <button type="button" className={`${btn} border-[#2dd4bf] bg-[#2dd4bf] text-zinc-950`} disabled={busy} onClick={() => void save()}>
+      <button type="button" className={toggleCls(true)} disabled={busy} onClick={() => void save()}>
         {busy ? "..." : "Simpan"}
       </button>
     </div>
