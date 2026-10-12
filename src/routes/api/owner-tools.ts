@@ -10,8 +10,19 @@ import {
 } from "@/lib/bot/posters.js";
 
 import { listHiddenForReview, setReviewMark } from "@/lib/owner-hidden-review";
-import { listHiddenCandidates, applyUnhidden, type HiddenCandidate } from "@/lib/catalog/local-cache";
-import { sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
+import {
+  listHiddenCandidates,
+  applyUnhidden,
+  hiddenReasonRaw,
+  loadItemsRaw,
+  sortByNewest,
+  type HiddenCandidate,
+} from "@/lib/catalog/local-cache";
+import { slugOf, sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
+import { findCategory } from "@/lib/catalog/categories";
+import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
+import { isLockedMinorId, lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
 import { isOwnerRequest, ownerSecret } from "@/lib/owner-auth";
 import {
@@ -283,6 +294,181 @@ async function handleRefreshPosters(body: { limit?: number }) {
   return json(result);
 }
 
+// ---------------------------------------------------------------------------
+// Catalog overview, recent uploads, search and title/category edit for /pemilik.
+// Edits are written to src/lib/catalog/overrides.json in the repo (same file the catalog
+// reads at build time), so they go live with the next build. The minor-lock is checked on the
+// server: locked or flagged items cannot be edited, and a new title cannot carry a minor theme.
+// ---------------------------------------------------------------------------
+
+type CatalogRow = {
+  id: string;
+  title: string;
+  category: string;
+  categoryLabel: string;
+  source: string;
+  createdAt: number;
+  hidden: boolean;
+  locked: boolean;
+};
+
+type BuiltLike = { items: RawItem[]; raw?: RawItem[]; hiddenIds?: Set<string>; byId: Map<string, RawItem> };
+
+const WIB_MS = 7 * 3600 * 1000;
+
+function createdMs(it: RawItem): number {
+  const v = it.createdAt ?? it.date;
+  if (typeof v === "number") return v < 1e12 ? v * 1000 : v;
+  const n = Date.parse(String(v || ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+function isLockedItem(it: RawItem): boolean {
+  if (isLockedMinorId(it.id)) return true;
+  const ov = (itemOverrides as Record<string, { title?: string }>)[it.id];
+  return Boolean(lockedMinorReason(String(it.title || "")) || lockedMinorReason(String(ov?.title || "")));
+}
+
+function toCatalogRow(it: RawItem, shown: RawItem | undefined, hidden: boolean): CatalogRow {
+  const view = shown || it;
+  const slug = slugOf(view);
+  return {
+    id: it.id,
+    title: String(view.title || ""),
+    category: slug,
+    categoryLabel: findCategory(slug)?.label || slug,
+    source: sourceLabel(it),
+    createdAt: createdMs(it),
+    hidden,
+    locked: isLockedItem(it),
+  };
+}
+
+async function catalogBase(): Promise<{ raw: RawItem[]; cache: BuiltLike; hidden: Set<string> }> {
+  const cache = (await loadItemsRaw()) as unknown as BuiltLike;
+  const raw = cache.raw || cache.items;
+  const shownIds = new Set(cache.items.map((it) => it.id));
+  const hidden = new Set<string>();
+  for (const it of raw) if (it?.id && !shownIds.has(it.id)) hidden.add(it.id);
+  return { raw, cache, hidden };
+}
+
+async function handleCatalogOverview() {
+  const { raw, cache, hidden } = await catalogBase();
+  const now = Date.now();
+  const dayStart = Math.floor((now + WIB_MS) / 86400000) * 86400000 - WIB_MS;
+  const weekStart = dayStart - 6 * 86400000;
+  let today = 0;
+  let week = 0;
+  const seen = new Set<string>();
+  const uniq: RawItem[] = [];
+  for (const it of raw) {
+    if (!it?.id || seen.has(it.id)) continue;
+    seen.add(it.id);
+    uniq.push(it);
+    const t = createdMs(it);
+    if (t >= dayStart) today++;
+    if (t >= weekStart) week++;
+  }
+  const recent = sortByNewest(uniq)
+    .slice(0, 10)
+    .map((it) => toCatalogRow(it, cache.byId.get(it.id), hidden.has(it.id)));
+  return json({
+    ok: true,
+    total: cache.items.length,
+    hidden: hidden.size,
+    uploadedToday: today,
+    uploadedWeek: week,
+    recent,
+  });
+}
+
+async function handleCatalogSearch(body: { q?: unknown }) {
+  const q = String(body.q || "").trim().toLowerCase();
+  if (q.length < 2) return json({ ok: true, items: [] });
+  const { raw, cache, hidden } = await catalogBase();
+  const out: CatalogRow[] = [];
+  const seen = new Set<string>();
+  for (const it of raw) {
+    if (!it?.id || seen.has(it.id)) continue;
+    seen.add(it.id);
+    const shown = cache.byId.get(it.id);
+    const hay = `${String(shown?.title || it.title || "").toLowerCase()} ${it.id.toLowerCase()}`;
+    if (!hay.includes(q)) continue;
+    out.push(toCatalogRow(it, shown, hidden.has(it.id)));
+    if (out.length >= 20) break;
+  }
+  return json({ ok: true, items: out });
+}
+
+function ghEnv(): { token: string; owner: string; repo: string; branch: string } {
+  const clean = (v: unknown) => String(v || "").trim().replace(/^GH_(?:TOKEN|OWNER|REPO|BRANCH)\s*=\s*/i, "").trim();
+  const env = process.env;
+  return {
+    token: clean(env.GITHUB_TOKEN || env.GH_TOKEN),
+    owner: clean(env.GITHUB_OWNER || env.GH_OWNER) || "fashfdhgacd",
+    repo: clean(env.GITHUB_REPO || env.GH_REPO) || "koleksi_dr_pinguinn",
+    branch: clean(env.GITHUB_BRANCH || env.GH_BRANCH) || "main",
+  };
+}
+
+const OVERRIDES_PATH = "src/lib/catalog/overrides.json";
+
+async function handleEditVideo(body: { id?: unknown; title?: unknown; category?: unknown }) {
+  const id = String(body.id || "").trim();
+  if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return json({ ok: false, error: "bad_id" }, 400);
+  const title = typeof body.title === "string" ? body.title.replace(/\s+/g, " ").trim() : "";
+  const category = typeof body.category === "string" ? body.category.trim() : "";
+  if (!title && !category) return json({ ok: false, error: "kosong" }, 400);
+  if (title && (title.length < 4 || title.length > 200)) return json({ ok: false, error: "judul_panjang" }, 400);
+  if (category && !findCategory(category)) return json({ ok: false, error: "kategori_tidak_dikenal" }, 400);
+
+  const { raw } = await catalogBase();
+  const item = raw.find((it) => it?.id === id);
+  if (!item) return json({ ok: false, error: "tidak_ditemukan" }, 404);
+  // Minor-lock: locked or flagged items cannot be edited from the panel, and a new title must
+  // not carry a school/minor theme.
+  if (isLockedItem(item)) return json({ ok: false, error: "terkunci" }, 403);
+  if (hiddenReasonRaw(item)) return json({ ok: false, error: "ditandai" }, 403);
+  if (title && (lockedMinorReason(title) || minorContentReason(title))) {
+    return json({ ok: false, error: "judul_ditolak" }, 403);
+  }
+
+  const gh = ghEnv();
+  if (!gh.token) return json({ ok: false, error: "github_tidak_tersedia" }, 503);
+  const url = `https://api.github.com/repos/${gh.owner}/${gh.repo}/contents/${OVERRIDES_PATH}`;
+  const headers = {
+    Authorization: `Bearer ${gh.token}`,
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    "User-Agent": "kdp-owner-panel",
+  };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const cur = await fetch(`${url}?ref=${encodeURIComponent(gh.branch)}`, { headers });
+    if (!cur.ok) return json({ ok: false, error: `github_get_${cur.status}` }, 502);
+    const meta = (await cur.json()) as { sha?: string; content?: string };
+    let data: Record<string, Record<string, unknown>> = {};
+    try {
+      data = JSON.parse(Buffer.from(String(meta.content || "").replace(/\n/g, ""), "base64").toString("utf8")) || {};
+    } catch {
+      return json({ ok: false, error: "overrides_rusak" }, 502);
+    }
+    const next = { ...(data[id] || {}) };
+    if (title) next.title = title;
+    if (category) next.category = category;
+    data[id] = next;
+    const content = Buffer.from(JSON.stringify(data, null, 1) + "\n", "utf8").toString("base64");
+    const put = await fetch(url, {
+      method: "PUT",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ message: `pemilik: edit ${id}`, content, branch: gh.branch, sha: meta.sha }),
+    });
+    if (put.ok) return json({ ok: true, id, title: next.title || null, category: next.category || null });
+    if (put.status !== 409) return json({ ok: false, error: `github_put_${put.status}` }, 502);
+  }
+  return json({ ok: false, error: "github_conflict" }, 409);
+}
+
 type OwnerBody = {
   action?: string;
   count?: number;
@@ -295,6 +481,8 @@ type OwnerBody = {
   unhide?: boolean;
   ids?: string[];
   key?: string;
+  q?: string;
+  title?: string;
 };
 
 /** Telegram webhook status for the owner: registered url, pending updates, last error, last OK. */
@@ -364,6 +552,9 @@ export const Route = createFileRoute("/api/owner-tools")({
           const r = await setReviewMark(body as never);
           return json(r, r.status || 200);
         }
+        if (body.action === "catalog-overview") return handleCatalogOverview();
+        if (body.action === "catalog-search") return handleCatalogSearch(body);
+        if (body.action === "edit-video") return handleEditVideo(body);
         if (body.action === "share") return handleShare(body);
         if (body.action === "upload") return handleUpload(body);
         if (body.action === "set-poster") return handleSetPoster(body);
