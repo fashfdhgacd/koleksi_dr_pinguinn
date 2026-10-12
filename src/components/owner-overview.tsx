@@ -55,11 +55,19 @@ function hostLabel(host: string): string {
   return host;
 }
 
-function wibHour(label: string): number | null {
-  const t = Date.parse(label);
-  if (Number.isFinite(t)) return new Date(t + 7 * 3600 * 1000).getUTCHours();
-  const m = String(label).match(/(\d{1,2})(?::\d{2})?$/);
-  return m ? Number(m[1]) % 24 : null;
+// Server sends hourly as 24 slots, oldest first, labelled with the WIB hour ("00".."23").
+function hourText(label: string): string {
+  const m = String(label).match(/^(\d{1,2})/);
+  return m ? `${m[1].padStart(2, "0")}.00` : String(label);
+}
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+
+// DayRow.day is the WIB calendar date (YYYY-MM-DD).
+function dateText(iso: string): string {
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return String(iso);
+  return `${Number(m[3])} ${MONTHS[Number(m[2]) - 1] || ""}`.trim();
 }
 
 function timeWib(ms: number): string {
@@ -107,26 +115,29 @@ function StatCell({ label, value, sub }: { label: string; value: string; sub?: s
 
 function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
   const [mode, setMode] = useState<"days" | "hours">("days");
-  const hasHours = hourly.length > 0;
+  const hasHours = hourly.some((r) => (Number(r.views) || 0) > 0);
+  const showHours = mode === "hours" && hasHours;
   const W = 720;
   const H = 120;
   const series = useMemo(() => {
-    if (mode === "hours" && hasHours) {
-      const byHour = new Array(24).fill(0) as number[];
-      for (const r of hourly) {
-        const h = wibHour(r.hour);
-        if (h != null) byHour[h] += Number(r.views) || 0;
-      }
-      return byHour.map((v, i) => ({ label: String(i).padStart(2, "0"), value: v, show: i % 3 === 0, now: false }));
+    if (showHours) {
+      const last = hourly.length - 1;
+      return hourly.map((r, i) => ({
+        label: hourText(r.hour),
+        value: Number(r.views) || 0,
+        show: (last - i) % 4 === 0,
+        now: i === last,
+      }));
     }
     const list = days.slice().reverse();
+    const last = list.length - 1;
     return list.map((d, i) => ({
-      label: i === list.length - 1 ? "HR" : String(i - list.length + 1),
+      label: i === last ? "Hari ini" : dateText(d.day),
       value: d.views,
-      show: i % 2 === 1 || i === list.length - 1,
-      now: i === list.length - 1,
+      show: (last - i) % 2 === 0,
+      now: i === last,
     }));
-  }, [mode, days, hourly, hasHours]);
+  }, [showHours, days, hourly]);
   const max = Math.max(1, ...series.map((s) => s.value));
   const bw = W / Math.max(1, series.length);
   return (
@@ -135,11 +146,11 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
         <span>Tayang</span>
         <span className="flex gap-1">
           {hasHours ? (
-            <button type="button" className={`${btn} ${mode === "hours" ? "border-[#2dd4bf] bg-[#2dd4bf] text-zinc-950" : ""}`} onClick={() => setMode("hours")}>
+            <button type="button" className={`${btn} ${showHours ? "border-[#2dd4bf] bg-[#2dd4bf] text-zinc-950" : ""}`} onClick={() => setMode("hours")}>
               24 jam
             </button>
           ) : null}
-          <button type="button" className={`${btn} ${mode === "days" ? "border-[#2dd4bf] bg-[#2dd4bf] text-zinc-950" : ""}`} onClick={() => setMode("days")}>
+          <button type="button" className={`${btn} ${!showHours ? "border-[#2dd4bf] bg-[#2dd4bf] text-zinc-950" : ""}`} onClick={() => setMode("days")}>
             14 hari
           </button>
         </span>
@@ -439,15 +450,15 @@ export function OwnerOverview(props: {
 
   const hourly = stats?.hourly || [];
   const busiest = useMemo(() => {
-    const byHour = new Array(24).fill(0) as number[];
+    let best: HourRow | null = null;
     for (const r of hourly) {
-      const h = wibHour(r.hour);
-      if (h != null) byHour[h] += Number(r.views) || 0;
+      const v = Number(r.views) || 0;
+      if (v > 0 && (!best || v > (Number(best.views) || 0))) best = r;
     }
-    const best = byHour.reduce((b, v, i) => (v > byHour[b] ? i : b), 0);
-    return byHour[best] > 0 ? `${String(best).padStart(2, "0")}:00` : null;
+    return best ? hourText(best.hour) : null;
   }, [hourly]);
   const mobile = devices.find((d) => d.device === "mobile");
+  const deviceTotal = devices.reduce((s, d) => s + (Number(d.views) || 0), 0);
 
   const cats = useMemo(() => {
     const m = new Map<string, number>();
@@ -485,18 +496,18 @@ export function OwnerOverview(props: {
 
       <section className={card}>
         <Chart days={days} hourly={hourly} />
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-zinc-400">
           <span>
-            <b className="mr-1 text-[13px] font-medium text-[#2dd4bf]">{fmt(stats?.viewsToday)}</b>hari ini
+            Hari ini <b className="font-medium text-[#2dd4bf]">{fmt(stats?.viewsToday)}</b> kali ditonton
           </span>
           {busiest ? (
             <span>
-              <b className="mr-1 text-[13px] font-medium text-[#2dd4bf]">{busiest}</b>jam ramai
+              Paling rame jam <b className="font-medium text-[#2dd4bf]">{busiest}</b>
             </span>
           ) : null}
-          {mobile ? (
+          {mobile && deviceTotal > 0 ? (
             <span>
-              <b className="mr-1 text-[13px] font-medium text-[#2dd4bf]">{mobile.pct}%</b>HP
+              Dari HP: <b className="font-medium text-[#2dd4bf]">{fmt(mobile.views)}</b> dari {fmt(deviceTotal)}
             </span>
           ) : null}
         </div>
@@ -549,15 +560,13 @@ export function OwnerOverview(props: {
             ) : hostRows.length ? (
               <ul className="mt-2 space-y-1.5">
                 {hostRows.map((h) => {
-                  const pct = h.rate == null ? null : h.rate * 100;
-                  const bad = pct != null && pct >= 5;
+                  const bad = h.starts > 0 && h.fails / h.starts >= 0.05;
                   return (
                     <li key={h.host} className="flex items-center gap-2 text-[11px]">
                       <span className={`size-1.5 shrink-0 ${bad ? "bg-red-400" : "bg-emerald-400"}`} />
                       <span className="flex-1 truncate text-zinc-300">{h.label}</span>
-                      <span className="tabular-nums text-zinc-500">{fmt(h.starts)} putar</span>
-                      <span className={`w-16 text-right tabular-nums ${bad ? "text-red-400" : "text-zinc-400"}`}>
-                        {pct == null ? "-" : `${pct.toFixed(1)}%`}
+                      <span className={`tabular-nums ${bad ? "text-red-400" : "text-zinc-400"}`}>
+                        {fmt(h.fails)} gagal dari {fmt(h.starts)}
                       </span>
                     </li>
                   );

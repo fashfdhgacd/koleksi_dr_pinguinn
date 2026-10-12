@@ -19,6 +19,7 @@ export function OwnerAuthedBottom(props: {
   beforeFooter?: ReactNode;
 }) {
   const { days, devices, stats, beforeFooter } = props;
+  const deviceTotal = devices.reduce((sum, d) => sum + (Number(d.views) || 0), 0);
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -82,9 +83,11 @@ export function OwnerAuthedBottom(props: {
                     <li key={d.device} className="flex items-center gap-3 text-sm">
                       <span className="w-16 shrink-0 text-zinc-400">{deviceLabel(d.device)}</span>
                       <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
-                        <span className="block h-full rounded-full bg-emerald-400/80" style={{ width: `${d.pct}%` }} />
+                        <span className="block h-full rounded-full bg-[#2dd4bf]/80" style={{ width: `${d.pct}%` }} />
                       </span>
-                      <span className="w-10 text-right tabular-nums text-zinc-300">{d.pct}%</span>
+                      <span className="shrink-0 text-right tabular-nums text-zinc-300">
+                        {fmt(d.views)} dari {fmt(deviceTotal)}
+                      </span>
                     </li>
                   ))}
                 </ul>

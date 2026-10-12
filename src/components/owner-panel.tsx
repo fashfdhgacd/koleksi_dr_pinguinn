@@ -427,7 +427,6 @@ function PlayerErrorsSection({ secret }: { secret: string }) {
                   <th className="py-1 pr-3 text-right font-normal">Putar</th>
                   <th className="py-1 pr-3 text-right font-normal">Lambat</th>
                   <th className="py-1 pr-3 text-right font-normal">Gagal</th>
-                  <th className="py-1 pr-3 text-right font-normal">Rasio</th>
                   <th className="py-1 pr-3 text-right font-normal">Lapor</th>
                   <th className="py-1 pr-3 text-right font-normal">Coba lagi</th>
                   <th className="py-1 pr-3 text-right font-normal">Buka sumber</th>
@@ -442,9 +441,6 @@ function PlayerErrorsSection({ secret }: { secret: string }) {
                       <td className="py-1 pr-3 text-right">{h.starts}</td>
                       <td className="py-1 pr-3 text-right">{h.slow ?? 0}</td>
                       <td className="py-1 pr-3 text-right">{h.fails}</td>
-                      <td className="py-1 pr-3 text-right">
-                        {h.rate === null ? "—" : `${(h.rate * 100).toFixed(h.rate < 0.1 ? 1 : 0)}%`}
-                      </td>
                       <td className="py-1 pr-3 text-right">{h.reports}</td>
                       <td className="py-1 pr-3 text-right">{h.retries}</td>
                       <td className="py-1 pr-3 text-right">{h.openSource}</td>
@@ -453,7 +449,7 @@ function PlayerErrorsSection({ secret }: { secret: string }) {
                   ))
                 ) : (
                   <tr className="border-t border-white/[0.06]">
-                    <td colSpan={9} className="py-2 text-zinc-500">
+                    <td colSpan={8} className="py-2 text-zinc-500">
                       Belum ada data versi 2. Angka muncul setelah ada pengunjung yang memutar video.
                     </td>
                   </tr>
