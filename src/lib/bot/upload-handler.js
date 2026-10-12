@@ -4,6 +4,7 @@ import { fetchPutarinMeta, fetchStreamtapeMeta, fetchEmbedPageMeta, expandPutari
 import { upsertVideosBatch } from "@/lib/bot/github.js";
 import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
 import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
+import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
 
 function hasUserTitle(raw) {
   const t = cleanTitle(String(raw || ""));
@@ -147,7 +148,8 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
       : video;
     const baseRecord = toRecord({ parsed: withPoster, title, category });
     // School/minor-themed titles are stored but flagged hidden (the catalog never shows them).
-    const hiddenReason = minorContentReason(`${baseTitle} ${String(video.title || parsedMsg.title || "")} ${String(meta.title || "")}`);
+    const minorText = `${baseTitle} ${String(video.title || parsedMsg.title || "")} ${String(meta.title || "")}`;
+    const hiddenReason = minorContentReason(minorText) || lockedMinorReason(minorText);
     const record = hiddenReason ? { ...baseRecord, hidden: true, hidden_reason: hiddenReason } : baseRecord;
     const fileName = video.file || "videos.json";
     const list = byFile.get(fileName) || [];

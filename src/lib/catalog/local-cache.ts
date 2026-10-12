@@ -28,6 +28,7 @@ import videoStats from "./video-stats.json";
 import itemOverrides from "./overrides.json";
 import { softenMinorTerms } from "./minor-title-guard";
 import { HIDDEN_IDS as HIDDEN_ID_REASONS, RESTORED_TITLES, minorContentReason } from "./hidden-ids.js";
+import { lockedMinorReason } from "./minor-lock.js";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
 import latestVideos from "../../../data/videos-latest.json";
@@ -115,11 +116,18 @@ export function hiddenReasonRaw(it: RawItem): string {
   if (rec.hidden === true) return String(rec.hidden_reason || "bot-flag");
   // Reviewed real title (overrides.json, or "***" restored to "Tocil ..." via RESTORED_TITLES)
   // is checked instead of a masked stored title.
-  return minorContentReason(String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || ""));
+  const title = String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "");
+  return minorContentReason(title) || lockedMinorReason(title);
+}
+
+/** Clear school/minor theme (minor-lock.js): hidden even when the owner pressed Unhide. */
+function isLockedMinor(it: RawItem): boolean {
+  return lockedMinorReason(String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "")) !== "";
 }
 
 function isHiddenRaw(it: RawItem): boolean {
   if (OWNER_HIDDEN.has(it.id)) return true;
+  if (isLockedMinor(it)) return true;
   if (UNHIDDEN.has(it.id)) return false;
   return hiddenReasonRaw(it) !== "";
 }
@@ -420,9 +428,10 @@ export async function isPublicHidden(id: string): Promise<boolean> {
   if (!key) return false;
   const cache = (await loadItemsRaw()) as BuiltCache;
   if (OWNER_HIDDEN.has(key)) return true;
+  // Built with isHiddenRaw: already honours Unhide, except for locked clear minor themes.
+  if ((cache.hiddenIds || lastHiddenIds).has(key)) return true;
   if (UNHIDDEN.has(key)) return false;
-  if (HIDDEN_IDS.has(key)) return true;
-  return (cache.hiddenIds || lastHiddenIds).has(key);
+  return HIDDEN_IDS.has(key);
 }
 
 export type HiddenCandidate = { item: RawItem; reason: string; unhidden: boolean; unhiddenAt: number };
