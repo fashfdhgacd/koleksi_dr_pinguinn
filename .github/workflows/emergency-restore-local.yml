@@ -11,6 +11,8 @@ permissions:
 
 jobs:
   restore:
+    # Disabled 2026-10-12: one-off repair job that overwrites live code with an old snapshot.
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
