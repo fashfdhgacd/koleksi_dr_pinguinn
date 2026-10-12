@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+
 /**
  * Pixel-art line icons for /kategori: 32x32 grid, white, one red accent (Amatir), crispEdges.
  * Each icon is 32 rows of 32 chars: "#" = white pixel, "r" = red pixel, "." = empty.
@@ -1243,8 +1245,37 @@ function urlFor(name: string): string {
  * <svg> inside a fractional-width grid card lands on half pixels and its rects get uneven widths.
  */
 export function PixelIcon({ slug, className }: { slug: string; className?: string }) {
+  const ref = useRef<HTMLImageElement | null>(null);
+  // Cards sit on fractional grid positions (e.g. x = 150.75px); nudge each icon onto whole device
+  // pixels so every 2x2 cell stays exactly 2x2 (no uneven stroke widths).
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof window === "undefined") return;
+    let raf = 0;
+    const snap = () => {
+      el.style.transform = "";
+      const r = el.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      const fx = (r.left * dpr) % 1;
+      const fy = (r.top * dpr) % 1;
+      const dx = fx > 0.001 ? -fx / dpr : 0;
+      const dy = fy > 0.001 ? -fy / dpr : 0;
+      if (dx || dy) el.style.transform = `translate(${dx}px, ${dy}px)`;
+    };
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(snap);
+    };
+    snap();
+    window.addEventListener("resize", onResize);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
   return (
     <img
+      ref={ref}
       src={urlFor(SLUG_ICON[slug] || "tag")}
       alt=""
       aria-hidden="true"
