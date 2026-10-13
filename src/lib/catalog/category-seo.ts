@@ -37,6 +37,7 @@ const COPY: Record<string, { h1: string; intro: string }> = {
   "crot-dalam": { h1: "Bokep Crot Dalam Indo Terbaru", intro: "Kumpulan video crot dalam (creampie) Indonesia dan Asia yang diperbarui berkala. Tonton langsung di HP maupun desktop. Khusus pengunjung 18 tahun ke atas." },
   hamil: { h1: "Bokep Hamil Indo Terbaru", intro: "Koleksi video bumil dan istri hamil Indonesia pilihan. Daftar diperbarui rutin dan bisa diputar langsung tanpa aplikasi tambahan. Khusus pengunjung 18 tahun ke atas." },
   ojol: { h1: "Bokep Ojol Indo Terbaru", intro: "Kumpulan video ojol Indonesia yang paling banyak dicari, dari prank sampai order fiktif. Tonton langsung secara streaming di HP. Khusus pengunjung 18 tahun ke atas." },
+  videy: { h1: "drpinguin videy Terbaru", intro: "Kumpulan video drpinguin videy pilihan, diputar langsung di player koleksidrpinguin.com. Khusus pengunjung 18 tahun ke atas." },
   lainnya: { h1: "Bokep Indo Lainnya", intro: "Kumpulan video dewasa lain yang belum masuk kategori utama, diperbarui berkala. Tonton langsung secara streaming tanpa unduh. Khusus pengunjung 18 tahun ke atas." },
 };
 

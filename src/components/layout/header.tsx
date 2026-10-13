@@ -14,6 +14,7 @@ const QUICK_CATS = [
   { slug: "ai-plus", label: "AI+" },
   { slug: "paling-ditonton", label: "Paling Banyak Ditonton" },
   { slug: "paling-disukai", label: "Paling Banyak Disukai" },
+  { slug: "videy", label: "drpinguin videy" },
 ] as const;
 
 export function Header({
