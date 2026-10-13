@@ -7,10 +7,15 @@ import type { VideoDetail } from "@/lib/catalog/types";
  *
  * Pre-roll: the VAST tag (wrappers followed, max 4 levels) gives an mp4 creative that plays in
  * the same <video>. Skip shows after the ad's skipoffset (5 s when missing). No ad, a broken ad
- * or no answer within AD_TIMEOUT_MS: the video starts right away.
+ * or no answer within AD_TIMEOUT_MS: the video starts right away. The VAST request starts when the
+ * player mounts, so the tap only waits for whatever is left of it. An ad the browser refuses to
+ * play with sound plays muted with a sound button. Ad states are counted through /api/ad-log.
+ *
+ * Fullscreen (own button on the wrapper, or the native video button): a landscape video locks the
+ * screen to landscape where the browser allows it, and unlocks on exit.
  */
 const VAST_TAG = "https://s.magsrv.com/v1/vast.php?idz=6054340";
-const AD_TIMEOUT_MS = 4000;
+const AD_TIMEOUT_MS = 7000;
 const SKIP_DEFAULT_S = 5;
 const MAX_WRAPPERS = 4;
 
@@ -52,6 +57,44 @@ function ping(urls: string[] | undefined): void {
       /* tracking is best effort */
     }
   }
+}
+
+type AdLogEvent = "vast_empty" | "vast_timeout" | "vast_error" | "ad_play" | "ad_muted" | "ad_error" | "ad_skip" | "ad_complete";
+
+/** Daily counter for an ad state (no personal data), once per event per page view. */
+function adLog(id: string, event: AdLogEvent, sent: Set<string>): void {
+  if (sent.has(event)) return;
+  sent.add(event);
+  try {
+    const body = JSON.stringify({ id, event });
+    if (!navigator.sendBeacon?.("/api/ad-log", body)) {
+      void fetch("/api/ad-log", { method: "POST", body, keepalive: true }).catch(() => undefined);
+    }
+  } catch {
+    /* best effort */
+  }
+}
+
+type AdResult = { ad: Ad | null; reason: "ok" | "empty" | "timeout" | "error" };
+
+async function fetchAd(): Promise<AdResult> {
+  const ctrl = new AbortController();
+  const timer = window.setTimeout(() => ctrl.abort(), AD_TIMEOUT_MS);
+  try {
+    const ad = await loadAd(ctrl.signal);
+    return { ad, reason: ad ? "ok" : "empty" };
+  } catch {
+    return { ad: null, reason: ctrl.signal.aborted ? "timeout" : "error" };
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
+type OrientationLock = ScreenOrientation & { lock?: (o: string) => Promise<void>; unlock?: () => void };
+
+function fullscreenEl(): Element | null {
+  const d = document as Document & { webkitFullscreenElement?: Element | null };
+  return d.fullscreenElement || d.webkitFullscreenElement || null;
 }
 
 async function loadAd(signal: AbortSignal): Promise<Ad | null> {
@@ -104,6 +147,10 @@ type Phase = "idle" | "loading" | "ad" | "main";
 
 export function VideyPlayer({ item }: { item: VideoDetail }) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const adReq = useRef<Promise<AdResult> | null>(null);
+  const logged = useRef<Set<string>>(new Set());
+  const [muted, setMuted] = useState(false);
   const adRef = useRef<Ad | null>(null);
   const firedRef = useRef<Set<string>>(new Set());
   const [phase, setPhase] = useState<Phase>("idle");
@@ -123,39 +170,131 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     setPhase("main");
     const v = videoRef.current;
     if (!v) return;
+    v.muted = false;
+    setMuted(false);
     v.src = file;
     v.controls = true;
     void v.play().catch(() => undefined);
   }, [file]);
 
   // New video (SPA navigation): back to the poster.
+  // The VAST request starts on mount, so the tap does not wait for the whole wrapper chain.
   useEffect(() => {
     adRef.current = null;
     firedRef.current = new Set();
+    logged.current = new Set();
     setPhase("idle");
+    adReq.current = fetchAd();
   }, [item.id]);
+
+  // Landscape lock while fullscreen (wrapper or native video button), unlock on exit.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    let locked = false;
+    const orient = () => (typeof screen !== "undefined" ? (screen.orientation as OrientationLock | undefined) : undefined);
+    const lock = () => {
+      const o = orient();
+      if (!o?.lock || locked) return;
+      if (!(v.videoWidth > v.videoHeight)) return;
+      locked = true;
+      o.lock("landscape").catch(() => {
+        locked = false;
+      });
+    };
+    const unlock = () => {
+      if (!locked) return;
+      locked = false;
+      try {
+        orient()?.unlock?.();
+      } catch {
+        /* not supported */
+      }
+    };
+    const onChange = () => {
+      const el = fullscreenEl();
+      if (el && (el === wrapRef.current || el === v || wrapRef.current?.contains(el))) {
+        if (v.videoWidth) lock();
+        else v.addEventListener("loadedmetadata", lock, { once: true });
+      } else unlock();
+    };
+    // A new source (ad -> video) while fullscreen: check the new size again.
+    const onMeta = () => {
+      if (!fullscreenEl()) return;
+      if (v.videoWidth > v.videoHeight) lock();
+    };
+    document.addEventListener("fullscreenchange", onChange);
+    document.addEventListener("webkitfullscreenchange", onChange);
+    v.addEventListener("webkitbeginfullscreen", lock);
+    v.addEventListener("webkitendfullscreen", unlock);
+    v.addEventListener("loadedmetadata", onMeta);
+    return () => {
+      document.removeEventListener("fullscreenchange", onChange);
+      document.removeEventListener("webkitfullscreenchange", onChange);
+      v.removeEventListener("webkitbeginfullscreen", lock);
+      v.removeEventListener("webkitendfullscreen", unlock);
+      v.removeEventListener("loadedmetadata", onMeta);
+      unlock();
+    };
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const wrap = wrapRef.current as (HTMLDivElement & { webkitRequestFullscreen?: () => void }) | null;
+    const v = videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
+    const d = document as Document & { webkitExitFullscreen?: () => void };
+    if (fullscreenEl()) {
+      if (d.exitFullscreen) void d.exitFullscreen().catch(() => undefined);
+      else d.webkitExitFullscreen?.();
+      return;
+    }
+    if (wrap?.requestFullscreen) void wrap.requestFullscreen().catch(() => undefined);
+    else if (wrap?.webkitRequestFullscreen) wrap.webkitRequestFullscreen();
+    else v?.webkitEnterFullscreen?.();
+  }, []);
 
   const start = useCallback(() => {
     if (phase !== "idle") return;
     setPhase("loading");
-    const v = videoRef.current;
-    const ctrl = new AbortController();
-    const timer = window.setTimeout(() => ctrl.abort(), AD_TIMEOUT_MS);
-    void loadAd(ctrl.signal)
-      .catch(() => null)
-      .then((ad) => {
-        window.clearTimeout(timer);
-        const el = videoRef.current;
-        if (!ad || !el) return playMain();
-        adRef.current = ad;
-        firedRef.current = new Set();
-        setLeft(Math.ceil(ad.skipAfter));
-        setPhase("ad");
-        el.controls = false;
-        el.src = ad.media;
-        el.play().catch(() => playMain());
-      });
-  }, [phase, playMain]);
+    const el0 = videoRef.current;
+    // Inside the tap: unlock the element for playback with sound (mobile autoplay rules).
+    if (el0) {
+      el0.muted = false;
+      void el0.play().catch(() => undefined);
+    }
+    const req = adReq.current || fetchAd();
+    adReq.current = null;
+    void req.then(({ ad, reason }) => {
+      const el = videoRef.current;
+      if (!ad || !el) {
+        adLog(item.id, reason === "timeout" ? "vast_timeout" : reason === "error" ? "vast_error" : "vast_empty", logged.current);
+        return playMain();
+      }
+      adRef.current = ad;
+      firedRef.current = new Set();
+      setLeft(Math.ceil(ad.skipAfter));
+      setPhase("ad");
+      el.controls = false;
+      el.muted = false;
+      el.src = ad.media;
+      el.play()
+        .then(() => adLog(item.id, "ad_play", logged.current))
+        .catch(() => {
+          // Sound not allowed here: play the ad muted with a sound button.
+          el.muted = true;
+          setMuted(true);
+          return el.play().then(
+            () => {
+              adLog(item.id, "ad_muted", logged.current);
+              adLog(item.id, "ad_play", logged.current);
+            },
+            () => {
+              adLog(item.id, "ad_error", logged.current);
+              playMain();
+            },
+          );
+        });
+    });
+  }, [phase, playMain, item.id]);
 
   // Ad events: impression on first frame, quartiles, end/error -> main video.
   useEffect(() => {
@@ -185,9 +324,13 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     };
     const onEnded = () => {
       fire("complete");
+      adLog(item.id, "ad_complete", logged.current);
       playMain();
     };
-    const onError = () => playMain();
+    const onError = () => {
+      adLog(item.id, "ad_error", logged.current);
+      playMain();
+    };
     // An ad that stalls for 8 s is dropped.
     let stall = window.setTimeout(onError, 8000);
     const onProgress = () => {
@@ -207,10 +350,11 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
       v.removeEventListener("ended", onEnded);
       v.removeEventListener("error", onError);
     };
-  }, [phase, fire, playMain]);
+  }, [phase, fire, playMain, item.id]);
 
   const skip = () => {
     fire("skip");
+    adLog(item.id, "ad_skip", logged.current);
     playMain();
   };
 
@@ -222,7 +366,10 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
   };
 
   return (
-    <div className="relative aspect-video max-h-[min(70vh,720px)] w-full overflow-hidden bg-black sm:mx-auto sm:rounded-xl">
+    <div
+      ref={wrapRef}
+      className="relative aspect-video max-h-[min(70vh,720px)] w-full overflow-hidden bg-black sm:mx-auto sm:rounded-xl [&:fullscreen]:max-h-none [&:fullscreen]:rounded-none"
+    >
       <video
         ref={videoRef}
         className="size-full bg-black object-contain"
@@ -263,6 +410,36 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
           >
             {left > 0 ? `Lewati dalam ${left}` : "Lewati iklan"}
           </button>
+          <div className="absolute right-2.5 top-2.5 flex gap-1.5">
+            {muted ? (
+              <button
+                type="button"
+                aria-label="Suara"
+                onClick={() => {
+                  const v = videoRef.current;
+                  if (v) v.muted = false;
+                  setMuted(false);
+                }}
+                className="flex size-8 items-center justify-center rounded-full bg-black/70 text-white"
+              >
+                <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current stroke-2" aria-hidden="true">
+                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" className="fill-current" />
+                  <line x1="23" y1="9" x2="17" y2="15" />
+                  <line x1="17" y1="9" x2="23" y2="15" />
+                </svg>
+              </button>
+            ) : null}
+            <button
+              type="button"
+              aria-label="Layar penuh"
+              onClick={toggleFullscreen}
+              className="flex size-8 items-center justify-center rounded-full bg-black/70 text-white"
+            >
+              <svg viewBox="0 0 24 24" className="size-4 fill-none stroke-current stroke-2" aria-hidden="true">
+                <path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" />
+              </svg>
+            </button>
+          </div>
         </>
       ) : null}
     </div>
