@@ -14,14 +14,14 @@ export const DEFAULT_OG = `${SITE_ORIGIN}/og-v2.jpg?v=13`;
 export const SITE_LOGO = `${SITE_ORIGIN}/icon-512.png`;
 
 const HOME_DESCRIPTION =
-  "Koleksi Dr. Pinguin Bokep, M.S.B., situs resmi di koleksidrpinguin.com. Katalog video dewasa 18+: bokep Indo, JAV, amatir, AI+. Update berkala.";
+  "Koleksi Dr. Pinguin Bokep, M.S.B.: bokep indo viral terbaru, video viral videy, JAV sub indo dan AI+ yang lagi rame. Langsung tonton di HP, update terus.";
 
 /** Judul beranda: frasa brand persis + domain. */
-export const HOME_TITLE = `${BRAND_NAME} | ${TITLE_SUFFIX}`;
+export const HOME_TITLE = `${BRAND_NAME} - Bokep Indo Viral Terbaru | ${TITLE_SUFFIX}`;
 
 /** Kalimat pendek di bawah H1 beranda. */
 export const HOME_INTRO =
-  "Situs resmi Koleksi Dr. Pinguin Bokep, M.S.B. Katalog video dewasa 18+: Indo, JAV, amatir, AI+. Update berkala.";
+  "Bokep indo viral terbaru, video viral videy, JAV sub indo dan AI+ yang lagi rame, semua bisa langsung ditonton di HP.";
 
 function categoryLabel(slugOrLabel?: string | null): string {
   const key = (slugOrLabel || "").trim().toLowerCase();
