@@ -51,6 +51,32 @@ export function periodAvailable(period: RankPeriod): boolean {
 }
 
 /** Earliest date (YYYY-MM-DD) a period can appear, from the first stored snapshot; null = unknown. */
+/** Day the site's own D1 pageview log starts (views week/month tabs never reach before it). */
+export const SITE_VIEWS_FROM = "2026-10-05";
+
+function wibToday(now = Date.now()): string {
+  return new Date(now + 7 * 3600_000).toISOString().slice(0, 10);
+}
+
+/**
+ * Period range for a ranking. Views week/month come from the site's own pageviews (D1), so they are
+ * always available: the range is the last 7/30 WIB days, clamped to SITE_VIEWS_FROM. Likes keep the
+ * snapshot-based meta.
+ */
+export function rankPeriodInfo(kind: RankKind, period: RankPeriod, now = Date.now()): PeriodMeta {
+  if (kind !== "views" || period === "all") return periodInfo(period);
+  const to = wibToday(now);
+  const span = period === "week" ? 7 : 30;
+  let from = new Date(Date.parse(`${to}T00:00:00Z`) - (span - 1) * 86_400_000).toISOString().slice(0, 10);
+  if (from < SITE_VIEWS_FROM) from = SITE_VIEWS_FROM;
+  const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
+  return { from, to, days };
+}
+
+export function rankPeriodAvailable(kind: RankKind, period: RankPeriod): boolean {
+  return kind === "views" ? true : periodAvailable(period);
+}
+
 export function periodExpectedFrom(period: RankPeriod): string | null {
   if (period === "all" || !META.firstSnapshot) return null;
   const days = period === "week" ? 7 : 30;
@@ -72,16 +98,25 @@ export function parseRankingKey(category: string | null | undefined): { def: Ran
   return { def, period: periodFromKey(p) };
 }
 
-export function rankingSeo(def: RankingDef): { title: string; h1: string; description: string; intro: string } {
+export function rankingSeo(def: RankingDef, period: RankPeriod = "all"): { title: string; h1: string; description: string; intro: string } {
   const year = new Date().getFullYear();
   if (def.kind === "views") {
+    if (period === "week" || period === "month") {
+      const word = period === "week" ? "minggu ini" : "bulan ini";
+      const span = period === "week" ? "7 hari" : "30 hari";
+      return {
+        h1: "Bokep Indo Paling Banyak Ditonton",
+        title: `Bokep Indo Paling Banyak Ditonton ${word.replace(/^./, (c) => c.toUpperCase())} ${year} | koleksidrpinguin.com`,
+        description: `Bokep indo paling banyak ditonton ${word} di Dr. Pinguin, dari video viral terbaru sampai videy viral.`,
+        intro: `Kumpulan bokep indo paling banyak ditonton ${word} di koleksidrpinguin.com. Urutannya dari jumlah tayangan pengunjung situs ini selama ${span} terakhir, jadi video viral terbaru dan videy viral yang lagi ramai langsung naik ke atas.`,
+      };
+    }
     return {
       h1: "Bokep Indo Paling Banyak Ditonton",
       title: `Bokep Indo Paling Banyak Ditonton ${year} | koleksidrpinguin.com`,
       description:
-        "Daftar video paling banyak ditonton di Dr. Pinguin, diurutkan dari jumlah tayangan. Diperbarui otomatis tiap 12 jam. Khusus 18+.",
-      intro:
-        "Video dengan jumlah tayangan terbanyak, diurutkan otomatis dari statistik sumber yang diperbarui tiap 12 jam. Khusus pengunjung 18 tahun ke atas.",
+        "Bokep indo paling banyak ditonton minggu ini dan bulan ini di Dr. Pinguin, dari video viral terbaru sampai videy viral.",
+      intro: "Bokep indo paling banyak ditonton sepanjang masa, diurutkan dari total tayangan. Diperbarui otomatis tiap 12 jam.",
     };
   }
   return {

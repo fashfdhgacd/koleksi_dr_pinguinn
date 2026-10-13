@@ -424,6 +424,38 @@ export async function d1Prune(db: D1DatabaseLike, now = Date.now(), eventDays = 
   ]);
 }
 
+/**
+ * Pageviews per video id (/watch/<id>) for the last `days` days. ONE aggregate query; callers must
+ * cache the result (ranking-list.ts keeps it in KV + isolate memory for ~1 h).
+ */
+export async function d1TopVideos(
+  db: D1DatabaseLike,
+  days: number,
+  limit = 1000,
+  now = Date.now(),
+): Promise<Record<string, number>> {
+  const rows = await all<{ path: string; n: number }>(
+    db,
+    `select path, count(*) as n from analytics_events
+      where event_type = 'pageview' and created_at >= ? and path like '/watch/%'
+      group by path order by n desc limit ?`,
+    now - days * DAY_MS,
+    limit,
+  );
+  const out: Record<string, number> = {};
+  for (const r of rows) {
+    let id = String(r.path || "").slice("/watch/".length).split(/[?#/]/)[0] || "";
+    try {
+      id = decodeURIComponent(id);
+    } catch {
+      /* keep raw id */
+    }
+    const n = Math.floor(Number(r.n) || 0);
+    if (id && n > 0) out[id] = (out[id] || 0) + n;
+  }
+  return out;
+}
+
 export async function d1Ping(db: D1DatabaseLike): Promise<void> {
   await db.prepare("select 1 as ok").first();
 }

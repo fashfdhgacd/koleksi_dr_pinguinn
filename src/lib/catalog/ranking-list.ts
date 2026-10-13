@@ -5,14 +5,17 @@
  *  - Views: source views (video-stats.json). Likes: source likes + our own visitor likes (D1).
  *  - D1 likes are read as ONE aggregated query, cached in KV ("rank:likes:v1", refreshed at most every
  *    45 min) and in-isolate for 10 min, so page views never hit D1 directly.
- *  - Week/month: deltas from rank-periods.json (written by scripts/stats-snapshot.py). Our D1 likes
+ *  - Views week/month: our own /watch/<id> pageviews (D1 analytics_events), ONE aggregate query per
+ *    period, cached in KV ("rank:views:v1:<period>", refreshed at most every 60 min) and in-isolate for
+ *    10 min. Videy is included in these two tabs.
+ *  - Likes week/month: deltas from rank-periods.json (written by scripts/stats-snapshot.py). Our D1 likes
  *    join a period only when a D1 day snapshot exists for the period's start date.
  */
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos } from "./types";
 import { isVidey, type RawItem } from "./local-shared";
 import { loadItems, pageOf } from "./local-cache";
-import { periodAvailable, periodInfo, type RankKind, type RankPeriod } from "./rankings";
+import { rankPeriodAvailable, rankPeriodInfo, type RankKind, type RankPeriod } from "./rankings";
 
 type PeriodData = { from: string; to: string; days: number; views: Record<string, number>; likes: Record<string, number> };
 type Periods = { week: PeriodData | null; month: PeriodData | null };
@@ -122,6 +125,55 @@ async function siteLikesOnDay(day: string): Promise<LikeMap | null> {
   return out;
 }
 
+const VIEWS_KV = "rank:views:v1:";
+const VIEWS_FRESH_MS = 60 * 60_000;
+
+async function readD1Views(days: number): Promise<LikeMap | null> {
+  if (!import.meta.env.SSR) return null;
+  try {
+    const { readyD1, d1TopVideos } = await import("@/lib/analytics-d1");
+    const db = await readyD1();
+    if (!db) return null;
+    return await d1TopVideos(db, days);
+  } catch {
+    return null;
+  }
+}
+
+const viewsMemo = new Map<string, { at: number; views: LikeMap }>();
+const viewsInflight = new Map<string, Promise<LikeMap>>();
+
+/** Our own visitor pageviews per id for the last 7/30 days (D1 aggregate via KV cache). Never throws. */
+async function siteViews(period: "week" | "month"): Promise<LikeMap> {
+  const now = Date.now();
+  const memo = viewsMemo.get(period);
+  if (memo && now - memo.at < MEMO_MS) return memo.views;
+  const running = viewsInflight.get(period);
+  if (running) return running;
+  const p = (async () => {
+    let cached: { at: number; views: LikeMap } | null = null;
+    try {
+      const raw = await kvGet(VIEWS_KV + period);
+      cached = raw ? (JSON.parse(raw) as { at: number; views: LikeMap }) : null;
+    } catch {
+      cached = null;
+    }
+    if (cached && now - Number(cached.at) < VIEWS_FRESH_MS) {
+      viewsMemo.set(period, { at: now, views: cached.views || {} });
+      return cached.views || {};
+    }
+    const fresh = await readD1Views(period === "week" ? 7 : 30);
+    if (fresh) await kvPut(VIEWS_KV + period, JSON.stringify({ at: now, views: fresh }), 6 * 3600);
+    const views = fresh || cached?.views || {};
+    viewsMemo.set(period, { at: now, views });
+    return views;
+  })().finally(() => {
+    viewsInflight.delete(period);
+  });
+  viewsInflight.set(period, p);
+  return p;
+}
+
 type Ranked = { item: RawItem; score: number };
 const listMemo = new Map<string, { at: number; src: unknown; list: Ranked[] }>();
 
@@ -132,10 +184,15 @@ async function rankedList(kind: RankKind, period: RankPeriod): Promise<Ranked[]>
   const hit = listMemo.get(key);
   if (hit && hit.src === cache && now - hit.at < MEMO_MS) return hit.list;
 
-  const pool = cache.items.filter((it) => it?.id && !isVidey(it));
+  const ownViews = kind === "views" && period !== "all";
+  // Videy joins only the views week/month tabs (our own pageviews); other rankings stay Videy-free.
+  const pool = cache.items.filter((it) => it?.id && (ownViews || !isVidey(it)));
   const site = kind === "likes" ? await siteLikes() : {};
   let score: (it: RawItem) => number;
-  if (period === "all") {
+  if (ownViews) {
+    const views = await siteViews(period as "week" | "month");
+    score = (it) => views[it.id] || 0;
+  } else if (period === "all") {
     score =
       kind === "views"
         ? (it) => (typeof it.views === "number" ? it.views : 0)
@@ -174,7 +231,7 @@ export async function listRanking(
   limit = DEFAULT_PAGE_SIZE,
 ): Promise<PagedVideos> {
   const { posters, videyNo } = await loadItems();
-  if (!periodAvailable(period) || (period !== "all" && !periodInfo(period))) {
+  if (!rankPeriodAvailable(kind, period) || (period !== "all" && !rankPeriodInfo(kind, period))) {
     return pageOf([], 1, limit, posters, videyNo);
   }
   const list = await rankedList(kind, period);

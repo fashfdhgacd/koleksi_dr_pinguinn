@@ -13,10 +13,10 @@ import {
   RANK_PERIODS,
   type RankingDef,
   findRanking,
-  periodAvailable,
+  rankPeriodAvailable,
+  rankPeriodInfo,
   periodExpectedFrom,
   periodFromKey,
-  periodInfo,
   rankingKey,
   rankingSeo,
 } from "@/lib/catalog/rankings";
@@ -63,10 +63,10 @@ export const Route = createFileRoute("/kategori/$slug")({
     const cat = rank ? undefined : findCategory(params.slug);
     const page = typeof match.search.page === "number" ? match.search.page : 1;
     const periode = rank ? parsePeriode(match.search.periode) : undefined;
-    const seo = rank ? rankingSeo(rank) : cat ? categorySeo(cat.slug) : homeSeo(undefined, undefined);
+    const seo = rank ? rankingSeo(rank, periodFromKey(periode).period) : cat ? categorySeo(cat.slug) : homeSeo(undefined, undefined);
     // A period tab without data yet (Minggu/Bulan ini "segera"): noindex,follow + canonical to the
     // Sepanjang-masa page. Becomes indexable automatically once rank-periods-meta.json has the period.
-    const emptyPeriod = Boolean(rank && periode && !periodAvailable(periodFromKey(periode).period));
+    const emptyPeriod = Boolean(rank && periode && !rankPeriodAvailable(rank.kind, periodFromKey(periode).period));
     const qs = new URLSearchParams();
     if (periode && !emptyPeriod) qs.set("periode", periode);
     if (page > 1 && !emptyPeriod) qs.set("page", String(page));
@@ -114,10 +114,10 @@ function RankingPage({ rank }: { rank: RankingDef }) {
   const navigate = useNavigate({ from: "/kategori/$slug" });
   const loaderData = Route.useLoaderData();
   const period = periodFromKey(periode);
-  const available = periodAvailable(period.period);
+  const available = rankPeriodAvailable(rank.kind, period.period);
   const key = rankingKey(rank.slug, periode);
-  const seo = rankingSeo(rank);
-  const info = periodInfo(period.period);
+  const seo = rankingSeo(rank, period.period);
+  const info = rankPeriodInfo(rank.kind, period.period);
 
   const seed =
     loaderData && "ok" in loaderData && loaderData.ok && loaderData.type === "category"
@@ -148,7 +148,7 @@ function RankingPage({ rank }: { rank: RankingDef }) {
           <nav className="mt-3 flex flex-wrap gap-2" aria-label="Periode">
             {RANK_PERIODS.map((p) => {
               const active = p.key === period.key;
-              const ok = periodAvailable(p.period);
+              const ok = rankPeriodAvailable(rank.kind, p.period);
               const cls = `inline-flex h-8 items-center rounded-full border px-3 text-sm ${
                 active ? "border-zinc-200 bg-zinc-100 text-zinc-900" : "border-white/10 text-zinc-300"
               }`;
