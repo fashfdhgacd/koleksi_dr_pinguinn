@@ -32,10 +32,16 @@
  *    category, on both hosts. A second purge ~29 s later catches a page another isolate rendered
  *    before its 30 s owner-edit sync. Only owner POSTs are read for this; visitors pay nothing.
  *
+ * 4. /pemilik "Edit" (POST /api/owner-tools, action edit-video): the typed title gets exactly one
+ *    " - koleksidrpinguin.com" (other site/Telegram branding at the end removed) before the app sees
+ *    it, the same brandUploadTitle() as bot uploads and the Videy panel. The app's own checks
+ *    (owner key, minor-lock, length) then run on that final title.
+ *
  * nitro is pinned to an exact version in package.json, so this internal path is stable; if a future
  * nitro moves it, `vite build` fails loudly instead of deploying something broken.
  */
 import nitroHandler from "../node_modules/nitro/dist/presets/cloudflare/runtime/cloudflare-module.mjs";
+import { brandUploadTitle } from "../src/lib/bot/title-brand.js";
 
 /** Longest time (s) a cached HTML page counts as fresh. */
 const HTML_FRESH_MAX = 180;
@@ -199,6 +205,30 @@ async function cachedFetch(request, env, context, url) {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
+/** Owner Edit: brand the typed title. Any parsing problem leaves the request untouched. */
+async function brandEditRequest(request) {
+  if (!request.headers.has("x-online-key")) return request;
+  let text = "";
+  try {
+    text = await request.clone().text();
+  } catch {
+    return request;
+  }
+  if (!text || text.length > 20_000) return request;
+  let body;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return request;
+  }
+  if (body?.action !== "edit-video" || typeof body.title !== "string") return request;
+  const typed = body.title.replace(/\s+/g, " ").trim();
+  if (!typed) return request;
+  const branded = brandUploadTitle(typed);
+  if (!branded || branded.length > 200) return request;
+  return new Request(request, { body: JSON.stringify({ ...body, title: branded }) });
+}
+
 const PURGE_HOSTS = ["https://koleksidrpinguin.com", "https://www.koleksidrpinguin.com"];
 
 function purgeKeys(env, id, category) {
@@ -239,7 +269,8 @@ export default {
       return nitroHandler.fetch(request, env, context);
     }
     if (request.method === "POST" && (url.pathname === "/api/owner-videy" || url.pathname === "/api/owner-tools")) {
-      const response = await nitroHandler.fetch(request, env, context);
+      const req = url.pathname === "/api/owner-tools" ? await brandEditRequest(request).catch(() => request) : request;
+      const response = await nitroHandler.fetch(req, env, context);
       await purgeAfterEdit(request, response, env, context).catch(() => undefined);
       return response;
     }
