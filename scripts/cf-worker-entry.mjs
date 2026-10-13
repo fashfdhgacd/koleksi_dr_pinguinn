@@ -20,6 +20,13 @@
  *      within a few minutes. After that it is served stale (up to its stale-while-revalidate) while
  *      one background render refreshes it.
  *
+ *    - Pages and data are cached per deploy: the key carries the deploy's version id (binding
+ *      CF_VERSION_METADATA, added by scripts/cf-patch-wrangler.mjs). Without it, HTML cached before a
+ *      deploy kept pointing to hashed /assets files the new deploy no longer has (JS 404, dead page)
+ *      for up to HTML_FRESH_MAX seconds plus the stale window. Images and other static files keep a
+ *      version-free key so a deploy does not empty their cache. Without the binding the key has no
+ *      version (old behaviour).
+ *
  * nitro is pinned to an exact version in package.json, so this internal path is stable; if a future
  * nitro moves it, `vite build` fails loudly instead of deploying something broken.
  */
@@ -72,6 +79,24 @@ function cacheableRequest(request, url) {
   if (p === "/api/online" || p.startsWith("/api/owner") || p.startsWith("/api/analytics")) return false;
   if (p.startsWith("/cdn-cgi/")) return false;
   return true;
+}
+
+/** Paths whose cached copy does not depend on the deploy (images, hashed or static files). */
+const VERSION_FREE =
+  /^\/(?:assets\/|thumb\/|videy-thumbs\/|api\/(?:img-proxy|tape-thumb|embed-thumb|puterin-thumb|og|frame)\b)|\.(?:jpe?g|png|webp|gif|avif|svg|ico|woff2?|css|js|mp4)$/i;
+
+function deployVersion(env) {
+  const id = env?.CF_VERSION_METADATA?.id;
+  return typeof id === "string" && id ? id.slice(0, 12) : "";
+}
+
+/** Cache key: the URL, plus the deploy version for pages and data. */
+function cacheKey(url, env) {
+  const v = VERSION_FREE.test(url.pathname) ? "" : deployVersion(env);
+  if (!v) return new Request(url.toString(), { method: "GET" });
+  const k = new URL(url.toString());
+  k.searchParams.set("__edge_v", v);
+  return new Request(k.toString(), { method: "GET" });
 }
 
 function directive(cc, name) {
@@ -134,7 +159,7 @@ async function renderAndStore(request, env, context, cache, key) {
 async function cachedFetch(request, env, context, url) {
   const cache = edgeCache();
   if (!cache || !cacheableRequest(request, url)) return nitroHandler.fetch(request, env, context);
-  const key = new Request(url.toString(), { method: "GET" });
+  const key = cacheKey(url, env);
 
   let hit = null;
   try {

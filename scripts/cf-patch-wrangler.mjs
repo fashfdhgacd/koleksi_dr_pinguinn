@@ -48,6 +48,10 @@ for (const p of paths) {
   for (const n of need) byBind.set(n.binding, n);
   j.kv_namespaces = [...byBind.values()];
 
+  // Deploy version for the edge cache key (scripts/cf-worker-entry.mjs): a new deploy never serves
+  // HTML cached by the previous one, which points to hashed /assets files that no longer exist.
+  // This is a binding (the version id Cloudflare gives each deploy), not an env var.
+  if (!j.version_metadata) j.version_metadata = { binding: "CF_VERSION_METADATA" };
 
   // Don't wipe routes — if empty, leave a note; CF dashboard routes may still apply
   // if we avoid sending empty routes array. Delete empty routes key.
