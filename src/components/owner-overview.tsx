@@ -99,6 +99,8 @@ type Overview = {
   uploadedToday?: number;
   uploadedWeek?: number;
   recent?: CatalogRow[];
+  recentTotal?: number;
+  offset?: number;
 };
 
 type HostRow = { host: string; starts: number; fails: number; rate: number | null };
@@ -297,11 +299,12 @@ function EditRow({
 }: {
   row: CatalogRow;
   secret: string;
-  onDone: (note: string) => void;
+  onDone: (note: string, saved?: { title?: string | null; category?: string | null }) => void;
 }) {
   const [title, setTitle] = useState(row.title);
   const [cat, setCat] = useState(row.category);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
   async function save() {
     setBusy(true);
     const body: Record<string, unknown> = { action: "edit-video", id: row.id };
@@ -312,9 +315,18 @@ function EditRow({
       onDone("Tidak ada perubahan.");
       return;
     }
-    const d = await ownerPost<{ ok?: boolean; error?: string }>(secret, body);
+    setErr("");
+    const d = await ownerPost<{ ok?: boolean; error?: string; title?: string | null; category?: string | null }>(
+      secret,
+      body,
+    );
     setBusy(false);
-    onDone(d?.ok ? "Tersimpan, aktif setelah build berikutnya." : `Gagal: ${d?.error || "jaringan"}`);
+    // Failure keeps the editor open with the server's message next to the fields.
+    if (!d.ok) {
+      setErr(`Gagal: ${d.error || "tidak diketahui"}`);
+      return;
+    }
+    onDone("Tersimpan. Tampil di situs dalam ±1 menit.", { title: d.title, category: d.category });
   }
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-white/[0.07] p-2">
@@ -330,6 +342,7 @@ function EditRow({
       <button type="button" className={toggleCls(true)} disabled={busy} onClick={() => void save()}>
         {busy ? "..." : "Simpan"}
       </button>
+      {err ? <p className="basis-full text-xs text-red-400">{err}</p> : null}
     </div>
   );
 }
@@ -348,6 +361,8 @@ function VideoRows({
   const [editing, setEditing] = useState("");
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
+  // Saved edits shown right away (the server list catches up after its next catalog sync).
+  const [patched, setPatched] = useState<Record<string, { title?: string; categoryLabel?: string; category?: string }>>({});
   async function hide(r: CatalogRow) {
     setBusy(r.id);
     try {
@@ -369,7 +384,9 @@ function VideoRows({
     <>
       {note ? <p className="mt-2 text-xs text-zinc-400">{note}</p> : null}
       <ul className="mt-2">
-        {rows.map((r) => (
+        {rows.map((r0) => {
+          const r = { ...r0, ...(patched[r0.id] || {}) };
+          return (
           <li key={r.id} className="border-t border-white/[0.05] py-2">
             <div className="flex items-center gap-3">
               <img
@@ -402,14 +419,26 @@ function VideoRows({
               <EditRow
                 row={r}
                 secret={secret}
-                onDone={(n) => {
+                onDone={(n, saved) => {
                   setNote(n);
                   setEditing("");
+                  if (saved) {
+                    const cat = saved.category ? CATEGORY_LIST.find((c) => c.slug === saved.category) : undefined;
+                    setPatched((p) => ({
+                      ...p,
+                      [r.id]: {
+                        ...(p[r.id] || {}),
+                        ...(saved.title ? { title: saved.title } : {}),
+                        ...(saved.category ? { category: saved.category, categoryLabel: cat?.label || saved.category } : {}),
+                      },
+                    }));
+                  }
                 }}
               />
             ) : null}
           </li>
-        ))}
+          );
+        })}
       </ul>
     </>
   );
@@ -537,6 +566,22 @@ export function OwnerOverview(props: {
       setOvBusy(false);
     }
   }, [secret]);
+
+  const loadMore = useCallback(async () => {
+    if (!secret || !ov?.recent) return;
+    setOvBusy(true);
+    try {
+      const d = await ownerPost<Overview>(secret, { action: "catalog-overview", offset: ov.recent.length, limit: 50 });
+      if (d.ok) {
+        const have = new Set(ov.recent.map((r) => r.id));
+        setOv({ ...d, recent: [...ov.recent, ...(d.recent || []).filter((r) => !have.has(r.id))] });
+      } else {
+        setOv({ ...ov, error: d.error || "Gagal memuat." });
+      }
+    } finally {
+      setOvBusy(false);
+    }
+  }, [secret, ov]);
 
   useEffect(() => {
     void loadOverview();
@@ -666,7 +711,14 @@ export function OwnerOverview(props: {
           </div>
           {ov?.error ? <p className="mt-2 text-xs text-red-400">{ov.error}</p> : null}
           {ov?.recent?.length ? (
-            <VideoRows rows={ov.recent} secret={secret} showTime onChanged={() => void loadOverview()} />
+            <>
+              <VideoRows rows={ov.recent} secret={secret} showTime onChanged={() => void loadOverview()} />
+              {ov.recentTotal != null && ov.recent.length < ov.recentTotal ? (
+                <button type="button" className={`${btn} mt-2 w-full`} disabled={ovBusy} onClick={() => void loadMore()}>
+                  {ovBusy ? "Memuat…" : `Muat lagi (${fmt(ov.recent.length)} dari ${fmt(ov.recentTotal)})`}
+                </button>
+              ) : null}
+            </>
           ) : ov?.recent ? (
             <p className="mt-3 text-xs text-zinc-600">Belum ada upload.</p>
           ) : !ov?.error ? (
