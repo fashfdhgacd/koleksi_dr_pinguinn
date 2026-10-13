@@ -58,7 +58,15 @@ export function VideoCard({
           {cleanDisplayTitle(video.title)}
         </h3>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] tabular-nums text-muted sm:text-xs">
-          {views != null ? (
+          {typeof video.periodViews === "number" && video.periodLabel ? (
+            <span
+              className="inline-flex items-center gap-1"
+              aria-label={`${video.periodViews} kali ditonton ${video.periodLabel}`}
+            >
+              <Eye className="size-3.5" aria-hidden="true" />
+              {video.periodViews.toLocaleString("id-ID")} tayangan {video.periodLabel}
+            </span>
+          ) : views != null ? (
             <span className="inline-flex items-center gap-1" aria-label={`${views} kali ditonton`}>
               <Eye className="size-3.5" aria-hidden="true" />
               {compactNumber(views)}

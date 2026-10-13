@@ -244,6 +244,12 @@ export async function listRanking(
     posters,
     videyNo,
   );
+  if (kind === "views" && period !== "all") {
+    // Week/month cards show our own pageviews for the period (same cached siteViews map, no extra D1).
+    const views = await siteViews(period as "week" | "month");
+    const label = period === "week" ? "minggu ini" : "bulan ini";
+    res.items = res.items.map((c) => ({ ...c, periodViews: views[c.id] || 0, periodLabel: label }));
+  }
   if (kind === "likes") {
     // Cards show the combined like count (source likes + our visitors). Our part goes in siteLikes
     // (current KV/D1 value, not the 12-hour snapshot) so the card can swap it for the live count.

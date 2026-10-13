@@ -33,6 +33,10 @@ export type VideoCard = {
   likes?: number | null;
   /** Our own likes (D1 video_likes, 12-hour snapshot in site-likes.json). Cards only; the watch page reads D1 live. */
   siteLikes?: number | null;
+  /** Ranking week/month tabs only: our own pageviews in that period (siteViews cache). */
+  periodViews?: number | null;
+  /** "minggu ini" | "bulan ini" — paired with periodViews. */
+  periodLabel?: string | null;
 };
 
 export type VideoDetail = VideoCard & {
