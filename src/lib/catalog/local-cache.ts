@@ -77,6 +77,14 @@ const STATS = videoStats as unknown as Record<string, [number, number, number]>;
 /** hidden: reason string (e.g. "source-gone") hides the item without deleting it; Unhide can restore it. */
 type ItemOverride = { title?: string; category?: string; poster?: string; hidden?: string };
 const OVERRIDES = itemOverrides as Record<string, ItemOverride>;
+/** Owner edits from /pemilik (KV owner:edit:v1, owner-edit-store.ts), applied on top of OVERRIDES. */
+let EDITS: Record<string, { title?: string; category?: string }> = {};
+let editsKey = "";
+
+function overrideTitle(id: string): string {
+  return String(EDITS[id]?.title || OVERRIDES[id]?.title || "");
+}
+
 /** Real source titles for stored "***" titles that only masked "tocil" (see hidden-ids.js). */
 const RESTORED = RESTORED_TITLES as Record<string, string>;
 
@@ -117,15 +125,22 @@ export function hiddenReasonRaw(it: RawItem): string {
   if (rec.hidden === true) return String(rec.hidden_reason || "bot-flag");
   const ovHidden = OVERRIDES[it.id]?.hidden;
   if (ovHidden) return String(ovHidden);
-  // Reviewed real title (overrides.json, or "***" restored to "Tocil ..." via RESTORED_TITLES)
-  // is checked instead of a masked stored title.
-  const title = String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "");
-  return minorContentReason(title) || lockedMinorReason(title);
+  // Reviewed real title (owner edit, overrides.json, or "***" restored to "Tocil ..." via
+  // RESTORED_TITLES) is checked instead of a masked stored title. An owner edit is checked as well
+  // as the stored title, so editing can never take a flagged video out of the hidden list.
+  const title = String(overrideTitle(it.id) || RESTORED[it.id] || it.title || "");
+  const edited = EDITS[it.id]?.title ? String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "") : "";
+  return (
+    minorContentReason(title) ||
+    lockedMinorReason(title) ||
+    (edited ? minorContentReason(edited) || lockedMinorReason(edited) : "")
+  );
 }
 
 /** Clear school/minor theme (minor-lock.js): hidden even when the owner pressed Unhide. */
 function isLockedMinor(it: RawItem): boolean {
   if (isLockedMinorId(it.id)) return true;
+  if (EDITS[it.id]?.title && lockedMinorReason(String(EDITS[it.id]?.title)) !== "") return true;
   return lockedMinorReason(String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "")) !== "";
 }
 
@@ -141,7 +156,12 @@ function keyOf(ids: Iterable<string>): string {
 }
 
 /** Unhide list + owner hide list (null = could not read it; keep the previous one). */
-type HideLists = { unhidden: string[]; ownerHidden: string[] | null };
+type HideLists = {
+  unhidden: string[];
+  ownerHidden: string[] | null;
+  /** Owner edits (null = could not read them; keep the previous ones). */
+  edits: Record<string, { title?: string; category?: string }> | null;
+};
 
 async function fetchUnhiddenIds(): Promise<HideLists | null> {
   try {
@@ -155,15 +175,26 @@ async function fetchUnhiddenIds(): Promise<HideLists | null> {
       } catch {
         ownerHidden = null;
       }
-      return { unhidden: Object.keys(state.ids), ownerHidden };
+      let edits: HideLists["edits"] = null;
+      try {
+        const editMod = await import("./owner-edit-store");
+        edits = (await editMod.readOwnerEditState()).ids;
+      } catch {
+        edits = null;
+      }
+      return { unhidden: Object.keys(state.ids), ownerHidden, edits };
     }
     const res = await fetch("/api/hidden-ids");
     if (!res.ok) return null;
-    const data = (await res.json()) as { unhidden?: unknown; ownerHidden?: unknown };
+    const data = (await res.json()) as { unhidden?: unknown; ownerHidden?: unknown; edits?: unknown };
     if (!Array.isArray(data?.unhidden)) return null;
     return {
       unhidden: data.unhidden.map(String),
       ownerHidden: Array.isArray(data.ownerHidden) ? data.ownerHidden.map(String) : null,
+      edits:
+        data.edits && typeof data.edits === "object" && !Array.isArray(data.edits)
+          ? (data.edits as Record<string, { title?: string; category?: string }>)
+          : null,
     };
   } catch {
     return null;
@@ -174,14 +205,23 @@ async function fetchUnhiddenIds(): Promise<HideLists | null> {
  * Applies a new Unhide list (and, when given, a new owner hide list); rebuilds the current indexes
  * when either changed. Callers that only know the Unhide list leave the owner hide list as it is.
  */
-export function applyUnhidden(ids: Iterable<string>, ownerHidden?: Iterable<string> | null): void {
+export function applyUnhidden(
+  ids: Iterable<string>,
+  ownerHidden?: Iterable<string> | null,
+  edits?: Record<string, { title?: string; category?: string }> | null,
+): void {
   const next = new Set<string>(ids);
   const nextHidden = ownerHidden ? new Set<string>(ownerHidden) : OWNER_HIDDEN;
-  const key = keyOf(next) + (nextHidden.size ? `|hide:${keyOf(nextHidden)}` : "");
+  const nextEdits = edits || EDITS;
+  const nextEditsKey = edits ? JSON.stringify(edits) : editsKey;
+  const key =
+    keyOf(next) + (nextHidden.size ? `|hide:${keyOf(nextHidden)}` : "") + (nextEditsKey ? `|edit:${nextEditsKey}` : "");
   unhideCheckedAt = Date.now();
   if (key === unhideKey) return;
   UNHIDDEN = next;
   OWNER_HIDDEN = nextHidden;
+  EDITS = nextEdits;
+  editsKey = nextEditsKey;
   unhideKey = key;
   const cur = runtime.cache as BuiltCache | null;
   if (cur && cur.raw && cur.unhideKey !== key) {
@@ -194,7 +234,7 @@ async function syncUnhidden(force = false): Promise<void> {
   if (unhideInflight) return unhideInflight;
   unhideInflight = (async () => {
     const lists = await fetchUnhiddenIds();
-    if (lists) applyUnhidden(lists.unhidden, lists.ownerHidden);
+    if (lists) applyUnhidden(lists.unhidden, lists.ownerHidden, lists.edits);
     else unhideCheckedAt = Date.now(); // keep the previous list; retry after the TTL
   })().finally(() => {
     unhideInflight = null;
@@ -229,6 +269,14 @@ function withStats(it: RawItem): RawItem {
       ...(ov.title ? { title: ov.title } : {}),
       ...(ov.category ? { category: ov.category } : {}),
       ...(ov.poster && !out.poster ? { poster: ov.poster } : {}),
+    };
+  }
+  const ed = EDITS[it.id];
+  if (ed) {
+    out = {
+      ...out,
+      ...(ed.title ? { title: ed.title } : {}),
+      ...(ed.category ? { category: ed.category } : {}),
     };
   }
   const title = typeof out.title === "string" ? out.title : "";

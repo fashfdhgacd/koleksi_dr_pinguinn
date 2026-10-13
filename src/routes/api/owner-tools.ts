@@ -23,6 +23,8 @@ import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
 import { isLockedMinorId, lockedMinorReason } from "@/lib/catalog/minor-lock.js";
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
+import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
+import { readOwnerEditState, setOwnerEdit } from "@/lib/catalog/owner-edit-store";
 import { isOwnerRequest, ownerSecret } from "@/lib/owner-auth";
 import {
   getWebhookInfo,
@@ -316,8 +318,14 @@ type BuiltLike = { items: RawItem[]; raw?: RawItem[]; hiddenIds?: Set<string>; b
 
 const WIB_MS = 7 * 3600 * 1000;
 
+/**
+ * Upload time. Bot uploads (lib/bot/store.js toRecord) carry no createdAt, only `date`
+ * (the UTC calendar day, so anything uploaded 00:00–07:00 WIB looked like "yesterday") and
+ * `updated_at` (full ISO time of the upload), which is the better source.
+ */
 function createdMs(it: RawItem): number {
-  const v = it.createdAt ?? it.date;
+  const rec = it as RawItem & { updated_at?: unknown; updatedAt?: unknown };
+  const v = it.createdAt ?? rec.updated_at ?? rec.updatedAt ?? it.date;
   if (typeof v === "number") return v < 1e12 ? v * 1000 : v;
   const n = Date.parse(String(v || ""));
   return Number.isFinite(n) ? n : 0;
@@ -353,7 +361,9 @@ async function catalogBase(): Promise<{ raw: RawItem[]; cache: BuiltLike; hidden
   return { raw, cache, hidden };
 }
 
-async function handleCatalogOverview() {
+async function handleCatalogOverview(body: { limit?: unknown; offset?: unknown } = {}) {
+  const limit = Math.min(100, Math.max(1, Math.floor(Number(body.limit) || 50)));
+  const offset = Math.max(0, Math.floor(Number(body.offset) || 0));
   const { raw, cache, hidden } = await catalogBase();
   const now = Date.now();
   const dayStart = Math.floor((now + WIB_MS) / 86400000) * 86400000 - WIB_MS;
@@ -372,10 +382,11 @@ async function handleCatalogOverview() {
   }
   // Strictly by upload time (sortByNewest ranks by source first, which is right for the catalog
   // pages but not for "Upload terbaru"). Items without a usable date go last.
-  const recent = uniq
+  const recent0 = uniq
     .map((it) => ({ it, t: createdMs(it) }))
-    .sort((a, b) => b.t - a.t)
-    .slice(0, 10)
+    .sort((a, b) => b.t - a.t);
+  const page = recent0
+    .slice(offset, offset + limit)
     .map(({ it }) => toCatalogRow(it, cache.byId?.get(it.id), hidden.has(it.id)));
   return json({
     ok: true,
@@ -383,7 +394,9 @@ async function handleCatalogOverview() {
     hidden: hidden.size,
     uploadedToday: today,
     uploadedWeek: week,
-    recent,
+    recent: page,
+    recentTotal: recent0.length,
+    offset,
   });
 }
 
@@ -405,72 +418,52 @@ async function handleCatalogSearch(body: { q?: unknown }) {
   return json({ ok: true, items: out });
 }
 
-function ghEnv(): { token: string; owner: string; repo: string; branch: string } {
-  const clean = (v: unknown) => String(v || "").trim().replace(/^GH_(?:TOKEN|OWNER|REPO|BRANCH)\s*=\s*/i, "").trim();
-  const env = process.env;
-  return {
-    token: clean(env.GITHUB_TOKEN || env.GH_TOKEN),
-    owner: clean(env.GITHUB_OWNER || env.GH_OWNER) || "fashfdhgacd",
-    repo: clean(env.GITHUB_REPO || env.GH_REPO) || "koleksi_dr_pinguinn",
-    branch: clean(env.GITHUB_BRANCH || env.GH_BRANCH) || "main",
-  };
-}
-
-const OVERRIDES_PATH = "src/lib/catalog/overrides.json";
-
 async function handleEditVideo(body: { id?: unknown; title?: unknown; category?: unknown }) {
   const id = String(body.id || "").trim();
-  if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return json({ ok: false, error: "bad_id" }, 400);
+  if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return json({ ok: false, error: "ID video tidak valid." }, 400);
   const title = typeof body.title === "string" ? body.title.replace(/\s+/g, " ").trim() : "";
   const category = typeof body.category === "string" ? body.category.trim() : "";
-  if (!title && !category) return json({ ok: false, error: "kosong" }, 400);
-  if (title && (title.length < 4 || title.length > 200)) return json({ ok: false, error: "judul_panjang" }, 400);
-  if (category && !findCategory(category)) return json({ ok: false, error: "kategori_tidak_dikenal" }, 400);
+  if (!title && !category) return json({ ok: false, error: "Tidak ada perubahan." }, 400);
+  if (title && (title.length < 4 || title.length > 200)) {
+    return json({ ok: false, error: "Judul harus 4–200 karakter." }, 400);
+  }
+  if (category && !findCategory(category)) return json({ ok: false, error: `Kategori tidak dikenal: ${category}` }, 400);
 
   const { raw } = await catalogBase();
   const item = raw.find((it) => it?.id === id);
-  if (!item) return json({ ok: false, error: "tidak_ditemukan" }, 404);
+  if (!item) return json({ ok: false, error: "Video tidak ditemukan di katalog." }, 404);
   // Minor-lock: locked or flagged items cannot be edited from the panel, and a new title must
-  // not carry a school/minor theme.
-  if (isLockedItem(item)) return json({ ok: false, error: "terkunci" }, 403);
-  if (hiddenReasonRaw(item)) return json({ ok: false, error: "ditandai" }, 403);
+  // not carry a school/minor theme. local-cache.ts checks edited titles again when it builds.
+  if (isLockedItem(item)) return json({ ok: false, error: "Video ini terkunci (minor-lock), tidak bisa diedit." }, 403);
+  if (hiddenReasonRaw(item)) return json({ ok: false, error: "Video ini ditandai/tersembunyi, tidak bisa diedit." }, 403);
   if (title && (lockedMinorReason(title) || minorContentReason(title))) {
-    return json({ ok: false, error: "judul_ditolak" }, 403);
+    return json({ ok: false, error: "Judul ditolak: bertema sekolah/di bawah umur." }, 403);
   }
 
-  const gh = ghEnv();
-  if (!gh.token) return json({ ok: false, error: "github_tidak_tersedia" }, 503);
-  const url = `https://api.github.com/repos/${gh.owner}/${gh.repo}/contents/${OVERRIDES_PATH}`;
-  const headers = {
-    Authorization: `Bearer ${gh.token}`,
-    Accept: "application/vnd.github+json",
-    "X-GitHub-Api-Version": "2022-11-28",
-    "User-Agent": "kdp-owner-panel",
-  };
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const cur = await fetch(`${url}?ref=${encodeURIComponent(gh.branch)}`, { headers });
-    if (!cur.ok) return json({ ok: false, error: `github_get_${cur.status}` }, 502);
-    const meta = (await cur.json()) as { sha?: string; content?: string };
-    let data: Record<string, Record<string, unknown>> = {};
-    try {
-      data = JSON.parse(Buffer.from(String(meta.content || "").replace(/\n/g, ""), "base64").toString("utf8")) || {};
-    } catch {
-      return json({ ok: false, error: "overrides_rusak" }, 502);
-    }
-    const next = { ...(data[id] || {}) };
-    if (title) next.title = title;
-    if (category) next.category = category;
-    data[id] = next;
-    const content = Buffer.from(JSON.stringify(data, null, 1) + "\n", "utf8").toString("base64");
-    const put = await fetch(url, {
-      method: "PUT",
-      headers: { ...headers, "Content-Type": "application/json" },
-      body: JSON.stringify({ message: `pemilik: edit ${id}`, content, branch: gh.branch, sha: meta.sha }),
-    });
-    if (put.ok) return json({ ok: true, id, title: next.title || null, category: next.category || null });
-    if (put.status !== 409) return json({ ok: false, error: `github_put_${put.status}` }, 502);
+  // Stored in KV (owner:edit:v1) and applied by the catalog at load time: no commit, no rebuild,
+  // no GitHub token needed in the Worker.
+  let saved;
+  try {
+    saved = await setOwnerEdit(id, { title, category });
+  } catch (err) {
+    const msg = String((err as Error)?.message || err);
+    return json(
+      { ok: false, error: msg === "kv_unavailable" ? "Penyimpanan KV tidak tersedia." : `Gagal menyimpan: ${msg.slice(0, 120)}` },
+      503,
+    );
   }
-  return json({ ok: false, error: "github_conflict" }, 409);
+  // Rebuild this isolate's catalog now; other isolates pick it up within ~30 s.
+  try {
+    const [unhide, hiddenState, edits] = await Promise.all([
+      readUnhideState(),
+      readOwnerHideState().catch(() => null),
+      readOwnerEditState(),
+    ]);
+    applyUnhidden(Object.keys(unhide.ids), hiddenState ? Object.keys(hiddenState.ids) : null, edits.ids);
+  } catch {
+    /* the regular 30 s sync applies it */
+  }
+  return json({ ok: true, id, title: saved.title || null, category: saved.category || null });
 }
 
 type OwnerBody = {
@@ -487,6 +480,7 @@ type OwnerBody = {
   key?: string;
   q?: string;
   title?: string;
+  offset?: number;
 };
 
 /** Telegram webhook status for the owner: registered url, pending updates, last error, last OK. */
@@ -559,13 +553,20 @@ export const Route = createFileRoute("/api/owner-tools")({
         if (body.action === "catalog-overview" || body.action === "catalog-search") {
           // Always answer JSON, so the panel can show what went wrong instead of staying empty.
           try {
-            return body.action === "catalog-overview" ? await handleCatalogOverview() : await handleCatalogSearch(body);
+            return body.action === "catalog-overview" ? await handleCatalogOverview(body) : await handleCatalogSearch(body);
           } catch (err) {
             console.error("[owner-tools] catalog", err);
             return json({ ok: false, error: `catalog_failed: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
           }
         }
-        if (body.action === "edit-video") return handleEditVideo(body);
+        if (body.action === "edit-video") {
+          try {
+            return await handleEditVideo(body);
+          } catch (err) {
+            console.error("[owner-tools] edit-video", err);
+            return json({ ok: false, error: `Edit gagal: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
+          }
+        }
         if (body.action === "share") return handleShare(body);
         if (body.action === "upload") return handleUpload(body);
         if (body.action === "set-poster") return handleSetPoster(body);
