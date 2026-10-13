@@ -43,7 +43,21 @@ async function resolveMetaFast(video, givenTitle, env) {
   return { title, thumb };
 }
 
-/** Videy videos already in the catalog, for the next "Video Viral N" number. */
+/** Auto titles for Videy uploads without a typed title; picked in turn by the running number. */
+const VIDEY_AUTO_TITLES = [
+  (n) => `Video Viral Videy Indo Terbaru ${n}`,
+  (n) => `Link Videy Viral Hari Ini ${n}`,
+  (n) => `Bokep Videy Indo Viral ${n}`,
+  (n) => `Videy Viral Terbaru ${n}`,
+  (n) => `Video Videy Indo Lagi Rame ${n}`,
+  (n) => `Link Videy Bokep Indo ${n}`,
+];
+
+function videyAutoTitle(n) {
+  return VIDEY_AUTO_TITLES[(n - 1) % VIDEY_AUTO_TITLES.length](n);
+}
+
+/** Videy videos already in the catalog, for the next auto-title number. */
 async function videyCount() {
   try {
     const [{ loadItems }, { isVidey }] = await Promise.all([
@@ -137,14 +151,17 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     return resolveMetaFast(video, given, env);
   });
 
-  // Videy without a typed title: "Video Viral N" (N counts on from the Videy videos already listed).
-  if (queue.some((v, i) => v.host === "videy" && !hasUserTitle(v.title || parsedMsg.title))) {
+  // Videy without a typed title: a keyword title with a running number (counts on from the Videy
+  // videos already listed). Marked titleAuto so /pemilik can list them for a real title later.
+  const autoTitled = new Set();
+  if (queue.some((v) => v.host === "videy" && !hasUserTitle(v.title || parsedMsg.title))) {
     let n = await videyCount();
     for (let i = 0; i < queue.length; i++) {
       const v = queue[i];
       if (v.host !== "videy" || hasUserTitle(v.title || parsedMsg.title)) continue;
       n += 1;
-      metas[i] = { ...(metas[i] || {}), title: `Video Viral ${n}`, thumb: "" };
+      metas[i] = { ...(metas[i] || {}), title: videyAutoTitle(n), thumb: "" };
+      autoTitled.add(i);
     }
   }
 
@@ -180,7 +197,8 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     // School/minor-themed titles are stored but flagged hidden (the catalog never shows them).
     const minorText = `${baseTitle} ${String(video.title || parsedMsg.title || "")} ${String(meta.title || "")}`;
     const hiddenReason = minorContentReason(minorText) || lockedMinorReason(minorText);
-    const record = hiddenReason ? { ...baseRecord, hidden: true, hidden_reason: hiddenReason } : baseRecord;
+    const flagged = autoTitled.has(i) ? { ...baseRecord, titleAuto: true } : baseRecord;
+    const record = hiddenReason ? { ...flagged, hidden: true, hidden_reason: hiddenReason } : flagged;
     const fileName = video.file || "videos.json";
     const list = byFile.get(fileName) || [];
     list.push({ video, title, record });
