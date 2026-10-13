@@ -96,7 +96,7 @@ function redirectTo(path: string): Response {
 
 async function fallbackOg(_requestUrl: string, id?: string): Promise<Response> {
   if (id) return redirectTo(`/thumb/${encodeURIComponent(id)}.jpg`);
-  return redirectTo("/og-v2.jpg?v=13");
+  return redirectTo("/og-v2.jpg?v=14");
 }
 
 export const Route = createFileRoute("/api/og")({

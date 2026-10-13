@@ -234,6 +234,35 @@ async function brandEditRequest(request) {
   return new Request(request, { body: JSON.stringify({ ...body, title: branded }) });
 }
 
+/**
+ * /thumb/<id> placeholder (the route found no poster): a Videy video has its own frame as a static
+ * file (public/videy-thumbs/<id>.jpg, videy-thumbs workflow), so that is served instead; anything
+ * else gets the pixel-art penguin brand poster (/brand-poster-v2.jpg, same as the header logo and
+ * og image). Both come from the static assets binding, only on placeholder answers.
+ */
+async function realThumb(env, url, response) {
+  if (!response.headers.has("x-thumb-fallback") || !env?.ASSETS?.fetch) return response;
+  const id = decodeURIComponent(url.pathname.slice("/thumb/".length)).replace(/\.(jpe?g|webp|png)$/i, "");
+  const tries = /^[A-Za-z0-9]{4,40}$/.test(id)
+    ? [[`/videy-thumbs/${id}.jpg`, "public, max-age=2592000, stale-while-revalidate=604800", "videy"]]
+    : [];
+  tries.push(["/brand-poster-v2.jpg", "public, max-age=300", "brand"]);
+  for (const [path, cc, tag] of tries) {
+    try {
+      const res = await env.ASSETS.fetch(new Request(new URL(path, url.origin).toString()));
+      if (!res.ok || !/image\/jpe?g/i.test(res.headers.get("content-type") || "")) continue;
+      const headers = new Headers({ "content-type": "image/jpeg", "cache-control": cc, "x-thumb-src": tag });
+      const edge = response.headers.get("x-edge-cache");
+      if (edge) headers.set("x-edge-cache", edge);
+      if (tag === "brand") headers.set("x-thumb-fallback", "1");
+      return new Response(res.body, { status: 200, headers });
+    } catch {
+      /* next */
+    }
+  }
+  return response;
+}
+
 const PURGE_HOSTS = ["https://koleksidrpinguin.com", "https://www.koleksidrpinguin.com"];
 
 function purgeKeys(env, id, category) {
@@ -278,6 +307,15 @@ export default {
       const response = await nitroHandler.fetch(req, env, context);
       await purgeAfterEdit(request, response, env, context).catch(() => undefined);
       return response;
+    }
+    if (url.pathname.startsWith("/thumb/") && request.method === "GET") {
+      let res;
+      try {
+        res = await cachedFetch(request, env, context, url);
+      } catch {
+        res = await nitroHandler.fetch(request, env, context);
+      }
+      return realThumb(env, url, res).catch(() => res);
     }
     try {
       return await cachedFetch(request, env, context, url);

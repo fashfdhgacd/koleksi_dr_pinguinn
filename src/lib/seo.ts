@@ -9,7 +9,7 @@ export const OG_SITE_NAME = "Koleksi Dr. Pinguin Bokep";
 /** Suffix judul halaman: domain (keputusan pemilik), contoh "Judul | koleksidrpinguin.com". */
 export const TITLE_SUFFIX = "koleksidrpinguin.com";
 /** Kartu share: logo situs. Query v= bust cache Telegram/X. */
-export const DEFAULT_OG = `${SITE_ORIGIN}/og-v2.jpg?v=13`;
+export const DEFAULT_OG = `${SITE_ORIGIN}/og-v2.jpg?v=14`;
 /** Logo persegi (ikon pinguin pixel 512x512, dilayani middleware brand-icons). */
 export const SITE_LOGO = `${SITE_ORIGIN}/icon-512.png`;
 
