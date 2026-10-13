@@ -27,6 +27,11 @@
  *      version-free key so a deploy does not empty their cache. Without the binding the key has no
  *      version (old behaviour).
  *
+ * 3. Owner title/category edits (/api/owner-videy save, /api/owner-tools edit) purge the cached pages
+ *    that show that video in this data centre: /watch/<id>, /, /kategori/videy and the edited
+ *    category, on both hosts. A second purge ~29 s later catches a page another isolate rendered
+ *    before its 30 s owner-edit sync. Only owner POSTs are read for this; visitors pay nothing.
+ *
  * nitro is pinned to an exact version in package.json, so this internal path is stable; if a future
  * nitro moves it, `vite build` fails loudly instead of deploying something broken.
  */
@@ -194,6 +199,35 @@ async function cachedFetch(request, env, context, url) {
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
 }
 
+const PURGE_HOSTS = ["https://koleksidrpinguin.com", "https://www.koleksidrpinguin.com"];
+
+function purgeKeys(env, id, category) {
+  const paths = [`/watch/${id}`, "/", "/kategori/videy"];
+  if (category && /^[A-Za-z0-9_-]{1,60}$/.test(category)) paths.push(`/kategori/${category}`);
+  const keys = [];
+  for (const origin of PURGE_HOSTS) for (const p of paths) keys.push(cacheKey(new URL(p, origin), env));
+  return keys;
+}
+
+/** After a successful owner edit: drop the cached pages that show the edited video. */
+async function purgeAfterEdit(request, response, env, context) {
+  const cache = edgeCache();
+  if (!cache || !context?.waitUntil || response.status !== 200) return;
+  let data = null;
+  try {
+    data = await response.clone().json();
+  } catch {
+    return;
+  }
+  const id = typeof data?.id === "string" ? data.id : "";
+  if (!data?.ok || !/^[A-Za-z0-9_-]{3,64}$/.test(id) || (!data.title && !data.category)) return;
+  const keys = purgeKeys(env, id, typeof data.category === "string" ? data.category : "");
+  const run = () => Promise.all(keys.map((k) => cache.delete(k).catch(() => false)));
+  context.waitUntil(
+    run().then(() => new Promise((r) => setTimeout(r, 29_000))).then(run).catch(() => undefined),
+  );
+}
+
 export default {
   ...nitroHandler,
   async fetch(request, env, context) {
@@ -203,6 +237,11 @@ export default {
       url = new URL(request.url);
     } catch {
       return nitroHandler.fetch(request, env, context);
+    }
+    if (request.method === "POST" && (url.pathname === "/api/owner-videy" || url.pathname === "/api/owner-tools")) {
+      const response = await nitroHandler.fetch(request, env, context);
+      await purgeAfterEdit(request, response, env, context).catch(() => undefined);
+      return response;
     }
     try {
       return await cachedFetch(request, env, context, url);
