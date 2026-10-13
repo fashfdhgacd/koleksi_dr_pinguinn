@@ -119,6 +119,8 @@ function directive(cc, name) {
 function cachePolicy(response) {
   if (response.status !== 200) return null;
   if (response.headers.has("set-cookie")) return null;
+  // /thumb placeholder (no poster yet): kept only briefly, so a real image takes over soon.
+  if (response.headers.has("x-thumb-fallback")) return { fresh: 300, stale: 0 };
   const cc = response.headers.get("cache-control") || "";
   if (!/\bpublic\b/i.test(cc) || /\b(private|no-store|no-cache)\b/i.test(cc)) return null;
   const ttl = directive(cc, "s-maxage") ?? directive(cc, "max-age");
@@ -178,6 +180,9 @@ async function cachedFetch(request, env, context, url) {
   } catch {
     hit = null;
   }
+
+  // Placeholder stored with the old 1 h lifetime: ignore it and render again.
+  if (hit && hit.headers.has("x-thumb-fallback") && Number(hit.headers.get("x-edge-fresh") || 0) > 300) hit = null;
 
   if (hit) {
     const at = Number(hit.headers.get("x-edge-at") || 0);

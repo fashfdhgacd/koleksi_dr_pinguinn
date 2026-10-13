@@ -70,7 +70,7 @@ async function fallback(_request: Request): Promise<Response> {
       return new Response(bytes, {
         headers: {
           "content-type": "image/jpeg",
-          "cache-control": "public, max-age=3600",
+          "cache-control": "public, max-age=300",
           "x-thumb-fallback": "1",
         },
       });
@@ -79,6 +79,27 @@ async function fallback(_request: Request): Promise<Response> {
     /* fall through */
   }
   return new Response(null, { status: 404 });
+}
+
+/**
+ * Videy videos have no remote poster: their frame is a static file grabbed by the videy-thumbs
+ * workflow (public/videy-thumbs/<id>.jpg). /thumb/<id> (e.g. /pemilik "Upload terbaru") serves
+ * that file through the static assets binding instead of the brand placeholder.
+ */
+async function videyStatic(id: string, request: Request): Promise<Response | null> {
+  if (!/^[A-Za-z0-9]{4,40}$/.test(id)) return null;
+  try {
+    const mod = (await import("cloudflare:workers")) as { env?: { ASSETS?: { fetch: (r: Request | string) => Promise<Response> } } };
+    const assets = mod.env?.ASSETS;
+    if (!assets) return null;
+    const res = await assets.fetch(new Request(new URL(`/videy-thumbs/${id}.jpg`, request.url).toString()));
+    if (!res.ok) return null;
+    const buf = await res.arrayBuffer();
+    if (buf.byteLength < 800 || sniffType(buf) !== "image/jpeg") return null;
+    return imageResponse(buf, "image/jpeg");
+  } catch {
+    return null;
+  }
 }
 
 export const Route = createFileRoute("/thumb/$id")({
@@ -112,7 +133,16 @@ export const Route = createFileRoute("/thumb/$id")({
           }
 
           const source = sourceFor(id);
-          if (!source) return fallback(request);
+          if (!source) {
+            const vy = await videyStatic(id, request);
+            if (!vy) return fallback(request);
+            try {
+              await caches.default.put(request, vy.clone());
+            } catch {
+              /* cache optional */
+            }
+            return vy;
+          }
           const remote = await fetch(source, {
             headers: { "user-agent": "kdp-poster/1" },
             signal: AbortSignal.timeout(8000),
