@@ -20,10 +20,12 @@ export function feedUrl(path: string): string {
   return `${path}${path.includes("?") ? "&" : "?"}t=${t}`;
 }
 
+/**
+ * Live feeds re-read every CACHE_MS per isolate. Only public URLs belong here: this repo is private,
+ * so raw.githubusercontent.com answers 404 for its data/ files (they reach the site through the
+ * build instead), and each refresh wasted three subrequests on them.
+ */
 export const BOT_FEEDS = [
-  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/videos-latest.json",
-  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/latest-posters.json",
-  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguinn/main/data/putarin-latest.json",
   "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguin/main/data/putarin.json",
 ];
 

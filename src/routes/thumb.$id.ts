@@ -38,7 +38,8 @@ function imageResponse(body: BodyInit, type: string): Response {
   return new Response(body, {
     headers: {
       "content-type": type,
-      "cache-control": "public, max-age=86400",
+      // Saved in R2 once, never changes for an id: keep it for 30 days in browser and edge cache.
+      "cache-control": "public, max-age=2592000, stale-while-revalidate=604800",
     },
   });
 }
