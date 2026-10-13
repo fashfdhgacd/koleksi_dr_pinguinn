@@ -3,6 +3,7 @@
 import type { OwnerStats, DayRow } from "@/components/owner-dashboard-shared";
 import { OwnerOverview } from "@/components/owner-overview";
 import { OwnerTools } from "@/components/owner-tools";
+import { OwnerVideyUntitled } from "@/components/owner-videy-untitled";
 
 /** /pemilik top: stats, chart, uploads, search, categories, player health, top videos, then Tambah video + Ambil link. */
 export function OwnerAuthedTop(props: {
@@ -30,6 +31,7 @@ export function OwnerAuthedTop(props: {
         vsUniq={vsUniq}
         vsViews={vsViews}
       />
+      <OwnerVideyUntitled secret={secret} />
       <OwnerTools secret={secret} />
     </>
   );
