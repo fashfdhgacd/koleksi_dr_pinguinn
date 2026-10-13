@@ -284,7 +284,9 @@ function PlainCategoryPage({ slug }: { slug: string }) {
       <section>
         <div className="mb-4">
           <h1 className="text-xl font-semibold text-zinc-100">{categorySeo(cat.slug).h1}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{categorySeo(cat.slug).intro}</p>
+          {categorySeo(cat.slug).intro ? (
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{categorySeo(cat.slug).intro}</p>
+          ) : null}
           {typeof feed.total === "number" ? (
             <p className="mt-1 text-sm text-zinc-500">{feed.total.toLocaleString("id-ID")} video</p>
           ) : null}

@@ -37,7 +37,8 @@ const COPY: Record<string, { h1: string; intro: string }> = {
   "crot-dalam": { h1: "Bokep Crot Dalam Indo Terbaru", intro: "Kumpulan video crot dalam (creampie) Indonesia dan Asia yang diperbarui berkala. Tonton langsung di HP maupun desktop. Khusus pengunjung 18 tahun ke atas." },
   hamil: { h1: "Bokep Hamil Indo Terbaru", intro: "Koleksi video bumil dan istri hamil Indonesia pilihan. Daftar diperbarui rutin dan bisa diputar langsung tanpa aplikasi tambahan. Khusus pengunjung 18 tahun ke atas." },
   ojol: { h1: "Bokep Ojol Indo Terbaru", intro: "Kumpulan video ojol Indonesia yang paling banyak dicari, dari prank sampai order fiktif. Tonton langsung secara streaming di HP. Khusus pengunjung 18 tahun ke atas." },
-  videy: { h1: "drpinguin videy Terbaru", intro: "Kumpulan video drpinguin videy pilihan, diputar langsung di player koleksidrpinguin.com. Khusus pengunjung 18 tahun ke atas." },
+  // No visible intro on this page (owner's choice); the meta description is built below.
+  videy: { h1: "drpinguin videy", intro: "" },
   lainnya: { h1: "Bokep Indo Lainnya", intro: "Kumpulan video dewasa lain yang belum masuk kategori utama, diperbarui berkala. Tonton langsung secara streaming tanpa unduh. Khusus pengunjung 18 tahun ke atas." },
 };
 
@@ -47,7 +48,9 @@ export function categorySeo(slug: string): CategorySeo {
   const c = COPY[slug] || { h1: `Bokep ${label} Terbaru`, intro: `Koleksi video ${label} pilihan yang diperbarui berkala. Tonton langsung di HP maupun desktop. Khusus pengunjung 18 tahun ke atas.` };
   const title = `${c.h1} ${YEAR} | ${TITLE_SUFFIX}`;
   let description = c.intro.replace(/\s*Khusus pengunjung 18 tahun ke atas\.$/, "");
-  description = `${c.h1} ${YEAR} di ${BRAND}. ${description}`;
+  description = description
+    ? `${c.h1} ${YEAR} di ${BRAND}. ${description}`
+    : `Video ${c.h1} di ${BRAND}, diputar langsung di HP maupun desktop.`;
   if (description.length > 160) description = `${description.slice(0, 157).replace(/\s+\S*$/, "")}…`;
   return { title, h1: c.h1, description, intro: c.intro };
 }
