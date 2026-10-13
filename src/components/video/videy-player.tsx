@@ -124,7 +124,9 @@ async function loadAd(signal: AbortSignal): Promise<Ad | null> {
   const tracking: Record<string, string[]> = {};
   const clickTracking: string[] = [];
   for (let depth = 0; depth <= MAX_WRAPPERS; depth++) {
-    const res = await fetch(url, { signal, credentials: "include" });
+    // Fresh answer for every video: a cache-buster on the first (our) request and no HTTP cache.
+    const reqUrl = depth === 0 ? `${url}${url.includes("?") ? "&" : "?"}cb=${Date.now()}${Math.floor(Math.random() * 1e6)}` : url;
+    const res = await fetch(reqUrl, { signal, credentials: "include", cache: "no-store" });
     if (!res.ok) return null;
     const doc = new DOMParser().parseFromString(await res.text(), "text/xml");
     const ad = doc.getElementsByTagName("Ad")[0];
@@ -200,11 +202,22 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
 
   // New video (SPA navigation): back to the poster.
   // The VAST request starts on mount, so the tap does not wait for the whole wrapper chain.
+  // A new Videy id (also client-side navigation, e.g. Tonton juga) resets everything: the old
+  // video or ad is stopped and unloaded, and a new VAST request is made for this video.
   useEffect(() => {
     adRef.current = null;
     firedRef.current = new Set();
     logged.current = new Set();
     setPhase("idle");
+    setMuted(false);
+    const v = videoRef.current;
+    if (v) {
+      v.pause();
+      v.removeAttribute("src");
+      v.controls = false;
+      v.muted = false;
+      v.load();
+    }
     adReq.current = fetchAd();
   }, [item.id]);
 
