@@ -144,7 +144,7 @@ const viewsMemo = new Map<string, { at: number; views: LikeMap }>();
 const viewsInflight = new Map<string, Promise<LikeMap>>();
 
 /** Our own visitor pageviews per id for the last 7/30 days (D1 aggregate via KV cache). Never throws. */
-async function siteViews(period: "week" | "month"): Promise<LikeMap> {
+async function siteViews(period: "week" | "month" | "all"): Promise<LikeMap> {
   const now = Date.now();
   const memo = viewsMemo.get(period);
   if (memo && now - memo.at < MEMO_MS) return memo.views;
@@ -162,7 +162,7 @@ async function siteViews(period: "week" | "month"): Promise<LikeMap> {
       viewsMemo.set(period, { at: now, views: cached.views || {} });
       return cached.views || {};
     }
-    const fresh = await readD1Views(period === "week" ? 7 : 30);
+    const fresh = await readD1Views(period === "week" ? 7 : period === "month" ? 30 : 90);
     if (fresh) await kvPut(VIEWS_KV + period, JSON.stringify({ at: now, views: fresh }), 6 * 3600);
     const views = fresh || cached?.views || {};
     viewsMemo.set(period, { at: now, views });
@@ -172,6 +172,23 @@ async function siteViews(period: "week" | "month"): Promise<LikeMap> {
   });
   viewsInflight.set(period, p);
   return p;
+}
+
+/**
+ * Videy cards have no source view count: fill `views` with our own /watch/<id> pageviews (D1 keeps
+ * 90 days, so "all" = everything recorded). Same KV/isolate cache as the ranking tabs (one D1
+ * aggregate per hour at most). Other sources keep their source counts untouched.
+ */
+export async function withVideyViews<T extends { id: string; creator?: string | null; views?: number | null }>(
+  cards: T[],
+): Promise<T[]> {
+  if (!import.meta.env.SSR || !cards.some((c) => c?.creator === "Videy")) return cards;
+  const views = await siteViews("all").catch(() => ({}) as LikeMap);
+  return cards.map((c) =>
+    c?.creator === "Videy" && !(typeof c.views === "number" && c.views > 0) && views[c.id]
+      ? { ...c, views: views[c.id] }
+      : c,
+  );
 }
 
 type Ranked = { item: RawItem; score: number };

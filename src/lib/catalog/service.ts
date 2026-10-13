@@ -9,7 +9,7 @@ import {
   listSearch,
 } from "./local";
 import { fetchCatalog } from "./client";
-import { listRanking } from "./ranking-list";
+import { listRanking, withVideyViews } from "./ranking-list";
 import { parseRankingKey } from "./rankings";
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./types";
 import type { CatalogError, CatalogResponse, CatalogType, VideoCard } from "./types";
@@ -101,7 +101,7 @@ export async function queryCatalog(query: CatalogQuery, signal?: AbortSignal): P
         return { ok: true, type, categories: await listListedCategories() };
       case "latest": {
         const data = await listLatest(page, limit, signal);
-        return { ok: true, type, ...data };
+        return { ok: true, type, ...data, items: await withVideyViews(data.items) };
       }
       case "featured": {
         const data = await listFeaturedWithArt(page, limit ?? 1, signal);
@@ -118,23 +118,23 @@ export async function queryCatalog(query: CatalogQuery, signal?: AbortSignal): P
             return fetchCatalog({ type: "category", category: slug, page: page ?? 1, limit: limit ?? DEFAULT_PAGE_SIZE }, signal);
           }
           const data = await listRanking(rank.def.kind, rank.period.period, page ?? 1, limit ?? DEFAULT_PAGE_SIZE);
-          return { ok: true, type, ...data };
+          return { ok: true, type, ...data, items: await withVideyViews(data.items) };
         }
         if (!findCategory(slug)) return { ok: false, error: "Kategori tidak dikenal.", code: "bad_request" };
         const data = await listCategory(slug, page, limit, signal);
-        return { ok: true, type, ...data };
+        return { ok: true, type, ...data, items: await withVideyViews(data.items) };
       }
       case "search": {
         const q = (query.q || "").trim();
         if (!q) return { ok: false, error: "Kata kunci wajib diisi.", code: "bad_request" };
         const data = await listSearch(q, page, limit, signal);
-        return { ok: true, type, ...data };
+        return { ok: true, type, ...data, items: await withVideyViews(data.items) };
       }
       case "related": {
         const id = (query.id || "").trim();
         if (!id) return { ok: false, error: "ID wajib diisi.", code: "bad_request" };
         const data = await listRelated(id, limit ?? 12, signal);
-        return { ok: true, type, ...data };
+        return { ok: true, type, ...data, items: await withVideyViews(data.items) };
       }
       case "detail": {
         const id = (query.id || "").trim();
@@ -143,7 +143,8 @@ export async function queryCatalog(query: CatalogQuery, signal?: AbortSignal): P
           getDetail(id, signal),
           listRelated(id, 12, signal).catch(() => ({ items: [] as VideoCard[] })),
         ]);
-        return { ok: true, type, item, related: related.items };
+        const [itemV] = await withVideyViews([item]);
+        return { ok: true, type, item: itemV, related: await withVideyViews(related.items) };
       }
       case "home": {
         const [featured, latest] = await Promise.all([
@@ -154,7 +155,7 @@ export async function queryCatalog(query: CatalogQuery, signal?: AbortSignal): P
           ok: true,
           type,
           featured: featured.items,
-          latest,
+          latest: { ...latest, items: await withVideyViews(latest.items) },
           categories: CATEGORY_LIST,
         };
       }
