@@ -179,10 +179,12 @@ export function parseVideoLink(url) {
   }
 
   if (VIDEY_HOST.test(host)) {
+    // videy.co/v/?id=X or a direct file link cdn.videy.co/X.mp4 (cdn2, cdn3, ... too).
     const mm = parsed.search.match(/[?&]id=([A-Za-z0-9]+)/i);
-    const id = (mm && mm[1]) || "";
+    const fm = /^cdn\d*\./i.test(host) ? path.match(/^\/([A-Za-z0-9]+)\.(mp4|mov)$/i) : null;
+    const id = (mm && mm[1]) || (fm && fm[1]) || "";
     if (!id) return null;
-    const ext = id.length === 9 && id.endsWith("2") ? ".mov" : ".mp4";
+    const ext = fm ? `.${fm[2].toLowerCase()}` : id.length === 9 && id.endsWith("2") ? ".mov" : ".mp4";
     return {
       id,
       host: "videy",
@@ -233,10 +235,17 @@ export function parseMessage(text = "") {
     if (/^(?:title|judul|category|kategori|cat)\s*[:\-]/i.test(line)) continue;
     const lineUrls = extractUrls(line);
     if (lineUrls.length) {
+      // Videy: "link judul" on one line; the text after the link is that video's title.
+      let sameLine = "";
+      if (lineUrls.length === 1) {
+        const rest = line.split(lineUrls[0]).join(" ").replace(/\s+/g, " ").trim();
+        const p0 = parseVideoLink(lineUrls[0]);
+        if (rest && p0 && p0.host === "videy") sameLine = rest;
+      }
       for (const url of lineUrls) {
         const parsed = parseVideoLink(url);
         if (!parsed) continue;
-        const own = cleanTitle(pendingTitle || title || parsed.title || "");
+        const own = cleanTitle(sameLine || pendingTitle || title || parsed.title || "");
         videos.push(own && own !== "Video" ? { ...parsed, title: own } : parsed);
       }
       pendingTitle = "";

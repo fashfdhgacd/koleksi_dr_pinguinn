@@ -43,6 +43,23 @@ async function resolveMetaFast(video, givenTitle, env) {
   return { title, thumb };
 }
 
+/** Videy videos already in the catalog, for the next "Video Viral N" number. */
+async function videyCount() {
+  try {
+    const [{ loadItems }, { isVidey }] = await Promise.all([
+      import("@/lib/catalog/local-cache"),
+      import("@/lib/catalog/local-shared"),
+    ]);
+    const bag = await loadItems();
+    const list = bag.raw || bag.items || [];
+    let n = 0;
+    for (const it of list) if (isVidey(it)) n++;
+    return n;
+  } catch {
+    return 0;
+  }
+}
+
 async function mapPool(items, limit, fn) {
   const out = new Array(items.length);
   let next = 0;
@@ -120,6 +137,17 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     return resolveMetaFast(video, given, env);
   });
 
+  // Videy without a typed title: "Video Viral N" (N counts on from the Videy videos already listed).
+  if (queue.some((v, i) => v.host === "videy" && !hasUserTitle(v.title || parsedMsg.title))) {
+    let n = await videyCount();
+    for (let i = 0; i < queue.length; i++) {
+      const v = queue[i];
+      if (v.host !== "videy" || hasUserTitle(v.title || parsedMsg.title)) continue;
+      n += 1;
+      metas[i] = { ...(metas[i] || {}), title: `Video Viral ${n}`, thumb: "" };
+    }
+  }
+
   const byFile = new Map();
   for (let i = 0; i < queue.length; i++) {
     const video = queue[i];
@@ -134,7 +162,9 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const generic = !given || ["amatir", "umum", "lainnya", "bokep"].includes(given);
     const detected = detectCategory(baseTitle);
     const category =
-      video.host === "putarin" || video.host === "putarin-folder"
+      video.host === "videy"
+        ? "videy"
+        : video.host === "putarin" || video.host === "putarin-folder"
         ? parsedMsg.category || "jav"
         : video.host === "streamtape"
           ? parsedMsg.category || "ai-plus"
