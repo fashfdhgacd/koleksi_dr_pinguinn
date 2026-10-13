@@ -165,16 +165,23 @@ function timeWib(ms: number): string {
   }
 }
 
-async function ownerPost<T>(secret: string, body: Record<string, unknown>): Promise<T | null> {
+/** Owner API call. Never returns null: failures come back as { ok: false, error } so the UI can show them. */
+async function ownerPost<T extends { ok?: boolean; error?: string }>(
+  secret: string,
+  body: Record<string, unknown>,
+): Promise<T> {
   try {
     const res = await fetch("/api/owner-tools", {
       method: "POST",
       headers: { "content-type": "application/json", "x-online-key": secret },
       body: JSON.stringify(body),
+      cache: "no-store",
     });
-    return ((await res.json().catch(() => null)) as T | null) ?? null;
+    const data = (await res.json().catch(() => null)) as T | null;
+    if (data) return data;
+    return { ok: false, error: `HTTP ${res.status}` } as T;
   } catch {
-    return null;
+    return { ok: false, error: "Jaringan error." } as T;
   }
 }
 
@@ -412,15 +419,21 @@ function SearchBox({ secret }: { secret: string }) {
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<CatalogRow[]>([]);
   const [tick, setTick] = useState(0);
+  const [searchNote, setSearchNote] = useState("");
   useEffect(() => {
     const term = q.trim();
     if (term.length < 2) {
       setRows([]);
+      setSearchNote("");
       return;
     }
     const t = window.setTimeout(async () => {
-      const d = await ownerPost<{ ok?: boolean; items?: CatalogRow[] }>(secret, { action: "catalog-search", q: term });
-      setRows(d?.items || []);
+      const d = await ownerPost<{ ok?: boolean; error?: string; items?: CatalogRow[] }>(secret, {
+        action: "catalog-search",
+        q: term,
+      });
+      setRows(d.items || []);
+      setSearchNote(d.ok ? (d.items?.length ? "" : "Tidak ditemukan.") : `Gagal: ${d.error || "jaringan"}`);
     }, 300);
     return () => window.clearTimeout(t);
   }, [q, secret, tick]);
@@ -434,6 +447,7 @@ function SearchBox({ secret }: { secret: string }) {
         placeholder="judul / id / kode JAV"
         aria-label="Cari video"
       />
+      {searchNote ? <p className="mt-2 text-xs text-zinc-500">{searchNote}</p> : null}
       {rows.length ? <VideoRows rows={rows} secret={secret} onChanged={() => setTick((n) => n + 1)} /> : null}
     </>
   );
@@ -512,10 +526,16 @@ export function OwnerOverview(props: {
   const [ov, setOv] = useState<Overview | null>(null);
   const [hosts, setHosts] = useState<HostRow[] | null>(null);
 
+  const [ovBusy, setOvBusy] = useState(false);
   const loadOverview = useCallback(async () => {
     if (!secret) return;
-    const d = await ownerPost<Overview>(secret, { action: "catalog-overview" });
-    if (d) setOv(d);
+    setOvBusy(true);
+    try {
+      const d = await ownerPost<Overview>(secret, { action: "catalog-overview" });
+      setOv((prev) => (d.ok ? d : { ...(prev || {}), ok: false, error: d.error || "Gagal memuat." }));
+    } finally {
+      setOvBusy(false);
+    }
   }, [secret]);
 
   useEffect(() => {
@@ -640,16 +660,18 @@ export function OwnerOverview(props: {
         <section className={`${card} lg:col-span-2`}>
           <div className={h2}>
             <span>Upload terbaru</span>
-            <button type="button" className={btn} onClick={() => void loadOverview()}>
-              Muat ulang
+            <button type="button" className={btn} disabled={ovBusy} onClick={() => void loadOverview()}>
+              {ovBusy ? "Memuat…" : "Muat ulang"}
             </button>
           </div>
           {ov?.error ? <p className="mt-2 text-xs text-red-400">{ov.error}</p> : null}
-          {ov?.recent ? (
+          {ov?.recent?.length ? (
             <VideoRows rows={ov.recent} secret={secret} showTime onChanged={() => void loadOverview()} />
-          ) : (
+          ) : ov?.recent ? (
+            <p className="mt-3 text-xs text-zinc-600">Belum ada upload.</p>
+          ) : !ov?.error ? (
             <p className="mt-3 text-xs text-zinc-600">Memuat…</p>
-          )}
+          ) : null}
         </section>
         <div className="flex min-w-0 flex-col gap-4">
           <section className={card}>

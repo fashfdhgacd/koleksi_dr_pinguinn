@@ -15,7 +15,6 @@ import {
   applyUnhidden,
   hiddenReasonRaw,
   loadItemsRaw,
-  sortByNewest,
   type HiddenCandidate,
 } from "@/lib/catalog/local-cache";
 import { slugOf, sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
@@ -371,9 +370,13 @@ async function handleCatalogOverview() {
     if (t >= dayStart) today++;
     if (t >= weekStart) week++;
   }
-  const recent = sortByNewest(uniq)
+  // Strictly by upload time (sortByNewest ranks by source first, which is right for the catalog
+  // pages but not for "Upload terbaru"). Items without a usable date go last.
+  const recent = uniq
+    .map((it) => ({ it, t: createdMs(it) }))
+    .sort((a, b) => b.t - a.t)
     .slice(0, 10)
-    .map((it) => toCatalogRow(it, cache.byId.get(it.id), hidden.has(it.id)));
+    .map(({ it }) => toCatalogRow(it, cache.byId?.get(it.id), hidden.has(it.id)));
   return json({
     ok: true,
     total: cache.items.length,
@@ -393,7 +396,7 @@ async function handleCatalogSearch(body: { q?: unknown }) {
   for (const it of raw) {
     if (!it?.id || seen.has(it.id)) continue;
     seen.add(it.id);
-    const shown = cache.byId.get(it.id);
+    const shown = cache.byId?.get(it.id);
     const hay = `${String(shown?.title || it.title || "").toLowerCase()} ${it.id.toLowerCase()}`;
     if (!hay.includes(q)) continue;
     out.push(toCatalogRow(it, shown, hidden.has(it.id)));
@@ -553,8 +556,15 @@ export const Route = createFileRoute("/api/owner-tools")({
           const r = await setReviewMark(body as never);
           return json(r, r.status || 200);
         }
-        if (body.action === "catalog-overview") return handleCatalogOverview();
-        if (body.action === "catalog-search") return handleCatalogSearch(body);
+        if (body.action === "catalog-overview" || body.action === "catalog-search") {
+          // Always answer JSON, so the panel can show what went wrong instead of staying empty.
+          try {
+            return body.action === "catalog-overview" ? await handleCatalogOverview() : await handleCatalogSearch(body);
+          } catch (err) {
+            console.error("[owner-tools] catalog", err);
+            return json({ ok: false, error: `catalog_failed: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
+          }
+        }
         if (body.action === "edit-video") return handleEditVideo(body);
         if (body.action === "share") return handleShare(body);
         if (body.action === "upload") return handleUpload(body);
