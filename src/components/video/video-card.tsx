@@ -23,7 +23,8 @@ export function VideoCard({
   eager?: boolean;
   preload?: VideoCardPreload;
 }) {
-  const views = typeof video.views === "number" && video.views > 0 ? video.views : null;
+  // 0 is shown too (own-pageview sources start at 0); null = no count known.
+  const views = typeof video.views === "number" && video.views >= 0 ? video.views : null;
   // Likes = source likes (folder stats) + our own D1 likes, 0 when none. Our likes start from the
   // 12-hour snapshot and switch to the live count (/api/likes-live, ~60 s) once the page has loaded.
   // Always shown, so every card has the same plain stats row (never a bare category label).

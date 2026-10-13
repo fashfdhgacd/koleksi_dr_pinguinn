@@ -8,6 +8,8 @@ permissions:
   contents: write
 jobs:
   patch:
+    # Disabled 2026-10-14: one-shot patch already applied (ea86d61).
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

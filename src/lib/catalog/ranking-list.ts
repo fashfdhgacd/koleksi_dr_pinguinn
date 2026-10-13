@@ -175,19 +175,20 @@ async function siteViews(period: "week" | "month" | "all"): Promise<LikeMap> {
 }
 
 /**
- * Videy cards have no source view count: fill `views` with our own /watch/<id> pageviews (D1 keeps
- * 90 days, so "all" = everything recorded). Same KV/isolate cache as the ranking tabs (one D1
- * aggregate per hour at most). Other sources keep their source counts untouched.
+ * View counts on cards: IndoAV and UserBokep keep their source counts; every other source (Videy,
+ * Puterin/Jav, Streamtape, FC2, ...) shows our own /watch/<id> pageviews (D1 keeps 90 days, so "all"
+ * = everything recorded), 0 when none. Same KV/isolate cache as the ranking tabs (one D1 aggregate
+ * per hour at most).
  */
+const SOURCE_COUNT_CREATORS = new Set(["IndoAV", "UserBokep"]);
 export async function withVideyViews<T extends { id: string; creator?: string | null; views?: number | null }>(
   cards: T[],
 ): Promise<T[]> {
-  if (!import.meta.env.SSR || !cards.some((c) => c?.creator === "Videy")) return cards;
+  if (!import.meta.env.SSR || !cards.some((c) => c && !SOURCE_COUNT_CREATORS.has(String(c.creator || ""))))
+    return cards;
   const views = await siteViews("all").catch(() => ({}) as LikeMap);
   return cards.map((c) =>
-    c?.creator === "Videy" && !(typeof c.views === "number" && c.views > 0) && views[c.id]
-      ? { ...c, views: views[c.id] }
-      : c,
+    c && !SOURCE_COUNT_CREATORS.has(String(c.creator || "")) ? { ...c, views: views[c.id] || 0 } : c,
   );
 }
 
