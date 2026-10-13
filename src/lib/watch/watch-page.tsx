@@ -4,6 +4,7 @@ import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { VideoPlayer } from "@/components/video/player";
+import { VideyPlayer } from "@/components/video/videy-player";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
@@ -29,6 +30,13 @@ function shareUrl(id: string): string {
 function xIntentUrl(title: string, url: string): string {
   const text = `${title}\n\n${url}`;
   return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+}
+
+const VIDEY_LABEL = "drpinguin videy";
+
+/** Videy plays in VideyPlayer (own HTML5 player + pre-roll) and has no "Buka Sumber". */
+function isVideyItem(item: VideoDetail): boolean {
+  return item.creator === "Videy" || item.category === "videy";
 }
 
 function catalogPlayUrl(item: VideoDetail): string {
@@ -275,7 +283,11 @@ export function WatchPage() {
           {item ? (
             <>
           <div className="-mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0">
-            <VideoPlayer key={item.id} item={item} />
+            {isVideyItem(item) ? (
+              <VideyPlayer key={item.id} item={item} />
+            ) : (
+              <VideoPlayer key={item.id} item={item} />
+            )}
             {(() => {
               const src = catalogPlayUrl(item);
               if (!src || /\.(mp4|webm|mov)($|\?)/i.test(src)) return null;
@@ -294,7 +306,11 @@ export function WatchPage() {
           </div>
           <header className="max-w-3xl space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
-              {(() => {
+              {isVideyItem(item) ? (
+                <a href="/kategori/videy" className="hover:text-foreground hover:underline">
+                  {VIDEY_LABEL}
+                </a>
+              ) : (() => {
                 const slug = categorySlugFor(item.category);
                 return slug ? (
                   <a href={`/kategori/${slug}`} className="hover:text-foreground hover:underline">
@@ -305,7 +321,7 @@ export function WatchPage() {
                 );
               })()}
               {item.year ? ` \u00b7 ${item.year}` : ""}
-              {item.creator ? ` \u00b7 ${item.creator}` : ""}
+              {item.creator && !isVideyItem(item) ? ` \u00b7 ${item.creator}` : ""}
               <span className="ml-3 align-middle text-muted">
                 <WatchStats
                   id={item.id}
@@ -325,7 +341,7 @@ export function WatchPage() {
               >
                 Bagikan
               </button>
-              <button
+              {isVideyItem(item) ? null : <button
                 type="button"
                 className="h-12 min-w-[140px] rounded-xl bg-secondary px-5 text-base font-medium text-foreground active:scale-[0.98] disabled:opacity-50"
                 disabled={!catalogPlayUrl(item)}
@@ -335,7 +351,7 @@ export function WatchPage() {
                 }}
               >
                 Buka Sumber
-              </button>
+              </button>}
               <CatalogBackLink item={item} />
             </div>
           </header>
