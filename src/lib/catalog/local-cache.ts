@@ -316,9 +316,9 @@ export function terbaruOrder(sorted: RawItem[]): RawItem[] {
   while (u < ub.length) out.push(ub[u++]);
   while (i < indo.length) out.push(indo[i++]);
   out.push(...rest);
-  // Videy (newest first) mixed in from the 2nd card on: one in every 4 cards.
+  // Videy (newest first) mixed in from page 2 on (page 1 stays IndoAV only): one in every 4 cards.
   for (let k = 0; k < vy.length; k++) {
-    const at = 1 + k * 4;
+    const at = TERBARU_FIRST_PAGE + 1 + k * 4;
     if (at <= out.length) out.splice(at, 0, vy[k]);
     else out.push(vy[k]);
   }
