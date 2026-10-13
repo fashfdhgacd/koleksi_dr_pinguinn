@@ -125,7 +125,7 @@ async function siteLikesOnDay(day: string): Promise<LikeMap | null> {
   return out;
 }
 
-const VIEWS_KV = "rank:views:v1:";
+const VIEWS_KV = "rank:views:v2:";
 const VIEWS_FRESH_MS = 60 * 60_000;
 
 async function readD1Views(days: number): Promise<LikeMap | null> {
@@ -134,7 +134,7 @@ async function readD1Views(days: number): Promise<LikeMap | null> {
     const { readyD1, d1TopVideos } = await import("@/lib/analytics-d1");
     const db = await readyD1();
     if (!db) return null;
-    return await d1TopVideos(db, days);
+    return await d1TopVideos(db, days, 20000);
   } catch {
     return null;
   }
