@@ -6,7 +6,8 @@ import type { VideoDetail } from "@/lib/catalog/types";
  * nothing passes through our Worker), with one ExoClick VAST pre-roll before it.
  *
  * Pre-roll: the VAST tag (wrappers followed, max 4 levels) gives an mp4 creative that plays in
- * the same <video>. Skip shows after the ad's skipoffset (5 s when missing). No ad, a broken ad
+ * the same <video>. Skip shows after the ad's skipoffset (HH:MM:SS(.mmm) or a percent of the ad,
+ * 10 s when missing); skipping earlier is never allowed. No ad, a broken ad
  * or no answer within AD_TIMEOUT_MS: the video starts right away. The VAST request starts when the
  * player mounts, so the tap only waits for whatever is left of it. An ad the browser refuses to
  * play with sound plays muted with a sound button. Ad states are counted through /api/ad-log.
@@ -16,7 +17,7 @@ import type { VideoDetail } from "@/lib/catalog/types";
  */
 const VAST_TAG = "https://s.magsrv.com/v1/vast.php?idz=6054340";
 const AD_TIMEOUT_MS = 7000;
-const SKIP_DEFAULT_S = 5;
+const SKIP_DEFAULT_S = 10;
 const MAX_WRAPPERS = 4;
 
 type Ad = {
@@ -25,7 +26,10 @@ type Ad = {
   clickTracking: string[];
   impressions: string[];
   tracking: Record<string, string[]>;
+  /** Seconds before skip is allowed. */
   skipAfter: number;
+  /** Set when skipoffset was a percent: recomputed from the real ad duration. */
+  skipPercent: number | null;
 };
 
 function videyFileOf(item: VideoDetail): string {
@@ -39,6 +43,14 @@ function texts(root: Element | Document, tag: string): string[] {
   return Array.from(root.getElementsByTagName(tag))
     .map((n) => (n.textContent || "").trim())
     .filter(Boolean);
+}
+
+/** VAST skipoffset: "HH:MM:SS(.mmm)" or "NN%". */
+function skipOffset(v: string | null | undefined): { s: number | null; pct: number | null } {
+  const raw = String(v || "").trim();
+  const pct = raw.match(/^(\d+(?:\.\d+)?)%$/);
+  if (pct) return { s: null, pct: Math.min(100, Number(pct[1])) };
+  return { s: seconds(raw), pct: null };
 }
 
 function seconds(v: string | null | undefined): number | null {
@@ -97,6 +109,15 @@ function fullscreenEl(): Element | null {
   return d.fullscreenElement || d.webkitFullscreenElement || null;
 }
 
+function skipOf(linear: Element): { skipAfter: number; skipPercent: number | null } {
+  const off = skipOffset(linear.getAttribute("skipoffset"));
+  if (off.pct != null) {
+    const dur = seconds(texts(linear, "Duration")[0]);
+    return { skipAfter: dur != null ? (dur * off.pct) / 100 : SKIP_DEFAULT_S, skipPercent: off.pct };
+  }
+  return { skipAfter: off.s ?? SKIP_DEFAULT_S, skipPercent: null };
+}
+
 async function loadAd(signal: AbortSignal): Promise<Ad | null> {
   let url = VAST_TAG;
   const impressions: string[] = [];
@@ -137,7 +158,7 @@ async function loadAd(signal: AbortSignal): Promise<Ad | null> {
       clickTracking,
       impressions,
       tracking,
-      skipAfter: seconds(linear.getAttribute("skipoffset")) ?? SKIP_DEFAULT_S,
+      ...skipOf(linear),
     };
   }
   return null;
@@ -315,6 +336,7 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
       if (!firedRef.current.has("impression")) onPlaying();
       const d = v.duration || 0;
       const t = v.currentTime || 0;
+      if (ad.skipPercent != null && d > 0 && Number.isFinite(d)) ad.skipAfter = (d * ad.skipPercent) / 100;
       setLeft(Math.max(0, Math.ceil(ad.skipAfter - t)));
       if (d > 0) {
         if (t >= d * 0.25) fire("firstQuartile");
@@ -353,6 +375,10 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
   }, [phase, fire, playMain, item.id]);
 
   const skip = () => {
+    const ad = adRef.current;
+    const v = videoRef.current;
+    // Never before the VAST skipoffset.
+    if (ad && v && (v.currentTime || 0) < ad.skipAfter) return;
     fire("skip");
     adLog(item.id, "ad_skip", logged.current);
     playMain();
