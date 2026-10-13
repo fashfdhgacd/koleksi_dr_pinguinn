@@ -133,9 +133,8 @@ export async function listCategory(
     const hit = bySlug.get("ai-plus");
     pool = hit && hit.length ? hit : items.filter(isStreamtape);
   } else if (s === "videy") {
-    return pageOf([], page, limit, posters, videyNo);
+    pool = bySlug.get("videy") || items.filter(isVidey);
   } else pool = bySlug.get(s) || mainSorted.filter((x) => slugOf(x) === s);
-  pool = pool.filter((x) => !isVidey(x));
   return pageOf(pool, page, limit, posters, videyNo);
 }
 
@@ -150,7 +149,6 @@ export async function listSearch(
   const { haystack, posters, videyNo } = await loadItems();
   const scored: { item: RawItem; score: number }[] = [];
   for (const item of sortByNewest(haystack.map((r) => r.item))) {
-    if (isVidey(item)) continue;
     const hay = normalizeSearchText(`${item.title || ""} ${item.id || ""}`);
     const score = scoreSearch(hay, sq);
     if (score > 0) scored.push({ item, score });
@@ -170,11 +168,12 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
     item = bag.byId.get(id);
   }
   if (item && (await isPublicHidden(id))) item = undefined;
-  if (!item || isVidey(item)) {
+  if (!item) {
     throw Object.assign(new Error("Video tidak ditemukan"), { code: "not_found" as const });
   }
   const card = toCard(item, bag.posters, bag.videyNo);
-  const embed = String(item.embed || item.direct || "");
+  // Videy plays the cdn mp4 in our own player (VideyPlayer); others keep their embed.
+  const embed = isVidey(item) ? String(item.direct || item.embed || "") : String(item.embed || item.direct || "");
   return {
     ...card,
     video_url: embed || null,
@@ -187,7 +186,7 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
 export async function listRelated(id: string, limit = 12, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters, videyNo } = await loadItems();
   const seed = slotIndex(hashId(id) % 997);
-  const pool = mixIndoHeavy(items, id, limit, seed).filter((x) => !isVidey(x));
+  const pool = mixIndoHeavy(items, id, limit, seed);
   return {
     page: 1,
     limit,
@@ -201,11 +200,9 @@ export async function listCategories(): Promise<{ slug: string; label: string; c
   const { bySlug } = await loadItems();
   const out: { slug: string; label: string; count: number }[] = [];
   for (const [slug, list] of bySlug) {
-    if (slug === "videy") continue;
-    const nonVidey = list.filter((x) => !isVidey(x));
-    if (!nonVidey.length) continue;
+    if (!list.length) continue;
     const cat = findCategory(slug);
-    out.push({ slug, label: cat?.label || slug, count: nonVidey.length });
+    out.push({ slug, label: cat?.label || slug, count: list.length });
   }
   return out.sort((a, b) => b.count - a.count);
 }
@@ -219,9 +216,11 @@ export async function listListedCategories(): Promise<CategoryInfo[]> {
   const out: CategoryInfo[] = [];
   for (const c of CATEGORY_LIST) {
     const pool = bySlug.get(c.slug) || [];
-    let count = 0;
-    for (const it of pool) if (!isVidey(it)) count++;
-    if (count >= MIN_LISTED_CATEGORY_COUNT) out.push({ slug: c.slug, label: c.label, count });
+    const count = pool.length;
+    // Videy is listed from its first video; other categories need MIN_LISTED_CATEGORY_COUNT.
+    if (count >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && count > 0)) {
+      out.push({ slug: c.slug, label: c.label, count });
+    }
   }
   return out;
 }

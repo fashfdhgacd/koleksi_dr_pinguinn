@@ -36,6 +36,7 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "hamil", label: "Hamil", query: "hamil" },
   { slug: "ojol", label: "Ojol", query: "ojol" },
   { slug: "lainnya", label: "Lainnya", query: "lainnya" },
+  { slug: "videy", label: "drpinguin videy", query: "videy" },
 ];
 
 /** Kategori yang tidak dipromosikan publik (slug ber-istilah minor): keluar dari menu/sitemap, noindex. */

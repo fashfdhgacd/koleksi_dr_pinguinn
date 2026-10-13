@@ -189,7 +189,8 @@ export function isSideSilo(item: RawItem): boolean {
  * Filter source dihapus supaya homepage menampilkan isi JSON penuh (~7000+).
  */
 export function mainCatalog(items: RawItem[]): RawItem[] {
-  return items.filter((x) => !isVidey(x));
+  // Videy is back (2026-10-13): only items with a playable cdn mp4 reach here (isUsable).
+  return items;
 }
 export function cleanTitle(t: string): string {
   return t.replace(/\s+/g, " ").trim() || "Video";
@@ -275,9 +276,15 @@ export function javCoverFromTitle(title = ""): string {
   return `https://pics.dmm.co.jp/digital/video/${code}/${code}pl.jpg`;
 }
 
+/** Videy frame grabbed once by .github/workflows/videy-thumbs.yml, served as a static asset. */
+export function videyThumb(item: RawItem): string {
+  const id = String(item.id || "").replace(/[^A-Za-z0-9_-]/g, "");
+  return id ? `/videy-thumbs/${id}.jpg` : "";
+}
+
 export function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const id = item.id;
-  if (isVidey(item)) return "";
+  if (isVidey(item)) return videyThumb(item);
   return (
     directPoster(posters[id]) ||
     directPoster(posters[embedKey(item.embed || "")]) ||
@@ -293,7 +300,8 @@ export function videyDisplayTitle(_item: RawItem, index: number): string {
 }
 
 export function isUsable(item: RawItem): boolean {
-  if (isVidey(item)) return false;
+  // Videy plays in our own player from the cdn mp4, so a Videy item needs that file URL.
+  if (isVidey(item)) return Boolean(item?.id && typeof item.id === "string" && videyFile(item));
   if (!item?.id || typeof item.id !== "string") return false;
   if (item.id.length < 3) return false;
   const play = String(item.embed || item.direct || "").trim();
@@ -312,9 +320,10 @@ function fmtDuration(sec: number): string {
 
 export function toCard(item: RawItem, posters: Record<string, string>, videyNo?: Map<string, number>): VideoCard {
   const id = item.id;
-  const title = isVidey(item)
-    ? videyDisplayTitle(item, videyNo?.get(id) || 1)
-    : cleanTitle(item.title || "Video");
+  const title =
+    isVidey(item) && !String(item.title || "").trim()
+      ? videyDisplayTitle(item, videyNo?.get(id) || 1)
+      : cleanTitle(item.title || "Video");
   let quality = "HD";
   if (isStreamtape(item)) quality = "Streamtape";
   else if (isPutarin(item)) quality = "Puterin";

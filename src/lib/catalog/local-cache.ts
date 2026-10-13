@@ -297,9 +297,11 @@ export function terbaruOrder(sorted: RawItem[]): RawItem[] {
   const indo: RawItem[] = [];
   const ub: RawItem[] = [];
   const rest: RawItem[] = [];
+  const vy: RawItem[] = [];
   for (const it of sorted) {
     if (isIndoAv(it)) indo.push(it);
     else if (isUserBokep(it)) ub.push(it);
+    else if (isVidey(it)) vy.push(it);
     else rest.push(it);
   }
   const out: RawItem[] = indo.slice(0, TERBARU_FIRST_PAGE);
@@ -314,6 +316,12 @@ export function terbaruOrder(sorted: RawItem[]): RawItem[] {
   while (u < ub.length) out.push(ub[u++]);
   while (i < indo.length) out.push(indo[i++]);
   out.push(...rest);
+  // Videy (newest first) mixed in from the 2nd card on: one in every 4 cards.
+  for (let k = 0; k < vy.length; k++) {
+    const at = 1 + k * 4;
+    if (at <= out.length) out.splice(at, 0, vy[k]);
+    else out.push(vy[k]);
+  }
   return out;
 }
 
