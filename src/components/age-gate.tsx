@@ -64,7 +64,7 @@ export function AgeGate({ children }: { children: ReactNode }) {
         </p>
       </noscript>
       {blocked ? (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-background px-6">
+        <div data-kdp-noad="" className="fixed inset-0 z-[80] flex items-center justify-center bg-background px-6">
           <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-center shadow-2xl">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">DR. PINGUIN</p>
             <h1 className="mt-3 font-display text-3xl text-foreground">Konten 18+</h1>

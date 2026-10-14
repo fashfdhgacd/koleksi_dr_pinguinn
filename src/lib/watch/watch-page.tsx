@@ -5,6 +5,7 @@ import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { VideoPlayer } from "@/components/video/player";
 import { VideyPlayer } from "@/components/video/videy-player";
+import { VideyPopunder } from "@/components/video/videy-popunder";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
@@ -284,7 +285,10 @@ export function WatchPage() {
             <>
           <div className="-mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0">
             {isVideyItem(item) ? (
-              <VideyPlayer key={item.id} item={item} />
+              <>
+                <VideyPlayer key={item.id} item={item} />
+                <VideyPopunder />
+              </>
             ) : (
               <VideoPlayer key={item.id} item={item} />
             )}
