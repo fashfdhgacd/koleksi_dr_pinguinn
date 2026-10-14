@@ -296,6 +296,8 @@ async function purgeAfterEdit(request, response, env, context) {
 /** Cron heartbeat (step 1 of the upload queue): only records the last run in KV. */
 const CRON_LAST_KEY = "cron:last";
 const FLUSH_LAST_KEY = "cron:flush:last";
+const FLUSH_REAL_KEY = "cron:flush:realAt";
+const FLUSH_EVERY_MS = 55 * 60_000;
 const QUEUE_FLAG_KEY = "bot:queue:on";
 const QUEUE_DEFAULT_MODE = "1"; // must match src/lib/bot/upload-handler.js
 
@@ -395,6 +397,17 @@ async function realFlush(env) {
   if (!kv?.list) return;
   const listed = await kv.list({ prefix: "bot:q:", limit: 500 });
   const keys = (listed?.keys || []).map((k) => k.name);
+  // At most one real flush (= one commit + one deploy) per ~hour, whatever the cron schedule is
+  // (a deploy may keep an older */10 trigger).
+  const lastReal = Number((await kv.get(FLUSH_REAL_KEY)) || 0);
+  if (keys.length && Date.now() - lastReal < FLUSH_EVERY_MS) {
+    await kv.put(
+      FLUSH_LAST_KEY,
+      JSON.stringify({ at: new Date().toISOString(), mode: "1", entries: keys.length, waiting: true, nextAfter: new Date(lastReal + FLUSH_EVERY_MS).toISOString() }),
+    );
+    return;
+  }
+  if (keys.length) await kv.put(FLUSH_REAL_KEY, String(Date.now()));
   if (!keys.length) {
     await kv.put(FLUSH_LAST_KEY, JSON.stringify({ at: new Date().toISOString(), mode: "1", entries: 0 }));
     return;
