@@ -1,29 +1,43 @@
 name: videy-thumbs
 # One frame per new Videy video, grabbed once with ffmpeg and saved as a static image
 # (public/videy-thumbs/<id>.jpg). Cards show that file; nothing is fetched per visit.
+# Batched: runs every 2 hours (and on demand) instead of once per bot upload commit, so bursts of
+# uploads cost one run per 2 hours, not one per upload (GitHub Actions minutes).
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "17 */2 * * *"
   push:
     branches: [main]
     paths:
-      - "data/videos-latest*.json"
-      - "data/videos.json"
-      - "src/lib/catalog/videos.json"
       - "scripts/videy_thumbs.py"
       - ".github/workflows/videy-thumbs.yml"
 permissions:
   contents: write
 concurrency:
   group: videy-thumbs
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   thumbs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Skip when no Videy thumb is missing
+        id: need
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import os, sys
+          sys.path.insert(0, "scripts")
+          import videy_thumbs as v
+          files = v.videy_files()
+          missing = [i for i in files if not os.path.exists(os.path.join(v.OUT, f"{i}.jpg"))]
+          print("missing=" + str(len(missing)))
+          PY
       - name: Install ffmpeg
+        if: steps.need.outputs.missing != '0'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - name: Grab missing Videy frames
+        if: steps.need.outputs.missing != '0'
         run: python3 scripts/videy_thumbs.py
       - name: Commit
         run: |
