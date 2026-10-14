@@ -458,17 +458,78 @@ async function realFlush(env) {
   }
 }
 
+/**
+ * Videy thumbnails without relying on GitHub's (unreliable) schedule:
+ *  - every ~2 h the cron dispatches videy-thumbs.yml (it skips ffmpeg when nothing is missing);
+ *  - commits made by that workflow (github-actions[bot]) do not trigger a Cloudflare deploy, so when
+ *    a new thumbs commit shows up, the cron writes a tiny stamp file with the bot token
+ *    (data/.thumbs-deploy.json), which does deploy. At most one such commit per new thumbs commit.
+ */
+const THUMBS_DISPATCH_KEY = "thumbs:dispatchAt";
+const THUMBS_SEEN_KEY = "thumbs:deployedSha";
+const THUMBS_STATUS_KEY = "thumbs:status";
+const THUMBS_EVERY_MS = 115 * 60_000;
+const REPO_API = "https://api.github.com/repos/fashfdhgacd/koleksi_dr_pinguinn";
+
+function ghHeaders(token) {
+  return {
+    Authorization: `Bearer ${token}`,
+    Accept: "application/vnd.github+json",
+    "User-Agent": "kdp-telegram-bot",
+    "Content-Type": "application/json",
+  };
+}
+
+async function thumbsTick(env) {
+  const kv = env?.ANALYTICS_KV;
+  const token = String(env?.GITHUB_TOKEN || env?.GH_TOKEN || "").trim();
+  if (!kv || !token) return;
+  const status = {};
+  const lastDispatch = Number((await kv.get(THUMBS_DISPATCH_KEY)) || 0);
+  if (Date.now() - lastDispatch > THUMBS_EVERY_MS) {
+    status.dispatch = await triggerThumbs(env);
+    await kv.put(THUMBS_DISPATCH_KEY, String(Date.now()));
+  }
+  // Latest commit touching public/videy-thumbs.
+  const r = await fetch(`${REPO_API}/commits?path=public/videy-thumbs&per_page=1&sha=main`, { headers: ghHeaders(token) });
+  if (r.ok) {
+    const [c] = await r.json();
+    const sha = String(c?.sha || "");
+    const seen = String((await kv.get(THUMBS_SEEN_KEY)) || "");
+    status.thumbsSha = sha.slice(0, 7);
+    if (sha && sha !== seen) {
+      const p = `${REPO_API}/contents/data/.thumbs-deploy.json`;
+      const cur = await fetch(`${p}?ref=main`, { headers: ghHeaders(token) });
+      const curSha = cur.ok ? (await cur.json())?.sha : undefined;
+      const body = {
+        message: "chore: deploy new Videy thumbnails",
+        content: btoa(JSON.stringify({ thumbsCommit: sha, at: new Date().toISOString() }) + "\n"),
+        branch: "main",
+        ...(curSha ? { sha: curSha } : {}),
+      };
+      const put = await fetch(p, { method: "PUT", headers: ghHeaders(token), body: JSON.stringify(body) });
+      status.stamp = String(put.status);
+      if (put.ok) await kv.put(THUMBS_SEEN_KEY, sha);
+    }
+  } else {
+    status.commits = String(r.status);
+  }
+  await kv.put(THUMBS_STATUS_KEY, JSON.stringify({ at: new Date().toISOString(), ...status }));
+}
+
 async function cronStatus(env) {
   let last = null;
   let flush = null;
+  let thumbs = null;
   try {
     last = (await env?.ANALYTICS_KV?.get(CRON_LAST_KEY)) || null;
     flush = (await env?.ANALYTICS_KV?.get(FLUSH_LAST_KEY)) || null;
+    thumbs = (await env?.ANALYTICS_KV?.get(THUMBS_STATUS_KEY)) || null;
   } catch {
     last = null;
   }
   const mode = await queueMode(env);
-  return new Response(JSON.stringify({ ok: true, last, mode, flush }), {
+  return new Response(JSON.stringify({ ok: true, last, mode, flush, thumbs }), {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
@@ -502,6 +563,15 @@ export default {
           FLUSH_LAST_KEY,
           JSON.stringify({ at: new Date().toISOString(), error: String(err?.message || err).slice(0, 200) }),
         );
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      await thumbsTick(env);
+    } catch (err) {
+      try {
+        await env?.ANALYTICS_KV?.put(THUMBS_STATUS_KEY, JSON.stringify({ at: new Date().toISOString(), error: String(err?.message || err).slice(0, 200) }));
       } catch {
         /* ignore */
       }
