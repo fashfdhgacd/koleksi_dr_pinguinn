@@ -95,6 +95,18 @@ async function reserveVideyNumbers(count) {
   return start;
 }
 
+/** Upload-queue mode: KV flag bot:queue:on ("0" off, "dry" shadow); default "dry". */
+const QUEUE_DEFAULT_MODE = "dry";
+async function queueMode() {
+  try {
+    const kv = await import("@/lib/owner-analytics-shared");
+    const v = String((await kv.optionalKvGet("bot:queue:on")) ?? "").trim();
+    return v || QUEUE_DEFAULT_MODE;
+  } catch {
+    return "0";
+  }
+}
+
 async function mapPool(items, limit, fn) {
   const out = new Array(items.length);
   let next = 0;
@@ -225,6 +237,25 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const list = byFile.get(fileName) || [];
     list.push({ video, title, record });
     byFile.set(fileName, list);
+  }
+
+  // Upload queue, step 2 (shadow / dry-run): Videy records are ALSO copied to KV so the cron flush
+  // can rehearse on real uploads. The direct commit below still runs unchanged. Mode comes from the
+  // KV flag bot:queue:on (kill switch "0"); default "dry". Any KV error is ignored.
+  try {
+    const mode = await queueMode();
+    if (mode === "dry") {
+      const kv = await import("@/lib/owner-analytics-shared");
+      for (const [fileName, items] of byFile) {
+        for (const it of items) {
+          if (String(it.record?.category || "") !== "videy") continue;
+          const key = `bot:qdry:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          await kv.optionalKvPut(key, JSON.stringify({ fileName, record: it.record, chatId }), 2 * 86400);
+        }
+      }
+    }
+  } catch {
+    /* shadow copy only */
   }
 
   for (const [fileName, items] of byFile) {

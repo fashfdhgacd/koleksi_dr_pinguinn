@@ -42,6 +42,7 @@
  */
 import nitroHandler from "../node_modules/nitro/dist/presets/cloudflare/runtime/cloudflare-module.mjs";
 import { brandUploadTitle } from "../src/lib/bot/title-brand.js";
+import { fetchJsonFromGithub } from "../src/lib/bot/github.js";
 
 /** Longest time (s) a cached HTML page counts as fresh. */
 const HTML_FRESH_MAX = 180;
@@ -294,14 +295,68 @@ async function purgeAfterEdit(request, response, env, context) {
 
 /** Cron heartbeat (step 1 of the upload queue): only records the last run in KV. */
 const CRON_LAST_KEY = "cron:last";
+const FLUSH_LAST_KEY = "cron:flush:last";
+const QUEUE_FLAG_KEY = "bot:queue:on";
+const QUEUE_DEFAULT_MODE = "dry"; // must match src/lib/bot/upload-handler.js
+
+async function queueMode(env) {
+  try {
+    const v = String((await env?.ANALYTICS_KV?.get(QUEUE_FLAG_KEY)) ?? "").trim();
+    return v || QUEUE_DEFAULT_MODE;
+  } catch {
+    return "0";
+  }
+}
+
+/**
+ * Step 2 dry-run flush: reads the shadow copies (bot:qdry:*) of real Videy uploads, groups them per
+ * feed file and checks each against GitHub (read-only). Commits nothing. Report -> cron:flush:last.
+ */
+async function dryFlush(env) {
+  const kv = env?.ANALYTICS_KV;
+  if (!kv?.list) return;
+  const listed = await kv.list({ prefix: "bot:qdry:", limit: 200 });
+  const keys = (listed?.keys || []).map((k) => k.name);
+  const byFile = new Map();
+  let bad = 0;
+  for (const name of keys) {
+    try {
+      const v = JSON.parse((await kv.get(name)) || "null");
+      if (!v?.record?.id) {
+        bad += 1;
+        continue;
+      }
+      const f = String(v.fileName || "videos.json");
+      byFile.set(f, [...(byFile.get(f) || []), v.record]);
+    } catch {
+      bad += 1;
+    }
+  }
+  const files = {};
+  for (const [f, recs] of byFile) {
+    const got = await fetchJsonFromGithub(env, f === "videos.json" ? "videos-latest.json" : f);
+    const ids = new Set((got.items || []).map((x) => String(x?.id || "").toLowerCase()));
+    const inGithub = recs.filter((r) => ids.has(String(r.id).toLowerCase())).length;
+    files[f] = { queued: recs.length, inGithub, wouldCreate: recs.length - inGithub, readOk: Boolean(got.ok) };
+  }
+  await kv.put(
+    FLUSH_LAST_KEY,
+    JSON.stringify({ at: new Date().toISOString(), mode: "dry", entries: keys.length, bad, files }),
+  );
+  for (const name of keys) await kv.delete(name).catch(() => undefined);
+}
+
 async function cronStatus(env) {
   let last = null;
+  let flush = null;
   try {
     last = (await env?.ANALYTICS_KV?.get(CRON_LAST_KEY)) || null;
+    flush = (await env?.ANALYTICS_KV?.get(FLUSH_LAST_KEY)) || null;
   } catch {
     last = null;
   }
-  return new Response(JSON.stringify({ ok: true, last }), {
+  const mode = await queueMode(env);
+  return new Response(JSON.stringify({ ok: true, last, mode, flush }), {
     headers: {
       "content-type": "application/json; charset=utf-8",
       "cache-control": "no-store",
@@ -320,6 +375,18 @@ export default {
       );
     } catch {
       /* heartbeat only */
+    }
+    try {
+      if ((await queueMode(env)) === "dry") await dryFlush(env);
+    } catch (err) {
+      try {
+        await env?.ANALYTICS_KV?.put(
+          FLUSH_LAST_KEY,
+          JSON.stringify({ at: new Date().toISOString(), mode: "dry", error: String(err?.message || err).slice(0, 200) }),
+        );
+      } catch {
+        /* ignore */
+      }
     }
     if (typeof nitroHandler.scheduled === "function") {
       try {
