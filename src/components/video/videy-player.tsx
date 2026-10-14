@@ -26,6 +26,9 @@ type Ad = {
   clickTracking: string[];
   impressions: string[];
   tracking: Record<string, string[]>;
+  /** VAST "progress" events (ExoClick counts a View from its progress pixel at 00:00:10). */
+  progress: { at: number | null; pct: number | null; url: string }[];
+  errors: string[];
   /** Seconds before skip is allowed. */
   skipAfter: number;
   /** Set when skipoffset was a percent: recomputed from the real ad duration. */
@@ -123,6 +126,8 @@ async function loadAd(signal: AbortSignal): Promise<Ad | null> {
   const impressions: string[] = [];
   const tracking: Record<string, string[]> = {};
   const clickTracking: string[] = [];
+  const progress: Ad["progress"] = [];
+  const errors: string[] = [];
   for (let depth = 0; depth <= MAX_WRAPPERS; depth++) {
     // Fresh answer for every video: a cache-buster on the first (our) request and no HTTP cache.
     const reqUrl = depth === 0 ? `${url}${url.includes("?") ? "&" : "?"}cb=${Date.now()}${Math.floor(Math.random() * 1e6)}` : url;
@@ -133,10 +138,16 @@ async function loadAd(signal: AbortSignal): Promise<Ad | null> {
     if (!ad) return null;
     impressions.push(...texts(ad, "Impression"));
     clickTracking.push(...texts(ad, "ClickTracking"));
+    errors.push(...texts(ad, "Error"));
     for (const t of Array.from(ad.getElementsByTagName("Tracking"))) {
       const ev = t.getAttribute("event") || "";
       const u = (t.textContent || "").trim();
       if (!ev || !u) continue;
+      if (ev === "progress") {
+        const off = skipOffset(t.getAttribute("offset"));
+        if (off.s != null || off.pct != null) progress.push({ at: off.s, pct: off.pct, url: u });
+        continue;
+      }
       if (!tracking[ev]) tracking[ev] = [];
       tracking[ev].push(u);
     }
@@ -160,6 +171,8 @@ async function loadAd(signal: AbortSignal): Promise<Ad | null> {
       clickTracking,
       impressions,
       tracking,
+      progress,
+      errors,
       ...skipOf(linear),
     };
   }
@@ -356,6 +369,13 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
         if (t >= d * 0.5) fire("midpoint");
         if (t >= d * 0.75) fire("thirdQuartile");
       }
+      ad.progress.forEach((p, i) => {
+        const at = p.at != null ? p.at : d > 0 && Number.isFinite(d) ? (d * (p.pct || 0)) / 100 : null;
+        const key = `progress:${i}`;
+        if (at == null || t < at || firedRef.current.has(key)) return;
+        firedRef.current.add(key);
+        ping([p.url]);
+      });
     };
     const onEnded = () => {
       fire("complete");
@@ -363,6 +383,11 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
       playMain();
     };
     const onError = () => {
+      const ad = adRef.current;
+      if (ad && !firedRef.current.has("error")) {
+        firedRef.current.add("error");
+        ping(ad.errors.map((u) => u.replace(/\[ERRORCODE\]/g, "405")));
+      }
       adLog(item.id, "ad_error", logged.current);
       playMain();
     };
