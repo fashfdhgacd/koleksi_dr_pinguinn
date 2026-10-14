@@ -292,8 +292,43 @@ async function purgeAfterEdit(request, response, env, context) {
   );
 }
 
+/** Cron heartbeat (step 1 of the upload queue): only records the last run in KV. */
+const CRON_LAST_KEY = "cron:last";
+async function cronStatus(env) {
+  let last = null;
+  try {
+    last = (await env?.ANALYTICS_KV?.get(CRON_LAST_KEY)) || null;
+  } catch {
+    last = null;
+  }
+  return new Response(JSON.stringify({ ok: true, last }), {
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      "x-robots-tag": "noindex, nofollow",
+    },
+  });
+}
+
 export default {
   ...nitroHandler,
+  async scheduled(event, env, context) {
+    try {
+      await env?.ANALYTICS_KV?.put(
+        CRON_LAST_KEY,
+        JSON.stringify({ at: new Date().toISOString(), cron: event?.cron || "" }),
+      );
+    } catch {
+      /* heartbeat only */
+    }
+    if (typeof nitroHandler.scheduled === "function") {
+      try {
+        await nitroHandler.scheduled(event, env, context);
+      } catch {
+        /* keep cron alive */
+      }
+    }
+  },
   async fetch(request, env, context) {
     if (hasMalformedPath(request)) return badRequest();
     let url;
@@ -302,6 +337,7 @@ export default {
     } catch {
       return nitroHandler.fetch(request, env, context);
     }
+    if (url.pathname === "/api/cron-status" && request.method === "GET") return cronStatus(env);
     if (request.method === "POST" && (url.pathname === "/api/owner-videy" || url.pathname === "/api/owner-tools")) {
       const req = url.pathname === "/api/owner-tools" ? await brandEditRequest(request).catch(() => request) : request;
       const response = await nitroHandler.fetch(req, env, context);
