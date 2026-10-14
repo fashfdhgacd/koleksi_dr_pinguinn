@@ -109,6 +109,9 @@ export function reviewPriority(reason = "", title = "") {
  *  - "masked-school-term"     → source page unavailable, real word unknown (stays hidden).
  */
 export const HIDDEN_IDS = {
+  "KAAAzVUQ1": "dead-videy-mp4",
+  "XHxd8uqv1": "dead-videy-mp4",
+  "3ttnEjDt1": "dead-videy-mp4",
   "0GF6UXVD9gef": "masked-check:sma",
   "0WWCuvLnDl2L": "masked-school:teman sekolah",
   "0boCqfWpPtDa": "masked-check:sma",
