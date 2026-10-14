@@ -4,32 +4,37 @@ import { useEffect } from "react";
  * ExoClick popunder (zone 6055468), only on Videy watch pages.
  * - Script (ExoClick hosted loader) is injected on client mount of a Videy page, never on SSR.
  * - Gate lives in ad_should_fire: fires only while a Videy watch page is mounted,
- *   only on a real user click, not on the pre-roll ad/skip button, max once per 5 minutes.
+ *   only on a real user click, not on the pre-roll ad/skip button or age gate,
+ *   only after 1 minute on the Videy page, max 3 per 5 minutes (zone settings).
  * - SPA navigation away flips the gate off, so other pages never open a tab.
  */
 const ZONE = 6055468;
 const SRC = "https://a.pemsrv.com/popunder1000.js";
 const CAP_MS = 5 * 60 * 1000;
-const LS_KEY = "kdp:vpop:last";
+const CAP_COUNT = 3;
+const ARM_MS = 60 * 1000;
+const LS_KEY = "kdp:vpop:times";
 
 type PopWin = Window & {
   __kdpVpopOn?: boolean;
+  __kdpVpopSince?: number;
   __kdpVpopLoaded?: boolean;
   __kdpVpopTarget?: Element | null;
   [k: string]: unknown;
 };
 
-function lastOpen(): number {
+function recentOpens(now: number): number[] {
   try {
-    return Number(localStorage.getItem(LS_KEY) || 0) || 0;
+    const raw = JSON.parse(localStorage.getItem(LS_KEY) || "[]");
+    return Array.isArray(raw) ? raw.map(Number).filter((n) => n > 0 && now - n < CAP_MS) : [];
   } catch {
-    return 0;
+    return [];
   }
 }
 
-function markOpen(now: number) {
+function saveOpens(list: number[]) {
   try {
-    localStorage.setItem(LS_KEY, String(now));
+    localStorage.setItem(LS_KEY, JSON.stringify(list));
   } catch {
     /* ignore */
   }
@@ -46,6 +51,7 @@ export function VideyPopunder() {
   useEffect(() => {
     const w = window as unknown as PopWin;
     w.__kdpVpopOn = true;
+    w.__kdpVpopSince = Date.now();
 
     const onDown = (e: Event) => {
       w.__kdpVpopTarget = e.isTrusted ? (e.target as Element | null) : null;
@@ -56,7 +62,7 @@ export function VideyPopunder() {
       w.__kdpVpopLoaded = true;
       w.ad_idzone = String(ZONE);
       w.ad_frequency_period = 5;
-      w.ad_frequency_count = 1;
+      w.ad_frequency_count = CAP_COUNT;
       w.ad_trigger_method = 1;
       w.ad_trigger_delay = 0;
       w.ad_popup_fallback = false;
@@ -70,8 +76,11 @@ export function VideyPopunder() {
         w.__kdpVpopTarget = null;
         if (!t || isAdClick(t)) return false;
         const now = Date.now();
-        if (now - lastOpen() < CAP_MS) return false;
-        markOpen(now);
+        if (now - (w.__kdpVpopSince || now) < ARM_MS) return false;
+        const list = recentOpens(now);
+        if (list.length >= CAP_COUNT) return false;
+        list.push(now);
+        saveOpens(list);
         return true;
       };
       const s = document.createElement("script");
