@@ -42,7 +42,7 @@
  */
 import nitroHandler from "../node_modules/nitro/dist/presets/cloudflare/runtime/cloudflare-module.mjs";
 import { brandUploadTitle } from "../src/lib/bot/title-brand.js";
-import { fetchJsonFromGithub } from "../src/lib/bot/github.js";
+import { fetchJsonFromGithub, upsertVideosBatch } from "../src/lib/bot/github.js";
 
 /** Longest time (s) a cached HTML page counts as fresh. */
 const HTML_FRESH_MAX = 180;
@@ -297,7 +297,7 @@ async function purgeAfterEdit(request, response, env, context) {
 const CRON_LAST_KEY = "cron:last";
 const FLUSH_LAST_KEY = "cron:flush:last";
 const QUEUE_FLAG_KEY = "bot:queue:on";
-const QUEUE_DEFAULT_MODE = "dry"; // must match src/lib/bot/upload-handler.js
+const QUEUE_DEFAULT_MODE = "1"; // must match src/lib/bot/upload-handler.js
 
 async function queueMode(env) {
   try {
@@ -346,6 +346,105 @@ async function dryFlush(env) {
   for (const name of keys) await kv.delete(name).catch(() => undefined);
 }
 
+/** Telegram text to a chat (bot token from the existing Worker secrets). Never throws. */
+async function tgText(env, chatId, text) {
+  const token = String(env?.BOT_TOKEN || env?.TELEGRAM_BOT_TOKEN || "").trim();
+  if (!token || !chatId) return;
+  try {
+    await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text: text.slice(0, 3900), disable_web_page_preview: true }),
+    });
+  } catch {
+    /* report only */
+  }
+}
+
+/** Ask GitHub to run videy-thumbs.yml now (same token as the bot). Never throws. */
+async function triggerThumbs(env) {
+  const token = String(env?.GITHUB_TOKEN || env?.GH_TOKEN || "").trim();
+  if (!token) return "no-token";
+  try {
+    const r = await fetch(
+      "https://api.github.com/repos/fashfdhgacd/koleksi_dr_pinguinn/actions/workflows/videy-thumbs.yml/dispatches",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "User-Agent": "kdp-telegram-bot",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ref: "main" }),
+      },
+    );
+    return String(r.status);
+  } catch {
+    return "error";
+  }
+}
+
+/**
+ * Real flush (mode "1"): all queued Videy records -> ONE upsertVideosBatch per feed file (one commit,
+ * one deploy). Entries are deleted only after GitHub accepted them; on failure they stay for the next
+ * run and the uploader is told. Each chat gets a final report.
+ */
+async function realFlush(env) {
+  const kv = env?.ANALYTICS_KV;
+  if (!kv?.list) return;
+  const listed = await kv.list({ prefix: "bot:q:", limit: 500 });
+  const keys = (listed?.keys || []).map((k) => k.name);
+  if (!keys.length) {
+    await kv.put(FLUSH_LAST_KEY, JSON.stringify({ at: new Date().toISOString(), mode: "1", entries: 0 }));
+    return;
+  }
+  const byFile = new Map();
+  for (const name of keys) {
+    try {
+      const v = JSON.parse((await kv.get(name)) || "null");
+      if (!v?.record?.id) continue;
+      const f = String(v.fileName || "videos.json");
+      byFile.set(f, [...(byFile.get(f) || []), { name, ...v }]);
+    } catch {
+      /* unreadable entry: leave it */
+    }
+  }
+  const files = {};
+  const perChat = new Map();
+  let committed = 0;
+  for (const [f, entries] of byFile) {
+    let result;
+    try {
+      result = await upsertVideosBatch(env, f, entries.map((x) => x.record));
+    } catch (err) {
+      result = { ok: false, errors: [String(err?.message || err)] };
+    }
+    files[f] = { queued: entries.length, ok: Boolean(result?.ok), created: result?.created || 0, skipped: result?.skipped || 0, errors: (result?.errors || []).slice(0, 3) };
+    const created = new Set((result?.records || []).map((r) => String(r.id || "").toLowerCase()));
+    for (const x of entries) {
+      const chat = String(x.chatId || "");
+      const lines = perChat.get(chat) || [];
+      if (!result?.ok) lines.push(`⚠️ ${x.record.id} — ${x.title || ""} (gagal, dicoba lagi flush berikutnya)`);
+      else if (created.has(String(x.record.id).toLowerCase())) lines.push(`✅ ${x.record.id} — ${x.title || ""}`);
+      else lines.push(`⏭️ ${x.record.id} — ${x.title || ""} (sudah ada)`);
+      perChat.set(chat, lines);
+    }
+    if (result?.ok) {
+      committed += result.created || 0;
+      for (const x of entries) await kv.delete(x.name).catch(() => undefined);
+    }
+  }
+  const thumbs = committed > 0 ? await triggerThumbs(env) : "skip";
+  await kv.put(
+    FLUSH_LAST_KEY,
+    JSON.stringify({ at: new Date().toISOString(), mode: "1", entries: keys.length, committed, thumbs, files }),
+  );
+  for (const [chat, lines] of perChat) {
+    await tgText(env, chat, [`Flush antrean selesai: ${lines.filter((l) => l.startsWith("✅")).length} tayang setelah deploy (±3 menit).`, "", ...lines].join("\n"));
+  }
+}
+
 async function cronStatus(env) {
   let last = null;
   let flush = null;
@@ -377,12 +476,18 @@ export default {
       /* heartbeat only */
     }
     try {
-      if ((await queueMode(env)) === "dry") await dryFlush(env);
+      const mode = await queueMode(env);
+      if (mode === "dry") await dryFlush(env);
+      else if (mode === "1") {
+        // Shadow copies left from dry mode are no longer needed.
+        await dryFlush(env).catch(() => undefined);
+        await realFlush(env);
+      }
     } catch (err) {
       try {
         await env?.ANALYTICS_KV?.put(
           FLUSH_LAST_KEY,
-          JSON.stringify({ at: new Date().toISOString(), mode: "dry", error: String(err?.message || err).slice(0, 200) }),
+          JSON.stringify({ at: new Date().toISOString(), error: String(err?.message || err).slice(0, 200) }),
         );
       } catch {
         /* ignore */

@@ -54,9 +54,8 @@ for (const p of paths) {
   if (!j.version_metadata) j.version_metadata = { binding: "CF_VERSION_METADATA" };
 
   // Cron trigger for the upload-queue flush (scripts/cf-worker-entry.mjs `scheduled`). A trigger, not
-  // an env var. Each run is one tiny invocation: it only records a heartbeat in KV unless the KV
-  // flag bot:queue:on is "1".
-  j.triggers = { ...(j.triggers || {}), crons: ["*/10 * * * *"] };
+  // an env var. Hourly: heartbeat + upload-queue flush (KV flag bot:queue:on, kill switch "0").
+  j.triggers = { ...(j.triggers || {}), crons: ["7 * * * *"] };
 
   // Don't wipe routes — if empty, leave a note; CF dashboard routes may still apply
   // if we avoid sending empty routes array. Delete empty routes key.

@@ -95,8 +95,19 @@ async function reserveVideyNumbers(count) {
   return start;
 }
 
-/** Upload-queue mode: KV flag bot:queue:on ("0" off, "dry" shadow); default "dry". */
-const QUEUE_DEFAULT_MODE = "dry";
+/** Ids already in the (deployed) catalog, lowercased. */
+async function catalogIds() {
+  try {
+    const { loadItems } = await import("@/lib/catalog/local-cache");
+    const bag = await loadItems();
+    return new Set((bag.raw || bag.items || []).map((it) => String(it?.id || "").toLowerCase()));
+  } catch {
+    return new Set();
+  }
+}
+
+/** Upload-queue mode: KV flag bot:queue:on ("0" off = direct commits, "dry" shadow, "1" queue Videy); default "1". */
+const QUEUE_DEFAULT_MODE = "1";
 async function queueMode() {
   try {
     const kv = await import("@/lib/owner-analytics-shared");
@@ -188,11 +199,15 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   // videos already listed). Marked titleAuto so /pemilik can list them for a real title later.
   const autoTitled = new Set();
   if (queue.some((v) => v.host === "videy" && !hasUserTitle(v.title || parsedMsg.title))) {
-    const need = queue.filter((v) => v.host === "videy" && !hasUserTitle(v.title || parsedMsg.title)).length;
+    // Links already in the catalog are skipped as duplicates later: they get no number.
+    const known = await catalogIds();
+    const wants = (v) =>
+      v.host === "videy" && !hasUserTitle(v.title || parsedMsg.title) && !known.has(String(v.id || "").toLowerCase());
+    const need = queue.filter(wants).length;
     let n = await reserveVideyNumbers(need);
     for (let i = 0; i < queue.length; i++) {
       const v = queue[i];
-      if (v.host !== "videy" || hasUserTitle(v.title || parsedMsg.title)) continue;
+      if (!wants(v)) continue;
       n += 1;
       metas[i] = { ...(metas[i] || {}), title: videyAutoTitle(n), thumb: "" };
       autoTitled.add(i);
@@ -239,23 +254,46 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     byFile.set(fileName, list);
   }
 
-  // Upload queue, step 2 (shadow / dry-run): Videy records are ALSO copied to KV so the cron flush
-  // can rehearse on real uploads. The direct commit below still runs unchanged. Mode comes from the
-  // KV flag bot:queue:on (kill switch "0"); default "dry". Any KV error is ignored.
+  // Upload queue. Mode from KV flag bot:queue:on (kill switch "0"); default "1".
+  //  "1":   Videy records go to KV (bot:q:*); the hourly cron flush commits them in one batch (one
+  //         deploy) and sends the final report. Any KV write error -> that item takes the direct path.
+  //  "dry": direct commit + shadow copy (bot:qdry:*) for the read-only dry-run flush.
+  //  "0":   direct commit only (old path).
+  let queuedTotal = 0;
   try {
     const mode = await queueMode();
-    if (mode === "dry") {
+    if (mode === "1" || mode === "dry") {
       const kv = await import("@/lib/owner-analytics-shared");
       for (const [fileName, items] of byFile) {
+        const keep = [];
         for (const it of items) {
-          if (String(it.record?.category || "") !== "videy") continue;
-          const key = `bot:qdry:${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-          await kv.optionalKvPut(key, JSON.stringify({ fileName, record: it.record, chatId }), 2 * 86400);
+          if (String(it.record?.category || "") !== "videy") {
+            keep.push(it);
+            continue;
+          }
+          const prefix = mode === "1" ? "bot:q:" : "bot:qdry:";
+          const key = `${prefix}${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+          const value = JSON.stringify({ fileName, record: it.record, title: it.title, chatId });
+          let ok = false;
+          try {
+            await kv.optionalKvPut(key, value, 7 * 86400);
+            ok = mode !== "1" || (await kv.optionalKvGet(key)) === value;
+          } catch {
+            ok = false;
+          }
+          if (mode === "1" && ok) {
+            queuedTotal += 1;
+            lines.push(`🕒 ${it.record.id} — ${it.title} (antre, tayang saat flush berikutnya)`);
+          } else {
+            keep.push(it);
+          }
         }
+        if (keep.length) byFile.set(fileName, keep);
+        else byFile.delete(fileName);
       }
     }
   } catch {
-    /* shadow copy only */
+    /* fall back to the direct path for everything still in byFile */
   }
 
   for (const [fileName, items] of byFile) {
@@ -314,7 +352,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     }
   }
 
-  const summary = `✅ ${createdTotal} dibuat · ⏭️ ${skippedTotal} skip · ⚠️ ${failedTotal} gagal`;
+  const summary = `✅ ${createdTotal} dibuat · ⏭️ ${skippedTotal} skip · ⚠️ ${failedTotal} gagal${queuedTotal ? ` · 🕒 ${queuedTotal} antre` : ""}`;
   await tgSendChunks(
     token,
     chatId,
