@@ -74,6 +74,27 @@ async function videyCount() {
   }
 }
 
+/**
+ * Running Videy number shared across bursts: the bundled catalog only knows deployed videos, so two
+ * uploads before the next deploy used to get the same number. KV (existing ANALYTICS_KV binding)
+ * keeps the last number handed out; we take the higher of both and reserve the whole block at once.
+ */
+const VIDEY_N_KEY = "bot:videy:n";
+async function reserveVideyNumbers(count) {
+  let kv = null;
+  try {
+    kv = await import("@/lib/owner-analytics-shared");
+  } catch {
+    kv = null;
+  }
+  const fromCatalog = await videyCount();
+  let fromKv = 0;
+  if (kv) fromKv = Math.floor(Number(await kv.optionalKvGet(VIDEY_N_KEY)) || 0);
+  const start = Math.max(fromCatalog, fromKv);
+  if (kv) await kv.optionalKvPut(VIDEY_N_KEY, String(start + count));
+  return start;
+}
+
 async function mapPool(items, limit, fn) {
   const out = new Array(items.length);
   let next = 0;
@@ -155,7 +176,8 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   // videos already listed). Marked titleAuto so /pemilik can list them for a real title later.
   const autoTitled = new Set();
   if (queue.some((v) => v.host === "videy" && !hasUserTitle(v.title || parsedMsg.title))) {
-    let n = await videyCount();
+    const need = queue.filter((v) => v.host === "videy" && !hasUserTitle(v.title || parsedMsg.title)).length;
+    let n = await reserveVideyNumbers(need);
     for (let i = 0; i < queue.length; i++) {
       const v = queue[i];
       if (v.host !== "videy" || hasUserTitle(v.title || parsedMsg.title)) continue;
