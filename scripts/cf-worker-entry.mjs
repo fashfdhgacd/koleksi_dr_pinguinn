@@ -423,6 +423,17 @@ async function realFlush(env) {
       /* unreadable entry: leave it */
     }
   }
+  // Videy only: re-check each queued file right before it goes live; dead (404 on 3 tries) -> stored hidden.
+  for (const entries of byFile.values()) {
+    for (const x of entries) {
+      if (String(x.record?.category || "") !== "videy" || x.record.hidden) continue;
+      try {
+        if (await isDeadVideyFile(x.record.id)) x.record = { ...x.record, hidden: true, hidden_reason: DEAD_VIDEY_REASON };
+      } catch {
+        /* treat as alive */
+      }
+    }
+  }
   const files = {};
   const perChat = new Map();
   let committed = 0;
@@ -439,6 +450,8 @@ async function realFlush(env) {
       const chat = String(x.chatId || "");
       const lines = perChat.get(chat) || [];
       if (!result?.ok) lines.push(`⚠️ ${x.record.id} — ${x.title || ""} (gagal, dicoba lagi flush berikutnya)`);
+      else if (created.has(String(x.record.id).toLowerCase()) && x.record.hidden_reason === DEAD_VIDEY_REASON)
+        lines.push(`🙈 ${x.record.id} — ${x.title || ""} · disembunyikan: video mati`);
       else if (created.has(String(x.record.id).toLowerCase())) lines.push(`✅ ${x.record.id} — ${x.title || ""}`);
       else lines.push(`⏭️ ${x.record.id} — ${x.title || ""} (sudah ada)`);
       perChat.set(chat, lines);
@@ -480,6 +493,37 @@ function ghHeaders(token) {
   };
 }
 
+const DEAD_VIDEY_REASON = "dead-videy-mp4";
+
+function videyFileUrl(id) {
+  const s = String(id || "");
+  return `https://cdn.videy.co/${s}.${s.length === 9 && s.endsWith("2") ? "mov" : "mp4"}`;
+}
+
+/** True only when cdn.videy.co answers 404/410 on 3 tries (cache-busted, ~1.5 s apart). */
+async function isDeadVideyFile(id) {
+  if (!/^[A-Za-z0-9]{4,40}$/.test(String(id || ""))) return false;
+  for (let t = 0; t < 3; t++) {
+    if (t) await new Promise((r) => setTimeout(r, 1500));
+    try {
+      const r = await fetch(`${videyFileUrl(id)}?cb=${Date.now()}${t}`, {
+        headers: { Range: "bytes=0-1", "User-Agent": "Mozilla/5.0" },
+        redirect: "follow",
+      });
+      try {
+        await r.body?.cancel();
+      } catch {
+        /* ignore */
+      }
+      if (r.status !== 404 && r.status !== 410) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
+
 async function thumbsTick(env) {
   const kv = env?.ANALYTICS_KV;
   const token = String(env?.GITHUB_TOKEN || env?.GH_TOKEN || "").trim();
@@ -491,10 +535,18 @@ async function thumbsTick(env) {
     await kv.put(THUMBS_DISPATCH_KEY, String(Date.now()));
   }
   // Latest commit touching public/videy-thumbs.
-  const r = await fetch(`${REPO_API}/commits?path=public/videy-thumbs&per_page=1&sha=main`, { headers: ghHeaders(token) });
-  if (r.ok) {
+  const [r, rh] = await Promise.all(
+    ["public/videy-thumbs", "src/lib/catalog/hidden-ids.js"].map((p) =>
+      fetch(`${REPO_API}/commits?path=${p}&per_page=1&sha=main`, { headers: ghHeaders(token) }),
+    ),
+  );
+  if (r.ok && rh.ok) {
     const [c] = await r.json();
-    const sha = String(c?.sha || "");
+    const [ch] = await rh.json();
+    // Only bot (workflow) commits need the stamp; user-token commits deploy on their own.
+    const bot = (x) => /github-actions/i.test(String(x?.author?.login || x?.commit?.author?.name || ""));
+    const pick = [c, ch].filter(bot).sort((a, b) => String(b?.commit?.committer?.date || "").localeCompare(String(a?.commit?.committer?.date || "")))[0];
+    const sha = String(pick?.sha || (await kv.get(THUMBS_SEEN_KEY)) || "");
     const seen = String((await kv.get(THUMBS_SEEN_KEY)) || "");
     status.thumbsSha = sha.slice(0, 7);
     if (sha && sha !== seen) {

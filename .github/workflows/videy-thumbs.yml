@@ -1,6 +1,7 @@
 name: videy-thumbs
 # One frame per new Videy video, grabbed once with ffmpeg and saved as a static image
 # (public/videy-thumbs/<id>.jpg). Cards show that file; nothing is fetched per visit.
+# Videy only: a file that 404s on cdn.videy.co on 3 tries is added to HIDDEN_IDS (never deleted).
 # Batched: runs every 2 hours (and on demand) instead of once per bot upload commit, so bursts of
 # uploads cost one run per 2 hours, not one per upload (GitHub Actions minutes).
 on:
@@ -29,7 +30,8 @@ jobs:
           import os, sys
           sys.path.insert(0, "scripts")
           import videy_thumbs as v
-          files = v.videy_files()
+          hid = v.hidden_ids()
+          files = [i for i in v.videy_files() if i not in hid]
           missing = [i for i in files if not os.path.exists(os.path.join(v.OUT, f"{i}.jpg"))]
           print("missing=" + str(len(missing)))
           PY
@@ -44,12 +46,12 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A public/videy-thumbs || true
+          git add -A public/videy-thumbs src/lib/catalog/hidden-ids.js || true
           if git diff --cached --quiet; then
             echo "No new thumbs"
             exit 0
           fi
-          git commit -m "chore: Videy thumbnails"
+          git commit -m "chore: Videy thumbnails (dead Videy files hidden, never deleted)"
           for i in 1 2 3; do
             git pull --rebase --quiet && git push && exit 0
             sleep 5

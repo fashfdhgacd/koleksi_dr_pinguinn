@@ -118,6 +118,37 @@ async function queueMode() {
   }
 }
 
+export const DEAD_VIDEY_REASON = "dead-videy-mp4";
+
+/** Videy file URL as videy.co builds it: 9-char id ending in 2 is .mov, everything else .mp4. */
+function videyFileUrl(id) {
+  const s = String(id || "");
+  return `https://cdn.videy.co/${s}.${s.length === 9 && s.endsWith("2") ? "mov" : "mp4"}`;
+}
+
+/** True only when cdn.videy.co answers 404/410 on 3 tries (cache-busted, ~1.5 s apart). */
+async function isDeadVideyFile(id) {
+  if (!/^[A-Za-z0-9]{4,40}$/.test(String(id || ""))) return false;
+  for (let t = 0; t < 3; t++) {
+    if (t) await new Promise((r) => setTimeout(r, 1500));
+    try {
+      const r = await fetch(`${videyFileUrl(id)}?cb=${Date.now()}${t}`, {
+        headers: { Range: "bytes=0-1", "User-Agent": "Mozilla/5.0" },
+        redirect: "follow",
+      });
+      try {
+        await r.body?.cancel();
+      } catch {
+        /* ignore */
+      }
+      if (r.status !== 404 && r.status !== 410) return false;
+    } catch {
+      return false;
+    }
+  }
+  return true;
+}
+
 async function mapPool(items, limit, fn) {
   const out = new Array(items.length);
   let next = 0;
@@ -214,6 +245,17 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     }
   }
 
+  // Videy only: a video whose file is gone on cdn.videy.co (404 on every retry) is stored hidden,
+  // never deleted. Network errors or any other status count as alive. Other sources are never checked.
+  const deadVidey = new Set();
+  await mapPool(
+    queue.map((v, i) => [v, i]).filter(([v]) => v.host === "videy"),
+    4,
+    async ([v, i]) => {
+      if (await isDeadVideyFile(v.id)) deadVidey.add(i);
+    },
+  );
+
   const byFile = new Map();
   for (let i = 0; i < queue.length; i++) {
     const video = queue[i];
@@ -247,7 +289,11 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const minorText = `${baseTitle} ${String(video.title || parsedMsg.title || "")} ${String(meta.title || "")}`;
     const hiddenReason = minorContentReason(minorText) || lockedMinorReason(minorText);
     const flagged = autoTitled.has(i) ? { ...baseRecord, titleAuto: true } : baseRecord;
-    const record = hiddenReason ? { ...flagged, hidden: true, hidden_reason: hiddenReason } : flagged;
+    const record = hiddenReason
+      ? { ...flagged, hidden: true, hidden_reason: hiddenReason }
+      : deadVidey.has(i)
+        ? { ...flagged, hidden: true, hidden_reason: DEAD_VIDEY_REASON }
+        : flagged;
     const fileName = video.file || "videos.json";
     const list = byFile.get(fileName) || [];
     list.push({ video, title, record });
@@ -283,7 +329,11 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
           }
           if (mode === "1" && ok) {
             queuedTotal += 1;
-            lines.push(`🕒 ${it.record.id} — ${it.title} (antre, tayang saat flush berikutnya)`);
+            lines.push(
+              it.record.hidden_reason === DEAD_VIDEY_REASON
+                ? `🕒 ${it.record.id} — ${it.title} · disembunyikan: video mati`
+                : `🕒 ${it.record.id} — ${it.title} (antre, tayang saat flush berikutnya)`,
+            );
           } else {
             keep.push(it);
           }
@@ -318,7 +368,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
         if (isHttpPoster(poster)) posterBatch[it.record.id] = poster;
         if (createdIds.has(idKey)) {
           lines.push(
-            `✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}${it.record.hidden ? " · 🙈 disembunyikan (judul menyiratkan minor/sekolah)" : ""}`,
+            `✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}${it.record.hidden_reason === DEAD_VIDEY_REASON ? " · disembunyikan: video mati" : it.record.hidden ? " · 🙈 disembunyikan (judul menyiratkan minor/sekolah)" : ""}`,
           );
         } else {
           lines.push(`⏭️ ${it.record.id} — ${it.title} (sudah ada)`);

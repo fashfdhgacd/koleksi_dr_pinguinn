@@ -10,10 +10,15 @@ import json
 import os
 import re
 import subprocess
+import time
+import urllib.error
+import urllib.request
 
 OUT = "public/videy-thumbs"
 SOURCES = sorted(set(glob.glob("data/videos*.json") + ["src/lib/catalog/videos.json"]))
 ID_RE = re.compile(r"^[A-Za-z0-9]{4,40}$")
+HIDDEN_FILE = "src/lib/catalog/hidden-ids.js"
+DEAD_REASON = "dead-videy-mp4"
 CDN_RE = re.compile(r"^https://cdn\d*\.videy\.co/([A-Za-z0-9]+)\.(mp4|mov)$", re.I)
 
 
@@ -36,10 +41,60 @@ def videy_files():
                 continue
             for key in ("direct", "embed", "video_url"):
                 m = CDN_RE.match(str(it.get(key) or "").strip())
+                if it.get("hidden"):
+                    break
                 if m and ID_RE.match(m.group(1)):
                     found.setdefault(m.group(1), f"https://cdn.videy.co/{m.group(1)}.{m.group(2).lower()}")
                     break
     return found
+
+
+def hidden_ids():
+    try:
+        with open(HIDDEN_FILE, encoding="utf-8") as f:
+            text = f.read()
+    except Exception:
+        return set()
+    start = text.find("export const HIDDEN_IDS = {")
+    end = text.find("};", start)
+    return set(re.findall(r'"([A-Za-z0-9]+)":', text[start:end])) if start >= 0 else set()
+
+
+def is_dead(url):
+    """True only when the Videy CDN answers 404/410 on 3 cache-busted tries. Errors count as alive."""
+    for t in range(3):
+        if t:
+            time.sleep(5)
+        req = urllib.request.Request(
+            f"{url}?cb={int(time.time())}{t}",
+            headers={"Range": "bytes=0-1", "User-Agent": "Mozilla/5.0"},
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=30):
+                return False
+        except urllib.error.HTTPError as e:
+            if e.code not in (404, 410):
+                return False
+        except Exception:
+            return False
+    return True
+
+
+def hide(ids):
+    """Add dead Videy ids to HIDDEN_IDS (never deletes anything)."""
+    if not ids:
+        return
+    with open(HIDDEN_FILE, encoding="utf-8") as f:
+        text = f.read()
+    head = "export const HIDDEN_IDS = {\n"
+    i = text.find(head)
+    if i < 0:
+        print("HIDDEN_IDS not found, nothing hidden")
+        return
+    add = "".join(f'  "{v}": "{DEAD_REASON}",\n' for v in sorted(ids))
+    i += len(head)
+    with open(HIDDEN_FILE, "w", encoding="utf-8") as f:
+        f.write(text[:i] + add + text[i:])
 
 
 def grab(url, dest):
@@ -64,8 +119,10 @@ def grab(url, dest):
 
 def main():
     os.makedirs(OUT, exist_ok=True)
-    files = videy_files()
+    hid = hidden_ids()
+    files = {k: v for k, v in videy_files().items() if k not in hid}
     made = failed = 0
+    dead = set()
     for vid, url in files.items():
         dest = os.path.join(OUT, f"{vid}.jpg")
         if os.path.exists(dest):
@@ -74,8 +131,13 @@ def main():
             made += 1
         else:
             failed += 1
-            print(f"no frame: {vid}")
-    print(f"videy: {len(files)} total, {made} new thumbs, {failed} failed")
+            if is_dead(url):
+                dead.add(vid)
+                print(f"dead (hidden): {vid}")
+            else:
+                print(f"no frame: {vid}")
+    hide(dead)
+    print(f"videy: {len(files)} total, {made} new thumbs, {failed} failed, {len(dead)} hidden as dead")
 
 
 if __name__ == "__main__":
