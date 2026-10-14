@@ -6,7 +6,7 @@
 import type { CategoryInfo } from "../../src/lib/catalog/types";
 import { listListedCategories } from "../../src/lib/catalog/local";
 import { listSitemapWatchEntries } from "../../src/lib/catalog/sitemap-entries";
-import { RANKINGS, RANK_PERIODS, periodAvailable } from "../../src/lib/catalog/rankings";
+import { RANKINGS, RANK_PERIODS, rankPeriodAvailable } from "../../src/lib/catalog/rankings";
 import { SITE_ORIGIN, cleanDisplayTitle, seoVideoThumbnail, videoSeoDescription } from "../../src/lib/seo";
 
 interface SitemapEvent {
@@ -47,8 +47,9 @@ function pageEntries(categories: CategoryInfo[]): string[] {
   ];
   // Minggu/Bulan ini tabs only once that period has data (until then they are noindex).
   for (const p of RANK_PERIODS) {
-    if (!p.key || !periodAvailable(p.period)) continue;
+    if (!p.key) continue;
     for (const r of RANKINGS) {
+      if (!rankPeriodAvailable(r.kind, p.period)) continue;
       out.push(urlEntry(`${SITE_ORIGIN}/kategori/${r.slug}?periode=${p.key}`, { changefreq: "daily", priority: "0.6" }));
     }
   }

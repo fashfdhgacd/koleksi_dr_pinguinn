@@ -15,10 +15,6 @@ function str(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
 }
 
-function isVideyItem(item: { embed?: unknown; source?: unknown; direct?: unknown }): boolean {
-  return /videy/i.test(`${item.embed || ""} ${item.source || ""} ${item.direct || ""}`);
-}
-
 function toSitemapLastmod(raw: unknown): string | undefined {
   if (raw == null || raw === "") return undefined;
   if (typeof raw === "number" && Number.isFinite(raw)) {
@@ -36,7 +32,8 @@ function toSitemapLastmod(raw: unknown): string | undefined {
 }
 
 /**
- * Semua ID katalog yang bisa di /watch/{id} (non-Videy), untuk sitemap URL-only.
+ * Semua ID katalog yang bisa di /watch/{id} (termasuk Videy), untuk sitemap. Dibangun dari katalog
+ * live, jadi upload baru (Videy juga) otomatis masuk; respons sitemap di-cache 1 jam.
  * Tidak memfilter silo (JAV/AI+/Indo) — GSC butuh daftar URL lengkap.
  */
 export async function listSitemapWatchEntries(): Promise<SitemapWatchEntry[]> {
@@ -44,7 +41,7 @@ export async function listSitemapWatchEntries(): Promise<SitemapWatchEntry[]> {
   const seen = new Set<string>();
   const out: SitemapWatchEntry[] = [];
   for (const it of items) {
-    if (!it?.id || seen.has(it.id) || isVideyItem(it)) continue;
+    if (!it?.id || seen.has(it.id)) continue;
     seen.add(it.id);
     const lastmod = toSitemapLastmod(it.createdAt ?? it.date);
     const entry: SitemapWatchEntry = { id: it.id };
