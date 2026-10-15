@@ -265,7 +265,7 @@ async function handleGet(request: Request): Promise<Response> {
     });
   }
   if (!(await isOwnerKey(extractKey(request)))) {
-    return json(request, { ok: false, error: "forbidden" });
+    return json(request, { ok: false, error: "forbidden" }, 403);
   }
   try {
     return json(request, { ok: true, owner: true, ...(await liveOwnerPayload(new URL(request.url).origin)) });

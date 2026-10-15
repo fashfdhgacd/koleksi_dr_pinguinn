@@ -519,4 +519,6 @@ export async function listHiddenCandidates(unhideAt: Record<string, number> = {}
 }
 
 /** Katalog publik = semua item (tanpa filter minor / Tidak publish). */
-[+86 bytes at .content[1].resource.text]
+export async function loadItems(): Promise<CatalogCache> {
+  return loadItemsRaw();
+}
