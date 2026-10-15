@@ -17,14 +17,22 @@ import type { VideoDetail } from "@/lib/catalog/types";
  */
 const VAST_TAG = "https://s.magsrv.com/v1/vast.php?idz=6054340";
 /**
- * Set by videy-popunder.tsx when a popunder opens: the next Videy page load within 60 s (the tab
- * the popunder opened) skips the pre-roll once and removes the flag. Every other Videy video
+ * Set by videy-popunder.tsx when a popunder opens: the next fresh Videy page load within 60 s in
+ * another tab (the one the popunder opened) skips the pre-roll once and removes the flag. Every other Videy video
  * gets the pre-roll as usual.
  */
 const SKIP_KEY = "kdp:vpop:skip";
 const SKIP_WINDOW_MS = 60 * 1000;
 function consumeSkip(): boolean {
   try {
+    // The tab where the popunder fired never skips: with the "popup" method it stays on our site
+    // (in-memory mark survives SPA navigation and bfcache). With the default/chromeTab methods it
+    // navigates to the ad, and our site opens in a new tab with a fresh page (navigation "navigate").
+    const w = window as unknown as { __kdpPopFiredAt?: number };
+    if (w.__kdpPopFiredAt && Date.now() - w.__kdpPopFiredAt < SKIP_WINDOW_MS) return false;
+    // Reload or Back to this page (e.g. returning from the ad) is never the new tab.
+    const nav = (performance.getEntriesByType?.("navigation")[0] as PerformanceNavigationTiming | undefined)?.type;
+    if (nav === "reload" || nav === "back_forward") return false;
     const at = Number(localStorage.getItem(SKIP_KEY) || 0);
     if (!at) return false;
     localStorage.removeItem(SKIP_KEY);

@@ -85,6 +85,8 @@ export function VideyPopunder() {
         if (list.length >= CAP_COUNT) return false;
         list.push(now);
         saveOpens(list);
+        // Marks this tab as the one that fired (read by videy-player.tsx), so it never skips itself.
+        (w as { __kdpPopFiredAt?: number }).__kdpPopFiredAt = now;
         try {
           localStorage.setItem(SKIP_KEY, String(now));
         } catch {
