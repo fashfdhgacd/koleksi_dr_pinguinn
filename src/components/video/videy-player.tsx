@@ -17,25 +17,20 @@ import type { VideoDetail } from "@/lib/catalog/types";
  */
 const VAST_TAG = "https://s.magsrv.com/v1/vast.php?idz=6054340";
 /**
- * Pre-roll once per visit: timestamp in localStorage (shared with new tabs, e.g. the one the
- * popunder opens), set after a pre-roll was shown (ended, skipped or failed), valid 30 minutes.
- * Same key and window in videy-popunder.tsx.
+ * Set by videy-popunder.tsx when a popunder opens: the next Videy page load within 60 s (the tab
+ * the popunder opened) skips the pre-roll once and removes the flag. Every other Videy video
+ * gets the pre-roll as usual.
  */
-const PREROLL_DONE_KEY = "kdp:vpre:at";
-const PREROLL_WINDOW_MS = 30 * 60 * 1000;
-function prerollDone(): boolean {
+const SKIP_KEY = "kdp:vpop:skip";
+const SKIP_WINDOW_MS = 60 * 1000;
+function consumeSkip(): boolean {
   try {
-    const at = Number(localStorage.getItem(PREROLL_DONE_KEY) || 0);
-    return at > 0 && Date.now() - at < PREROLL_WINDOW_MS;
+    const at = Number(localStorage.getItem(SKIP_KEY) || 0);
+    if (!at) return false;
+    localStorage.removeItem(SKIP_KEY);
+    return Date.now() - at < SKIP_WINDOW_MS;
   } catch {
     return false;
-  }
-}
-function markPrerollDone(): void {
-  try {
-    localStorage.setItem(PREROLL_DONE_KEY, String(Date.now()));
-  } catch {
-    /* ignore */
   }
 }
 /** Tells the Videy popunder (videy-popunder.tsx) it may arm 10 s from now. */
@@ -215,6 +210,7 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
   const logged = useRef<Set<string>>(new Set());
   const [muted, setMuted] = useState(false);
   const adRef = useRef<Ad | null>(null);
+  const skipRef = useRef(false);
   const firedRef = useRef<Set<string>>(new Set());
   const [phase, setPhase] = useState<Phase>("idle");
   const [left, setLeft] = useState(SKIP_DEFAULT_S);
@@ -229,7 +225,6 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
   }, []);
 
   const playMain = useCallback(() => {
-    if (adRef.current) markPrerollDone();
     armPopunder();
     adRef.current = null;
     setPhase("main");
@@ -260,8 +255,9 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
       v.muted = false;
       v.load();
     }
-    // Pre-roll already shown in the last 30 minutes: no VAST request.
-    adReq.current = prerollDone() ? null : fetchAd();
+    // Tab opened by the popunder: no pre-roll this once, no VAST request.
+    skipRef.current = consumeSkip();
+    adReq.current = skipRef.current ? null : fetchAd();
   }, [item.id]);
 
   // Landscape lock while fullscreen (wrapper or native video button), unlock on exit.
@@ -338,7 +334,8 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
       el0.muted = false;
       void el0.play().catch(() => undefined);
     }
-    if (prerollDone()) {
+    if (skipRef.current) {
+      skipRef.current = false;
       adReq.current = null;
       return playMain();
     }

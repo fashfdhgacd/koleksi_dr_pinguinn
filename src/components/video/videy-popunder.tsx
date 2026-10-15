@@ -6,7 +6,7 @@ import { useEffect } from "react";
  * - Gate lives in ad_should_fire: fires only while a Videy watch page is mounted,
  *   only on a real user click, not on the pre-roll ad/skip button or age gate,
  *   only 10 s after the VAST pre-roll ended/was skipped/failed (videy-player.tsx sets
- *   __kdpVpopArmAt), or 10 s after opening when the pre-roll was already shown in the last 30 min (any tab),
+ *   __kdpVpopArmAt). When it opens, the next Videy page (the new tab) skips the pre-roll once (SKIP_KEY, 60 s),
  *   max 3 per 5 minutes (zone settings).
  * - SPA navigation away flips the gate off, so other pages never open a tab.
  */
@@ -14,9 +14,8 @@ const ZONE = 6055468;
 const SRC = "https://a.pemsrv.com/popunder1000.js";
 const CAP_MS = 5 * 60 * 1000;
 const CAP_COUNT = 3;
-const ARM_MS = 10 * 1000;
-const PREROLL_DONE_KEY = "kdp:vpre:at";
-const PREROLL_WINDOW_MS = 30 * 60 * 1000;
+/** Read by videy-player.tsx: the tab the popunder opens skips the pre-roll once (60 s). */
+const SKIP_KEY = "kdp:vpop:skip";
 const LS_KEY = "kdp:vpop:times";
 
 type PopWin = Window & {
@@ -55,15 +54,8 @@ export function VideyPopunder() {
   useEffect(() => {
     const w = window as unknown as PopWin;
     w.__kdpVpopOn = true;
-    let done = false;
-    try {
-      const at = Number(localStorage.getItem(PREROLL_DONE_KEY) || 0);
-      done = at > 0 && Date.now() - at < PREROLL_WINDOW_MS;
-    } catch {
-      done = false;
-    }
-    // No pre-roll this time: arm 10 s after opening. Otherwise the player arms it after the pre-roll.
-    w.__kdpVpopArmAt = done ? Date.now() + ARM_MS : Number.POSITIVE_INFINITY;
+    // Armed by the player 10 s after the pre-roll ends, is skipped or fails (or is skipped once).
+    w.__kdpVpopArmAt = Number.POSITIVE_INFINITY;
 
     const onDown = (e: Event) => {
       w.__kdpVpopTarget = e.isTrusted ? (e.target as Element | null) : null;
@@ -93,6 +85,11 @@ export function VideyPopunder() {
         if (list.length >= CAP_COUNT) return false;
         list.push(now);
         saveOpens(list);
+        try {
+          localStorage.setItem(SKIP_KEY, String(now));
+        } catch {
+          /* ignore */
+        }
         return true;
       };
       const s = document.createElement("script");
