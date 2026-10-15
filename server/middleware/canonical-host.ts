@@ -29,7 +29,8 @@ export default function canonicalHostMiddleware(
   return new Response(null, {
     status: 301,
     headers: {
-      location: `https://${COM_HOST}${event.url.pathname}${event.url.search}`,
+      // Strip trailing slash here too so www + "/kategori/" is still a single 301 hop.
+      location: `https://${COM_HOST}${event.url.pathname.length > 1 ? event.url.pathname.replace(/\/+$/, "") || "/" : event.url.pathname}${event.url.search}`,
     },
   });
 }

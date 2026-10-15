@@ -30,6 +30,9 @@ function parsePage(value: unknown): number | undefined {
   return Math.min(n, 500);
 }
 
+/** Halaman paginasi di atas ini: noindex,follow (link video tetap di-crawl). */
+const DEEP_PAGE_NOINDEX = 5;
+
 export const Route = createFileRoute("/kategori/$slug")({
   validateSearch: (search: Record<string, unknown>) => ({
     page: parsePage(search.page),
@@ -80,7 +83,12 @@ export const Route = createFileRoute("/kategori/$slug")({
         { property: "og:url", content: url },
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
-        ...(emptyPeriod ? [{ name: "robots", content: "noindex,follow" }] : []),
+        ...(emptyPeriod || page > DEEP_PAGE_NOINDEX
+          ? [
+              { name: "robots", content: "noindex,follow" },
+              { name: "googlebot", content: "noindex,follow" },
+            ]
+          : []),
       ],
       links: [{ rel: "canonical", href: url }],
     };

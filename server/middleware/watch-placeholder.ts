@@ -1,6 +1,9 @@
 /**
  * URL template /watch/$id (atau /watch/:id, /watch/{id}) yang sempat terindeks → 404 + noindex.
- * Hidden ids (minor/school-themed content, see src/lib/catalog/hidden-ids.js) → real 404 + noindex.
+ * Hidden ids (minor/school-themed content, see src/lib/catalog/hidden-ids.js) → 410 Gone + noindex
+ * (video tidak dihapus, cuma disembunyikan; 410 bikin Google cepat buang URL-nya).
+ * Template /kategori/$slug yang bocor dari manifest router → 410.
+ * Trailing slash (mis. /kategori/) → satu kali 301 ke versi tanpa slash.
  */
 import { isPublicHidden } from "../../src/lib/catalog/local-cache";
 
@@ -10,11 +13,12 @@ interface WatchPlaceholderEvent {
 }
 
 const PLACEHOLDER_RE = /^\/(watch|v)\/(\$id|%24id|:id|\{id\}|%7bid%7d)\/?$/i;
+const CAT_PLACEHOLDER_RE = /^\/kategori\/(\$slug|%24slug|:slug|\{slug\}|%7bslug%7d)\/?$/i;
 const WATCH_ID_RE = /^\/(?:watch|v)\/([A-Za-z0-9_-]{3,64})\/?$/;
 
-function notFound(): Response {
-  return new Response("Not Found", {
-    status: 404,
+function notFound(status = 404): Response {
+  return new Response(status === 410 ? "Gone" : "Not Found", {
+    status,
     headers: {
       "content-type": "text/plain; charset=utf-8",
       "x-robots-tag": "noindex, nofollow",
@@ -39,11 +43,25 @@ export default async function watchPlaceholderMiddleware(
       headers: { "content-type": "text/plain; charset=utf-8", "x-robots-tag": "noindex" },
     });
   }
-  if (PLACEHOLDER_RE.test(event.url.pathname)) return notFound();
+  const path = event.url.pathname;
+  if (PLACEHOLDER_RE.test(path)) return notFound();
+  if (CAT_PLACEHOLDER_RE.test(path)) return notFound(410);
+  if (
+    path.length > 1 &&
+    path.endsWith("/") &&
+    !path.startsWith("/api/") &&
+    (event.req.method === "GET" || event.req.method === "HEAD")
+  ) {
+    const clean = path.replace(/\/+$/, "") || "/";
+    return new Response(null, {
+      status: 301,
+      headers: { location: `https://koleksidrpinguin.com${clean}${event.url.search}` },
+    });
+  }
   const m = event.url.pathname.match(WATCH_ID_RE);
   if (m) {
     try {
-      if (await isPublicHidden(m[1])) return notFound();
+      if (await isPublicHidden(m[1])) return notFound(410);
     } catch {
       /* catalog unavailable: let the page decide */
     }

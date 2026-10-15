@@ -67,6 +67,9 @@ function seedFromLoader(loaderData: Awaited<ReturnType<typeof loadHome>>): {
   return null;
 }
 
+/** Halaman paginasi di atas ini: noindex,follow (link video tetap di-crawl). */
+const DEEP_PAGE_NOINDEX = 5;
+
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>): HomeSearch => ({
     q: typeof search.q === "string" && search.q.trim() ? search.q.trim() : undefined,
@@ -125,7 +128,7 @@ export const Route = createFileRoute("/")({
         { property: "og:type", content: "website" },
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
-        ...(q
+        ...(q || page > DEEP_PAGE_NOINDEX
           ? [
               { name: "robots", content: "noindex, follow" },
               { name: "googlebot", content: "noindex, follow" },
