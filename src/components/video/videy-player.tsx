@@ -16,6 +16,27 @@ import type { VideoDetail } from "@/lib/catalog/types";
  * screen to landscape where the browser allows it, and unlocks on exit.
  */
 const VAST_TAG = "https://s.magsrv.com/v1/vast.php?idz=6054340";
+/** Pre-roll once per visitor session: set after a pre-roll was shown (ended, skipped or failed). */
+const PREROLL_DONE_KEY = "kdp:vpre:done";
+function prerollDone(): boolean {
+  try {
+    return sessionStorage.getItem(PREROLL_DONE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function markPrerollDone(): void {
+  try {
+    sessionStorage.setItem(PREROLL_DONE_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+}
+/** Tells the Videy popunder (videy-popunder.tsx) it may arm 10 s from now. */
+function armPopunder(): void {
+  const w = window as unknown as { __kdpVpopArmAt?: number };
+  w.__kdpVpopArmAt = Date.now() + 10_000;
+}
 const AD_TIMEOUT_MS = 7000;
 const SKIP_DEFAULT_S = 10;
 const MAX_WRAPPERS = 4;
@@ -202,6 +223,8 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
   }, []);
 
   const playMain = useCallback(() => {
+    if (adRef.current) markPrerollDone();
+    armPopunder();
     adRef.current = null;
     setPhase("main");
     const v = videoRef.current;
@@ -231,7 +254,8 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
       v.muted = false;
       v.load();
     }
-    adReq.current = fetchAd();
+    // Pre-roll already shown this session: no VAST request.
+    adReq.current = prerollDone() ? null : fetchAd();
   }, [item.id]);
 
   // Landscape lock while fullscreen (wrapper or native video button), unlock on exit.
@@ -307,6 +331,10 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     if (el0) {
       el0.muted = false;
       void el0.play().catch(() => undefined);
+    }
+    if (prerollDone()) {
+      adReq.current = null;
+      return playMain();
     }
     const req = adReq.current || fetchAd();
     adReq.current = null;
