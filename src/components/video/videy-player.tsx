@@ -16,18 +16,24 @@ import type { VideoDetail } from "@/lib/catalog/types";
  * screen to landscape where the browser allows it, and unlocks on exit.
  */
 const VAST_TAG = "https://s.magsrv.com/v1/vast.php?idz=6054340";
-/** Pre-roll once per visitor session: set after a pre-roll was shown (ended, skipped or failed). */
-const PREROLL_DONE_KEY = "kdp:vpre:done";
+/**
+ * Pre-roll once per visit: timestamp in localStorage (shared with new tabs, e.g. the one the
+ * popunder opens), set after a pre-roll was shown (ended, skipped or failed), valid 30 minutes.
+ * Same key and window in videy-popunder.tsx.
+ */
+const PREROLL_DONE_KEY = "kdp:vpre:at";
+const PREROLL_WINDOW_MS = 30 * 60 * 1000;
 function prerollDone(): boolean {
   try {
-    return sessionStorage.getItem(PREROLL_DONE_KEY) === "1";
+    const at = Number(localStorage.getItem(PREROLL_DONE_KEY) || 0);
+    return at > 0 && Date.now() - at < PREROLL_WINDOW_MS;
   } catch {
     return false;
   }
 }
 function markPrerollDone(): void {
   try {
-    sessionStorage.setItem(PREROLL_DONE_KEY, "1");
+    localStorage.setItem(PREROLL_DONE_KEY, String(Date.now()));
   } catch {
     /* ignore */
   }
@@ -254,7 +260,7 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
       v.muted = false;
       v.load();
     }
-    // Pre-roll already shown this session: no VAST request.
+    // Pre-roll already shown in the last 30 minutes: no VAST request.
     adReq.current = prerollDone() ? null : fetchAd();
   }, [item.id]);
 

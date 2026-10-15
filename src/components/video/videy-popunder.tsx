@@ -6,7 +6,7 @@ import { useEffect } from "react";
  * - Gate lives in ad_should_fire: fires only while a Videy watch page is mounted,
  *   only on a real user click, not on the pre-roll ad/skip button or age gate,
  *   only 10 s after the VAST pre-roll ended/was skipped/failed (videy-player.tsx sets
- *   __kdpVpopArmAt), or 10 s after opening when the pre-roll was already shown this session,
+ *   __kdpVpopArmAt), or 10 s after opening when the pre-roll was already shown in the last 30 min (any tab),
  *   max 3 per 5 minutes (zone settings).
  * - SPA navigation away flips the gate off, so other pages never open a tab.
  */
@@ -15,7 +15,8 @@ const SRC = "https://a.pemsrv.com/popunder1000.js";
 const CAP_MS = 5 * 60 * 1000;
 const CAP_COUNT = 3;
 const ARM_MS = 10 * 1000;
-const PREROLL_DONE_KEY = "kdp:vpre:done";
+const PREROLL_DONE_KEY = "kdp:vpre:at";
+const PREROLL_WINDOW_MS = 30 * 60 * 1000;
 const LS_KEY = "kdp:vpop:times";
 
 type PopWin = Window & {
@@ -56,7 +57,8 @@ export function VideyPopunder() {
     w.__kdpVpopOn = true;
     let done = false;
     try {
-      done = sessionStorage.getItem(PREROLL_DONE_KEY) === "1";
+      const at = Number(localStorage.getItem(PREROLL_DONE_KEY) || 0);
+      done = at > 0 && Date.now() - at < PREROLL_WINDOW_MS;
     } catch {
       done = false;
     }
