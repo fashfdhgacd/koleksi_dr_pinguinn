@@ -32,6 +32,8 @@ import { isLockedMinorId, lockedMinorReason } from "./minor-lock.js";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
 import latestVideos from "../../../data/videos-latest.json";
+// Putarin uploads from the Telegram bot land here (bot appends, dedupes by id); bundle so every batch stays live.
+import latestPutarin from "../../../data/putarin-latest.json";
 import latestPosters from "../../../data/latest-posters.json";
 
 // Re-bind mutable cache/inflight via shared module namespace
@@ -397,6 +399,7 @@ export function assembleLocal(): { items: RawItem[]; posters: Record<string, str
   const st = withIds(asList(streamtapeBatch)).filter(isUsable);
   const st2 = withIds(asList(streamtapeBatchSep25)).filter(isUsable);
   const pu = withIds(asList(putarinBatch)).filter(isUsable);
+  const pl = withIds(asList(latestPutarin)).filter(isUsable);
   // Owner folder ingest (IndoAV/UserBokep /f/ folders). Placed last so existing entries always win.
   const fb = withIds(asList(folderBatch20261007)).filter(isUsable);
   const posters: Record<string, string> = {
@@ -404,7 +407,7 @@ export function assembleLocal(): { items: RawItem[]; posters: Record<string, str
     ...asPosterMap(javPosters),
     ...asPosterMap(latestPosters),
   };
-  return { items: uniqById([...latest, ...st, ...st2, ...pu, ...local, ...fb]), posters };
+  return { items: uniqById([...latest, ...pl, ...st, ...st2, ...pu, ...local, ...fb]), posters };
 }
 
 export async function refreshRemote(base: { items: RawItem[]; posters: Record<string, string> }): Promise<CatalogCache> {
@@ -516,6 +519,4 @@ export async function listHiddenCandidates(unhideAt: Record<string, number> = {}
 }
 
 /** Katalog publik = semua item (tanpa filter minor / Tidak publish). */
-export async function loadItems(): Promise<CatalogCache> {
-  return loadItemsRaw();
-}
+[+86 bytes at .content[1].resource.text]
