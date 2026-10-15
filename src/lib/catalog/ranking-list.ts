@@ -8,8 +8,11 @@
  *  - Views week/month: our own /watch/<id> pageviews (D1 analytics_events), ONE aggregate query per
  *    period, cached in KV ("rank:views:v1:<period>", refreshed at most every 60 min) and in-isolate for
  *    10 min. Videy is included in these two tabs.
- *  - Likes week/month: deltas from rank-periods.json (written by scripts/stats-snapshot.py). Our D1 likes
- *    join a period only when a D1 day snapshot exists for the period's start date.
+ *  - Likes week/month: our own visitors' likes inside the period, from the dated D1 like rows
+ *    (video_like_guard, kept 32 days; sum(liked) per id) or the delta against the oldest KV day snapshot in
+ *    the period, whichever is larger; plus source-like deltas from rank-periods.json when present. ONE
+ *    aggregate query per period, cached in KV ("rank:likes:p1:<period>", refreshed at most every 60 min).
+ *    After the period-liked videos come the newest catalog videos by total likes, so the tab never runs dry.
  */
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos } from "./types";
@@ -125,6 +128,90 @@ async function siteLikesOnDay(day: string): Promise<LikeMap | null> {
   return out;
 }
 
+const LIKES_PERIOD_KV = "rank:likes:p1:";
+const LIKES_PERIOD_FRESH_MS = 60 * 60_000;
+
+async function readD1LikesSince(day: string): Promise<LikeMap | null> {
+  if (!import.meta.env.SSR) return null;
+  try {
+    const { getD1 } = await import("@/lib/analytics-d1");
+    const db = await getD1();
+    if (!db) return null;
+    const res = await db
+      .prepare(
+        "select id, sum(liked) as n from video_like_guard where day >= ? group by id having n > 0 order by n desc limit 20000",
+      )
+      .bind(day)
+      .all<{ id: string; n: number }>();
+    const out: LikeMap = {};
+    for (const r of res.results || []) {
+      const n = Math.floor(Number(r.n) || 0);
+      if (r.id && n > 0) out[String(r.id)] = n;
+    }
+    return out;
+  } catch {
+    return null; // table not created yet / D1 unavailable
+  }
+}
+
+/** Oldest KV like snapshot on or after `from` (and before today), with its day. */
+async function oldestSnapshotSince(from: string, today: string): Promise<LikeMap | null> {
+  let t = Date.parse(`${from}T00:00:00Z`);
+  const end = Date.parse(`${today}T00:00:00Z`);
+  for (let i = 0; i < 31 && t < end; i++, t += 86_400_000) {
+    const snap = await siteLikesOnDay(new Date(t).toISOString().slice(0, 10));
+    if (snap) return snap;
+  }
+  return null;
+}
+
+const likesPeriodMemo = new Map<string, { at: number; likes: LikeMap }>();
+const likesPeriodInflight = new Map<string, Promise<LikeMap>>();
+
+/** Our own visitor likes per id within the week/month range (D1 + KV snapshots via KV cache). Never throws. */
+async function siteLikesPeriod(period: "week" | "month", from: string): Promise<LikeMap> {
+  const now = Date.now();
+  const memo = likesPeriodMemo.get(period);
+  if (memo && now - memo.at < MEMO_MS) return memo.likes;
+  const running = likesPeriodInflight.get(period);
+  if (running) return running;
+  const p = (async () => {
+    let cached: { at: number; from?: string; likes: LikeMap } | null = null;
+    try {
+      const raw = await kvGet(LIKES_PERIOD_KV + period);
+      cached = raw ? (JSON.parse(raw) as { at: number; from?: string; likes: LikeMap }) : null;
+    } catch {
+      cached = null;
+    }
+    if (cached && cached.from === from && now - Number(cached.at) < LIKES_PERIOD_FRESH_MS) {
+      likesPeriodMemo.set(period, { at: now, likes: cached.likes || {} });
+      return cached.likes || {};
+    }
+    const rows = await readD1LikesSince(from);
+    let likes: LikeMap | null = rows ? { ...rows } : null;
+    const base = await oldestSnapshotSince(from, wibDay(now)).catch(() => null);
+    if (base) {
+      const site = await siteLikes();
+      likes ??= {};
+      for (const [id, n] of Object.entries(site)) {
+        const d = n - (base[id] || 0);
+        if (d > (likes[id] || 0)) likes[id] = d;
+      }
+    }
+    if (likes) await kvPut(LIKES_PERIOD_KV + period, JSON.stringify({ at: now, from, likes }), 6 * 3600);
+    const out = likes || cached?.likes || {};
+    likesPeriodMemo.set(period, { at: now, likes: out });
+    return out;
+  })().finally(() => {
+    likesPeriodInflight.delete(period);
+  });
+  likesPeriodInflight.set(period, p);
+  return p;
+}
+
+/** How many of the newest catalog videos pad the likes week/month tabs after the period-liked ones. */
+const RECENT_PAD = { week: 240, month: 960 } as const;
+
 const VIEWS_KV = "rank:views:v2:";
 const VIEWS_FRESH_MS = 60 * 60_000;
 
@@ -215,16 +302,45 @@ async function rankedList(kind: RankKind, period: RankPeriod): Promise<Ranked[]>
       kind === "views"
         ? (it) => (typeof it.views === "number" ? it.views : 0)
         : (it) => (typeof it.likes === "number" ? it.likes : 0) + (site[it.id] || 0);
+  } else if (kind === "likes") {
+    const info = rankPeriodInfo(kind, period);
+    if (!info) return [];
+    const data = (await loadPeriods())[period];
+    const src = data?.likes || {};
+    const own = await siteLikesPeriod(period as "week" | "month", info.from);
+    score = (it) => (src[it.id] || 0) + (own[it.id] || 0);
+    const list: Ranked[] = [];
+    const seen = new Set<string>();
+    for (const it of pool) {
+      const s = score(it);
+      if (s > 0) {
+        list.push({ item: it, score: s });
+        seen.add(it.id);
+      }
+    }
+    list.sort(
+      (a, b) =>
+        b.score - a.score ||
+        (Number(b.item.likes) || 0) - (Number(a.item.likes) || 0) ||
+        a.item.id.localeCompare(b.item.id),
+    );
+    // Pad with the newest public videos by total likes (source + ours), so the tab is never near-empty.
+    const poolIds = new Set(pool.map((it) => it.id));
+    const total = (it: RawItem) => (typeof it.likes === "number" ? it.likes : 0) + (site[it.id] || 0);
+    const recent = cache.mainSorted
+      .filter((it) => it?.id && poolIds.has(it.id) && !seen.has(it.id))
+      .slice(0, RECENT_PAD[period as "week" | "month"])
+      .filter((it) => total(it) > 0)
+      .map((it) => ({ item: it, score: 0, t: total(it) }))
+      .sort((a, b) => b.t - a.t || a.item.id.localeCompare(b.item.id));
+    for (const r of recent) list.push({ item: r.item, score: 0 });
+    listMemo.set(key, { at: now, src: cache, list });
+    return list;
   } else {
     const data = (await loadPeriods())[period];
     if (!data) return [];
-    const src = kind === "views" ? data.views || {} : data.likes || {};
-    const base = kind === "likes" ? await siteLikesOnDay(data.from) : null;
-    score = (it) => {
-      let s = src[it.id] || 0;
-      if (base) s += Math.max(0, (site[it.id] || 0) - (base[it.id] || 0));
-      return s;
-    };
+    const src = data.views || {};
+    score = (it) => src[it.id] || 0;
   }
   const list: Ranked[] = [];
   for (const it of pool) {

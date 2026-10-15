@@ -6,7 +6,9 @@ import { getDetail } from "@/lib/catalog/local";
  * Our own likes, stored in Cloudflare D1 (binding ANALYTICS_DB) for exact counts:
  *  - video_likes:       one row per video, atomic UPSERT n = n + 1
  *  - video_like_guard:  unique (id, visitor, day) row = one like per visitor per video per day
- *    (rows older than 2 days are deleted opportunistically, at most once per 6 h per isolate)
+ *    (rows older than 32 days are deleted opportunistically, at most once per 6 h per isolate).
+ *    The same rows double as the dated like log for the "Minggu ini" / "Bulan ini" tabs of
+ *    /kategori/paling-disukai (sum(liked) per id since a day; see ranking-list.ts), so no extra writes.
  * Only ids of videos that are actually public in the catalog can be liked (no rows for made-up ids),
  * and storage errors are never echoed to the client.
  * Kept separate from src/lib/catalog/video-stats.json (source stats refreshed by the GitHub
@@ -28,6 +30,7 @@ const SCHEMA = [
      primary key (id, visitor, day)
    )`,
   `create index if not exists video_like_guard_created on video_like_guard (created_at)`,
+  `create index if not exists video_like_guard_day on video_like_guard (day)`,
 ];
 
 const BOT_UA = /bot|crawl|spider|slurp|headless|curl\/|wget|python-requests|preview/i;
@@ -74,11 +77,11 @@ async function isLikeableId(id: string): Promise<boolean> {
   return ok;
 }
 
-const GUARD_KEEP_MS = 2 * 24 * 3600_000;
+const GUARD_KEEP_MS = 32 * 24 * 3600_000;
 const CLEANUP_EVERY_MS = 6 * 3600_000;
 let lastCleanup = 0;
 
-/** Delete like-guard rows older than 2 days (one-like-per-day only needs today's rows). */
+/** Delete like-guard rows older than 32 days (kept that long for the week/month like rankings). */
 async function cleanupGuard(db: D1DatabaseLike): Promise<void> {
   const now = Date.now();
   if (now - lastCleanup < CLEANUP_EVERY_MS) return;

@@ -59,22 +59,27 @@ function wibToday(now = Date.now()): string {
 }
 
 /**
- * Period range for a ranking. Views week/month come from the site's own pageviews (D1), so they are
- * always available: the range is the last 7/30 WIB days, clamped to SITE_VIEWS_FROM. Likes keep the
- * snapshot-based meta.
+ * Period range for a ranking. Views week/month come from the site's own pageviews (D1); likes
+ * week/month from the site's own dated likes (D1 video_like_guard rows + KV day snapshots), plus
+ * source-like deltas when rank-periods.json has them. Both are always available: the range is the
+ * last 7/30 WIB days, clamped to SITE_VIEWS_FROM / SITE_LIKES_FROM.
  */
+/** First day our own dated like history (D1 day rows + KV day snapshots) can cover. */
+export const SITE_LIKES_FROM = "2026-10-09";
+
 export function rankPeriodInfo(kind: RankKind, period: RankPeriod, now = Date.now()): PeriodMeta {
-  if (kind !== "views" || period === "all") return periodInfo(period);
+  if (period === "all") return periodInfo(period);
   const to = wibToday(now);
   const span = period === "week" ? 7 : 30;
+  const floor = kind === "views" ? SITE_VIEWS_FROM : SITE_LIKES_FROM;
   let from = new Date(Date.parse(`${to}T00:00:00Z`) - (span - 1) * 86_400_000).toISOString().slice(0, 10);
-  if (from < SITE_VIEWS_FROM) from = SITE_VIEWS_FROM;
+  if (from < floor) from = floor;
   const days = Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
   return { from, to, days };
 }
 
-export function rankPeriodAvailable(kind: RankKind, period: RankPeriod): boolean {
-  return kind === "views" ? true : periodAvailable(period);
+export function rankPeriodAvailable(_kind: RankKind, _period: RankPeriod): boolean {
+  return true;
 }
 
 export function periodExpectedFrom(period: RankPeriod): string | null {
@@ -117,6 +122,16 @@ export function rankingSeo(def: RankingDef, period: RankPeriod = "all"): { title
       description:
         "Bokep indo paling banyak ditonton minggu ini dan bulan ini di Dr. Pinguin, dari video viral terbaru sampai videy viral.",
       intro: "Bokep indo paling banyak ditonton sepanjang masa, diurutkan dari total tayangan. Diperbarui otomatis tiap 12 jam.",
+    };
+  }
+  if (period === "week" || period === "month") {
+    const word = period === "week" ? "minggu ini" : "bulan ini";
+    const span = period === "week" ? "7 hari" : "30 hari";
+    return {
+      h1: "Bokep Indo Paling Banyak Disukai",
+      title: `Bokep Indo Paling Banyak Disukai ${word.replace(/^./, (c) => c.toUpperCase())} ${year} | koleksidrpinguin.com`,
+      description: `Bokep indo paling banyak disukai ${word} di Dr. Pinguin, dari tombol suka pengunjung situs ini. Khusus 18+.`,
+      intro: `Video yang paling banyak disukai ${word}: urutannya dari tombol suka pengunjung situs ini selama ${span} terakhir, disusul video terbaru dengan suka terbanyak. Khusus pengunjung 18 tahun ke atas.`,
     };
   }
   return {
