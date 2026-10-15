@@ -7,7 +7,7 @@ import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { isRealMinor } from "@/lib/minor-terms";
 import { BRAND_POSTER, VideoThumb } from "./thumb";
 
-const ROTATE_MS = 5 * 60 * 1000;
+const ROTATE_MS = 60 * 60 * 1000;
 
 type HeroProps = {
   video?: VideoCardType;
