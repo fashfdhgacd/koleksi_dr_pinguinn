@@ -10,7 +10,7 @@ import latestVideos from "../../../data/videos-latest.json";
  * (data/putarin-latest.json, data/videos-latest.json) with their status in the live catalog.
  * Reads only bundled data and the in-memory catalog, so no D1/KV/GitHub calls.
  */
-const LIMIT = 40;
+const LIMIT = 80;
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, { status, headers: { "cache-control": "no-store", "x-robots-tag": "noindex" } });
