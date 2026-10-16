@@ -337,7 +337,7 @@ function uploadDateFromId(id: string): string {
   const day = (Math.abs(h) % 28) + 1;
   const month = (Math.abs(h >> 5) % 12) + 1;
   const year = 2025 + (Math.abs(h >> 9) % 2);
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T00:00:00+07:00`;
 }
 
 export function videoJsonLd(input: {
