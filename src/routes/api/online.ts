@@ -87,17 +87,17 @@ function allowOrigin(request: Request): string {
   return "https://koleksidrpinguin.com";
 }
 
-function json(request: Request, data: unknown, status = 200): Response {
-  return Response.json(data, {
-    status,
-    headers: {
-      "cache-control": "no-store",
-      "access-control-allow-origin": allowOrigin(request),
-      "access-control-allow-methods": "GET, POST, OPTIONS",
-      "access-control-allow-headers": "content-type, x-online-key",
-      vary: "Origin",
-    },
-  });
+function json(request: Request, data: unknown, status = 200, presence?: "d1" | "kv"): Response {
+  const headers: Record<string, string> = {
+    "cache-control": "no-store",
+    "access-control-allow-origin": allowOrigin(request),
+    "access-control-allow-methods": "GET, POST, OPTIONS",
+    "access-control-allow-headers": "content-type, x-online-key",
+    vary: "Origin",
+  };
+  // Where this heartbeat's presence went (diagnostic only): "d1" = no KV write, "kv" = KV online:<id>.
+  if (presence) headers["x-presence"] = presence;
+  return Response.json(data, { status, headers });
 }
 
 function clientIp(request: Request): string {
@@ -214,16 +214,18 @@ async function handlePost(request: Request): Promise<Response> {
   if (fresh) lastTouch.set(id, now);
   if (normPath) lastPathById.set(id, normPath);
 
+  let presence: "d1" | "kv" | undefined;
   if (shouldTouchPresence || shouldRecordView) {
     try {
       const device = classifyDevice(ua);
-      await kvTouchLive({
+      const wroteKv = await kvTouchLive({
         id,
         path: normPath || undefined,
         ref: ref || undefined,
         device,
         recordView: shouldRecordView,
       });
+      presence = wroteKv ? "kv" : "d1";
       if (shouldRecordView) {
         await recordHit({
           path: normPath,
@@ -238,16 +240,17 @@ async function handlePost(request: Request): Promise<Response> {
       }
       // PG presence + peak for every presence touch and every pageview (SPA nav).
       // Awaited: Workers cancel un-awaited promises after the response is sent.
-      // skipKv: kvTouchLive already wrote online:<id> this request.
+      // skipKv: kvTouchLive already wrote online:<id> this request (only when D1 is unavailable;
+      // touchOnline writes it itself if a D1 call fails).
       if (shouldTouchPresence || shouldRecordView) {
-        await touchOnline(id, { skipKv: true });
+        await touchOnline(id, { skipKv: wroteKv });
       }
     } catch {
       return json(request, { ok: true, skipped: "busy" });
     }
   }
 
-  if (!owner) return json(request, { ok: true });
+  if (!owner) return json(request, { ok: true }, 200, presence);
   try {
     return json(request, { ok: true, owner: true, ...(await liveOwnerPayload(new URL(request.url).origin)) });
   } catch {
