@@ -6,9 +6,15 @@
  * are live (that was the "Riwayat 14 hari" vs top-card mismatch). Daily totals now
  * come from Postgres events (or KV daystats fallback) in owner-analytics-stats;
  * this roll is only used as a fallback for the top lists.
+ *
+ * KV write budget (Oct 2026: the free 1M writes/month ran out): when the D1 binding ANALYTICS_DB is
+ * ready, presence lives in D1 analytics_sessions (touchOnline), so no online:<id> key is written and
+ * no KV list() is made per heartbeat, and the roll is flushed at most once per ROLL_FLUSH_D1_MS per
+ * isolate. Without D1 everything works exactly as before (KV presence + 20 s roll flush).
  */
 
 import { resolveAnalyticsKV, type KVNamespaceLike } from "@/lib/analytics-kv";
+import { readyD1 } from "@/lib/analytics-d1";
 
 const ONLINE_PREFIX = "online:";
 const ROLL_PREFIX = "roll:";
@@ -16,6 +22,8 @@ const ROLL_PREFIX = "roll:";
 const ONLINE_TTL_SEC = 180;
 const ROLL_TTL_SEC = 90 * 24 * 3600;
 const FLUSH_MS = 20_000;
+/** Roll flush interval when D1 is the source of truth (the roll is then only a fallback). */
+const ROLL_FLUSH_D1_MS = 60 * 60_000;
 const COUNT_CACHE_MS = 45_000;
 const HISTORY_CACHE_MS = 60_000;
 
@@ -95,10 +103,10 @@ function parseRoll(raw: string | null): KvRoll {
   }
 }
 
-async function flushRoll(force = false): Promise<void> {
+async function flushRoll(force = false, every = FLUSH_MS): Promise<void> {
   if (!rollDirty || !rollMem) return;
   const now = Date.now();
-  if (!force && now - lastFlush < FLUSH_MS) return;
+  if (!force && now - lastFlush < every) return;
   const store = await kv();
   if (!store) return;
   lastFlush = now;
@@ -154,6 +162,19 @@ export async function kvReadHistory(days = 14): Promise<KvDayRow[]> {
   return rows;
 }
 
+/** True when the D1 analytics binding is bound and its schema is ready (cached per isolate). */
+async function d1Ready(): Promise<boolean> {
+  try {
+    return Boolean(await readyD1());
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Presence touch + roll bump. Returns true when it wrote the KV presence key online:<id>
+ * (only when D1 is not available; with D1, presence is the analytics_sessions row).
+ */
 export async function kvTouchLive(input: {
   id: string;
   path?: string;
@@ -161,24 +182,29 @@ export async function kvTouchLive(input: {
   device?: string;
   onlineGuess?: number;
   recordView?: boolean;
-}): Promise<void> {
+}): Promise<boolean> {
   const id = input.id.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
-  if (!id) return;
+  if (!id) return false;
+  let wrote = false;
   try {
     const store = await kv();
-    if (!store) return;
+    if (!store) return false;
     const now = Date.now();
     const day = dayKey(now);
-    await store.put(`${ONLINE_PREFIX}${id}`, "1", { expirationTtl: ONLINE_TTL_SEC });
-    // Cached list() (45s) — avoids one KV list per heartbeat. Real peak is
-    // recorded by touchOnline (Postgres sessions / KV daystats).
-    const onlineNow = Math.max(
-      1,
-      Number(input.onlineGuess) || 0,
-      await kvCountOnline(),
-    );
+    const viaD1 = await d1Ready();
+    let onlineNow = Math.max(1, Number(input.onlineGuess) || 0);
+    if (!viaD1) {
+      await store.put(`${ONLINE_PREFIX}${id}`, "1", { expirationTtl: ONLINE_TTL_SEC });
+      wrote = true;
+      // Cached list() (45s) — avoids one KV list per heartbeat. Real peak is
+      // recorded by touchOnline (Postgres sessions / KV daystats).
+      onlineNow = Math.max(onlineNow, await kvCountOnline());
+    }
+    const flushEvery = viaD1 ? ROLL_FLUSH_D1_MS : FLUSH_MS;
 
     if (!rollMem || rollDay !== day) {
+      // New WIB day: save what is still buffered for the previous day first (one write).
+      if (rollMem && rollDay && rollDirty) await flushRoll(true).catch(() => undefined);
       rollDay = day;
       rollMem = parseRoll(await store.get(`${ROLL_PREFIX}${day}`));
     }
@@ -189,8 +215,8 @@ export async function kvTouchLive(input: {
     }
 
     if (input.recordView === false) {
-      await flushRoll(false);
-      return;
+      await flushRoll(false, flushEvery);
+      return wrote;
     }
 
     rollMem.views += 1;
@@ -203,10 +229,11 @@ export async function kvTouchLive(input: {
     // Unique visitors are counted by recordHitKv (uv:<day>:<id>) — no second marker here.
     rollDirty = true;
     historyCache = null;
-    await flushRoll(false);
+    await flushRoll(false, flushEvery);
   } catch {
     /* KV optional */
   }
+  return wrote;
 }
 
 export function rollToStats(roll: KvRoll, online: number, history: KvDayRow[] = []) {

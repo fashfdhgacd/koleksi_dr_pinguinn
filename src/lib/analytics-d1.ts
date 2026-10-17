@@ -221,10 +221,37 @@ export async function d1BumpPeak(
        values (?1, ?2, ?3)
        on conflict (day_wib) do update
        set peak = max(analytics_daily_peak.peak, excluded.peak),
-           updated_at = excluded.updated_at`,
+           updated_at = excluded.updated_at
+       where excluded.peak > analytics_daily_peak.peak`,
     )
     .bind(day, peak, now)
     .run();
+}
+
+/** Today's (WIB `day`) pageviews, distinct visitors and recorded peak — for the KV daystats mirror. */
+export async function d1TodayTotals(
+  db: D1DatabaseLike,
+  day: string,
+): Promise<{ views: number; unique: number; peak: number }> {
+  const t0 = wibDayStartMs(day);
+  const [ev, pk] = await Promise.all([
+    db
+      .prepare(
+        `select count(*) as views, count(distinct visitor_id) as uniq from analytics_events
+          where created_at >= ?1 and created_at < ?2 and event_type = 'pageview'`,
+      )
+      .bind(t0, t0 + DAY_MS)
+      .first<{ views: number; uniq: number }>(),
+    db
+      .prepare(`select peak from analytics_daily_peak where day_wib = ?1`)
+      .bind(day)
+      .first<{ peak: number }>(),
+  ]);
+  return {
+    views: Math.max(0, Number(ev?.views) || 0),
+    unique: Math.max(0, Number(ev?.uniq) || 0),
+    peak: Math.max(0, Number(pk?.peak) || 0),
+  };
 }
 
 export async function d1RecordHit(

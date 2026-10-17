@@ -1,5 +1,10 @@
 /**
  * Owner analytics presence + hit recording.
+ *
+ * KV write budget: with D1 (ANALYTICS_DB) ready, D1 is the only per-request store. The KV daystats
+ * fallback (daystats:<day>) is refreshed from D1 at most once per DAYSTATS_MIRROR_MS (shared through
+ * the `at` field in the KV value), instead of 1–2 KV writes per pageview (daystats + uv marker) and a
+ * KV read per heartbeat. Without D1, or when a D1 call fails, the old per-hit KV path is used.
  */
 import { getDbSource, getSql } from "@/lib/db";
 import { resolveAnalyticsKV } from "@/lib/analytics-kv";
@@ -8,9 +13,11 @@ import {
   d1CountOnline,
   d1Ping,
   d1RecordHit,
+  d1TodayTotals,
   d1TouchSession,
   getD1,
   readyD1,
+  type D1DatabaseLike,
 } from "@/lib/analytics-d1";
 import { kvCountOnline } from "@/lib/kv-live";
 import {
@@ -28,9 +35,36 @@ import {
   normalizePath,
   normalizeRef,
   optionalKvPut,
+  readDayStatsKv,
   recordHitKv,
   safeId,
+  writeDayStatsKv,
 } from "@/lib/owner-analytics-shared";
+
+/** How often today's KV daystats fallback is refreshed from D1 (whole site, not per isolate). */
+const DAYSTATS_MIRROR_MS = 15 * 60_000;
+const mirrorState = globalThis as typeof globalThis & { __kvDayMirrorAt__?: number };
+
+/**
+ * Copy today's D1 totals (views, unique visitors, peak) into KV daystats:<day> so the owner panel
+ * still has a recent history if D1 goes down. Isolate memory gates the KV read; the `at` stamp in
+ * the KV value gates the D1 query + KV write across isolates. Counts never go down.
+ */
+async function mirrorDayStatsKv(d1: D1DatabaseLike, now = Date.now()): Promise<void> {
+  if (now - (mirrorState.__kvDayMirrorAt__ || 0) < DAYSTATS_MIRROR_MS) return;
+  mirrorState.__kvDayMirrorAt__ = now;
+  const dk = dayKey(now);
+  const prev = await readDayStatsKv(dk);
+  if (prev.at && now - prev.at < DAYSTATS_MIRROR_MS) return;
+  const t = await d1TodayTotals(d1, dk);
+  const next = {
+    views: Math.max(prev.views, t.views),
+    unique: Math.max(prev.unique, t.unique),
+    peak: Math.max(prev.peak, t.peak),
+    at: now,
+  };
+  await writeDayStatsKv(dk, next);
+}
 
 /** Prune expired entries from in-memory presence map; return active count. */
 export function countMemoryOnline(now = Date.now()): number {
@@ -170,22 +204,26 @@ export async function touchOnline(id: string, opts: { skipKv?: boolean } = {}): 
   // 1) Always update memory (works even if DB/KV down)
   touchMemory(sid, now);
 
-  // 2) KV write-through (shared). /api/online already wrote online:<id> via kvTouchLive.
-  if (!opts.skipKv) {
+  // 2) KV presence key: only when D1 can't hold presence. skipKv = the caller (kvTouchLive) already
+  //    wrote online:<id> this request (it does so only when D1 is unavailable).
+  let kvWritten = Boolean(opts.skipKv);
+  const kvPresence = async () => {
+    if (kvWritten) return;
+    kvWritten = true;
     await optionalKvPut(`${ONLINE_KV_PREFIX}${sid}`, String(now), ONLINE_KV_TTL_SEC);
-  }
+  };
 
   // 3) D1 when bound, else Postgres when available
   try {
     const d1 = await readyD1();
     if (d1) {
+      // D1 sessions are shared across isolates: online count + peak need no KV.
       const dbCount = await d1TouchSession(d1, sid, now);
       const best = Math.max(dbCount, countMemoryOnline(now));
       await d1BumpPeak(d1, dayKey(now), best, now);
-      const total = Math.max(best, await countKvOnline(now));
-      await bumpPeakKv(total);
-      return total;
+      return best;
     }
+    await kvPresence();
     const sql = await getSql();
     await sql.query(
       `insert into analytics_sessions (session_id, visitor_id, last_seen_at)
@@ -215,6 +253,8 @@ export async function touchOnline(id: string, opts: { skipKv?: boolean } = {}): 
     return total;
   } catch (err) {
     console.error("[analytics] touchOnline db failed — using memory/KV", err);
+    // D1/Postgres failed: keep presence visible to other isolates through KV.
+    await kvPresence();
     const total = Math.max(countMemoryOnline(now), await countKvOnline(now));
     await bumpPeakKv(total);
     return total;
@@ -281,7 +321,8 @@ export async function recordHit(input: {
         now,
         hourUtc: hourUtcBucket(now).toISOString(),
       });
-      await recordHitKv({ visitorId, sessionId, path }).catch(() => undefined);
+      // KV daystats fallback: refreshed from D1 every DAYSTATS_MIRROR_MS, not per hit.
+      await mirrorDayStatsKv(d1, now).catch(() => undefined);
       return;
     }
     const sql = await getSql();

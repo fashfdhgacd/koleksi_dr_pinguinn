@@ -215,17 +215,20 @@ export async function optionalKvGet(key: string): Promise<string | null> {
   }
 }
 
-export type DayStatsKv = { views: number; unique: number; peak: number };
+/** `at` = epoch ms of the last D1 → KV mirror (absent on per-hit KV counters). */
+export type DayStatsKv = { views: number; unique: number; peak: number; at?: number };
 
 export async function readDayStatsKv(dk = dayKey()): Promise<DayStatsKv> {
   const raw = await optionalKvGet(`${DAYSTATS_KV_PREFIX}${dk}`);
   if (!raw) return { views: 0, unique: 0, peak: 0 };
   try {
     const j = JSON.parse(raw) as Partial<DayStatsKv>;
+    const at = Number(j.at) || 0;
     return {
       views: Math.max(0, Number(j.views) || 0),
       unique: Math.max(0, Number(j.unique) || 0),
       peak: Math.max(0, Number(j.peak) || 0),
+      ...(at > 0 ? { at } : {}),
     };
   } catch {
     return { views: 0, unique: 0, peak: 0 };
@@ -288,7 +291,7 @@ export function lastDayKeys(count = HISTORY_DAYS, now = Date.now()): string[] {
 export async function readDayStatsHistoryKv(count = HISTORY_DAYS, now = Date.now()): Promise<DayRow[]> {
   const keys = lastDayKeys(count, now);
   const rows = await Promise.all(keys.map((day) => readDayStatsKv(day)));
-  return keys.map((day, i) => ({ day, ...rows[i] }));
+  return keys.map((day, i) => ({ day, views: rows[i].views, unique: rows[i].unique, peak: rows[i].peak }));
 }
 
 export async function getKV() {
