@@ -16,7 +16,7 @@ const lastTouch = new Map<string, number>();
 const lastPathById = new Map<string, string>();
 const ipHits = new Map<string, { n: number; t: number }>();
 /** Rate-limit presence/heartbeat only; pageviews on path change bypass this. */
-const TOUCH_GAP_MS = 60_000;
+const TOUCH_GAP_MS = 120_000;
 const IP_WINDOW_MS = 60_000;
 const IP_MAX = 20;
 const OWNER_CACHE_MS = 20_000;
@@ -28,7 +28,7 @@ let ownerCache: { at: number; data: Record<string, unknown> } | null = null;
  * /api/owner…, which the worker entry never serves from cache, so it can't leak publicly.
  * Online count and peak are still recomputed from KV on every owner poll.
  */
-const SHARED_STATS_SEC = 60;
+const SHARED_STATS_SEC = 300;
 const SHARED_STATS_PATH = "/api/owner-stats-cache-v1";
 
 type OwnerStatsResult = Awaited<ReturnType<typeof getOwnerStats>>;
