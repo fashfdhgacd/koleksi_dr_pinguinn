@@ -3,8 +3,7 @@
  *
  * Selection order used by owner-analytics: D1 (when bound) → Postgres (when
  * DATABASE_URL is set) → KV/memory fallback. All timestamps are INTEGER epoch
- * ms; WIB (UTC+7) calendar days are computed with
- * `date((created_at/1000)+25200,'unixepoch')`.
+ * ms; a WIB (UTC+7) calendar day is the created_at range [wibDayStartMs(day), +24 h).
  */
 
 /** Minimal D1 surface (avoids a dependency on @cloudflare/workers-types). */
@@ -20,7 +19,6 @@ export interface D1DatabaseLike {
 }
 
 const BINDING = "ANALYTICS_DB";
-const WIB_DAY = `date((created_at/1000)+25200,'unixepoch')`;
 const DAY_MS = 86_400_000;
 /** Max rows for "Video terpopuler hari ini". */
 export const TOP_VIDEOS_LIMIT = 20;
@@ -120,6 +118,16 @@ const SCHEMA = [
      peak integer not null default 0,
      updated_at integer not null
    )`,
+  // One row per WIB day for the owner history (views, distinct visitors, max distinct visitors in a
+  // 2-minute bucket). Filled lazily by d1HistoryRows: past days once after they end, today at most
+  // every SUMMARY_TODAY_MS. Kept after analytics_events rows are pruned.
+  `create table if not exists analytics_daily_summary (
+     day_wib text primary key,
+     views integer not null default 0,
+     unique_visitors integer not null default 0,
+     est_peak integer not null default 0,
+     updated_at integer not null
+   )`,
 ];
 
 const g = globalThis as typeof globalThis & { __d1SchemaPromise__?: Promise<void> };
@@ -180,10 +188,16 @@ export function wibDayStartMs(day: string): number {
   return Date.parse(`${day}T00:00:00+07:00`);
 }
 
+/**
+ * "Online" window: visitors whose last pageview was in the last 5 minutes. There is no client
+ * heartbeat (presence-ping.tsx sends one ping per page), so this is pageview-based.
+ */
+export const ONLINE_WINDOW_D1_MS = 5 * 60_000;
+
 export function d1CountOnline(
   db: D1DatabaseLike,
   now = Date.now(),
-  windowMs = 120_000,
+  windowMs = ONLINE_WINDOW_D1_MS,
 ): Promise<number> {
   return count(
     db,
@@ -192,7 +206,7 @@ export function d1CountOnline(
   );
 }
 
-/** Upsert session, return D1 online count (last 2 min). */
+/** Upsert session, return D1 online count (last ONLINE_WINDOW_D1_MS). */
 export async function d1TouchSession(
   db: D1DatabaseLike,
   sid: string,
@@ -306,47 +320,130 @@ export async function d1RecordHit(
   ]);
 }
 
+/** Today's summary row is recomputed at most this often (the owner stats are cached 5 min anyway). */
+const SUMMARY_TODAY_MS = 5 * 60_000;
+/** A past day's row is final once it was computed this long after the day ended (late pings). */
+const SUMMARY_SETTLE_MS = 15 * 60_000;
+/** Most days computed from raw events in one call (first run = one-time backfill). */
+const SUMMARY_MAX_COMPUTE = 31;
+
+/** Views, distinct visitors and max distinct visitors per 2-minute bucket for one WIB day. */
+async function d1DayTotals(
+  db: D1DatabaseLike,
+  day: string,
+): Promise<{ views: number; uniq: number; est: number }> {
+  const t0 = wibDayStartMs(day);
+  const [tot, win] = await Promise.all([
+    db
+      .prepare(
+        `select count(*) as views, count(distinct visitor_id) as uniq from analytics_events
+          where created_at >= ?1 and created_at < ?2 and event_type = 'pageview'`,
+      )
+      .bind(t0, t0 + DAY_MS)
+      .first<{ views: number; uniq: number }>(),
+    db
+      .prepare(
+        `select max(c) as est from (
+           select created_at / 120000 as b, count(distinct visitor_id) as c from analytics_events
+            where created_at >= ?1 and created_at < ?2 and event_type = 'pageview'
+            group by b
+         )`,
+      )
+      .bind(t0, t0 + DAY_MS)
+      .first<{ est: number }>(),
+  ]);
+  return {
+    views: Math.max(0, Number(tot?.views) || 0),
+    uniq: Math.max(0, Number(tot?.uniq) || 0),
+    est: Math.max(0, Number(win?.est) || 0),
+  };
+}
+
+/** WIB day keys from `today` back `days` days, oldest first. */
+function wibDays(today: string, days: number): string[] {
+  const t = wibDayStartMs(today);
+  return Array.from({ length: days }, (_, i) =>
+    new Date(t - (days - 1 - i) * DAY_MS + 7 * 3600_000).toISOString().slice(0, 10),
+  );
+}
+
 /**
- * Per-WIB-day rows (same semantics as the Postgres CTE): views, distinct
- * visitors, recorded peak, and max distinct visitors per 2-minute bucket.
+ * Per-WIB-day rows: views, distinct visitors, recorded peak, and max distinct visitors per 2-minute
+ * bucket (same shape as before). Read from analytics_daily_summary; only days whose summary row is
+ * missing or not final (and today, at most every SUMMARY_TODAY_MS) are computed from
+ * analytics_events, one day at a time, and stored. So a dashboard read touches ~`days` summary rows
+ * plus at most today's events, instead of scanning every event of the whole period twice.
  */
-export function d1HistoryRows(
+export async function d1HistoryRows(
   db: D1DatabaseLike,
   today: string,
   days: number,
+  now = Date.now(),
 ): Promise<{ day: string; views: number; uniq: number; peak: number; est: number }[]> {
-  const startDay = new Date(wibDayStartMs(today) - (days - 1) * DAY_MS + 7 * 3600_000)
-    .toISOString()
-    .slice(0, 10);
-  const startMs = wibDayStartMs(startDay);
-  return all(
-    db,
-    `with ev as (
-       select ${WIB_DAY} as d, count(*) as views, count(distinct visitor_id) as uniq
-         from analytics_events
-        where event_type = 'pageview' and created_at >= ?1
-        group by 1
-     ), win as (
-       select d, max(c) as est from (
-         select ${WIB_DAY} as d, created_at / 120000 as b, count(distinct visitor_id) as c
-           from analytics_events
-          where event_type = 'pageview' and created_at >= ?1
-          group by 1, 2
-       ) group by d
-     )
-     select ev.d as day, ev.views as views, ev.uniq as uniq,
-            coalesce(p.peak, 0) as peak, coalesce(win.est, 0) as est
-       from ev
-       left join win on win.d = ev.d
-       left join analytics_daily_peak p on p.day_wib = ev.d
-     union all
-     select p.day_wib as day, 0, 0, p.peak, 0
-       from analytics_daily_peak p
-      where p.day_wib >= ?2
-        and not exists (select 1 from ev where ev.d = p.day_wib)`,
-    startMs,
-    startDay,
-  );
+  const list = wibDays(today, days);
+  const startDay = list[0];
+  const [sumRows, peakRows] = await Promise.all([
+    all<{ day_wib: string; views: number; unique_visitors: number; est_peak: number; updated_at: number }>(
+      db,
+      `select day_wib, views, unique_visitors, est_peak, updated_at from analytics_daily_summary
+        where day_wib >= ?1 and day_wib <= ?2`,
+      startDay,
+      today,
+    ),
+    all<{ day_wib: string; peak: number }>(
+      db,
+      `select day_wib, peak from analytics_daily_peak where day_wib >= ?1 and day_wib <= ?2`,
+      startDay,
+      today,
+    ),
+  ]);
+  const sums = new Map<string, { views: number; uniq: number; est: number; at: number }>();
+  for (const r of sumRows) {
+    sums.set(String(r.day_wib), {
+      views: Number(r.views) || 0,
+      uniq: Number(r.unique_visitors) || 0,
+      est: Number(r.est_peak) || 0,
+      at: Number(r.updated_at) || 0,
+    });
+  }
+  const stale = list
+    .filter((d) => {
+      const r = sums.get(d);
+      if (!r) return true;
+      if (d >= today) return now - r.at >= SUMMARY_TODAY_MS;
+      return r.at < wibDayStartMs(d) + DAY_MS + SUMMARY_SETTLE_MS;
+    })
+    // Newest first, so today and yesterday are always fresh even if the cap is hit.
+    .reverse()
+    .slice(0, SUMMARY_MAX_COMPUTE);
+  for (const d of stale) {
+    try {
+      const t = await d1DayTotals(db, d);
+      sums.set(d, { ...t, at: now });
+      await db
+        .prepare(
+          `insert into analytics_daily_summary (day_wib, views, unique_visitors, est_peak, updated_at)
+           values (?1, ?2, ?3, ?4, ?5)
+           on conflict (day_wib) do update
+           set views = excluded.views, unique_visitors = excluded.unique_visitors,
+               est_peak = excluded.est_peak, updated_at = excluded.updated_at`,
+        )
+        .bind(d, t.views, t.uniq, t.est, now)
+        .run();
+    } catch (err) {
+      // One day failing must not break the history; it is retried on the next read.
+      if (d >= today) throw err;
+    }
+  }
+  const peaks = new Map(peakRows.map((r) => [String(r.day_wib), Number(r.peak) || 0]));
+  const out: { day: string; views: number; uniq: number; peak: number; est: number }[] = [];
+  for (const d of list) {
+    const r = sums.get(d);
+    const peak = peaks.get(d) || 0;
+    if ((!r || (!r.views && !r.uniq)) && !peak) continue;
+    out.push({ day: d, views: r?.views || 0, uniq: r?.uniq || 0, peak, est: r?.est || 0 });
+  }
+  return out;
 }
 
 /** Dashboard aggregates for the owner stats (shapes match the Postgres path). */
@@ -354,19 +451,11 @@ export async function d1StatsParts(db: D1DatabaseLike, today: string, now = Date
   const t0 = wibDayStartMs(today);
   const t1 = t0 + DAY_MS;
   const TODAY = `created_at >= ?1 and created_at < ?2 and event_type = 'pageview'`;
-  const [online, views24, views30d, hourlyRows, pathRows, refRows, deviceRows, hostRows, videoRows] =
+  // 24 h views come from the 24 analytics_hourly rows and 30-day views from the daily summary
+  // (owner-analytics-stats), instead of counting 1–30 days of raw events on every read.
+  const [online, hourlyRows, pathRows, refRows, deviceRows, hostRows, videoRows] =
     await Promise.all([
       d1CountOnline(db, now),
-      count(
-        db,
-        `select count(*) as n from analytics_events where created_at >= ? and event_type = 'pageview'`,
-        now - DAY_MS,
-      ),
-      count(
-        db,
-        `select count(*) as n from analytics_events where created_at >= ? and event_type = 'pageview'`,
-        now - 30 * DAY_MS,
-      ),
       all<{ hour_utc: string; page_views: number }>(
         db,
         `select hour_utc, page_views from analytics_hourly where hour_utc >= ?`,
@@ -428,10 +517,10 @@ export async function d1StatsParts(db: D1DatabaseLike, today: string, now = Date
       t1,
     ).catch(() => []),
   ]);
+  const views24 = hourlyRows.reduce((sum, r) => sum + (Number(r.page_views) || 0), 0);
   return {
     online,
     views24,
-    views30d,
     hourlyRows,
     pathRows,
     refRows,

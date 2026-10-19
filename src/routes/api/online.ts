@@ -6,6 +6,7 @@ import {
   touchOnline,
 } from "@/lib/owner-analytics";
 import { kvCountOnline, kvReadRoll, kvTouchLive, rollToStats } from "@/lib/kv-live";
+import { ONLINE_WINDOW_D1_MS, d1CountOnline, readyD1 } from "@/lib/analytics-d1";
 import { isOwnerKey, ownerKeyFrom, ownerSecret } from "@/lib/owner-auth";
 
 const BOT_UA =
@@ -15,7 +16,10 @@ const lastTouch = new Map<string, number>();
 /** Last recorded path per session — SPA nav within TOUCH_GAP still counts a pageview. */
 const lastPathById = new Map<string, string>();
 const ipHits = new Map<string, { n: number; t: number }>();
-/** Rate-limit presence/heartbeat only; pageviews on path change bypass this. */
+/**
+ * Rate-limit for repeated pings of the same page; pageviews on path change bypass this. The client has
+ * no heartbeat any more (presence-ping.tsx): it sends one ping per page.
+ */
 const TOUCH_GAP_MS = 60_000;
 const IP_WINDOW_MS = 60_000;
 const IP_MAX = 20;
@@ -26,9 +30,10 @@ let ownerCache: { at: number; data: Record<string, unknown> } | null = null;
  * getOwnerStats scans 14–30 days of analytics_events in D1, so its result is also shared across
  * isolates in this data centre for SHARED_STATS_SEC via the Cache API. The key sits under
  * /api/owner…, which the worker entry never serves from cache, so it can't leak publicly.
- * Online count and peak are still recomputed from KV on every owner poll.
+ * The online count is still read live on every owner poll (D1: visitors with a pageview in the last
+ * 5 minutes, one indexed count; KV only when D1 is not bound).
  */
-const SHARED_STATS_SEC = 60;
+const SHARED_STATS_SEC = 300;
 const SHARED_STATS_PATH = "/api/owner-stats-cache-v1";
 
 type OwnerStatsResult = Awaited<ReturnType<typeof getOwnerStats>>;
@@ -127,14 +132,30 @@ function shouldSkipBot(ua: string, owner: boolean): boolean {
   return classifyDevice(ua) === "bot";
 }
 
+/** Live online count: D1 visitors with a pageview in the last 5 minutes, else KV presence; -1 = unknown. */
+async function liveOnlineCount(now: number): Promise<number> {
+  try {
+    const d1 = await readyD1();
+    if (d1) return await d1CountOnline(d1, now, ONLINE_WINDOW_D1_MS);
+  } catch {
+    return -1;
+  }
+  try {
+    return await kvCountOnline();
+  } catch {
+    return -1;
+  }
+}
+
 async function liveOwnerPayload(origin: string) {
   const now = Date.now();
   if (ownerCache && now - ownerCache.at < OWNER_CACHE_MS) return ownerCache.data;
   // Single source of truth: getOwnerStats builds days[] (Postgres events, or KV
   // daystats when DB is down) and derives today/yesterday/7d cards from it.
   const stats = await sharedOwnerStats(origin);
-  const [kvN, roll] = await Promise.all([kvCountOnline(), kvReadRoll()]);
-  const online = Math.max(Number(stats.online) || 0, Number(stats.count) || 0, kvN);
+  const [kvN, roll] = await Promise.all([liveOnlineCount(now), kvReadRoll()]);
+  // stats.online is up to SHARED_STATS_SEC old; the live count wins when it is available.
+  const online = kvN >= 0 ? kvN : Math.max(Number(stats.online) || 0, Number(stats.count) || 0);
   const live = rollToStats(roll, online);
   const peakToday = Math.max(Number(stats.peakToday) || 0, online);
   const days = stats.days.length
@@ -150,7 +171,7 @@ async function liveOwnerPayload(origin: string) {
     topPaths: stats.topPaths.length ? stats.topPaths : live.topPaths,
     topRefs: stats.topRefs.length ? stats.topRefs : live.topRefs,
     devices: stats.devices.length ? stats.devices : live.devices,
-    presence: stats.presence === "memory" && kvN > 0 ? "kv" : stats.presence,
+    presence: stats.presence === "memory" && online > 0 ? "kv" : stats.presence,
     // Surface real PG/KV persist status — do not hardcode healthy.
     persistOk: Boolean(stats.persistOk),
     analytics: stats.analytics || "operational",

@@ -20,6 +20,9 @@ import { kvReadHistory } from "@/lib/kv-live";
 import { TOP_VIDEOS_LIMIT, d1HistoryRows, d1Prune, d1StatsParts, readyD1 } from "@/lib/analytics-d1";
 import { toTopVideos, withVideoTitles } from "@/lib/owner-top-videos";
 
+/** Days of D1 daily summary read for the history table + 30-day total. */
+const D1_SUMMARY_DAYS = 30;
+
 /** WIB calendar day of a timestamptz column (no tz-name dependency). */
 const WIB_DAY = `((created_at at time zone 'UTC') + interval '7 hours')::date`;
 /** Start of WIB day $1 as timestamptz. */
@@ -196,14 +199,16 @@ export async function getOwnerStats(): Promise<OwnerStats> {
     let countryRows: { country: string; views: number }[] = [];
     if (d1) {
       await maybePruneD1(d1, now);
+      // History comes from analytics_daily_summary (one row per WIB day). 30 days are read so the
+      // "30 hari" card is a sum of summary rows; the table still shows HISTORY_DAYS.
       const [parts, histRows] = await Promise.all([
         d1StatsParts(d1, dk, now),
-        d1HistoryRows(d1, dk, HISTORY_DAYS),
+        d1HistoryRows(d1, dk, D1_SUMMARY_DAYS, now),
       ]);
       onlineRows = [{ n: parts.online }];
       history = rowsToDays(histRows, dk, HISTORY_DAYS);
       views24 = [{ n: parts.views24 }];
-      views30d = [{ n: parts.views30d }];
+      views30d = [{ n: histRows.reduce((sum, r) => sum + n(r.views), 0) }];
       hourlyRows = parts.hourlyRows;
       pathRows = parts.pathRows;
       refRows = parts.refRows;

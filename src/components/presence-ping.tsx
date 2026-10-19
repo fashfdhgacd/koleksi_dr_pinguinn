@@ -3,11 +3,14 @@
 import { useEffect, useRef } from "react";
 import { useRouterState } from "@tanstack/react-router";
 
+/**
+ * Pageview ping: one POST /api/online per page (first load and every SPA navigation), nothing else.
+ *
+ * Cost (Oct 2026): the old 90 s heartbeat was most of the Worker requests and a big part of CPU. There
+ * is no heartbeat now. The owner panel's "online" number is the count of visitors with a pageview in
+ * the last 5 minutes (D1 analytics_sessions.last_seen_at, updated by every pageview).
+ */
 const ID_KEY = "drp_online_id";
-/** ≤ presence window (~2 min); KV TTL 180s. Matches dashboard copy "90 dtk". */
-const HEARTBEAT_MS = 90_000;
-/** Client debounce for non-navigation heartbeats — below HEARTBEAT_MS. */
-const MIN_GAP_MS = 60_000;
 const BOT_RE =
   /bot|crawl|spider|slurp|headless|webdriver|puppeteer|playwright|phantom|scrapy|httpclient|curl\/|wget|python-requests|axios\/|node-fetch|bytespider|gptbot|claudebot|ccbot|semrush|ahrefs|dataforseo|petalbot/i;
 
@@ -50,26 +53,20 @@ function hasAgeConsent(): boolean {
 export function PresencePing() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const lastPath = useRef("");
-  const lastBeat = useRef(0);
 
   useEffect(() => {
     if (isAutomated()) return;
-    if (pathname !== "/pemilik" && !hasAgeConsent()) return;
 
     const id = getOrCreateId();
 
-    async function beat(recordPage: boolean) {
-      if (document.visibilityState === "hidden") return;
-      const now = Date.now();
-      if (!recordPage && now - lastBeat.current < MIN_GAP_MS) return;
-      lastBeat.current = now;
+    async function beat() {
       try {
-        const body: Record<string, string> = { id };
-        if (recordPage) {
-          body.path = pathname || window.location.pathname;
-          body.ref = document.referrer || "";
-          body.host = window.location.hostname;
-        }
+        const body: Record<string, string> = {
+          id,
+          path: pathname || window.location.pathname,
+          ref: document.referrer || "",
+          host: window.location.hostname,
+        };
         const payload = JSON.stringify({
           ...body,
           eventId: `${id}-${pathname || ""}-${Math.floor(Date.now() / 60000)}`,
@@ -87,18 +84,39 @@ export function PresencePing() {
       }
     }
 
-    const isNewPath = lastPath.current !== pathname;
-    lastPath.current = pathname;
-    void beat(isNewPath);
-
-    const timer = window.setInterval(() => void beat(false), HEARTBEAT_MS);
-    const onVisible = () => {
-      if (document.visibilityState === "visible") void beat(false);
+    // One ping per page: only when the path really changed (not on a re-render of the same page).
+    // A page opened in a background tab is sent once it is first shown.
+    let onVisible: (() => void) | null = null;
+    const send = () => {
+      if (lastPath.current === pathname) return;
+      if (document.visibilityState === "hidden") {
+        if (onVisible) return;
+        onVisible = () => {
+          if (document.visibilityState !== "visible") return;
+          if (onVisible) document.removeEventListener("visibilitychange", onVisible);
+          onVisible = null;
+          send();
+        };
+        document.addEventListener("visibilitychange", onVisible);
+        return;
+      }
+      lastPath.current = pathname;
+      void beat();
     };
-    document.addEventListener("visibilitychange", onVisible);
+    let wait = 0;
+    if (pathname === "/pemilik" || hasAgeConsent()) send();
+    else {
+      // Age gate still open on this page: a local check (no network) sends the ping once the visitor
+      // accepts, so a first visit that never navigates is still counted.
+      wait = window.setInterval(() => {
+        if (!hasAgeConsent()) return;
+        window.clearInterval(wait);
+        send();
+      }, 1500);
+    }
     return () => {
-      window.clearInterval(timer);
-      document.removeEventListener("visibilitychange", onVisible);
+      if (wait) window.clearInterval(wait);
+      if (onVisible) document.removeEventListener("visibilitychange", onVisible);
     };
   }, [pathname]);
 
