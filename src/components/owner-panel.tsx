@@ -84,6 +84,8 @@ export function OwnerDashboard() {
       const res = await fetch("/api/player-log", { headers: { "x-online-key": key }, cache: "no-store" });
       const d = (await res.json().catch(() => null)) as PlayerLogData | null;
       if (!d || d.error) {
+        // Wrong key: the login form already says "Kunci salah."; no extra toast.
+        if (d?.error === "forbidden") return;
         ownerToast(`Gagal memuat Kesehatan player: ${d?.error || `HTTP ${res.status}`}`, "error", {
           label: "Coba lagi",
           run: () => void loadPlayerLog(key),

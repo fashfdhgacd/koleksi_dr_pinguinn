@@ -679,7 +679,7 @@ export function OwnerOverview(props: {
       if (d.ok) setOv(d);
       else {
         setOv((prev) => ({ ...(prev || {}), ok: false, error: d.error || "Gagal memuat." }));
-        ownerToast(`Gagal memuat katalog: ${d.error || "tidak diketahui"}`, "error", { label: "Coba lagi", run: () => void loadOverview() });
+        if (d.error !== "forbidden") ownerToast(`Gagal memuat katalog: ${d.error || "tidak diketahui"}`, "error", { label: "Coba lagi", run: () => void loadOverview() });
       }
     } finally {
       setOvBusy(false);

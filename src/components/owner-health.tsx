@@ -251,6 +251,7 @@ export function ThumbMissingCard({ secret, reloadKey }: { secret: string; reload
       });
       const d = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; total?: number; items?: ThumbRow[] } | null;
       if (!d?.ok) {
+        if (d?.error === "forbidden") return;
         ownerToast(`Gagal memuat Thumbnail kosong: ${d?.error || `HTTP ${res.status}`}`, "error", { label: "Coba lagi", run: () => void load() });
         return;
       }
