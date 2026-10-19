@@ -88,15 +88,15 @@ export function TsGridAd({ className = "", onEmpty }: { className?: string; onEm
   }, [state, onEmpty]);
 
   if (state === "empty") return null;
-  // One video-card footprint, reserved from the first paint (no CLS): a dark 300:250 frame like the
-  // thumbs with the ad centered at its real size (a 300x250 banner only shrinks, never crops, when a
+  // One video-card footprint, reserved from the first paint (no CLS): a dark frame tall enough for
+  // the native unit (300:250 image at up to 300 px wide + its text) with the ad centered at its real size (a 300x250 banner only shrinks, never crops, when a
   // cell is narrower than 300 px; a native unit flows to the width), then a text row with IKLAN.
   // The frame grows with taller content instead of clipping it.
   return (
-    <div data-kdp-ad="trafficstars" className={"p-1 sm:p-1.5 " + className}>
+    <div data-kdp-ad="trafficstars" className={"p-1 [container-type:inline-size] sm:p-1.5 " + className}>
       <div
         ref={boxRef}
-        className="flex aspect-[300/250] w-full items-center justify-center rounded-xl bg-[#131316]"
+        className="flex min-h-[calc(min(300px,100cqw)*0.8334+76px)] w-full items-center justify-center rounded-xl bg-[#131316]"
       >
         <div
           ref={ref}
