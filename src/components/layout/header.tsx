@@ -10,12 +10,12 @@ import { prefetchCatalog } from "@/lib/catalog/client";
 import { DEFAULT_PAGE_SIZE } from "@/lib/catalog/types";
 
 const QUICK_CATS = [
+  { slug: "bokep", label: "Koleksi Dr. Pinguin Bokep" },
+  { slug: "paling-ditonton", label: "Paling Banyak Ditonton" },
   { slug: "jav", label: "Jav" },
   { slug: "ai-plus", label: "AI+" },
-  { slug: "paling-ditonton", label: "Paling Banyak Ditonton" },
-  { slug: "paling-disukai", label: "Paling Banyak Disukai" },
   { slug: "videy", label: "drpinguin videy" },
-  { slug: "bokep", label: "Koleksi Dr. Pinguin Bokep" },
+  { slug: "paling-disukai", label: "Paling Banyak Disukai" },
 ] as const;
 
 export function Header({

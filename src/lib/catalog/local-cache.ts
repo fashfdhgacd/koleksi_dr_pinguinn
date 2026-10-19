@@ -35,6 +35,8 @@ import latestVideos from "../../../data/videos-latest.json";
 // Putarin uploads from the Telegram bot land here (bot appends, dedupes by id); bundle so every batch stays live.
 import latestPutarin from "../../../data/putarin-latest.json";
 import latestPosters from "../../../data/latest-posters.json";
+// Owner's Byse / DoodStream / LuluStream library (/kategori/bokep), one-off import 2026-10-19.
+import drpBokepBatch from "../../../data/drp-bokep.json";
 
 // Re-bind mutable cache/inflight via shared module namespace
 import { runtime } from "./local-shared";
@@ -402,12 +404,13 @@ export function assembleLocal(): { items: RawItem[]; posters: Record<string, str
   const pl = withIds(asList(latestPutarin)).filter(isUsable);
   // Owner folder ingest (IndoAV/UserBokep /f/ folders). Placed last so existing entries always win.
   const fb = withIds(asList(folderBatch20261007)).filter(isUsable);
+  const drp = withIds(asList(drpBokepBatch)).filter(isUsable);
   const posters: Record<string, string> = {
     ...(postersMap as Record<string, string>),
     ...asPosterMap(javPosters),
     ...asPosterMap(latestPosters),
   };
-  return { items: uniqById([...latest, ...pl, ...st, ...st2, ...pu, ...local, ...fb]), posters };
+  return { items: uniqById([...latest, ...pl, ...st, ...st2, ...pu, ...local, ...fb, ...drp]), posters };
 }
 
 export async function refreshRemote(base: { items: RawItem[]; posters: Record<string, string> }): Promise<CatalogCache> {
