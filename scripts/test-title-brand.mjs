@@ -64,7 +64,8 @@ const cases = [
   // Keamanan / bentuk
   ["<script>alert(1)</script> Tante", "script alert(1) /script Tante"],
   ["Judul: Tante Viral Hotel", "Tante Viral Hotel"],
-  ["AVTub", "AVTub"],
+  // Nama situs saja = placeholder (dulu dibiarkan; sejak 2026-10-19 dianggap tanpa judul)
+  ["AVTub", "Video"],
   ["", "Video"],
   ["Bokep Indo Terbaru - Bokep Indo", "Bokep Indo Terbaru Bokep Indo"],
   ["Ayang Manja - YouTube", "Ayang Manja"],
@@ -78,6 +79,21 @@ const cases = [
   ["@nov4prilia (NOVA APRILIA).mp4 (1440)", "@nov4prilia (NOVA APRILIA).mp4 (1440)"],
   ["Ukhti cantik jago main \u{1F3F4}\u200D\u2620\uFE0F", "Ukhti cantik jago main \u{1F3F4}\u200D\u2620\uFE0F"],
   ["Talent Vellyn Ngewe Ditonton Live Tele Koleksi Dr. Pinguin", "Talent Vellyn Ngewe Ditonton Live Tele"],
+  // Judul placeholder (judul halaman situs sumber, nama situs, nama file) → "Video" (= tanpa judul)
+  ["Jelajahi video ExaStream (3)", "Video"],
+  ["Jelajahi video — ExaStream", "Video"],
+  ["Jelajahi video ExaStream", "Video"],
+  ["Watch video", "Video"],
+  ["Video player", "Video"],
+  ["ExaStream", "Video"],
+  ["Untitled", "Video"],
+  ["video.mp4", "Video"],
+  ["VID_20241003_221500.mp4", "Video"],
+  // Bukan placeholder → tetap
+  ["Video Ngewe Di Dalem Mobil - KingBokep", "Video Ngewe Di Dalem Mobil"],
+  ["Watch Me Colmek Pake Sisir", "Watch Me Colmek Pake Sisir"],
+  ["Koleksi Dr. Pinguin Bokep 13", "Koleksi Dr. Pinguin Bokep 13"],
+  ["Mainstream Indo Viral", "Mainstream Indo Viral"],
 ];
 
 let fail = 0;

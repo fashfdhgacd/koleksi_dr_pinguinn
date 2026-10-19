@@ -264,6 +264,30 @@ export function adultAgeWording(raw = "") {
 }
 
 /**
+ * Judul "placeholder" = bukan judul asli: judul halaman situs sumber ("Jelajahi video ExaStream (3)",
+ * "Watch video", "Video player"), nama situs/host saja ("ExaStream", "AVTub"), "Untitled",
+ * nama file ("video.mp4", "VID_2024.mp4"). cleanUploadTitle mengembalikan "Video" (= tanpa judul),
+ * jadi bot memakai judul otomatis kategori itu.
+ */
+export function isPlaceholderTitle(raw = "") {
+  const t = String(raw ?? "")
+    .replace(/[\s\-|–—·•:,~]+/gu, " ")
+    .trim();
+  if (!t) return true;
+  if (/^(?:jelajahi|tonton|lihat|putar|watch|play|view|explore|stream)\s+(?:video|videos|film)\b/i.test(t)) return true;
+  if (/^(?:video|media)\s*player\b/i.test(t)) return true;
+  if (/^(?:untitled|no title|tanpa judul|new video|video baru|video)(?:\s*\(?\d+\)?)?$/i.test(t)) return true;
+  if (/^[\w\s().-]*\.(?:mp4|mkv|mov|webm|avi|m4v|ts|flv|3gp)$/i.test(t)) return true;
+  const one = t.replace(/\s*\(?\d+\)?$/, "").trim();
+  if (one && !/\s/.test(one)) {
+    if (KNOWN_FOREIGN_BRANDS.includes(normBrand(one))) return true;
+    if (/^[a-z0-9]{2,}(?:stream|streams|tube|tub|hub|vid|vids|play|player|upload|host)$/i.test(one) && !COMMON_WORDS.has(one.toLowerCase())) return true;
+    if (DOMAIN_RE.test(one)) return true;
+  }
+  return false;
+}
+
+/**
  * Judul dasar tanpa branding siapa pun (situs lain maupun pinguin). Idempotent.
  * Kosong → "Video" (dipakai bot untuk tahu "tidak ada judul").
  */
@@ -303,14 +327,15 @@ export function cleanUploadTitle(raw = "") {
     t = next;
   }
 
-  return (
+  if (isPlaceholderTitle(t)) return "Video";
+  const out =
     adultAgeWording(t)
       .replace(/[_-]+/g, " ")
       .replace(/\s+/g, " ")
       .trim()
       .replace(/^[\-|]+|[\-|]+$/g, "")
-      .trim() || "Video"
-  );
+      .trim() || "Video";
+  return isPlaceholderTitle(out) ? "Video" : out;
 }
 
 /** Judul final yang disimpan untuk upload baru: judul dasar + tepat satu " - koleksidrpinguin.com". */

@@ -22,11 +22,33 @@ function isDrpHost(host) {
 }
 
 /**
- * Title when Lulu/Dood/Byse give none (marked titleAuto so /pemilik lists it for a real title).
- * No "Dr. Pinguin" words here: cleanTitle strips old pinguin branding, brandTitle adds the domain.
+ * Interim title when Lulu/Dood/Byse give none (marked titleAuto so /pemilik lists it for a real title);
+ * processUploadBatch replaces it with the numbered "Koleksi Dr. Pinguin Bokep N".
  */
 function drpAutoTitle(video) {
   return `Bokep Indo Pilihan ${String(video.code || video.id || "").replace(/^(?:lu|dd|by)-/i, "")}`.trim();
+}
+
+/** /kategori/bokep auto title, numbered on from the catalog: "Koleksi Dr. Pinguin Bokep 13". */
+const DRP_NUMBERED_RE = /^Koleksi Dr\. Pinguin Bokep (\d+)\b/i;
+function drpNumberedTitle(n) {
+  return `Koleksi Dr. Pinguin Bokep ${n}`;
+}
+
+/** Highest N already used by "Koleksi Dr. Pinguin Bokep N" titles in the (deployed) catalog. */
+async function drpTitleMax() {
+  try {
+    const { loadItems } = await import("@/lib/catalog/local-cache");
+    const bag = await loadItems();
+    let max = 0;
+    for (const it of bag.raw || bag.items || []) {
+      const m = String(it?.title || "").match(DRP_NUMBERED_RE);
+      if (m) max = Math.max(max, Number(m[1]) || 0);
+    }
+    return max;
+  } catch {
+    return 0;
+  }
 }
 
 function hasUserTitle(raw) {
@@ -274,6 +296,17 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const given = cleanTitle(String(video.title || parsedMsg.title || ""));
     return resolveMetaFast(video, given, env);
   });
+
+  // Lulu/Dood/Byse without a real title (none, or a page-title placeholder like "Jelajahi video
+  // ExaStream"): "Koleksi Dr. Pinguin Bokep N", numbered on from the highest N in the catalog.
+  if (metas.some((m) => m?.titleAuto)) {
+    let n = await drpTitleMax();
+    for (let i = 0; i < metas.length; i++) {
+      if (!metas[i]?.titleAuto) continue;
+      n += 1;
+      metas[i] = { ...metas[i], title: drpNumberedTitle(n) };
+    }
+  }
 
   // Videy without a typed title: a keyword title with a running number (counts on from the Videy
   // videos already listed). Marked titleAuto so /pemilik can list them for a real title later.
