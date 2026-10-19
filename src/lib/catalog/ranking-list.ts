@@ -16,7 +16,8 @@
  */
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos } from "./types";
-import { isVidey, type RawItem } from "./local-shared";
+import { isVidey, thumbOf, type RawItem } from "./local-shared";
+import deadSources from "./dead-sources.json";
 import { loadItems, pageOf } from "./local-cache";
 import { rankPeriodAvailable, rankPeriodInfo, type RankKind, type RankPeriod } from "./rankings";
 
@@ -282,6 +283,31 @@ export async function withVideyViews<T extends { id: string; creator?: string | 
 type Ranked = { item: RawItem; score: number };
 const listMemo = new Map<string, { at: number; src: unknown; list: Ranked[] }>();
 
+/** Top of page 1 (owner rule 2026-10-19): only videos with a real thumbnail and not marked dead. */
+const CLEAN_TOP = 10;
+const DEAD_IDS = new Set<string>([
+  ...Object.keys(((deadSources as { gone?: Record<string, unknown> }).gone || {}) as Record<string, unknown>),
+  ...Object.keys(((deadSources as { suspect?: Record<string, unknown> }).suspect || {}) as Record<string, unknown>),
+]);
+
+/**
+ * Keeps the ranking order, but a video without a real thumbnail (card would show the logo fallback)
+ * or marked dead/suspect by the dead-video check cannot sit in the first CLEAN_TOP places: it moves
+ * to just after them. Runs once per memoized list (not per request).
+ */
+function cleanTop(list: Ranked[], posters: Record<string, string>): Ranked[] {
+  const top: Ranked[] = [];
+  const pushed: Ranked[] = [];
+  let i = 0;
+  for (; i < list.length && top.length < CLEAN_TOP; i++) {
+    const it = list[i].item;
+    const ok = !DEAD_IDS.has(it.id) && Boolean(thumbOf(it, posters));
+    (ok ? top : pushed).push(list[i]);
+  }
+  if (!pushed.length) return list;
+  return [...top, ...pushed, ...list.slice(i)];
+}
+
 async function rankedList(kind: RankKind, period: RankPeriod): Promise<Ranked[]> {
   const cache = await loadItems();
   const key = `${kind}:${period}`;
@@ -334,8 +360,9 @@ async function rankedList(kind: RankKind, period: RankPeriod): Promise<Ranked[]>
       .map((it) => ({ item: it, score: 0, t: total(it) }))
       .sort((a, b) => b.t - a.t || a.item.id.localeCompare(b.item.id));
     for (const r of recent) list.push({ item: r.item, score: 0 });
-    listMemo.set(key, { at: now, src: cache, list });
-    return list;
+    const clean = cleanTop(list, cache.posters);
+    listMemo.set(key, { at: now, src: cache, list: clean });
+    return clean;
   } else {
     const data = (await loadPeriods())[period];
     if (!data) return [];
@@ -353,8 +380,9 @@ async function rankedList(kind: RankKind, period: RankPeriod): Promise<Ranked[]>
       (Number(b.item.views) || 0) - (Number(a.item.views) || 0) ||
       a.item.id.localeCompare(b.item.id),
   );
-  listMemo.set(key, { at: now, src: cache, list });
-  return list;
+  const clean = cleanTop(list, cache.posters);
+  listMemo.set(key, { at: now, src: cache, list: clean });
+  return clean;
 }
 
 /** One page of a ranking. Unavailable periods return an empty page (never estimated numbers). */
