@@ -5,6 +5,7 @@
 // list, system status, top videos. Edits and hides go through owner-only APIs; the minor-lock is
 // enforced on the server (owner-tools.ts). Nothing here polls: data loads when the panel opens,
 // on Refresh, and when the tab comes back (owner-panel.tsx, at most once a minute).
+import { OwnerHeroCard } from "@/components/owner-hero";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CATEGORY_LIST } from "@/lib/catalog/categories";
 import { fmt, ownerToast, type OwnerStats, type DayRow } from "@/components/owner-dashboard-shared";
@@ -604,7 +605,7 @@ function TopVideos({ videos }: { videos: NonNullable<OwnerStats["topVideos"]> })
     if (!text) return;
     if (typeof navigator.share !== "function") return void copyAll();
     try {
-      await navigator.share({ title: "Video paling banyak dibuka hari ini", text });
+      await navigator.share({ title: "Video paling banyak dibuka 24 jam terakhir", text });
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
       void copyAll();
@@ -613,7 +614,7 @@ function TopVideos({ videos }: { videos: NonNullable<OwnerStats["topVideos"]> })
   return (
     <>
       <div className={h2}>
-        <span>Paling banyak dibuka hari ini</span>
+        <span>Paling banyak dibuka 24 jam</span>
         <span className="flex gap-1">
           <button type="button" className={btn} disabled={!videos.length} onClick={() => void copyAll()}>
             Salin
@@ -1029,6 +1030,10 @@ export function OwnerOverview(props: {
         <section className={`${card} h-full`}>
           <TopVideos videos={stats?.topVideos || []} />
         </section>
+      </div>
+
+      <div className="mt-4">
+        <OwnerHeroCard secret={secret} />
       </div>
 
       <ThumbMissingCard secret={secret} reloadKey={reloadKey} />
