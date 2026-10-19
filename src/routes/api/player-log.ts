@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { getD1, type D1DatabaseLike } from "@/lib/analytics-d1";
 import { getDetail } from "@/lib/catalog/local";
 import { applyUnhidden, loadItemsRaw } from "@/lib/catalog/local-cache";
-import type { RawItem } from "@/lib/catalog/local-shared";
+import { sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
 import { readUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState, setOwnerHidden } from "@/lib/catalog/owner-hide-store";
 import { isOwnerRequest, OWNER_KEY_HEADER } from "@/lib/owner-auth";
@@ -29,7 +29,10 @@ import deadSources from "@/lib/catalog/dead-sources.json";
  *
  * GET (owner, header x-online-key): 7-day v2 numbers per host, top 20 failing videos, videos the
  *  dead-video check marked "Dihapus oleh sumber" (src/lib/catalog/dead-sources.json), and the
- *  owner-hidden list.
+ *  owner-hidden list. The player only names IndoAV/UserBokep/Streamtape/Putarin/Videy/Arsip and
+ *  sends everything else as "Lainnya"; this owner read splits those rows by the video's catalog
+ *  source (Byse, LuluStream, DoodStream, ...) so the panel shows them per host. Read-only, only
+ *  when the owner opens the panel; the visitor beacon (and player.tsx) is unchanged.
  *
  * GET ?alt=<id> (public): another public catalog video with the same title or JAV code from a
  *  different host, for the player's "Coba server lain" button. Read-only, cacheable.
@@ -286,6 +289,40 @@ async function handleOwnerView(): Promise<Response> {
       console.error("player-log owner view:", err instanceof Error ? err.message.slice(0, 160) : "d1 error");
     }
   }
+  const items = await rawById();
+  // "Lainnya" per video, so it can be split by catalog source (one small grouped read).
+  let otherRows: { id: string; event: string; n: number }[] | null = null;
+  if (db && hostRows.some((r) => r.host === "Lainnya")) {
+    try {
+      otherRows =
+        (
+          await db
+            .prepare(
+              `select id, event, sum(n) as n from player_errors
+               where day >= ? and host = 'Lainnya'
+                 and event in ('start2','slow2','fail2','retry2','open2','report2','alt2')
+               group by id, event`,
+            )
+            .bind(since)
+            .all<{ id: string; event: string; n: number }>()
+        ).results || [];
+    } catch (err) {
+      otherRows = null;
+      console.error("player-log owner split:", err instanceof Error ? err.message.slice(0, 160) : "d1 error");
+    }
+  }
+  const realHost = (id: string, host: string): string => {
+    if (host !== "Lainnya") return host;
+    const it = items.get(id);
+    const label = it ? sourceLabel(it) : "";
+    return label && label !== "Unknown" ? label : "Lainnya";
+  };
+  const eventRows: { host: string; event: string; n: number }[] = otherRows
+    ? [
+        ...hostRows.filter((r) => r.host !== "Lainnya"),
+        ...otherRows.map((r) => ({ host: realHost(r.id, "Lainnya"), event: r.event, n: Number(r.n) || 0 })),
+      ]
+    : hostRows;
   type HostRow = {
     host: string;
     starts: number;
@@ -297,7 +334,7 @@ async function handleOwnerView(): Promise<Response> {
     alt: number;
   };
   const byHost = new Map<string, HostRow>();
-  for (const r of hostRows) {
+  for (const r of eventRows) {
     if (!V2_EVENTS.includes(r.event)) continue;
     const cur =
       byHost.get(r.host) || { host: r.host, starts: 0, slow: 0, fails: 0, reports: 0, retries: 0, openSource: 0, alt: 0 };
@@ -323,14 +360,13 @@ async function handleOwnerView(): Promise<Response> {
     hideReadable = false;
   }
   const hidden = new Set(Object.keys(hiddenIds));
-  const items = await rawById();
   const dead = deadSources as DeadFile;
   const gone = Object.entries(dead.gone || {})
     .map(([id, e]) => ({ ...row(id, items, hidden, String(e?.host || "")), since: String(e?.since || "") }))
     .filter((r) => r.inCatalog)
     .sort((a, b) => b.since.localeCompare(a.since));
   const top = topRows.map((r) => ({
-    ...row(r.id, items, hidden, r.host),
+    ...row(r.id, items, hidden, realHost(r.id, r.host)),
     fails: Number(r.fails) || 0,
     starts: Number(r.starts) || 0,
     reports: Number(r.reports) || 0,

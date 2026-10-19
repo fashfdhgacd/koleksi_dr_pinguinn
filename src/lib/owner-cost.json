@@ -1,0 +1,27 @@
+{
+  "updated": "2026-10-19",
+  "note": "Diisi dari audit tagihan Cloudflare 19 Okt 2026. Diperbarui manual / dari laporan mingguan, tidak ditarik langsung dari Cloudflare.",
+  "cloudflare": {
+    "cycleFrom": "2026-09-22",
+    "cycleTo": "2026-10-21",
+    "spentUsd": 8.64,
+    "projectedUsageUsd": 9.26,
+    "baseUsd": 5,
+    "projectedTotalUsd": 14.26,
+    "ceilingUsd": 20,
+    "items": [
+      { "label": "KV writes", "usd": 5.0, "note": "1,51 jt write (dr-pinguin-analytics 1,31 jt); hampir 0 sejak 19 Okt" },
+      { "label": "Workers CPU", "usd": 3.04, "note": "181 jt ms; naik dari $0,24 ke $0,46 per hari (12-18 Okt)" },
+      { "label": "Requests", "usd": 0.6, "note": "11,94 jt request" }
+    ]
+  },
+  "earnings": {
+    "weekUsd": null,
+    "monthUsd": null
+  },
+  "ads": [
+    { "name": "Monetag", "status": "aktif", "note": "direct link di Videy, maks 3 per sesi", "earningsUsd": null },
+    { "name": "TrafficStars", "status": "menunggu approve", "note": "situs 91976", "earningsUsd": null },
+    { "name": "ExoClick", "status": "dicopot", "note": "dicopot 19 Okt ($1,79 dalam seminggu)", "earningsUsd": null }
+  ]
+}

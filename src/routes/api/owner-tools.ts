@@ -17,7 +17,11 @@ import {
   loadItemsRaw,
   type HiddenCandidate,
 } from "@/lib/catalog/local-cache";
-import { slugOf, sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
+import { isDrpBokep, PLACEHOLDER_IMAGE_RE, slugOf, sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
+import deadSources from "@/lib/catalog/dead-sources.json";
+import rankMeta from "@/lib/catalog/rank-periods-meta.json";
+import latestPosters from "../../../data/latest-posters.json";
+import thumbsDeploy from "../../../data/.thumbs-deploy.json";
 import { findCategory } from "@/lib/catalog/categories";
 import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
 import { isLockedMinorId, lockedMinorReason } from "@/lib/catalog/minor-lock.js";
@@ -288,6 +292,35 @@ async function handleSetPoster(body: { id?: string; url?: string }) {
   });
 }
 
+/**
+ * Several posters in ONE merge (one commit of data/latest-posters.json, so one deploy) for the
+ * "Thumbnail kosong" card, instead of one commit per pasted link. At most 50 per call.
+ */
+async function handleSetPosters(body: { posters?: unknown }) {
+  const input = body.posters && typeof body.posters === "object" && !Array.isArray(body.posters) ? body.posters : null;
+  if (!input) return json({ ok: false, error: "no_posters" }, 400);
+  const entries: Record<string, string> = {};
+  const rejected: string[] = [];
+  for (const [rawId, rawUrl] of Object.entries(input as Record<string, unknown>).slice(0, 50)) {
+    const id = cleanPosterId(rawId);
+    const url = String(rawUrl || "").trim();
+    if (id && isHttpPoster(url)) entries[id] = url;
+    else rejected.push(String(rawId).slice(0, 64));
+  }
+  if (!Object.keys(entries).length) return json({ ok: false, error: "bad_url", rejected }, 400);
+  const merged = await mergeLatestPosters(process.env, entries);
+  if (!merged.ok) return json({ ok: false, error: merged.error || "merge_failed", rejected }, 502);
+  return json({
+    ok: true,
+    saved: Object.keys(entries),
+    rejected,
+    added: merged.added,
+    updated: merged.updated,
+    total: merged.total,
+    text: `${Object.keys(entries).length} poster tersimpan. Tampil setelah deploy berikutnya (±2-3 menit).`,
+  });
+}
+
 async function handleRefreshPosters(body: { limit?: number }) {
   const result = await refreshMissingPosters(process.env, { limit: body.limit });
   if (!result.ok) {
@@ -312,9 +345,37 @@ type CatalogRow = {
   createdAt: number;
   hidden: boolean;
   locked: boolean;
+  /** Owner's own Byse/Lulu/Dood upload without any poster: the site shows the penguin logo. */
+  noThumb: boolean;
 };
 
-type BuiltLike = { items: RawItem[]; raw?: RawItem[]; hiddenIds?: Set<string>; byId: Map<string, RawItem> };
+type BuiltLike = {
+  at?: number;
+  items: RawItem[];
+  raw?: RawItem[];
+  hiddenIds?: Set<string>;
+  byId: Map<string, RawItem>;
+  posters?: Record<string, string>;
+};
+
+function realPoster(v: unknown): boolean {
+  const s = String(v || "").trim();
+  return /^https?:\/\//i.test(s) && !PLACEHOLDER_IMAGE_RE.test(s) && !/brand-poster/i.test(s);
+}
+
+/**
+ * Same poster sources /thumb/<id> uses for the owner's Byse/LuluStream/DoodStream uploads (item
+ * poster/thumbnail, data/latest-posters.json, overrides.json, the catalog poster map). No poster
+ * means /thumb redirects to the brand logo. Only these uploads are checked: the other hosts always
+ * carry their own thumbnail. Pure in-memory check, no storage read.
+ */
+function lacksThumb(it: RawItem, posters?: Record<string, string>): boolean {
+  if (!isDrpBokep(it)) return false;
+  if (realPoster(it.poster) || realPoster(it.thumbnail)) return false;
+  if (realPoster(posters?.[it.id]) || realPoster((latestPosters as Record<string, string>)[it.id])) return false;
+  const ov = (itemOverrides as Record<string, { poster?: string }>)[it.id];
+  return !realPoster(ov?.poster);
+}
 
 const WIB_MS = 7 * 3600 * 1000;
 
@@ -337,7 +398,12 @@ function isLockedItem(it: RawItem): boolean {
   return Boolean(lockedMinorReason(String(it.title || "")) || lockedMinorReason(String(ov?.title || "")));
 }
 
-function toCatalogRow(it: RawItem, shown: RawItem | undefined, hidden: boolean): CatalogRow {
+function toCatalogRow(
+  it: RawItem,
+  shown: RawItem | undefined,
+  hidden: boolean,
+  posters?: Record<string, string>,
+): CatalogRow {
   const view = shown || it;
   const slug = slugOf(view);
   return {
@@ -349,6 +415,7 @@ function toCatalogRow(it: RawItem, shown: RawItem | undefined, hidden: boolean):
     createdAt: createdMs(it),
     hidden,
     locked: isLockedItem(it),
+    noThumb: lacksThumb(it, posters),
   };
 }
 
@@ -361,42 +428,95 @@ async function catalogBase(): Promise<{ raw: RawItem[]; cache: BuiltLike; hidden
   return { raw, cache, hidden };
 }
 
-async function handleCatalogOverview(body: { limit?: unknown; offset?: unknown } = {}) {
+async function handleCatalogOverview(
+  body: { limit?: unknown; offset?: unknown; source?: unknown; noThumb?: unknown } = {},
+) {
   const limit = Math.min(100, Math.max(1, Math.floor(Number(body.limit) || 50)));
   const offset = Math.max(0, Math.floor(Number(body.offset) || 0));
+  const sourceFilter = typeof body.source === "string" ? body.source.trim().slice(0, 40) : "";
+  const noThumbFilter = body.noThumb === true;
   const { raw, cache, hidden } = await catalogBase();
+  const posters = cache.posters;
   const now = Date.now();
   const dayStart = Math.floor((now + WIB_MS) / 86400000) * 86400000 - WIB_MS;
   const weekStart = dayStart - 6 * 86400000;
   let today = 0;
   let week = 0;
+  const todayBySource: Record<string, number> = {};
+  const bySource: Record<string, number> = {};
   const seen = new Set<string>();
-  const uniq: RawItem[] = [];
+  const uniq: { it: RawItem; t: number; source: string }[] = [];
   for (const it of raw) {
     if (!it?.id || seen.has(it.id)) continue;
     seen.add(it.id);
-    uniq.push(it);
     const t = createdMs(it);
-    if (t >= dayStart) today++;
+    const source = sourceLabel(it);
+    uniq.push({ it, t, source });
+    bySource[source] = (bySource[source] || 0) + 1;
+    if (t >= dayStart) {
+      today++;
+      todayBySource[source] = (todayBySource[source] || 0) + 1;
+    }
     if (t >= weekStart) week++;
   }
+  // Public catalog per category and the shown uploads still on the logo (in-memory counts only).
+  const catCount = new Map<string, number>();
+  let noThumb = 0;
+  for (const it of cache.items) {
+    const slug = slugOf(it);
+    catCount.set(slug, (catCount.get(slug) || 0) + 1);
+    if (lacksThumb(it, posters)) noThumb++;
+  }
+  const categories = [...catCount.entries()]
+    .map(([slug, count]) => ({ slug, label: findCategory(slug)?.label || slug, count }))
+    .sort((a, b) => b.count - a.count);
   // Strictly by upload time (sortByNewest ranks by source first, which is right for the catalog
   // pages but not for "Upload terbaru"). Items without a usable date go last.
   const recent0 = uniq
-    .map((it) => ({ it, t: createdMs(it) }))
+    .filter((r) => (!sourceFilter || r.source === sourceFilter) && (!noThumbFilter || lacksThumb(r.it, posters)))
     .sort((a, b) => b.t - a.t);
   const page = recent0
     .slice(offset, offset + limit)
-    .map(({ it }) => toCatalogRow(it, cache.byId?.get(it.id), hidden.has(it.id)));
+    .map(({ it }) => toCatalogRow(it, cache.byId?.get(it.id), hidden.has(it.id), posters));
+  const dead = deadSources as { checkedAt?: string | null };
   return json({
     ok: true,
     total: cache.items.length,
     hidden: hidden.size,
     uploadedToday: today,
     uploadedWeek: week,
+    todayBySource,
+    bySource,
+    categories,
+    noThumb,
     recent: page,
     recentTotal: recent0.length,
     offset,
+    source: sourceFilter || null,
+    noThumbOnly: noThumbFilter,
+    status: {
+      catalogAt: typeof cache.at === "number" ? cache.at : null,
+      thumbsAt: (thumbsDeploy as { at?: string }).at || null,
+      deadCheckedAt: dead.checkedAt || null,
+      statsUpdated: (rankMeta as { updated?: string }).updated || null,
+    },
+  });
+}
+
+/** Shown Byse/Lulu/Dood uploads without a poster, newest first, for "Thumbnail kosong". */
+async function handleThumbMissing(body: { limit?: unknown; offset?: unknown } = {}) {
+  const limit = Math.min(100, Math.max(1, Math.floor(Number(body.limit) || 20)));
+  const offset = Math.max(0, Math.floor(Number(body.offset) || 0));
+  const { cache } = await catalogBase();
+  const rows = cache.items
+    .filter((it) => lacksThumb(it, cache.posters))
+    .map((it) => ({ it, t: createdMs(it) }))
+    .sort((a, b) => b.t - a.t);
+  return json({
+    ok: true,
+    total: rows.length,
+    offset,
+    items: rows.slice(offset, offset + limit).map(({ it }) => toCatalogRow(it, it, false, cache.posters)),
   });
 }
 
@@ -412,7 +532,7 @@ async function handleCatalogSearch(body: { q?: unknown }) {
     const shown = cache.byId?.get(it.id);
     const hay = `${String(shown?.title || it.title || "").toLowerCase()} ${it.id.toLowerCase()}`;
     if (!hay.includes(q)) continue;
-    out.push(toCatalogRow(it, shown, hidden.has(it.id)));
+    out.push(toCatalogRow(it, shown, hidden.has(it.id), cache.posters));
     if (out.length >= 20) break;
   }
   return json({ ok: true, items: out });
@@ -481,6 +601,8 @@ type OwnerBody = {
   q?: string;
   title?: string;
   offset?: number;
+  noThumb?: boolean;
+  posters?: Record<string, string>;
 };
 
 /** Telegram webhook status for the owner: registered url, pending updates, last error, last OK. */
@@ -550,9 +672,10 @@ export const Route = createFileRoute("/api/owner-tools")({
           const r = await setReviewMark(body as never);
           return json(r, r.status || 200);
         }
-        if (body.action === "catalog-overview" || body.action === "catalog-search") {
+        if (body.action === "catalog-overview" || body.action === "catalog-search" || body.action === "thumb-missing") {
           // Always answer JSON, so the panel can show what went wrong instead of staying empty.
           try {
+            if (body.action === "thumb-missing") return await handleThumbMissing(body);
             return body.action === "catalog-overview" ? await handleCatalogOverview(body) : await handleCatalogSearch(body);
           } catch (err) {
             console.error("[owner-tools] catalog", err);
@@ -570,6 +693,7 @@ export const Route = createFileRoute("/api/owner-tools")({
         if (body.action === "share") return handleShare(body);
         if (body.action === "upload") return handleUpload(body);
         if (body.action === "set-poster") return handleSetPoster(body);
+        if (body.action === "set-posters") return handleSetPosters(body);
         if (body.action === "refresh-posters") return handleRefreshPosters(body);
         return json({ ok: false, error: "bad_action" }, 400);
       },
