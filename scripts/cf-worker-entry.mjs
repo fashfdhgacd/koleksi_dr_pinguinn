@@ -51,6 +51,20 @@ import { fetchJsonFromGithub, upsertVideosBatch } from "../src/lib/bot/github.js
  * this long (then the stale copy is dropped when the refresh no longer gets a 200).
  */
 const HTML_FRESH_MAX = 600;
+/**
+ * Busy-day freshness (s) for cached pages/JSON while the traffic valve samples analytics
+ * (src/lib/traffic-valve.ts; the rate this isolate last read is on globalThis.__kdpValve__). On a
+ * viral day most views hit a few popular URLs, so an hour of freshness turns almost every view into a
+ * cache hit (~1–2 ms CPU instead of a full render). Uploads still show at once (deploy = new key).
+ */
+const BUSY_FRESH = 3600;
+function valveBusy() {
+  try {
+    return Number(globalThis.__kdpValve__?.n || 1) > 1;
+  } catch {
+    return false;
+  }
+}
 /** Longest stale window (s) for HTML when the page sets a larger stale-while-revalidate. */
 const HTML_STALE_MAX = 86_400;
 /** Longest time (s) any other cached response (images, xml, json) is kept. */
@@ -192,7 +206,9 @@ async function cachedFetch(request, env, context, url) {
 
   if (hit) {
     const at = Number(hit.headers.get("x-edge-at") || 0);
-    const fresh = Number(hit.headers.get("x-edge-fresh") || 0);
+    const stored = Number(hit.headers.get("x-edge-fresh") || 0);
+    // Busy day: keep cached pages fresh longer (only entries this wrapper stored, never /thumb placeholders).
+    const fresh = at && stored > 0 && !hit.headers.has("x-thumb-fallback") && valveBusy() ? Math.max(stored, BUSY_FRESH) : stored;
     // Entries written by a route itself (e.g. /thumb) carry no x-edge-at: their own max-age governs.
     if (!at || Date.now() - at < fresh * 1000) return fromCache(hit, "HIT");
     // Stale but within its stale window (the cache drops it after that): serve it, refresh once.
