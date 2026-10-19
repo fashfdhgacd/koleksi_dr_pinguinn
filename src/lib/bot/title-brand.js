@@ -250,6 +250,20 @@ function stripLeading(t) {
 }
 
 /**
+ * Kata usia ala aturan Pornhub: "teen/teens", "ABG", "remaja", "belia" -> "18+" (pemeran dewasa).
+ * "Cewek ABG" -> "Cewek 18+", "ABG Hijab" -> "Cewek 18+ Hijab". Idempotent.
+ */
+export function adultAgeWording(raw = "") {
+  return String(raw ?? "")
+    .replace(/\b(cewek|cewe|cwe|gadis|girl)\s+(?:abg|teens?|remaja|belia)\b/gi, "$1 18+")
+    .replace(/\babg\b/gi, "Cewek 18+")
+    .replace(/\b(?:teens?|remaja|belia)\b/gi, "18+")
+    .replace(/18\+(?:\s+18\+)+/g, "18+")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
  * Judul dasar tanpa branding siapa pun (situs lain maupun pinguin). Idempotent.
  * Kosong → "Video" (dipakai bot untuk tahu "tidak ada judul").
  */
@@ -290,7 +304,7 @@ export function cleanUploadTitle(raw = "") {
   }
 
   return (
-    t
+    adultAgeWording(t)
       .replace(/[_-]+/g, " ")
       .replace(/\s+/g, " ")
       .trim()
