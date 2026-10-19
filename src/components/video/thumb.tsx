@@ -135,6 +135,13 @@ export function VideoThumb({
       onError={handleError}
       onLoad={(e) => {
         const img = e.currentTarget;
+        // /thumb/<id> without a real poster redirects to the brand poster: draw it as the neat
+        // centered fallback (object-contain on the dark card), not cropped like a photo.
+        if (!isPosterSrc(current) && /\/brand-poster[^/]*\.jpg(?:\?|$)/.test(img.currentSrc || "")) {
+          setStep(3);
+          setCurrent(FALLBACK_POSTER);
+          return;
+        }
         if (img.naturalWidth > 2) markPosterWarm(current);
         else if (!isPosterSrc(current)) {
           setStep(3);

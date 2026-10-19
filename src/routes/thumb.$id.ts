@@ -3,9 +3,9 @@ import posters from "@/lib/catalog/posters.json";
 import javPosters from "@/lib/catalog/jav-posters.json";
 import latestPosters from "../../data/latest-posters.json";
 import folderBatch20261007 from "@/lib/catalog/folder-batch-20261007.json";
+import drpBokepBatch from "../../data/drp-bokep.json";
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { resolvePostersBucket } from "@/lib/poster-r2";
-import brandPosterDataUrl from "../../public/brand-poster.jpg?inline";
 
 function sourceFor(id: string): string {
   const maps = [posters, javPosters, latestPosters] as Array<Record<string, string>>;
@@ -15,8 +15,11 @@ function sourceFor(id: string): string {
   }
   const ov = (itemOverrides as Record<string, { poster?: string }>)[id];
   if (ov && typeof ov.poster === "string" && ov.poster.startsWith("http")) return ov.poster;
-  // Folder-ingest batches carry their poster on the item itself.
-  for (const it of folderBatch20261007 as Array<{ id?: string; poster?: string }>) {
+  // Folder-ingest batches (and the /kategori/bokep import) carry their poster on the item itself.
+  for (const it of [
+    ...(folderBatch20261007 as Array<{ id?: string; poster?: string }>),
+    ...(drpBokepBatch as Array<{ id?: string; poster?: string }>),
+  ]) {
     if (it?.id === id && typeof it.poster === "string" && it.poster.startsWith("http")) return it.poster;
   }
   return "";
@@ -45,40 +48,21 @@ function imageResponse(body: BodyInit, type: string): Response {
 }
 
 /**
- * No stored/remote poster (or the host is dead): serve the site's own brand poster
- * (public/brand-poster.jpg, inlined at build time) instead of a 404, so Google's video
- * indexing never sees an unreachable thumbnail. A Worker can't reliably fetch its own
- * hostname, hence the inline copy. Short cache + not saved to R2, so a real poster
- * added later still takes over.
+ * No stored/remote poster (or the host is dead): redirect to the site's own brand poster
+ * (public/brand-poster-6x5.jpg, a static asset served without the Worker) instead of a 404, so
+ * Google's video indexing never sees an unreachable thumbnail. The card (thumb.tsx) sees the
+ * redirected URL and draws the logo centered (object-contain) instead of cropping it as a photo.
+ * Short cache + not saved to R2, so a real poster added later still takes over.
  */
-let fallbackBytes: Uint8Array | null = null;
-function fallbackImage(): Uint8Array {
-  if (!fallbackBytes) {
-    const b64 = String(brandPosterDataUrl).split(",")[1] || "";
-    const bin = atob(b64);
-    const out = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-    fallbackBytes = out;
-  }
-  return fallbackBytes;
-}
-
-async function fallback(_request: Request): Promise<Response> {
-  try {
-    const bytes = fallbackImage();
-    if (bytes.byteLength > 800) {
-      return new Response(bytes, {
-        headers: {
-          "content-type": "image/jpeg",
-          "cache-control": "public, max-age=300",
-          "x-thumb-fallback": "1",
-        },
-      });
-    }
-  } catch {
-    /* fall through */
-  }
-  return new Response(null, { status: 404 });
+async function fallback(request: Request): Promise<Response> {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      location: new URL("/brand-poster-6x5.jpg", request.url).toString(),
+      "cache-control": "public, max-age=300",
+      "x-thumb-fallback": "1",
+    },
+  });
 }
 
 /**
