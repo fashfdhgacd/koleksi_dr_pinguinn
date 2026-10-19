@@ -37,6 +37,8 @@ export function OwnerVideyUntitled({ secret }: { secret: string }) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loadError, setLoadError] = useState<string | null>(null);
   const [ads, setAds] = useState<AdCounts | null>(null);
+  // Collapsed by default, same header as the panel's other Collapse sections (owner-panel.tsx).
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     if (!secret) return;
@@ -131,12 +133,22 @@ export function OwnerVideyUntitled({ secret }: { secret: string }) {
         </section>
       ) : null}
       {showList ? (
-    <section id="videy-judul" className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-[13px] font-semibold uppercase tracking-[0.04em] text-zinc-300">Videy belum dikasih judul</h2>
-        {rows ? <span className="text-xs text-zinc-500">{open.length} video</span> : null}
-      </div>
-      {loadError ? <p className="mt-3 text-sm text-amber-400">{loadError}</p> : null}
+    <section id="videy-judul" className="rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/35 bg-[#121215]">
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]"
+      >
+        <span>
+          Videy belum dikasih judul
+          {rows ? <span className="ml-2 font-normal normal-case tracking-normal text-zinc-500">{open.length} video</span> : null}
+        </span>
+        <span className="text-zinc-600">{expanded ? "-" : "+"}</span>
+      </button>
+      {expanded ? (
+      <div className="border-t border-white/[0.06] p-2 sm:p-3">
+      {loadError ? <p className="mt-1 text-sm text-amber-400">{loadError}</p> : null}
       {rows == null && !loadError ? <p className="mt-3 text-sm text-zinc-500">...</p> : null}
       <div className="mt-3">
         {(rows || []).map((r) => (
@@ -188,6 +200,8 @@ export function OwnerVideyUntitled({ secret }: { secret: string }) {
           </div>
         ))}
       </div>
+      </div>
+      ) : null}
     </section>
       ) : null}
     </>
