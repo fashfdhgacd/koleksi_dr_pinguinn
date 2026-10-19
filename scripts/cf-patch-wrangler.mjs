@@ -63,11 +63,15 @@ for (const p of paths) {
     delete j.routes;
   }
 
-  // Keep observability on if present remotely (safer default)
+  // Keep observability on if present remotely (safer default). Logs are sampled at 10% (Oct 2026,
+  // $20/month ceiling): Workers Logs beyond the included 20M events/month are billed, and at ~1M
+  // requests/day 100% logging would pass that. 10% is still plenty to see CPU time per path.
+  const LOG_SAMPLING = 0.1;
   if (!j.observability) {
-    j.observability = { enabled: true, logs: { enabled: true } };
+    j.observability = { enabled: true, head_sampling_rate: LOG_SAMPLING, logs: { enabled: true } };
   } else {
     j.observability.enabled = true;
+    j.observability.head_sampling_rate = LOG_SAMPLING;
     j.observability.logs = { ...(j.observability.logs || {}), enabled: true };
   }
 
