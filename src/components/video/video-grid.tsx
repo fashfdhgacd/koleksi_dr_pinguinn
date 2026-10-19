@@ -1,10 +1,9 @@
-// Grid: 2 / 3 / 4 kolom (mobile / tablet / desktop).
-// Catalog grids (home, kategori; `ads` prop kept as the catalog-layout flag, no ads are rendered):
-// fluid columns filling the content width (1 / 3 / 4), card thumbs 300:250. Pages hold 36 videos
-// (DEFAULT_PAGE_SIZE), a multiple of 12, so every row is full at 1, 3 and 4 columns.
-// One TrafficStars card (ts-grid-ad.tsx) before video 10: row 3, center column at 4 columns;
-// while shown one trailing video is trimmed at 3/4 columns, and it collapses if unfilled.
-// The watch page keeps the default grid (no ad).
+// Grid: 2 / 3 / 4 kolom (mobile / tablet / desktop) for the watch page; catalog grids 2 / 3 / 6.
+// Catalog grids (home, kategori; `ads` prop): 2 / 3 / 6 columns, card thumbs 300:250, and a
+// TrafficStars MasterSpot card (ts-grid-ad.tsx) as every 8th card (cells 8, 16, 24, 32; max 4),
+// each one card footprint, lazy-loaded, collapsing on its own if unfilled. Pages hold 36 videos;
+// trailing videos are trimmed at 3 / 6 columns so rows stay full (40 cells -> 36 at 3 and 6 cols;
+// 2 cols is always even). The watch page ("Tonton juga") keeps the default grid, no ads.
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { isRealMinor } from "@/lib/minor-terms";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,7 +14,7 @@ import { useCallback, useState } from "react";
 const DEFAULT_GRID =
   "grid grid-cols-2 gap-x-2.5 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 lg:grid-cols-4";
 const CATALOG_GRID =
-  "grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-3 sm:gap-y-7 lg:grid-cols-4 [&>a>div:first-child]:aspect-[300/250]";
+  "grid grid-cols-2 gap-x-2.5 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 lg:grid-cols-6 [&>a>div:first-child]:aspect-[300/250]";
 
 /**
  * Tablet/desktop: hide up to 3 trailing videos so cells fill whole rows at 3 and 4 columns
@@ -26,10 +25,11 @@ const TRIM_CLASS = [
   " sm:[&>a:nth-last-of-type(-n+1)]:hidden",
   " sm:[&>a:nth-last-of-type(-n+2)]:hidden",
   " sm:[&>a:nth-last-of-type(-n+3)]:hidden",
+  " sm:[&>a:nth-last-of-type(-n+4)]:hidden",
 ];
 function trimClass(count: number): string {
   const extra = count % 12;
-  return count > 12 && extra > 0 && extra <= 3 ? TRIM_CLASS[extra] : "";
+  return count > 12 && extra > 0 && extra <= 4 ? TRIM_CLASS[extra] : "";
 }
 
 function visibleCards(items: VideoCardType[]): VideoCardType[] {
@@ -48,25 +48,31 @@ export function VideoGrid({
 }) {
   const shown = visibleCards(items);
   const [empty, setEmpty] = useState<Record<number, true>>({});
-  const onEmpty1 = useCallback(() => setEmpty((e) => ({ ...e, 1: true })), []);
-  // One slot before video 10 (row 3 center at 4 columns); lazy-loads and collapses if unfilled
-  // (the trimmed trailing video then returns).
-  const at1 = ads && !empty[1] && shown.length >= 4 ? Math.min(AD_INDEX, shown.length) : -1;
-  const cells = shown.length + (at1 >= 0 ? 1 : 0);
-  const ad1 = <TsGridAd key="ts-ad-1" onEmpty={onEmpty1} />;
+  const onEmpty = useCallback((slot: number) => setEmpty((e) => ({ ...e, [slot]: true })), []);
+  // Up to 4 slots, every 8th card; each lazy-loads and collapses
+  // on its own if unfilled (a trimmed trailing video then returns).
+  const slots = ads
+    ? AD_POSITIONS.map((at, slot) => ({ at, slot })).filter((x) => x.at < shown.length && !empty[x.slot])
+    : [];
+  const cells = shown.length + slots.length;
   return (
     <div className={ads ? CATALOG_GRID + trimClass(cells) : DEFAULT_GRID}>
-      {shown.map((video, index) => (
-        <Cell key={video.id} ad={index === at1 ? ad1 : null}>
-          <VideoCard video={video} eager={index < eagerCount} />
-        </Cell>
-      ))}
-      {at1 === shown.length ? ad1 : null}
+      {shown.map((video, index) => {
+        const s = slots.find((x) => x.at === index);
+        return (
+          <Cell
+            key={video.id}
+            ad={s ? <TsGridAd key={`ts-ad-${s.slot}`} onEmpty={() => onEmpty(s.slot)} /> : null}
+          >
+            <VideoCard video={video} eager={index < eagerCount} />
+          </Cell>
+        );
+      })}
     </div>
   );
 }
 
-const AD_INDEX = 9;
+const AD_POSITIONS = [7, 14, 21, 28]; // every 8th card (cells 8, 16, 24, 32)
 
 function Cell({ ad, children }: { ad: React.ReactNode; children: React.ReactNode }) {
   return (

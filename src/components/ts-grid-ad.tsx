@@ -1,4 +1,4 @@
-// TrafficStars MasterSpot 300x250 (spot 5210857) as one card in catalog grids (home, kategori).
+// TrafficStars MasterSpot (spot 5210857) as one video-card-sized cell in catalog grids (home, kategori).
 // Client-side only: the SDK script is injected into the slot element when the slot nears the
 // viewport, once per mounted slot (SPA navigation remounts the slot with a fresh container, the
 // old one is removed with its ad). If nothing fills within the timeout the slot collapses.
@@ -73,14 +73,27 @@ export function TsGridAd({ className = "", onEmpty }: { className?: string; onEm
   }, [state, onEmpty]);
 
   if (state === "empty") return null;
-  // Sizes to the rendered ad (no fixed frame, nothing clipped). Space for a 300x250 is reserved up
-  // front (min-height) so the grid does not jump when the ad arrives; full cell width on mobile.
+  // One video-card footprint: until the ad arrives an invisible card-shaped placeholder (300:250
+  // thumb + two title lines + stats row, like VideoCard) holds the cell, so nothing shifts; the ad
+  // sits over it and takes its place once filled. Small IKLAN badge on the image.
   return (
-    <div data-kdp-ad="trafficstars" className={"p-1 sm:p-1.5 " + className}>
-      <div className="flex min-h-[250px] w-full items-center justify-center">
-        <div ref={ref} className="w-full max-w-full" />
-      </div>
-      <p className="mt-2 text-[11px] uppercase tracking-wide text-zinc-500">Iklan</p>
+    <div data-kdp-ad="trafficstars" className={"relative p-1 sm:p-1.5 " + className}>
+      {state === "filled" ? null : (
+        <div aria-hidden className="invisible">
+          <div className="aspect-[300/250] w-full" />
+          <div className="mt-3 min-h-[2.5em] text-[13px] leading-snug sm:text-[15px]">&nbsp;</div>
+          <div className="mt-1.5 text-[11px] sm:text-xs">&nbsp;</div>
+        </div>
+      )}
+      <div
+        ref={ref}
+        className={
+          state === "filled" ? "relative w-full" : "absolute inset-x-1 top-1 sm:inset-x-1.5 sm:top-1.5"
+        }
+      />
+      <span className="pointer-events-none absolute left-2.5 top-2.5 z-10 rounded bg-black/65 px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-zinc-300 sm:left-3 sm:top-3">
+        Iklan
+      </span>
     </div>
   );
 }
