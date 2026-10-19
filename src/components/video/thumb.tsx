@@ -8,6 +8,18 @@ export const FALLBACK_POSTER = "/brand-poster-6x5.jpg";
 
 const FALLBACK_CLASS = "media-thumb size-full object-contain bg-[#0e0d12]";
 
+/**
+ * Posters straight from the R2 bucket `posters` (custom domain, no Worker): same key the /thumb route
+ * stores them under (posters/typed/<id>). Oct 2026 cost cut: ~23 of ~28 Worker requests per page were
+ * /thumb/<id>. A poster not in R2 yet (404) falls back to /thumb/<id>, which fetches and stores it.
+ */
+const R2_POSTERS = "https://img.koleksidrpinguin.com/posters/typed/";
+
+function r2PosterUrl(id: string): string {
+  const key = id.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
+  return key ? `${R2_POSTERS}${key}` : "";
+}
+
 function isVideoSrc(src: string): boolean {
   if (!src || typeof src !== "string") return false;
   return /\.(mp4|mov|webm)(\?|$)/i.test(src) || /cdn\.videy\.co\//i.test(src);
@@ -45,7 +57,8 @@ export function VideoThumb({
   // No .jpg suffix: old /thumb/{id}.jpg responses are cached as the brand penguin (immutable).
   // Our own static files (e.g. /videy-thumbs/{id}.jpg) are used as they are.
   const local = videoId && real && /^https?:\/\//i.test(real) ? `/thumb/${videoId}` : "";
-  const first = local || real || dmm || FALLBACK_POSTER;
+  const r2 = local ? r2PosterUrl(videoId) : "";
+  const first = r2 || local || real || dmm || FALLBACK_POSTER;
   const [current, setCurrent] = useState(first);
   const [step, setStep] = useState(0);
   const imgRef = useRef<HTMLImageElement | null>(null);
@@ -61,6 +74,11 @@ export function VideoThumb({
   }, [step, onUnavailable]);
 
   const handleError = useCallback(() => {
+    // Not in R2 yet: the Worker route fetches the source poster (and stores it for next time).
+    if (r2 && current === r2 && local) {
+      setCurrent(local);
+      return;
+    }
     if (step === 0 && real && current !== real) {
       setStep(1);
       setCurrent(real);
@@ -77,7 +95,7 @@ export function VideoThumb({
       return;
     }
     setStep(4);
-  }, [step, real, dmm, current]);
+  }, [step, real, dmm, current, r2, local]);
 
   // An image that failed before hydration never reaches React's onError, so mobile
   // browsers keep showing the broken-image icon. Check once mounted and on every src change.
