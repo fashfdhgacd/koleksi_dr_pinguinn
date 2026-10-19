@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useRouterState } from "@tanstack/react-router";
+import { inSample, wibDayKey } from "@/lib/traffic-valve";
 
 /**
  * Pageview ping: one POST /api/online per page (first load and every SPA navigation), nothing else.
@@ -9,8 +10,36 @@ import { useRouterState } from "@tanstack/react-router";
  * Cost (Oct 2026): the old 90 s heartbeat was most of the Worker requests and a big part of CPU. There
  * is no heartbeat now. The owner panel's "online" number is the count of visitors with a pageview in
  * the last 5 minutes (D1 analytics_sessions.last_seen_at, updated by every pageview).
+ *
+ * Traffic valve (traffic-valve.ts): the answer carries `s` = sample rate 1-in-N for today. A visitor
+ * outside the sample stops pinging for an hour (then one ping re-checks); N = 1 on normal days.
  */
 const ID_KEY = "drp_online_id";
+const SAMPLE_KEY = "drp_s";
+
+/** A remembered rate is re-checked after an hour (one ping), so a calmer hour lets visitors back in. */
+const SAMPLE_TTL_MS = 60 * 60_000;
+
+function readSample(): number {
+  try {
+    const [day, n, at] = String(localStorage.getItem(SAMPLE_KEY) || "").split("|");
+    if (day !== wibDayKey() || !(Date.now() - Number(at) < SAMPLE_TTL_MS)) return 1;
+    return Math.max(1, Number(n) || 1);
+  } catch {
+    return 1;
+  }
+}
+
+function saveSample(n: unknown): void {
+  const v = Math.max(1, Math.floor(Number(n) || 1));
+  try {
+    if (v > 1) localStorage.setItem(SAMPLE_KEY, `${wibDayKey()}|${v}|${Date.now()}`);
+    else localStorage.removeItem(SAMPLE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 const BOT_RE =
   /bot|crawl|spider|slurp|headless|webdriver|puppeteer|playwright|phantom|scrapy|httpclient|curl\/|wget|python-requests|axios\/|node-fetch|bytespider|gptbot|claudebot|ccbot|semrush|ahrefs|dataforseo|petalbot/i;
 
@@ -60,6 +89,7 @@ export function PresencePing() {
     const id = getOrCreateId();
 
     async function beat() {
+      if (pathname !== "/pemilik" && !inSample(id, readSample())) return;
       try {
         const body: Record<string, string> = {
           id,
@@ -71,7 +101,7 @@ export function PresencePing() {
           ...body,
           eventId: `${id}-${pathname || ""}-${Math.floor(Date.now() / 60000)}`,
         });
-        await fetch("/api/online", {
+        const res = await fetch("/api/online", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: payload,
@@ -79,6 +109,8 @@ export function PresencePing() {
           cache: "no-store",
           keepalive: true,
         });
+        const data = (await res.json().catch(() => null)) as { s?: number } | null;
+        if (data && "s" in data) saveSample(data.s);
       } catch {
         /* silent */
       }
