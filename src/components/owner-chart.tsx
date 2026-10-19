@@ -57,7 +57,7 @@ function useWidth<T extends HTMLElement>(): [RefObject<T | null>, number] {
 }
 
 /**
- * 14-day chart: bars = tayang (left axis), line = unik (right axis), plus a
+ * 14-day chart: bars = kunjungan halaman (left axis), line = unik (right axis), plus a
  * small peak-online sparkline. Pure inline SVG, no chart dependency.
  * `days` comes newest-first from the API; rendered oldest → newest.
  */
@@ -112,7 +112,7 @@ export function OwnerChart({ days }: { days: ChartDay[] }) {
           <span className="ml-2 text-[11px] text-zinc-600">{cur.day}</span>
         </p>
         <p className="text-xs tabular-nums text-zinc-400">
-          <span style={{ color: VIEWS_COLOR }}>{fmt(cur.views)}</span> tayang ·{" "}
+          <span style={{ color: VIEWS_COLOR }}>{fmt(cur.views)}</span> kunjungan ·{" "}
           <span style={{ color: UNIQUE_COLOR }}>{fmt(cur.unique)}</span> unik ·{" "}
           <span style={{ color: PEAK_COLOR }}>{fmt(cur.peak)}</span> puncak
         </p>
@@ -123,7 +123,7 @@ export function OwnerChart({ days }: { days: ChartDay[] }) {
         height={H}
         viewBox={`0 0 ${W} ${H}`}
         role="img"
-        aria-label="Grafik tayang dan pengunjung unik 14 hari (WIB)"
+        aria-label="Grafik kunjungan halaman dan pengunjung unik 14 hari (WIB)"
         className="block max-w-full touch-pan-y"
         onPointerDown={(e) => pick(e.clientX, e.currentTarget)}
         onPointerMove={(e) => {
@@ -215,7 +215,7 @@ export function OwnerChart({ days }: { days: ChartDay[] }) {
       <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-zinc-500">
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block size-2.5 rounded-sm" style={{ backgroundColor: VIEWS_COLOR }} />
-          Tayang (kiri)
+          Kunjungan (kiri)
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="inline-block h-0.5 w-3 rounded" style={{ backgroundColor: UNIQUE_COLOR }} />
