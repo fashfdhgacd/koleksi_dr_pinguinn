@@ -125,6 +125,15 @@ export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: 
   return pageOf(terbaruSorted, page, limit, posters, videyNo);
 }
 
+/**
+ * Every shown video, newest first, all sources (incl. Videy and Byse/Dood/Lulu, which are not in
+ * Terbaru). Used by the Telegram share pool when no category is given.
+ */
+export async function listAllNewest(page = 1, limit = DEFAULT_PAGE_SIZE): Promise<PagedVideos> {
+  const { mainSorted, posters, videyNo } = await loadItems();
+  return pageOf(mainSorted, page, limit, posters, videyNo);
+}
+
 /** Featured pool per (catalog build, 5-min slot, size): same for every request in the slot. */
 const featuredMemo = new WeakMap<object, Map<string, RawItem[]>>();
 
@@ -166,10 +175,13 @@ export async function listCategory(
   limit = DEFAULT_PAGE_SIZE,
   _signal?: AbortSignal,
 ): Promise<PagedVideos> {
-  const { items, posters, videyNo, bySlug, mainSorted } = await loadItems();
+  const { items, posters, videyNo, bySlug, mainSorted, listOrder } = await loadItems();
   const s = category.toLowerCase().trim();
   let pool: RawItem[];
-  if (s === "jav") {
+  const mixed = listOrder?.get(s === "streamtape" ? "ai-plus" : s);
+  if (mixed && mixed.length) {
+    pool = mixed;
+  } else if (s === "jav") {
     const hit = bySlug.get("jav");
     pool = hit && hit.length ? hit : items.filter(isPutarin);
   } else if (s === "ai-plus" || s === "streamtape") {

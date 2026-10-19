@@ -1,4 +1,4 @@
-import { listCategory, listLatest } from "@/lib/catalog/local";
+import { listAllNewest, listCategory, listLatest } from "@/lib/catalog/local";
 import { DEFAULT_PAGE_SIZE } from "@/lib/catalog/types";
 import type { VideoCard } from "@/lib/catalog/types";
 
@@ -44,7 +44,8 @@ export async function collectSharePool(opts: {
       ? await listLatest(p, DEFAULT_PAGE_SIZE)
       : opts.category
         ? await listCategory(opts.category, p, 48)
-        : await listLatest(p, 48);
+        : // All sources (Terbaru itself has no Videy / Byse / Dood / Lulu), so "lulu" shares still work.
+          await listAllNewest(p, 48);
     for (const it of page.items) {
       if (!it?.id || seen.has(it.id)) continue;
       const tk = titleKey(it.title || "");

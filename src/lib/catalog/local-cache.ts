@@ -15,6 +15,7 @@ import {
   isPutarin,
   isUsable,
   isVidey,
+  isDrpBokep,
   mainCatalog,
   slugOf,
   toCard,
@@ -322,41 +323,84 @@ function withStats(it: RawItem): RawItem {
 }
 
 /**
- * Terbaru (homepage list) ordering, deterministic for pagination/SEO:
- *  - positions 1..24 (page 1): IndoAV only, same order as before
- *  - from page 2: every 3rd card is UserBokep (newest first), the rest IndoAV, until
- *    UserBokep runs out; then the remaining items keep the existing order.
- * Category pages and search keep their own ordering (mainSorted / bySlug / ranking).
+ * Terbaru (homepage list, /api/data?type=latest) ordering, deterministic for pagination/SEO
+ * (owner rule 2026-10-19):
+ *  - page 1 (positions 1..36): IndoAV only
+ *  - from page 2: every 4th card is UserBokep (newest first), the rest IndoAV = 27 IndoAV + 9
+ *    UserBokep per 36; when one of the two runs out, the other continues.
+ *  - ONLY IndoAV and its sister site UserBokep. Videy, Koleksi Dr. Pinguin Bokep (Byse / DoodStream /
+ *    LuluStream), Puterin, Streamtape and every other source live only in their own categories.
+ * Built once per catalog build (buildIndexes). Category pages keep their own ordering (listOrder).
  */
 const TERBARU_FIRST_PAGE = DEFAULT_PAGE_SIZE;
+const TERBARU_UB_EVERY = 4;
 export function terbaruOrder(sorted: RawItem[]): RawItem[] {
   const indo: RawItem[] = [];
   const ub: RawItem[] = [];
-  const rest: RawItem[] = [];
-  const vy: RawItem[] = [];
   for (const it of sorted) {
+    if (isVidey(it) || isDrpBokep(it) || isPutarin(it)) continue;
     if (isIndoAv(it)) indo.push(it);
     else if (isUserBokep(it)) ub.push(it);
-    else if (isVidey(it)) vy.push(it);
-    else rest.push(it);
   }
   const out: RawItem[] = indo.slice(0, TERBARU_FIRST_PAGE);
   let i = TERBARU_FIRST_PAGE;
   let u = 0;
   let slot = 0;
   while (u < ub.length && i < indo.length) {
-    if (slot % 3 === 2) out.push(ub[u++]);
+    if (slot % TERBARU_UB_EVERY === TERBARU_UB_EVERY - 1) out.push(ub[u++]);
     else out.push(indo[i++]);
     slot++;
   }
   while (u < ub.length) out.push(ub[u++]);
   while (i < indo.length) out.push(indo[i++]);
-  out.push(...rest);
-  // Videy (newest first) mixed in from page 2 on (page 1 stays IndoAV only): one in every 4 cards.
-  for (let k = 0; k < vy.length; k++) {
-    const at = TERBARU_FIRST_PAGE + 1 + k * 4;
-    if (at <= out.length) out.splice(at, 0, vy[k]);
-    else out.push(vy[k]);
+  return out;
+}
+
+/**
+ * Interleave two newest-first lists in a fixed pattern: `a` cards of `main`, then `b` of `side`,
+ * repeating; when one runs out the other continues (`sideStops`: the side list only fills between
+ * main cards and stops when main runs out). Each item appears once.
+ */
+function interleave(main: RawItem[], side: RawItem[], a: number, b: number, sideStops = false): RawItem[] {
+  const out: RawItem[] = [];
+  const seen = new Set<string>();
+  const push = (it: RawItem) => {
+    if (seen.has(it.id)) return false;
+    seen.add(it.id);
+    out.push(it);
+    return true;
+  };
+  let m = 0;
+  let s = 0;
+  while (m < main.length) {
+    for (let k = 0; k < a && m < main.length; ) if (push(main[m++])) k++;
+    if (m >= main.length && sideStops) break;
+    for (let k = 0; k < b && s < side.length; ) if (push(side[s++])) k++;
+  }
+  if (!sideStops) while (s < side.length) push(side[s++]);
+  return out;
+}
+
+/**
+ * Category page order (listCategory), built once per catalog build. bySlug keeps the plain
+ * category membership (counts, related videos); only these slugs get a mixed page order:
+ *  - bokep: owner's Byse / DoodStream / LuluStream videos (thumbnail first, logo-only after) with one
+ *    IndoAV video (newest first, each once) after every 2 host videos: H, H, I.
+ *  - jav: 2 IndoAV/UserBokep jav videos : 1 Puterin, newest first within each, then the rest.
+ */
+function categoryOrders(bySlug: Map<string, RawItem[]>, mainSorted: RawItem[]): Map<string, RawItem[]> {
+  const out = new Map<string, RawItem[]>();
+  const bokep = bySlug.get("bokep") || [];
+  if (bokep.length) {
+    const indo = mainSorted.filter((it) => isIndoAv(it) && !isVidey(it) && !isDrpBokep(it));
+    out.set("bokep", interleave(bokep, indo, 2, 1, true));
+  }
+  const jav = bySlug.get("jav") || [];
+  if (jav.length) {
+    const put: RawItem[] = [];
+    const other: RawItem[] = [];
+    for (const it of jav) (isPutarin(it) ? put : other).push(it);
+    out.set("jav", interleave(other, put, 2, 1));
   }
   return out;
 }
@@ -415,6 +459,7 @@ export function buildIndexes(
     bySlug.set(slug, slug === "bokep" ? postersFirst(sorted, posters) : sorted);
   }
   const terbaruSorted = terbaruOrder(mainSorted);
+  const listOrder = categoryOrders(bySlug, mainSorted);
   return {
     at,
     items,
@@ -424,6 +469,7 @@ export function buildIndexes(
     bySlug,
     mainSorted,
     terbaruSorted,
+    listOrder,
     haystack,
     raw,
     hiddenIds,
