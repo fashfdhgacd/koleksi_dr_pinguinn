@@ -16,6 +16,7 @@ import {
 import { runtime } from "./local-shared";
 import { normalizeSearchText, parseSearchQuery, scoreSearch } from "./search-rank";
 import { isPublicHidden, loadItems, pageOf, sortByNewest } from "./local-cache";
+import type { CatalogCache } from "./local-shared";
 
 export { loadItems } from "./local-cache";
 
@@ -57,30 +58,60 @@ function shuffleSlot<T>(arr: T[], seed: number): T[] {
   return out;
 }
 
-function mixIndoHeavy(items: RawItem[], excludeId: string, limit: number, seed: number): RawItem[] {
-  const indo = shuffleSlot(
-    items.filter((x) => isIndoAv(x) && x.id !== excludeId),
-    seed,
-  );
-  const user = shuffleSlot(
-    items.filter((x) => isUserBokep(x) && x.id !== excludeId),
-    seed + 17,
-  );
-  if (!indo.length && !user.length) {
-    return shuffleSlot(
-      items.filter((x) => x.id !== excludeId && !isVidey(x) && !isPutarin(x) && !isStreamtape(x)),
-      seed + 31,
-    ).slice(0, limit);
+/**
+ * First `k` items of a seeded Fisher-Yates shuffle, skipping `excludeId`. Stops after `k` picks, so a
+ * related/featured list costs ~k random draws instead of shuffling (and filtering) the whole catalog
+ * on every /watch render.
+ */
+function pickShuffled(arr: RawItem[], seed: number, k: number, excludeId = ""): RawItem[] {
+  const out: RawItem[] = [];
+  if (k <= 0 || !arr.length) return out;
+  const pool = arr.slice();
+  const rnd = mulberry32(seed >>> 0);
+  const n = pool.length;
+  for (let i = 0; i < n && out.length < k; i++) {
+    const j = i + Math.floor(rnd() * (n - i));
+    const tmp = pool[i]!;
+    pool[i] = pool[j]!;
+    pool[j] = tmp;
+    if (pool[i]!.id !== excludeId) out.push(pool[i]!);
   }
-  const nUser = Math.min(user.length, Math.max(0, Math.round(limit * 0.15)));
-  const nIndo = Math.min(indo.length, Math.max(0, limit - nUser));
+  return out;
+}
+
+type MixPools = { indo: RawItem[]; user: RawItem[]; plain: RawItem[] };
+/** Source pools per catalog build (the cache object changes only on a rebuild). */
+const mixPoolsMemo = new WeakMap<object, MixPools>();
+function mixPools(items: RawItem[]): MixPools {
+  let pools = mixPoolsMemo.get(items);
+  if (!pools) {
+    pools = { indo: [], user: [], plain: [] };
+    for (const x of items) {
+      if (isIndoAv(x)) pools.indo.push(x);
+      else if (isUserBokep(x)) pools.user.push(x);
+      if (!isVidey(x) && !isPutarin(x) && !isStreamtape(x)) pools.plain.push(x);
+    }
+    mixPoolsMemo.set(items, pools);
+  }
+  return pools;
+}
+
+function mixIndoHeavy(items: RawItem[], excludeId: string, limit: number, seed: number): RawItem[] {
+  const pools = mixPools(items);
+  const hasIndo = pools.indo.some((x) => x.id !== excludeId);
+  const hasUser = pools.user.some((x) => x.id !== excludeId);
+  if (!hasIndo && !hasUser) return pickShuffled(pools.plain, seed + 31, limit, excludeId);
+  const nUserWant = Math.max(0, Math.round(limit * 0.15));
+  const user = pickShuffled(pools.user, seed + 17, limit, excludeId);
+  const nUser = Math.min(user.length, nUserWant);
+  const indo = pickShuffled(pools.indo, seed, Math.max(0, limit - nUser), excludeId);
+  const nIndo = indo.length;
   const fillUser = Math.min(user.length, limit - nIndo);
-  const picked = [...indo.slice(0, nIndo), ...user.slice(0, fillUser)];
+  const picked = [...indo, ...user.slice(0, fillUser)];
   if (picked.length < limit) {
     const seen = new Set(picked.map((x) => x.id));
-    for (const x of shuffleSlot(items, seed + 53)) {
-      if (x.id === excludeId || seen.has(x.id)) continue;
-      if (isVidey(x) || isPutarin(x) || isStreamtape(x)) continue;
+    for (const x of pickShuffled(pools.plain, seed + 53, limit * 3 + seen.size, excludeId)) {
+      if (seen.has(x.id)) continue;
       picked.push(x);
       seen.add(x.id);
       if (picked.length >= limit) break;
@@ -94,12 +125,24 @@ export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: 
   return pageOf(terbaruSorted, page, limit, posters, videyNo);
 }
 
+/** Featured pool per (catalog build, 5-min slot, size): same for every request in the slot. */
+const featuredMemo = new WeakMap<object, Map<string, RawItem[]>>();
+
 export async function listFeatured(page = 1, limit = 8, _signal?: AbortSignal): Promise<PagedVideos> {
   const { items, posters, videyNo } = await loadItems();
   const seed = slotIndex(0);
-  let pool = mixIndoHeavy(items, "", Math.max(limit * 6, 48), seed);
-  const withArt = pool.filter((x) => Boolean(thumbOf(x, posters)));
-  if (withArt.length >= limit) pool = withArt;
+  const want = Math.max(limit * 6, 48);
+  let perBuild = featuredMemo.get(items);
+  if (!perBuild) featuredMemo.set(items, (perBuild = new Map()));
+  const memoKey = `${seed}:${want}:${limit}`;
+  let pool = perBuild.get(memoKey);
+  if (!pool) {
+    pool = mixIndoHeavy(items, "", want, seed);
+    const withArt = pool.filter((x) => Boolean(thumbOf(x, posters)));
+    if (withArt.length >= limit) pool = withArt;
+    if (perBuild.size > 16) perBuild.clear();
+    perBuild.set(memoKey, pool);
+  }
   const start = Math.max(0, (Math.max(1, page) - 1) * limit);
   const slice = pool.slice(start, start + limit);
   return {
@@ -138,6 +181,23 @@ export async function listCategory(
   return pageOf(pool, page, limit, posters, videyNo);
 }
 
+/**
+ * Newest-first items with their normalized search text, built once per catalog build (was: re-sorted
+ * and re-normalized, ~8k titles, on every search request).
+ */
+const searchMemo = new WeakMap<object, { item: RawItem; hay: string }[]>();
+function searchIndex(cache: CatalogCache): { item: RawItem; hay: string }[] {
+  let rows = searchMemo.get(cache);
+  if (!rows) {
+    rows = sortByNewest(cache.haystack.map((r) => r.item)).map((item) => ({
+      item,
+      hay: normalizeSearchText(`${item.title || ""} ${item.id || ""}`),
+    }));
+    searchMemo.set(cache, rows);
+  }
+  return rows;
+}
+
 export async function listSearch(
   q: string,
   page = 1,
@@ -146,12 +206,12 @@ export async function listSearch(
 ): Promise<PagedVideos> {
   const sq = parseSearchQuery(q);
   if (!sq.tokens.length) return listLatest(page, limit, _signal);
-  const { haystack, posters, videyNo } = await loadItems();
+  const cache = await loadItems();
+  const { posters, videyNo } = cache;
   const scored: { item: RawItem; score: number }[] = [];
-  for (const item of sortByNewest(haystack.map((r) => r.item))) {
-    const hay = normalizeSearchText(`${item.title || ""} ${item.id || ""}`);
-    const score = scoreSearch(hay, sq);
-    if (score > 0) scored.push({ item, score });
+  for (const row of searchIndex(cache)) {
+    const score = scoreSearch(row.hay, sq);
+    if (score > 0) scored.push({ item: row.item, score });
   }
   // Stable sort: same score keeps newest-first order.
   scored.sort((a, b) => b.score - a.score);

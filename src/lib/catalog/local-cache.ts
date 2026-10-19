@@ -37,6 +37,9 @@ import latestPutarin from "../../../data/putarin-latest.json";
 import latestPosters from "../../../data/latest-posters.json";
 // Owner's Byse / DoodStream / LuluStream library (/kategori/bokep), one-off import 2026-10-19.
 import drpBokepBatch from "../../../data/drp-bokep.json";
+// Frozen copy of the old repo's live feed (koleksi_dr_pinguin data/putarin.json, last change Oct 7 2026),
+// bundled so no request ever fetches it from raw.githubusercontent.com again (see BOT_FEEDS).
+import putarinFeedSnapshot from "./putarin-feed-20261007.json";
 
 // Re-bind mutable cache/inflight via shared module namespace
 import { runtime } from "./local-shared";
@@ -48,12 +51,14 @@ function sourcePriority(item: RawItem): number {
   return 0;
 }
 
+/**
+ * Same order as before (source priority, then createdAt/date newest first; stable), but the keys are
+ * computed once per item instead of 3 regex tests per comparison.
+ */
 export function sortByNewest(items: RawItem[]): RawItem[] {
-  return [...items].sort((a, b) => {
-    const pd = sourcePriority(b) - sourcePriority(a);
-    if (pd !== 0) return pd;
-    return Number(b.createdAt || b.date || 0) - Number(a.createdAt || a.date || 0);
-  });
+  const keyed = items.map((it) => ({ it, p: sourcePriority(it), t: Number(it.createdAt || it.date || 0) }));
+  keyed.sort((a, b) => b.p - a.p || b.t - a.t);
+  return keyed.map((k) => k.it);
 }
 
 export function uniqById(items: RawItem[]): RawItem[] {
@@ -103,6 +108,33 @@ const RESTORED = RESTORED_TITLES as Record<string, string>;
  * That list is re-read every UNHIDE_TTL_MS and the indexes are rebuilt when it changes.
  */
 const HIDDEN_REASONS = HIDDEN_ID_REASONS as Record<string, string>;
+
+/**
+ * Title -> detector result, per isolate. Both detectors are pure functions of the title, and each
+ * title is checked several times per index build (locked check + hidden reason), so this halves the
+ * cold-start build and makes later rebuilds (owner Unhide/Edit) almost free.
+ */
+const minorMemo = new Map<string, string>();
+const lockedMemo = new Map<string, string>();
+const MEMO_MAX = 50_000;
+function minorReasonMemo(title: string): string {
+  let r = minorMemo.get(title);
+  if (r === undefined) {
+    r = minorContentReason(title);
+    if (minorMemo.size > MEMO_MAX) minorMemo.clear();
+    minorMemo.set(title, r);
+  }
+  return r;
+}
+function lockedReasonMemo(title: string): string {
+  let r = lockedMemo.get(title);
+  if (r === undefined) {
+    r = lockedMinorReason(title);
+    if (lockedMemo.size > MEMO_MAX) lockedMemo.clear();
+    lockedMemo.set(title, r);
+  }
+  return r;
+}
 const HIDDEN_IDS = new Set<string>(Object.keys(HIDDEN_REASONS));
 
 /** Cache plus the raw (pre-filter, pre-override) item list, so hidden items can be restored. */
@@ -135,17 +167,17 @@ export function hiddenReasonRaw(it: RawItem): string {
   const title = String(overrideTitle(it.id) || RESTORED[it.id] || it.title || "");
   const edited = EDITS[it.id]?.title ? String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "") : "";
   return (
-    minorContentReason(title) ||
-    lockedMinorReason(title) ||
-    (edited ? minorContentReason(edited) || lockedMinorReason(edited) : "")
+    minorReasonMemo(title) ||
+    lockedReasonMemo(title) ||
+    (edited ? minorReasonMemo(edited) || lockedReasonMemo(edited) : "")
   );
 }
 
 /** Clear school/minor theme (minor-lock.js): hidden even when the owner pressed Unhide. */
 function isLockedMinor(it: RawItem): boolean {
   if (isLockedMinorId(it.id)) return true;
-  if (EDITS[it.id]?.title && lockedMinorReason(String(EDITS[it.id]?.title)) !== "") return true;
-  return lockedMinorReason(String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "")) !== "";
+  if (EDITS[it.id]?.title && lockedReasonMemo(String(EDITS[it.id]?.title)) !== "") return true;
+  return lockedReasonMemo(String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "")) !== "";
 }
 
 function isHiddenRaw(it: RawItem): boolean {
@@ -422,15 +454,19 @@ export function assembleLocal(): { items: RawItem[]; posters: Record<string, str
   // Owner folder ingest (IndoAV/UserBokep /f/ folders). Placed last so existing entries always win.
   const fb = withIds(asList(folderBatch20261007)).filter(isUsable);
   const drp = withIds(asList(drpBokepBatch)).filter(isUsable);
+  // First, like the live feed it replaces (remote items used to be merged in front of the bundle).
+  const feed = withIds(asList(putarinFeedSnapshot)).filter(isUsable);
   const posters: Record<string, string> = {
     ...(postersMap as Record<string, string>),
     ...asPosterMap(javPosters),
     ...asPosterMap(latestPosters),
+    ...asPosterMap(putarinFeedSnapshot),
   };
-  return { items: uniqById([...latest, ...pl, ...st, ...st2, ...pu, ...local, ...fb, ...drp]), posters };
+  return { items: uniqById([...feed, ...latest, ...pl, ...st, ...st2, ...pu, ...local, ...fb, ...drp]), posters };
 }
 
 export async function refreshRemote(base: { items: RawItem[]; posters: Record<string, string> }): Promise<CatalogCache> {
+  if (!BOT_FEEDS.length) return runtime.cache || buildIndexes(base.items, base.posters, buildVideyNo(base.items), Date.now());
   const posters = { ...base.posters };
   const remote: RawItem[] = [];
   const botResults = await Promise.all(BOT_FEEDS.map((url) => fetchJson(url)));
@@ -478,25 +514,27 @@ export async function loadItemsRaw(): Promise<CatalogCache> {
   return cache;
 }
 
+/**
+ * The catalog is built ONCE per isolate from the bundled data (every upload lands through a GitHub
+ * commit + deploy, so new videos arrive with the new deploy, not through a fetch). It is rebuilt only
+ * when the owner's Unhide / hide / edit lists change (syncUnhidden, every 30 s from KV). Live feeds
+ * (BOT_FEEDS, empty now) are still merged in every CACHE_MS if any are ever added again.
+ */
 async function loadItemsInner(): Promise<CatalogCache> {
+  if (!runtime.cache) runtime.cache = seedLocalCache();
+  if (!BOT_FEEDS.length) return runtime.cache;
   const now = Date.now();
-  if (runtime.cache && now - runtime.cache.at < CACHE_MS) return runtime.cache;
-  if (runtime.cache && now - runtime.cache.at < STALE_MS) {
+  if (now - runtime.cache.at < CACHE_MS) return runtime.cache;
+  if (now - runtime.cache.at < STALE_MS || runtime.cache.items.filter(isPutarin).length >= 200) {
     kickRemoteRefresh(baseOf(runtime.cache));
     return runtime.cache;
   }
-  if (!runtime.cache) runtime.cache = seedLocalCache();
-  const putarinN = runtime.cache.items.filter(isPutarin).length;
-  if (putarinN < 200) {
-    try {
-      if (runtime.inflight) runtime.cache = await runtime.inflight;
-      else runtime.cache = await refreshRemote(baseOf(runtime.cache));
-    } catch {
-      kickRemoteRefresh(baseOf(runtime.cache));
-    }
-    return runtime.cache;
+  try {
+    if (runtime.inflight) runtime.cache = await runtime.inflight;
+    else runtime.cache = await refreshRemote(baseOf(runtime.cache));
+  } catch {
+    kickRemoteRefresh(baseOf(runtime.cache));
   }
-  kickRemoteRefresh(baseOf(runtime.cache));
   return runtime.cache;
 }
 

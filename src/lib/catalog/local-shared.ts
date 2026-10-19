@@ -22,13 +22,14 @@ export function feedUrl(path: string): string {
 }
 
 /**
- * Live feeds re-read every CACHE_MS per isolate. Only public URLs belong here: this repo is private,
- * so raw.githubusercontent.com answers 404 for its data/ files (they reach the site through the
- * build instead), and each refresh wasted three subrequests on them.
+ * Live feeds re-read per isolate. Empty since Oct 19 2026 (cost cut): the last one,
+ * raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguin/main/data/putarin.json (the OLD repo,
+ * unchanged since Oct 7 2026; the bot writes to this repo's data/ files, which reach the site through
+ * the build), is bundled as putarin-feed-20261007.json instead. Every refresh used to cost one GitHub
+ * subrequest plus a full catalog rebuild (~0.2-0.5 s CPU) per isolate every 10 min (~21k/day).
+ * Earlier the three data/ feeds of this repo were dropped (Oct 13): they always answered 404.
  */
-export const BOT_FEEDS = [
-  "https://raw.githubusercontent.com/fashfdhgacd/koleksi_dr_pinguin/main/data/putarin.json",
-];
+export const BOT_FEEDS: string[] = [];
 
 export type RawItem = {
   id: string;
