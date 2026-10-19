@@ -2,11 +2,15 @@
 // Catalog grids (home, kategori; `ads` prop kept as the catalog-layout flag, no ads are rendered):
 // fluid columns filling the content width (1 / 3 / 4), card thumbs 300:250. Pages hold 36 videos
 // (DEFAULT_PAGE_SIZE), a multiple of 12, so every row is full at 1, 3 and 4 columns.
-// The watch page keeps the default grid.
+// One TrafficStars card (ts-grid-ad.tsx) sits before video 10: row 3, center column at 4 columns;
+// while it is shown one trailing video is trimmed at 3/4 columns, and it collapses if unfilled.
+// The watch page keeps the default grid (no ad).
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { isRealMinor } from "@/lib/minor-terms";
 import { Skeleton } from "@/components/ui/skeleton";
+import { TsGridAd } from "@/components/ts-grid-ad";
 import { VideoCard } from "./video-card";
+import { useCallback, useState } from "react";
 
 const DEFAULT_GRID =
   "grid grid-cols-2 gap-x-2.5 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 lg:grid-cols-4";
@@ -39,16 +43,35 @@ export function VideoGrid({
 }: {
   items: VideoCardType[];
   eagerCount?: number;
-  /** Catalog layout (1 / 3 / 4 columns, 300:250 thumbs). Name kept for existing callers; renders no ads. */
+  /** Catalog layout (1 / 3 / 4 columns, 300:250 thumbs). Also enables the single TrafficStars grid card. */
   ads?: boolean;
 }) {
   const shown = visibleCards(items);
+  const [adEmpty, setAdEmpty] = useState(false);
+  const onEmpty = useCallback(() => setAdEmpty(true), []);
+  const adAt = ads && !adEmpty && shown.length >= 4 ? Math.min(AD_INDEX, shown.length) : -1;
+  const cells = shown.length + (adAt >= 0 ? 1 : 0);
+  const ad = <TsGridAd key="ts-ad" onEmpty={onEmpty} />;
   return (
-    <div className={ads ? CATALOG_GRID + trimClass(shown.length) : DEFAULT_GRID}>
+    <div className={ads ? CATALOG_GRID + trimClass(cells) : DEFAULT_GRID}>
       {shown.map((video, index) => (
-        <VideoCard key={video.id} video={video} eager={index < eagerCount} />
+        <Cell key={video.id} ad={index === adAt ? ad : null}>
+          <VideoCard video={video} eager={index < eagerCount} />
+        </Cell>
       ))}
+      {adAt === shown.length ? ad : null}
     </div>
+  );
+}
+
+const AD_INDEX = 9;
+
+function Cell({ ad, children }: { ad: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <>
+      {ad}
+      {children}
+    </>
   );
 }
 
