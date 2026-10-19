@@ -329,6 +329,19 @@ export function terbaruOrder(sorted: RawItem[]): RawItem[] {
   return out;
 }
 
+function hasDataPoster(it: RawItem, posters: Record<string, string>): boolean {
+  const p = String(it.poster || it.thumbnail || posters[it.id] || "").trim();
+  return /^https?:\/\//i.test(p);
+}
+
+/** Stable split: items with a poster URL in data, then the rest. */
+function postersFirst(list: RawItem[], posters: Record<string, string>): RawItem[] {
+  const withPoster: RawItem[] = [];
+  const without: RawItem[] = [];
+  for (const it of list) (hasDataPoster(it, posters) ? withPoster : without).push(it);
+  return [...withPoster, ...without];
+}
+
 export function buildIndexes(
   items: RawItem[],
   posters: Record<string, string>,
@@ -363,7 +376,11 @@ export function buildIndexes(
   // Homepage = semua item (urut tanggal), tanpa batasi cuma IndoAV/UserBokep
   const mainSorted = sortByNewest(core);
   for (const [slug, list] of bySlug) {
-    bySlug.set(slug, sortByNewest(list));
+    const sorted = sortByNewest(list);
+    // /kategori/bokep: videos with a real poster in data first, logo-only ones after (stable, so the
+    // newest-first order holds inside each group). A poster added to data/drp-bokep.json later moves
+    // the video up on the next build. Other categories keep their order.
+    bySlug.set(slug, slug === "bokep" ? postersFirst(sorted, posters) : sorted);
   }
   const terbaruSorted = terbaruOrder(mainSorted);
   return {
