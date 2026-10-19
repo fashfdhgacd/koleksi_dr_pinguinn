@@ -26,21 +26,6 @@ function shareCardImage(thumbnail: string | null | undefined): string {
   return absolute;
 }
 
-/** ExoClick (VAST pre-roll on Videy pages) may read these client hints. */
-const EXO_DELEGATE_CH = [
-  "Sec-CH-UA",
-  "Sec-CH-UA-Mobile",
-  "Sec-CH-UA-Arch",
-  "Sec-CH-UA-Model",
-  "Sec-CH-UA-Platform",
-  "Sec-CH-UA-Platform-Version",
-  "Sec-CH-UA-Bitness",
-  "Sec-CH-UA-Full-Version-List",
-  "Sec-CH-UA-Full-Version",
-]
-  .map((h) => `${h} https://s.magsrv.com`)
-  .join("; ");
-
 export const Route = createFileRoute("/watch/$id")({
   loader: async ({ params }) => {
     const id = (params.id || "").trim();
@@ -107,9 +92,6 @@ export const Route = createFileRoute("/watch/$id")({
         { name: "twitter:image:alt", content: OG_SITE_NAME },
         { name: "robots", content: item ? "index,follow,max-video-preview:120" : "noindex,follow" },
         { name: "rating", content: "adult" },
-        ...(item && (item.creator === "Videy" || item.category === "videy")
-          ? [{ httpEquiv: "Delegate-CH", content: EXO_DELEGATE_CH }]
-          : []),
       ],
       links: [{ rel: "canonical", href: url }],
       scripts: jsonLd
