@@ -1,3 +1,5 @@
+import { DRP_SOURCES, drpKindOfUrl } from "./drp-hosts.js";
+
 export type PlayMode = "video" | "iframe";
 
 export type ResolvedSource = {
@@ -34,7 +36,11 @@ export function hostLabel(url: string): string {
   if (/indoav/.test(s)) return "IndoAV";
   if (/userbokep/.test(s)) return "UserBokep";
   if (/videy/.test(s)) return "Videy";
-  if (/streamtape|campur|lulu|strcloud|tapecontent/.test(s)) return "Streamtape";
+  // LuluStream / DoodStream / Byse: their own label (Lulu used to be lumped in with Streamtape, which
+  // made the player add Streamtape-only ?color=/?thumb= params and wait for Streamtape's Player.js).
+  const drp = drpKindOfUrl(url);
+  if (drp) return DRP_SOURCES[drp as keyof typeof DRP_SOURCES];
+  if (/streamtape|campur|strcloud|tapecontent/.test(s)) return "Streamtape";
   if (/putarin|puterin/.test(s)) return "Puterin";
   if (/archive\.org/.test(s)) return "Arsip";
   try {

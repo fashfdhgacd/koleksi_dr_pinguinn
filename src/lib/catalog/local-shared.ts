@@ -8,6 +8,7 @@ import {
   refineCategory,
 } from "./title-category.js";
 import siteLikesSnapshot from "./site-likes.json";
+import { DRP_CATEGORY, DRP_SOURCES, drpKindOfItem } from "./drp-hosts.js";
 
 /** Our own D1 likes (video_likes), 12-hour snapshot written by the stats workflow. Cards only. */
 const SITE_LIKES = siteLikesSnapshot as unknown as Record<string, number>;
@@ -181,6 +182,10 @@ export function isStreamtape(item: RawItem): boolean {
 export function isVidey(item: RawItem): boolean {
   return /videy/i.test(`${item.embed || ""} ${item.source || ""} ${item.direct || ""}`);
 }
+/** Owner's own LuluStream / DoodStream / Byse uploads -> "Koleksi Dr. Pinguin Bokep" (/kategori/bokep). */
+export function isDrpBokep(item: RawItem): boolean {
+  return Boolean(drpKindOfItem(item));
+}
 export function isSideSilo(item: RawItem): boolean {
   return isPutarin(item) || isStreamtape(item) || isVidey(item);
 }
@@ -217,6 +222,7 @@ export function classify(title: string): string {
 }
 export function slugOf(item: RawItem): string {
   if (isVidey(item)) return "videy";
+  if (isDrpBokep(item)) return DRP_CATEGORY;
   const raw = (item.category || "").toLowerCase().trim();
   const title = item.title || "";
   if (isPutarin(item)) return "jav";
@@ -247,6 +253,8 @@ export function sourceLabel(item: RawItem): string {
   if (isPutarin(item)) return "Putarin";
   if (isStreamtape(item)) return "Streamtape";
   if (isVidey(item)) return "Videy";
+  const drp = drpKindOfItem(item);
+  if (drp) return DRP_SOURCES[drp as keyof typeof DRP_SOURCES];
   return item.source || "Unknown";
 }
 
