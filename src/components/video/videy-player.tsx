@@ -172,9 +172,9 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
 
   const start = useCallback(() => {
     if (phase !== "idle") return;
-    // Popunder (direct link) synchronously inside the tap, once per video: when the ad tab opens,
-    // this tap does nothing else (the video stays on its poster; the next tap plays). If the
-    // popup was blocked, this same tap plays so the visitor is never stuck.
+    // Popunder (direct link) synchronously inside the tap, once per video: a tap used for the ad
+    // (opened, or blocked with retries left) does nothing else; the next tap plays. After 2
+    // blocked attempts the tap plays so ad-blocker visitors are never stuck.
     if (popunderOnPlayTap(item.id)) return;
     track.current = { startedAt: Date.now(), alive: false, settled: false };
     sendPlayerLog(item.id, "Videy", "start2");
