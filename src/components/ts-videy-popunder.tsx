@@ -1,32 +1,18 @@
 // TrafficStars popunder (spot 5210859) for Videy watch pages only; called from videy-player.tsx,
 // which only renders for Videy items (never IndoAV / UserBokep / Putarin or catalog pages).
-// Goal: one popunder per Videy video, on the first play tap of each video in this session.
-// - armVideyPopunder(id) runs when a Videy video mounts. If this video has not fired yet, the SDK
-//   script is put in the page (one tag per page load; SPA navigation reuses it, never duplicates)
-//   so its click listener is bound before the visitor taps play.
-// - markVideyPopunderTap(id) runs on the play tap and records the id (sessionStorage set), so
-//   reopening the same video does not arm it again.
-// The SDK's own cap is kept loose (30 s, 1) so it does not block the next video's first tap.
-const SDK_SRC = "https://cdn.fozekikikiminu.com/sdk/v1/dd.p.js";
-const SPOT = "587547ff73c844b39ab9f02d1285154b";
-const DOMAIN = "fozekikikiminu.com";
+// One per Videy video: the first real play tap of each video opens the spot's direct link in a new
+// tab (window.open, synchronously inside the tap so popup blockers allow it); the video keeps
+// playing here. The id is recorded only when the tab really opened (sessionStorage set), so an
+// age-gate tap, a blocked popup or SPA navigation never uses up a video's turn.
+// (The dd.p.js SDK was dropped: on Android Chrome it bound late / lost the tap, so it did not fire.)
+const DIRECT_LINK = "https://fozekikikiminu.com/api/v1/direct/587547ff73c844b39ab9f02d1285154b";
 const KEY = "kdp_ts_pop_ids";
-const TAG_ID = "kdp-ts-popunder";
 let memory: string[] = [];
-let currentId = "";
-let listening = false;
-
-// The SDK opens on the first tap anywhere, sometimes before React's handler runs, and the opened
-// tab copies sessionStorage at that moment. So the id is recorded in a window capture listener
-// (runs before the SDK's own listener) and the new tab already knows this video has fired.
-function onFirstTap(): void {
-  if (currentId) markVideyPopunderTap(currentId);
-}
 
 function firedIds(): string[] {
   try {
     const raw = sessionStorage.getItem(KEY);
-    return raw ? (JSON.parse(raw) as string[]) : [];
+    return raw ? (JSON.parse(raw) as string[]) : memory;
   } catch {
     return memory;
   }
@@ -41,31 +27,19 @@ function saveIds(ids: string[]): void {
   }
 }
 
-export function armVideyPopunder(videoId: string): void {
-  if (typeof document === "undefined" || !videoId) return;
-  currentId = videoId;
-  if (firedIds().includes(videoId)) return;
-  if (!listening) {
-    listening = true;
-    window.addEventListener("pointerdown", onFirstTap, true);
-    window.addEventListener("click", onFirstTap, true);
-  }
-  if (document.getElementById(TAG_ID)) return;
-  const s = document.createElement("script");
-  s.id = TAG_ID;
-  s.type = "text/javascript";
-  s.src = SDK_SRC;
-  s.async = true;
-  s.defer = true;
-  s.setAttribute("data-ts-spot", SPOT);
-  s.setAttribute("data-ts-domain", DOMAIN);
-  s.setAttribute("data-ts-session-duration", "30");
-  s.setAttribute("data-ts-count", "1");
-  document.body.appendChild(s);
-}
-
-export function markVideyPopunderTap(videoId: string): void {
-  if (!videoId) return;
+/** Call synchronously from the play tap handler. Returns true when the ad tab opened. */
+export function popunderOnPlayTap(videoId: string): boolean {
+  if (typeof window === "undefined" || !videoId) return false;
   const ids = firedIds();
-  if (!ids.includes(videoId)) saveIds(ids.concat(videoId));
+  if (ids.includes(videoId)) return false;
+  let w: Window | null = null;
+  try {
+    w = window.open(DIRECT_LINK, "_blank");
+    if (w) w.opener = null; // the ad tab cannot reach back into this page
+  } catch {
+    w = null;
+  }
+  const opened = Boolean(w); // null = blocked: keep this video's turn for the next tap
+  if (opened) saveIds(ids.concat(videoId));
+  return opened;
 }

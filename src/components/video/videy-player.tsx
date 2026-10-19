@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VideoDetail } from "@/lib/catalog/types";
 import { sendPlayerLog } from "@/lib/player-log-client";
-import { armVideyPopunder, markVideyPopunderTap } from "@/components/ts-videy-popunder";
+import { popunderOnPlayTap } from "@/components/ts-videy-popunder";
 
 /**
  * Videy player: the cdn mp4 plays straight from Videy in a native <video> (no crossorigin, so
@@ -10,8 +10,8 @@ import { armVideyPopunder, markVideyPopunderTap } from "@/components/ts-videy-po
  * Fullscreen (native video button): a landscape video locks the screen to landscape where the
  * browser allows it, and unlocks on exit.
  *
- * TrafficStars popunder (ts-videy-popunder.tsx): armed when a Videy video mounts, one per video on its
- * first play tap per session; the tap still starts the video here.
+ * TrafficStars popunder (ts-videy-popunder.tsx): the first play tap of each video per session opens
+ * the spot's direct link in a new tab; the tap still starts the video here.
  *
  * Kesehatan player (/pemilik): the same /api/player-log beacons as the other hosts, once per video
  * per session (src/lib/player-log-client.ts), host "Videy":
@@ -170,16 +170,12 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     };
   }, [item.id, settle]);
 
-  // Popunder: bind the SDK before the play tap, only for videos that have not fired yet.
-  useEffect(() => {
-    armVideyPopunder(item.id);
-  }, [item.id]);
-
   const start = useCallback(() => {
     if (phase !== "idle") return;
+    // Popunder (direct link) synchronously inside the tap, once per video; video still starts.
+    popunderOnPlayTap(item.id);
     track.current = { startedAt: Date.now(), alive: false, settled: false };
     sendPlayerLog(item.id, "Videy", "start2");
-    markVideyPopunderTap(item.id);
     setPhase("main");
     const v = videoRef.current;
     if (!v) return;
