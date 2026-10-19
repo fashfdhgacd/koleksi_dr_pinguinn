@@ -20,6 +20,8 @@ export interface D1DatabaseLike {
 
 const BINDING = "ANALYTICS_DB";
 const DAY_MS = 86_400_000;
+/** Weight of one analytics_events row (traffic-valve.ts sampling). */
+const W = "coalesce(w, 1)";
 /** Max rows for "Video terpopuler hari ini". */
 export const TOP_VIDEOS_LIMIT = 20;
 
@@ -144,6 +146,13 @@ export function ensureD1Schema(db: D1DatabaseLike): Promise<void> {
         .all()
         .catch(() => undefined),
     )
+    // Sample weight (traffic-valve.ts): null/1 = recorded 1:1, N = one recorded event stands for N.
+    .then(() =>
+      db
+        .prepare(`alter table analytics_events add column w integer`)
+        .all()
+        .catch(() => undefined),
+    )
     .then(() => undefined)
     .catch((err) => {
       g.__d1SchemaPromise__ = undefined;
@@ -251,8 +260,11 @@ export async function d1TodayTotals(
   const [ev, pk] = await Promise.all([
     db
       .prepare(
-        `select count(*) as views, count(distinct visitor_id) as uniq from analytics_events
-          where created_at >= ?1 and created_at < ?2 and event_type = 'pageview'`,
+        `select coalesce(sum(vw * n), 0) as views, coalesce(sum(vw), 0) as uniq from (
+           select max(${W}) as vw, count(*) as n from analytics_events
+            where created_at >= ?1 and created_at < ?2 and event_type = 'pageview'
+            group by visitor_id
+         )`,
       )
       .bind(t0, t0 + DAY_MS)
       .first<{ views: number; uniq: number }>(),
@@ -284,14 +296,17 @@ export async function d1RecordHit(
     host: string;
     now: number;
     hourUtc: string;
+    /** Sample weight (traffic-valve.ts); 1 when every pageview is recorded. */
+    weight?: number;
   },
 ): Promise<void> {
+  const w = Math.max(1, Math.floor(Number(e.weight) || 1));
   await db.batch([
     db
       .prepare(
         `insert into analytics_events
-          (id, event_type, visitor_id, session_id, page, path, referrer, user_agent, device_type, browser, host, created_at, country)
-         values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13)
+          (id, event_type, visitor_id, session_id, page, path, referrer, user_agent, device_type, browser, host, created_at, country, w)
+         values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)
          on conflict (id) do nothing`,
       )
       .bind(
@@ -308,15 +323,16 @@ export async function d1RecordHit(
         e.host,
         e.now,
         e.country || null,
+        w > 1 ? w : null,
       ),
     db
       .prepare(
         `insert into analytics_hourly (hour_utc, page_views, unique_visitors, sessions)
-         values (?1, 1, 0, 0)
+         values (?1, ?2, 0, 0)
          on conflict (hour_utc) do update
-         set page_views = analytics_hourly.page_views + 1`,
+         set page_views = analytics_hourly.page_views + excluded.page_views`,
       )
-      .bind(e.hourUtc),
+      .bind(e.hourUtc, w),
   ]);
 }
 
@@ -336,17 +352,22 @@ async function d1DayTotals(
   const [tot, win] = await Promise.all([
     db
       .prepare(
-        `select count(*) as views, count(distinct visitor_id) as uniq from analytics_events
-          where created_at >= ?1 and created_at < ?2 and event_type = 'pageview'`,
+        `select coalesce(sum(vw * n), 0) as views, coalesce(sum(vw), 0) as uniq from (
+           select max(${W}) as vw, count(*) as n from analytics_events
+            where created_at >= ?1 and created_at < ?2 and event_type = 'pageview'
+            group by visitor_id
+         )`,
       )
       .bind(t0, t0 + DAY_MS)
       .first<{ views: number; uniq: number }>(),
     db
       .prepare(
         `select max(c) as est from (
-           select created_at / 120000 as b, count(distinct visitor_id) as c from analytics_events
-            where created_at >= ?1 and created_at < ?2 and event_type = 'pageview'
-            group by b
+           select b, sum(vw) as c from (
+             select created_at / 120000 as b, visitor_id, max(${W}) as vw from analytics_events
+              where created_at >= ?1 and created_at < ?2 and event_type = 'pageview'
+              group by b, visitor_id
+           ) group by b
          )`,
       )
       .bind(t0, t0 + DAY_MS)
@@ -463,28 +484,28 @@ export async function d1StatsParts(db: D1DatabaseLike, today: string, now = Date
       ),
       all<{ path: string; views: number }>(
         db,
-        `select path, count(*) as views from analytics_events where ${TODAY}
+        `select path, sum(${W}) as views from analytics_events where ${TODAY}
          group by path order by views desc limit 15`,
         t0,
         t1,
       ),
       all<{ ref: string; views: number }>(
         db,
-        `select coalesce(referrer,'(direct)') as ref, count(*) as views from analytics_events where ${TODAY}
+        `select coalesce(referrer,'(direct)') as ref, sum(${W}) as views from analytics_events where ${TODAY}
          group by 1 order by views desc limit 12`,
         t0,
         t1,
       ),
       all<{ device: string; views: number }>(
         db,
-        `select coalesce(device_type,'other') as device, count(*) as views from analytics_events where ${TODAY}
+        `select coalesce(device_type,'other') as device, sum(${W}) as views from analytics_events where ${TODAY}
          group by 1`,
         t0,
         t1,
       ),
       all<{ host: string; views: number }>(
         db,
-        `select coalesce(host,'(unknown)') as host, count(*) as views from analytics_events where ${TODAY}
+        `select coalesce(host,'(unknown)') as host, sum(${W}) as views from analytics_events where ${TODAY}
          group by 1 order by views desc limit 6`,
         t0,
         t1,
@@ -492,9 +513,11 @@ export async function d1StatsParts(db: D1DatabaseLike, today: string, now = Date
       // Video pages only (/watch/<id>) — separate from the mixed "Halaman" list.
       all<{ path: string; views: number; uniq: number }>(
         db,
-        `select path, count(*) as views, count(distinct visitor_id) as uniq from analytics_events
-          where ${TODAY} and path like '/watch/%'
-          group by path order by views desc, uniq desc limit ?3`,
+        `select path, sum(vw * n) as views, sum(vw) as uniq from (
+           select path, visitor_id, max(${W}) as vw, count(*) as n from analytics_events
+            where ${TODAY} and path like '/watch/%'
+            group by path, visitor_id
+         ) group by path order by views desc, uniq desc limit ?3`,
         t0,
         t1,
         TOP_VIDEOS_LIMIT,
@@ -504,14 +527,14 @@ export async function d1StatsParts(db: D1DatabaseLike, today: string, now = Date
   const [browserRows, countryRows] = await Promise.all([
     all<{ browser: string; views: number }>(
       db,
-      `select coalesce(browser,'other') as browser, count(*) as views from analytics_events where ${TODAY}
+      `select coalesce(browser,'other') as browser, sum(${W}) as views from analytics_events where ${TODAY}
        group by 1 order by views desc limit 8`,
       t0,
       t1,
     ).catch(() => []),
     all<{ country: string; views: number }>(
       db,
-      `select coalesce(country,'') as country, count(*) as views from analytics_events where ${TODAY}
+      `select coalesce(country,'') as country, sum(${W}) as views from analytics_events where ${TODAY}
        group by 1 order by views desc limit 8`,
       t0,
       t1,
@@ -552,7 +575,7 @@ export async function d1TopVideos(
 ): Promise<Record<string, number>> {
   const rows = await all<{ path: string; n: number }>(
     db,
-    `select path, count(*) as n from analytics_events
+    `select path, sum(${W}) as n from analytics_events
       where event_type = 'pageview' and created_at >= ? and path like '/watch/%'
       group by path order by n desc limit ?`,
     now - days * DAY_MS,
@@ -570,6 +593,28 @@ export async function d1TopVideos(
     if (id && n > 0) out[id] = (out[id] || 0) + n;
   }
   return out;
+}
+
+/**
+ * Today's pageviews (WIB day) and the last ~2 hours, from the ≤26 analytics_hourly rows (weighted, so
+ * they stay real estimates while sampling). For traffic-valve.ts: callers cache it per isolate.
+ */
+export async function d1TrafficLevel(
+  db: D1DatabaseLike,
+  now = Date.now(),
+): Promise<{ today: number; last2h: number }> {
+  const wibToday = new Date(now + 7 * 3600_000).toISOString().slice(0, 10);
+  const todayStart = new Date(wibDayStartMs(wibToday)).toISOString();
+  const h = new Date(Math.floor(now / 3600_000) * 3600_000 - 3600_000).toISOString();
+  const row = await db
+    .prepare(
+      `select coalesce(sum(case when hour_utc >= ?1 then page_views else 0 end), 0) as today,
+              coalesce(sum(case when hour_utc >= ?2 then page_views else 0 end), 0) as last2h
+         from analytics_hourly where hour_utc >= min(?1, ?2)`,
+    )
+    .bind(todayStart, h)
+    .first<{ today: number; last2h: number }>();
+  return { today: Number(row?.today) || 0, last2h: Number(row?.last2h) || 0 };
 }
 
 export async function d1Ping(db: D1DatabaseLike): Promise<void> {

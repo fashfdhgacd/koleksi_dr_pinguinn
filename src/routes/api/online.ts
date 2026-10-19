@@ -7,6 +7,8 @@ import {
 } from "@/lib/owner-analytics";
 import { kvCountOnline, kvReadRoll, kvTouchLive, rollToStats } from "@/lib/kv-live";
 import { ONLINE_WINDOW_D1_MS, d1CountOnline, readyD1 } from "@/lib/analytics-d1";
+import { currentSampleRate } from "@/lib/owner-analytics-presence";
+import { inSample } from "@/lib/traffic-valve";
 import { isOwnerKey, ownerKeyFrom, ownerSecret } from "@/lib/owner-auth";
 
 const BOT_UA =
@@ -34,6 +36,8 @@ let ownerCache: { at: number; data: Record<string, unknown> } | null = null;
  * 5 minutes, one indexed count; KV only when D1 is not bound).
  */
 const SHARED_STATS_SEC = 300;
+/** While the traffic valve samples (busy day), the heavy stats are rebuilt at most every 15 min. */
+const SHARED_STATS_BUSY_SEC = 900;
 const SHARED_STATS_PATH = "/api/owner-stats-cache-v1";
 
 type OwnerStatsResult = Awaited<ReturnType<typeof getOwnerStats>>;
@@ -57,10 +61,11 @@ async function sharedOwnerStats(origin: string): Promise<OwnerStatsResult> {
   const stats = await getOwnerStats();
   if (cache) {
     try {
+      const ttl = (await currentSampleRate()) > 1 ? SHARED_STATS_BUSY_SEC : SHARED_STATS_SEC;
       await cache.put(
         key,
         new Response(JSON.stringify(stats), {
-          headers: { "content-type": "application/json", "cache-control": `public, max-age=${SHARED_STATS_SEC}` },
+          headers: { "content-type": "application/json", "cache-control": `public, max-age=${ttl}` },
         }),
       );
     } catch {
@@ -136,7 +141,8 @@ function shouldSkipBot(ua: string, owner: boolean): boolean {
 async function liveOnlineCount(now: number): Promise<number> {
   try {
     const d1 = await readyD1();
-    if (d1) return await d1CountOnline(d1, now, ONLINE_WINDOW_D1_MS);
+    // Sampled visitors only (traffic-valve.ts) while the valve is on: scale back up.
+    if (d1) return (await d1CountOnline(d1, now, ONLINE_WINDOW_D1_MS)) * (await currentSampleRate(now));
   } catch {
     return -1;
   }
@@ -221,6 +227,10 @@ async function handlePost(request: Request): Promise<Response> {
   }
 
   const now = Date.now();
+  // Traffic valve (traffic-valve.ts): on a very busy day only 1-in-N visitors are recorded (weight N).
+  // `s` tells the browser the rate, so sampled-out visitors stop pinging for the rest of the day.
+  const rate = owner ? 1 : await currentSampleRate(now);
+  if (!inSample(id, rate)) return json(request, { ok: true, s: rate, skipped: "sample" });
   const prev = lastTouch.get(id) || 0;
   const fresh = now - prev >= TOUCH_GAP_MS;
   const normPath = path
@@ -257,6 +267,7 @@ async function handlePost(request: Request): Promise<Response> {
           visitorId: id,
           eventId,
           country: request.headers.get("cf-ipcountry") || "",
+          weight: rate,
         });
       }
       // PG presence + peak for every presence touch and every pageview (SPA nav).
@@ -264,14 +275,14 @@ async function handlePost(request: Request): Promise<Response> {
       // skipKv: kvTouchLive already wrote online:<id> this request (only when D1 is unavailable;
       // touchOnline writes it itself if a D1 call fails).
       if (shouldTouchPresence || shouldRecordView) {
-        await touchOnline(id, { skipKv: wroteKv });
+        await touchOnline(id, { skipKv: wroteKv, weight: rate });
       }
     } catch {
       return json(request, { ok: true, skipped: "busy" });
     }
   }
 
-  if (!owner) return json(request, { ok: true }, 200, presence);
+  if (!owner) return json(request, { ok: true, s: rate }, 200, presence);
   try {
     return json(request, { ok: true, owner: true, ...(await liveOwnerPayload(new URL(request.url).origin)) });
   } catch {

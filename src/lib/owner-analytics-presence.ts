@@ -15,11 +15,13 @@ import {
   d1RecordHit,
   d1TodayTotals,
   d1TouchSession,
+  d1TrafficLevel,
   getD1,
   readyD1,
   type D1DatabaseLike,
 } from "@/lib/analytics-d1";
 import { kvCountOnline } from "@/lib/kv-live";
+import { sampleFor } from "@/lib/traffic-valve";
 import {
   ONLINE_KV_PREFIX,
   ONLINE_KV_TTL_SEC,
@@ -68,6 +70,34 @@ async function mirrorDayStatsKv(d1: D1DatabaseLike, now = Date.now()): Promise<v
     at: now,
   };
   await writeDayStatsKv(dk, next);
+}
+
+/** How long one isolate reuses its traffic-valve reading. */
+const VALVE_CACHE_MS = 3 * 60_000;
+const valveState = globalThis as typeof globalThis & { __kdpValve__?: { at: number; n: number } };
+
+/**
+ * Current analytics sample rate 1-in-N (traffic-valve.ts) from today's pageviews and the last ~2 h
+ * (projected to a day, so a sudden spike reacts within minutes). One ≤26-row D1 read per isolate
+ * every VALVE_CACHE_MS; 1 (record everything) when D1 is missing or the read fails.
+ */
+export async function currentSampleRate(now = Date.now()): Promise<number> {
+  const cached = valveState.__kdpValve__;
+  if (cached && now - cached.at < VALVE_CACHE_MS) return cached.n;
+  let n = cached?.n || 1;
+  try {
+    const d1 = await readyD1();
+    if (d1) {
+      const t = await d1TrafficLevel(d1, now);
+      // last2h covers the previous full hour plus the current partial one.
+      const hours = 1 + (now % 3600_000) / 3600_000;
+      n = sampleFor(Math.max(t.today, (t.last2h / hours) * 24));
+    } else n = 1;
+  } catch {
+    /* keep the previous rate */
+  }
+  valveState.__kdpValve__ = { at: now, n };
+  return n;
 }
 
 /** Prune expired entries from in-memory presence map; return active count. */
@@ -200,7 +230,12 @@ export async function analyticsHealth(): Promise<{
   }
 }
 
-export async function touchOnline(id: string, opts: { skipKv?: boolean } = {}): Promise<number> {
+/** opts.weight: sample rate in force (traffic-valve.ts); the D1 count is scaled by it. */
+export async function touchOnline(
+  id: string,
+  opts: { skipKv?: boolean; weight?: number } = {},
+): Promise<number> {
+  const weight = Math.max(1, Math.floor(Number(opts.weight) || 1));
   const sid = safeId(id);
   if (!sid) return 0;
   const now = Date.now();
@@ -222,7 +257,7 @@ export async function touchOnline(id: string, opts: { skipKv?: boolean } = {}): 
     const d1 = await readyD1();
     if (d1) {
       // D1 sessions are shared across isolates: online count + peak need no KV.
-      const dbCount = await d1TouchSession(d1, sid, now);
+      const dbCount = (await d1TouchSession(d1, sid, now)) * weight;
       const best = Math.max(dbCount, countMemoryOnline(now));
       await d1BumpPeak(d1, dayKey(now), best, now);
       return best;
@@ -289,6 +324,8 @@ export async function recordHit(input: {
   eventId?: string;
   eventType?: string;
   country?: string;
+  /** Sample weight (traffic-valve.ts); 1 = every pageview recorded. */
+  weight?: number;
 }): Promise<void> {
   const now = Date.now();
   const path = normalizePath(input.path);
@@ -324,6 +361,7 @@ export async function recordHit(input: {
         host,
         now,
         hourUtc: hourUtcBucket(now).toISOString(),
+        weight: input.weight,
       });
       // KV daystats fallback: refreshed from D1 every DAYSTATS_MIRROR_MS, not per hit.
       await mirrorDayStatsKv(d1, now).catch(() => undefined);
