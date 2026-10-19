@@ -1,4 +1,5 @@
 import { DEFAULT_PAGE_SIZE } from "./types";
+import { findCategory } from "./categories";
 import type { PagedVideos } from "./types";
 import {
   type RawItem,
@@ -317,7 +318,7 @@ function withStats(it: RawItem): RawItem {
     };
   }
   const title = typeof out.title === "string" ? out.title : "";
-  const safe = title ? softenMinorTerms(title) : title;
+  const safe = title ? softenMinorTerms(title, findCategory(String(out.category || ""))?.label) : title;
   if (safe !== title) out = { ...out, title: safe };
   return out;
 }

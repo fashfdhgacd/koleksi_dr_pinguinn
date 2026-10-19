@@ -4,8 +4,10 @@
  *
  * - uploadRejectReason(): EXPLICIT minor terms (bocil, anak kecil, SD/SMP/SMA, underage, child/kid,
  *                         preteen, loli/shota, schoolgirl, belum sunat, นักเรียน) -> NOT saved.
- * - uploadWarnReason():   school / force / sleeping / drunk words -> saved normally, the bot warns
- *                         so the owner can check and hide (too many false positives to reject).
+ * - uploadWarnReason():   school / force / sleeping / drunk / drugged / blood-incest / urination
+ *                         words, Indonesian, English and Chinese -> saved normally, the bot warns
+ *                         so the owner can check (too many false positives to reject). The shown
+ *                         title is cleaned automatically by src/lib/catalog/minor-title-guard.ts.
  *
  * No soft warning for category "jav" or a JAV product code in the title (scripted studio JAV); the reject applies to every category.
  * Whole words, case-insensitive. "guru"/"cikgu" never count. No imports: plain JS, testable with node.
@@ -48,6 +50,16 @@ const WARN_RULES = [
   ["mabuk", /\s(?:mabuk|dimabukin|dimabukkan|nilasing|lasing|drunk)\s/],
   ["pingsan", /\s(?:pingsan|unconscious)\s/],
   ["dibius", /\s(?:dibius|bius|drugged)\s/],
+  ["obat tidur/perangsang", /\s(?:obat\s+(?:tidur|perangsang|sange|bius)|dikasih\s+obat|di\s+kasih\s+obat)\s/],
+  ["kandung/sedarah", /\s(?:kandung|sedarah|incest)\s/],
+  ["kencing/pipis", /\s(?:kencing|kencingin|pipis)\s/],
+  ["dedek/remaja", /\s(?:dedek|remaja|teen|teens|student|students)\s/],
+  // CJK: no word boundaries (norm() keeps Han/Kana as letters), so plain substring checks.
+  ["学生/校园 (sekolah)", /学生|师生|校园|校服|女子校生|女高|初中|高中/],
+  ["萝莉/未成年 (di bawah umur)", /萝莉|蘿莉|未成年|幼女|少女/],
+  ["强奸/迷奸 (dipaksa)", /强奸|強姦|迷奸|强迫/],
+  ["下药/睡/醉 (nggak sadar)", /下药|下藥|睡|醉/],
+  ["乱伦 (inses)", /乱伦|亂倫/],
 ];
 
 function firstHit(rules, text) {
