@@ -42,6 +42,8 @@ export const Route = createRootRoute({
       // RTA label (rtalabel.org). Uppercase key so HeadContent does not dedupe it with "rating".
       { name: "RATING", content: "RTA-5042-1996-1400-1577-RTA" },
       { name: "googlebot", content: "index,follow,max-image-preview:large" },
+      // TrafficStars site verification (publisher account).
+      { name: "Trafficstars", content: "91976" },
       { property: "og:site_name", content: OG_SITE_NAME },
       { property: "og:title", content: HOME_TITLE },
       { property: "og:type", content: "website" },

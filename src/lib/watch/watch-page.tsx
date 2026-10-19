@@ -5,7 +5,6 @@ import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { VideoPlayer } from "@/components/video/player";
 import { VideyPlayer } from "@/components/video/videy-player";
-import { VideyPopunder } from "@/components/video/videy-popunder";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
@@ -35,7 +34,7 @@ function xIntentUrl(title: string, url: string): string {
 
 const VIDEY_LABEL = "drpinguin videy";
 
-/** Videy plays in VideyPlayer (own HTML5 player + pre-roll) and has no "Buka Sumber". */
+/** Videy plays in VideyPlayer (own HTML5 player) and has no "Buka Sumber". */
 function isVideyItem(item: VideoDetail): boolean {
   return item.creator === "Videy" || item.category === "videy";
 }
@@ -285,10 +284,7 @@ export function WatchPage() {
             <>
           <div className="-mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0">
             {isVideyItem(item) ? (
-              <>
-                <VideyPlayer key={item.id} item={item} />
-                <VideyPopunder />
-              </>
+              <VideyPlayer key={item.id} item={item} />
             ) : (
               <VideoPlayer key={item.id} item={item} />
             )}
