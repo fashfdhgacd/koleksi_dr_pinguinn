@@ -1,7 +1,12 @@
 # Daily video sync — 01:00 WIB (18:00 UTC)
 # 1) Enrich Streamtape titles + thumbs (file/info + getsplash)
 # 2) Fill missing posters for IndoAV / UserBokep / Streamtape
-# 3) Guard: jangan biarkan videos-latest.json invalid/kosong total tanpa restore attempt
+# 3) Byse (owner uploads): retry posters still missing at upload time. Byse keeps the thumbnail at
+#    https://img-place.com/<code>_xt.jpg (bigger) / _t.jpg (small); set only when the URL really
+#    answers 200 with a jpeg/png/webp of a real size (unknown codes get a small SVG, unready ones
+#    404), so new uploads keep the logo until Byse has made the thumbnail and are tried again
+#    on the next run. Runs here on GitHub Actions: no Cloudflare request, read or write.
+# 4) Guard: jangan biarkan videos-latest.json invalid/kosong total tanpa restore attempt
 name: Daily video sync
 
 on:
@@ -269,6 +274,65 @@ jobs:
 
           let latestPosters = loadJson(latestPostersPath, {});
           if (typeof latestPosters !== "object" || Array.isArray(latestPosters)) latestPosters = {};
+
+          // --- 3) Byse posters (img-place), verified before set ---
+          const NOT_REAL = /placeholder|1x1|transparent|data:image|please.?watch|original.?website|brand-poster/i;
+          const realUrl = (u) => typeof u === "string" && /^https?:\/\//i.test(u) && !NOT_REAL.test(u);
+          const overrides = loadJson("src/lib/catalog/overrides.json", {});
+          function isByse(v) {
+            return /^by-/.test(String(v.id || "")) || /byse/i.test(`${v.embed || ""} ${v.source || ""} ${v.direct || ""}`);
+          }
+          function byseCode(v) {
+            const c = String(v.code || "") || embedId(v.direct || "") || embedId(v.embed || "") || String(v.id || "").replace(/^by-/, "");
+            return /^[A-Za-z0-9]{6,40}$/.test(c) ? c : "";
+          }
+          async function realImage(url) {
+            try {
+              const res = await fetch(url, {
+                headers: { "user-agent": "Mozilla/5.0 (compatible; kdp-daily-sync/1.0)", accept: "image/*" },
+                redirect: "follow",
+                signal: AbortSignal.timeout(10000),
+              });
+              const type = String(res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+              if (res.status !== 200 || !/^image\/(?:jpeg|jpg|png|webp)$/.test(type)) {
+                await res.body?.cancel().catch(() => {});
+                return false;
+              }
+              const size = (await res.arrayBuffer()).byteLength;
+              return size >= 1500;
+            } catch {
+              return false;
+            }
+          }
+          const byseNeed = [];
+          const byseSeen = new Set();
+          for (const v of [...loadJson("data/drp-bokep.json", []), ...latest]) {
+            if (!v?.id || byseSeen.has(v.id) || !isByse(v)) continue;
+            byseSeen.add(v.id);
+            const ov = overrides && typeof overrides === "object" ? overrides[v.id] : null;
+            if (realUrl(v.poster) || realUrl(v.thumbnail) || realUrl(posters[v.id]) || realUrl(latestPosters[v.id]) || realUrl(ov?.poster)) continue;
+            const code = byseCode(v);
+            if (code) byseNeed.push({ id: v.id, code });
+          }
+          let byseOk = 0;
+          const MAX_BYSE = 600;
+          const byseList = byseNeed.slice(0, MAX_BYSE);
+          for (let i = 0; i < byseList.length; i += 6) {
+            await Promise.all(
+              byseList.slice(i, i + 6).map(async ({ id, code }) => {
+                for (const suffix of ["_xt", "_t"]) {
+                  const url = `https://img-place.com/${code}${suffix}.jpg`;
+                  if (await realImage(url)) {
+                    latestPosters[id] = url;
+                    byseOk++;
+                    return;
+                  }
+                }
+              }),
+            );
+            await sleep(150);
+          }
+          console.log("Byse posters filled:", byseOk, "of", byseNeed.length, "missing (checked", byseList.length + ")");
           for (const v of latest) {
             if (!v?.id) continue;
             const url = posters[v.id] || v.poster || v.thumbnail;

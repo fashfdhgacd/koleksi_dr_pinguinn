@@ -220,7 +220,8 @@ async function looksLikeImage(url, referer) {
     } catch {
       /* ignore */
     }
-    return (res.status === 200 || res.status === 206) && type.startsWith("image/");
+    // SVG is never a video frame (img-place answers unknown codes with a small SVG placeholder).
+    return (res.status === 200 || res.status === 206) && type.startsWith("image/") && !type.includes("svg");
   } catch {
     return false;
   }
@@ -315,6 +316,9 @@ export async function fetchByseMeta(origin, code) {
         if (!looksByse) continue;
         const title = cleanHostTitle(d.title || d.name || "");
         let thumb = absUrl(d.poster_url || d.thumbnail_url || d.thumbnail || d.poster || d.splash_url || "", base);
+        // Byse keeps every thumbnail at img-place.com/<code>_xt.jpg; used when the details omit it.
+        // Still verified below: a fresh upload has none yet and keeps the logo until the daily sync.
+        if (!thumb) thumb = `https://img-place.com/${encodeURIComponent(String(d.code || d.file_code || code))}_xt.jpg`;
         if (thumb && !(await looksLikeImage(thumb, `${base}/`))) thumb = "";
         const len = Number(d.length_seconds || d.duration || d.length || 0);
         return {
