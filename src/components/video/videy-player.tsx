@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VideoDetail } from "@/lib/catalog/types";
+import { maybeOpenMonetagDirectLink } from "@/lib/ads/monetag";
 
 /**
  * Videy player: the cdn mp4 plays straight from Videy in a native <video> (no crossorigin, so
@@ -7,6 +8,10 @@ import type { VideoDetail } from "@/lib/catalog/types";
  *
  * Fullscreen (native video button): a landscape video locks the screen to landscape where the
  * browser allows it, and unlocks on exit.
+ *
+ * Monetag direct link (src/lib/ads/monetag.ts): a play tap (the poster overlay, or the native play
+ * control after a pause) opens it in a new tab, at most 3 times per session and 20 s apart; the video
+ * keeps playing here.
  */
 
 function videyFileOf(item: VideoDetail): string {
@@ -97,8 +102,28 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     };
   }, []);
 
+  // Resume taps on the native controls (after a pause / at the end). The play() started by the
+  // poster tap itself is skipped: that tap already had its chance in start().
+  const skipNextPlay = useRef(false);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const onPlay = () => {
+      if (skipNextPlay.current) {
+        skipNextPlay.current = false;
+        return;
+      }
+      if (v.controls) maybeOpenMonetagDirectLink();
+    };
+    v.addEventListener("play", onPlay);
+    return () => v.removeEventListener("play", onPlay);
+  }, []);
+
   const start = useCallback(() => {
     if (phase !== "idle") return;
+    // Synchronously inside the tap, so popup blockers allow the new tab.
+    maybeOpenMonetagDirectLink();
+    skipNextPlay.current = true;
     setPhase("main");
     const v = videoRef.current;
     if (!v) return;
