@@ -57,6 +57,14 @@ const jav = [
   ["Sleeping wife JAV", "jav", "ok"],
   ["Istri dipaksa bosnya", "amatir", "warn"],
   ["Japanese schoolgirl JAV", "jav", "reject"],
+  ["SSIS-123 istri dipaksa bos", "amatir", "ok"],
+  ["IPX-456 sleeping sister", "", "ok"],
+  ["FC2-PPV-1234567 mabuk", "lainnya", "ok"],
+  ["SSIS-123 siswi SMA", "", "reject"],
+  ["HOT51 cewek mabuk", "amatir", "warn"],
+  ["Bokep Indo FC2689 tidur", "amatir", "warn"],
+  ["Tahun 2023 dipaksa", "amatir", "warn"],
+  ["ssis-123 dipaksa", "amatir", "warn"],
 ];
 for (const [title, cat, want] of jav) {
   const got = uploadRejectReason(title) ? "reject" : uploadWarnReason(title, cat) ? "warn" : "ok";

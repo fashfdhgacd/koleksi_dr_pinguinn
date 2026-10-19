@@ -7,7 +7,7 @@
  * - uploadWarnReason():   school / force / sleeping / drunk words -> saved normally, the bot warns
  *                         so the owner can check and hide (too many false positives to reject).
  *
- * No soft warning for category "jav" (scripted studio JAV); the reject applies to every category.
+ * No soft warning for category "jav" or a JAV product code in the title (scripted studio JAV); the reject applies to every category.
  * Whole words, case-insensitive. "guru"/"cikgu" never count. No imports: plain JS, testable with node.
  */
 
@@ -62,8 +62,19 @@ export function uploadRejectReason(text = "") {
 }
 
 /** Label of a school / force / sleeping / drunk term: the video is saved, the owner gets a warning. "" when none. */
+/**
+ * JAV product code in the raw title (case-sensitive, hyphen required so words/years never match):
+ * "SSIS-123", "IPX-456", "FC2-PPV-1234567", "FC2PPV-1234567". "HOT51", "FC2689", "2023" do not match.
+ * Used ONLY to skip the soft warning; category assignment is unchanged.
+ */
+const JAV_CODE_RE = /(?:^|[^A-Za-z0-9])(?:FC2-?PPV-?\d{5,8}|[A-Z]{2,6}-\d{2,5})(?![A-Za-z0-9])/;
+
+export function hasJavCode(text = "") {
+  return JAV_CODE_RE.test(String(text ?? ""));
+}
+
 export function uploadWarnReason(text = "", category = "") {
   // Jav = professional scripted studio videos: no soft warning (the hard reject above still applies).
-  if (String(category || "").trim().toLowerCase() === "jav") return "";
+  if (String(category || "").trim().toLowerCase() === "jav" || hasJavCode(text)) return "";
   return firstHit(WARN_RULES, text);
 }
