@@ -153,8 +153,10 @@ function cleanHostTitle(raw = "") {
     .replace(/[_]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  if (!t || t.length < 3 || JUNK_TITLE.test(t)) return "";
-  if (t.length > 160) t = t.slice(0, 160).trim();
+  // Short CJK titles ("龍女") are real titles: 2+ characters is enough for Chinese/Japanese/Korean.
+  const minLen = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(t) ? 2 : 3;
+  if (!t || t.length < minLen || JUNK_TITLE.test(t)) return "";
+  // Never cut the title (owner 2026-10-19: titles, incl. Chinese ones, are kept exactly as uploaded).
   return t;
 }
 

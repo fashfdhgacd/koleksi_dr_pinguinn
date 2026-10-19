@@ -544,8 +544,10 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
   const title = typeof body.title === "string" ? body.title.replace(/\s+/g, " ").trim() : "";
   const category = typeof body.category === "string" ? body.category.trim() : "";
   if (!title && !category) return json({ ok: false, error: "Tidak ada perubahan." }, 400);
-  if (title && (title.length < 4 || title.length > 200)) {
-    return json({ ok: false, error: "Judul harus 4–200 karakter." }, 400);
+  // Chinese/Japanese/Korean titles are dense: 2 characters ("龍女") is already a real title.
+  const minTitle = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(title) ? 2 : 4;
+  if (title && (title.length < minTitle || title.length > 200)) {
+    return json({ ok: false, error: `Judul harus ${minTitle}–200 karakter.` }, 400);
   }
   if (category && !findCategory(category)) return json({ ok: false, error: `Kategori tidak dikenal: ${category}` }, 400);
 

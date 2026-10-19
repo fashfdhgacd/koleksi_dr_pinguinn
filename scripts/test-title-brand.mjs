@@ -1,5 +1,6 @@
 // Tes judul upload bot: node scripts/test-title-brand.mjs  (exit 1 kalau ada yang gagal)
-import { brandUploadTitle, cleanUploadTitle } from "../src/lib/bot/title-brand.js";
+import { brandUploadTitle, cleanUploadTitle, isPlaceholderTitle } from "../src/lib/bot/title-brand.js";
+import { parseMessage } from "../src/lib/bot/parse.js";
 
 const S = " - koleksidrpinguin.com";
 const cases = [
@@ -94,6 +95,17 @@ const cases = [
   ["Watch Me Colmek Pake Sisir", "Watch Me Colmek Pake Sisir"],
   ["Koleksi Dr. Pinguin Bokep 13", "Koleksi Dr. Pinguin Bokep 13"],
   ["Mainstream Indo Viral", "Mainstream Indo Viral"],
+  // Judul Mandarin / CJK → persis apa adanya (tidak diterjemahkan, tidak dibuang, tidak jadi placeholder)
+  ["AI成人短剧契约魔法美女就能不断变强 被操到高潮 A片", "AI成人短剧契约魔法美女就能不断变强 被操到高潮 A片"],
+  ["AI成人短剧契约魔法美女就能不断变强 被操到高潮 A片 - koleksidrpinguin.com", "AI成人短剧契约魔法美女就能不断变强 被操到高潮 A片"],
+  ["AI成人短剧契约魔法美女就能不断变强 被操到高潮 A片 - AVTub", "AI成人短剧契约魔法美女就能不断变强 被操到高潮 A片"],
+  ["AI成人短剧契约魔法美女就能不断变强 被操到高潮 A片 (Koleksi Dr. Pinguin Bokep, M.S.B.)", "AI成人短剧契约魔法美女就能不断变强 被操到高潮 A片"],
+  ["龍女奇遇記 龍女凡人奇遇 ai短剧 龙女情欲故事 奇遇缠绵 A片", "龍女奇遇記 龍女凡人奇遇 ai短剧 龙女情欲故事 奇遇缠绵 A片"],
+  ["禁忌的喘息2 第1集 禁忌喘息交织 ai短剧 禁忌情欲故事 喘息缠绵 A片", "禁忌的喘息2 第1集 禁忌喘息交织 ai短剧 禁忌情欲故事 喘息缠绵 A片"],
+  ["绝美古装蕾丝美女双飞诱惑成人短劇重磅大作震撼上映完美 A片", "绝美古装蕾丝美女双飞诱惑成人短劇重磅大作震撼上映完美 A片"],
+  ["契约魔法｜第1集", "契约魔法｜第1集"],
+  ["契约魔法 — 第1集", "契约魔法 — 第1集"],
+  ["龍女", "龍女"],
 ];
 
 let fail = 0;
@@ -106,5 +118,22 @@ for (const [input, base] of cases) {
   if (!ok) fail++;
   console.log(`${ok ? "OK  " : "FAIL"} ${JSON.stringify(input)}\n     → ${JSON.stringify(gotFinal)}${ok ? "" : `\n     want ${JSON.stringify(want)} (base ${JSON.stringify(gotBase)}, twice ${JSON.stringify(twice)})`}`);
 }
-console.log(`\n${cases.length - fail}/${cases.length} lulus`);
+// Upload Telegram (link + judul satu baris / baris judul di atas link / "judul:"): judul CJK utuh
+const CJK = "AI成人短剧契约魔法美女就能不断变强 被操到高潮 A片";
+const msgs = [
+  [`https://byse.sx/d/abc123 ${CJK}`, "byse"],
+  [`https://luluvdo.com/abc123def ${CJK}`, "lulu"],
+  [`${CJK}\nhttps://byse.sx/d/abc123`, "byse"],
+  [`judul: ${CJK}\nhttps://dood.to/d/abc123`, "dood"],
+  [`https://videy.co/v?id=AbCd1234 ${CJK}`, "videy"],
+];
+for (const [msg, host] of msgs) {
+  const v = parseMessage(msg).videos[0] || {};
+  const ok = v.host === host && v.title === CJK && brandUploadTitle(v.title) === `${CJK}${S}` && !isPlaceholderTitle(v.title);
+  if (!ok) fail++;
+  console.log(`${ok ? "OK  " : "FAIL"} pesan ${host}: ${JSON.stringify(v.title)}`);
+}
+
+const total = cases.length + msgs.length;
+console.log(`\n${total - fail}/${total} lulus`);
 process.exit(fail ? 1 : 0);

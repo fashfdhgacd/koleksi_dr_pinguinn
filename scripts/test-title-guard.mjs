@@ -19,6 +19,9 @@ const cases = [
   ["Japanese schoolgirl uniform", "reject"],
   ["Mama Tiri Ngentotin Anak Kontol Gede Belum Sunat", "reject"],
   ["แตกในนักเรียนสาววัยทีน", "reject"],
+  // Judul Mandarin dewasa biasa: boleh upload, tanpa peringatan
+  ["AI成人短剧契约魔法美女就能不断变强 被操到高潮 A片", "ok"],
+  ["龍女奇遇記 龍女凡人奇遇 ai短剧 龙女情欲故事 奇遇缠绵 A片", "ok"],
   ["anak pesantren jilbab digenjot gurunya", "warn"],
   ["Santriwati cantik colmek", "warn"],
   ["Pelajar kos ngewe", "warn"],
