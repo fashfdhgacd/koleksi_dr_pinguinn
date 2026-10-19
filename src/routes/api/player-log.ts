@@ -27,7 +27,9 @@ import deadSources from "@/lib/catalog/dead-sources.json";
  *  v1 events (start sampled 1/4 x4, load_timeout after 8/12 s) are still accepted from old cached
  *  bundles but no longer shown: load_timeout fired on players that were working.
  *
- * GET (owner, header x-online-key): 7-day v2 numbers per host, top 20 failing videos, videos the
+ * GET (owner, header x-online-key): 7-day v2 numbers per host, the same numbers for today and
+ *  yesterday (WIB calendar days, split from the same daily rows in the same grouped read - no extra
+ *  query, no extra write), top 20 failing videos, videos the
  *  dead-video check marked "Dihapus oleh sumber" (src/lib/catalog/dead-sources.json), and the
  *  owner-hidden list. The player only names IndoAV/UserBokep/Streamtape/Putarin/Videy/Arsip and
  *  sends everything else as "Lainnya"; this owner read splits those rows by the video's catalog
@@ -256,7 +258,9 @@ function row(id: string, items: Map<string, RawItem>, hidden: Set<string>, host 
 async function handleOwnerView(): Promise<Response> {
   const db = await logDb().catch(() => null);
   const since = wibDay(Date.now() - 6 * 86_400_000);
-  let hostRows: { host: string; event: string; n: number }[] = [];
+  const today = wibDay();
+  const yesterday = wibDay(Date.now() - 86_400_000);
+  let hostRows: { day: string; host: string; event: string; n: number }[] = [];
   let topRows: { id: string; host: string; fails: number; starts: number; reports: number }[] = [];
   if (db) {
     try {
@@ -264,12 +268,12 @@ async function handleOwnerView(): Promise<Response> {
         (
           await db
             .prepare(
-              `select host, event, sum(n) as n from player_errors
+              `select day, host, event, sum(n) as n from player_errors
                where day >= ? and event in ('start2','slow2','fail2','retry2','open2','report2','alt2')
-               group by host, event`,
+               group by day, host, event`,
             )
             .bind(since)
-            .all<{ host: string; event: string; n: number }>()
+            .all<{ day: string; host: string; event: string; n: number }>()
         ).results || [];
       topRows =
         (
@@ -291,20 +295,20 @@ async function handleOwnerView(): Promise<Response> {
   }
   const items = await rawById();
   // "Lainnya" per video, so it can be split by catalog source (one small grouped read).
-  let otherRows: { id: string; event: string; n: number }[] | null = null;
+  let otherRows: { day: string; id: string; event: string; n: number }[] | null = null;
   if (db && hostRows.some((r) => r.host === "Lainnya")) {
     try {
       otherRows =
         (
           await db
             .prepare(
-              `select id, event, sum(n) as n from player_errors
+              `select day, id, event, sum(n) as n from player_errors
                where day >= ? and host = 'Lainnya'
                  and event in ('start2','slow2','fail2','retry2','open2','report2','alt2')
-               group by id, event`,
+               group by day, id, event`,
             )
             .bind(since)
-            .all<{ id: string; event: string; n: number }>()
+            .all<{ day: string; id: string; event: string; n: number }>()
         ).results || [];
     } catch (err) {
       otherRows = null;
@@ -317,10 +321,10 @@ async function handleOwnerView(): Promise<Response> {
     const label = it ? sourceLabel(it) : "";
     return label && label !== "Unknown" ? label : "Lainnya";
   };
-  const eventRows: { host: string; event: string; n: number }[] = otherRows
+  const eventRows: { day: string; host: string; event: string; n: number }[] = otherRows
     ? [
         ...hostRows.filter((r) => r.host !== "Lainnya"),
-        ...otherRows.map((r) => ({ host: realHost(r.id, "Lainnya"), event: r.event, n: Number(r.n) || 0 })),
+        ...otherRows.map((r) => ({ day: r.day, host: realHost(r.id, "Lainnya"), event: r.event, n: Number(r.n) || 0 })),
       ]
     : hostRows;
   type HostRow = {
@@ -333,24 +337,29 @@ async function handleOwnerView(): Promise<Response> {
     openSource: number;
     alt: number;
   };
-  const byHost = new Map<string, HostRow>();
-  for (const r of eventRows) {
-    if (!V2_EVENTS.includes(r.event)) continue;
-    const cur =
-      byHost.get(r.host) || { host: r.host, starts: 0, slow: 0, fails: 0, reports: 0, retries: 0, openSource: 0, alt: 0 };
-    const n = Number(r.n) || 0;
-    if (r.event === "start2") cur.starts += n;
-    else if (r.event === "slow2") cur.slow += n;
-    else if (r.event === "fail2") cur.fails += n;
-    else if (r.event === "report2") cur.reports += n;
-    else if (r.event === "retry2") cur.retries += n;
-    else if (r.event === "open2") cur.openSource += n;
-    else if (r.event === "alt2") cur.alt += n;
-    byHost.set(r.host, cur);
-  }
-  const hosts = [...byHost.values()]
-    .map((h) => ({ ...h, rate: h.starts > 0 ? Math.min(1, h.fails / h.starts) : null }))
-    .sort((a, b) => b.fails - a.fails || b.starts - a.starts);
+  /** Per-host totals for one WIB day, or for the whole 7-day window when day is omitted. */
+  const hostsFor = (day?: string) => {
+    const byHost = new Map<string, HostRow>();
+    for (const r of eventRows) {
+      if (!V2_EVENTS.includes(r.event)) continue;
+      if (day && r.day !== day) continue;
+      const cur =
+        byHost.get(r.host) || { host: r.host, starts: 0, slow: 0, fails: 0, reports: 0, retries: 0, openSource: 0, alt: 0 };
+      const n = Number(r.n) || 0;
+      if (r.event === "start2") cur.starts += n;
+      else if (r.event === "slow2") cur.slow += n;
+      else if (r.event === "fail2") cur.fails += n;
+      else if (r.event === "report2") cur.reports += n;
+      else if (r.event === "retry2") cur.retries += n;
+      else if (r.event === "open2") cur.openSource += n;
+      else if (r.event === "alt2") cur.alt += n;
+      byHost.set(r.host, cur);
+    }
+    return [...byHost.values()]
+      .map((h) => ({ ...h, rate: h.starts > 0 ? Math.min(1, h.fails / h.starts) : null }))
+      .sort((a, b) => b.fails - a.fails || b.starts - a.starts);
+  };
+  const hosts = hostsFor();
 
   let hiddenIds: Record<string, { at: number }> = {};
   let hideReadable = true;
@@ -382,6 +391,8 @@ async function handleOwnerView(): Promise<Response> {
     storage: db ? "d1" : "none",
     since,
     hosts,
+    today: { day: today, hosts: hostsFor(today) },
+    yesterday: { day: yesterday, hosts: hostsFor(yesterday) },
     top,
     gone,
     suspect: Object.keys(dead.suspect || {}).length,

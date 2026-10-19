@@ -37,6 +37,9 @@ export type PlayerLogData = {
   version?: number;
   since?: string;
   hosts?: PlayerLogHost[];
+  /** Same per-host numbers for one WIB calendar day (older deploys do not send these). */
+  today?: { day: string; hosts: PlayerLogHost[] };
+  yesterday?: { day: string; hosts: PlayerLogHost[] };
   top?: (PlayerLogRow & { fails: number; starts: number; reports: number; gone: boolean })[];
   gone?: (PlayerLogRow & { since: string })[];
   suspect?: number;

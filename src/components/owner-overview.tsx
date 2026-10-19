@@ -157,6 +157,13 @@ function hostLabel(host: string): string {
   return host;
 }
 
+type HealthRange = "today" | "yesterday" | "week";
+const HEALTH_RANGES: { key: HealthRange; label: string; total: string }[] = [
+  { key: "today", label: "Hari ini", total: "hari ini" },
+  { key: "yesterday", label: "Kemarin", total: "kemarin" },
+  { key: "week", label: "7 hari", total: "7 hari" },
+];
+
 function shortSource(src: string): string {
   if (src === "LuluStream") return "Lulu";
   if (src === "DoodStream") return "Dood";
@@ -665,6 +672,7 @@ export function OwnerOverview(props: {
   const [filter, setFilter] = useState<RecentFilter>("");
   const [ovBusy, setOvBusy] = useState(false);
   const [q, setQ] = useState("");
+  const [healthRange, setHealthRange] = useState<HealthRange>("today");
 
   const filterBody = useCallback(
     (f: RecentFilter) => (f === "nothumb" ? { noThumb: true } : f ? { source: f } : {}),
@@ -768,7 +776,11 @@ export function OwnerOverview(props: {
     .slice(0, 8);
   const allCount = Object.values(ov?.bySource || {}).reduce((s, n) => s + n, 0);
 
-  const hostRows = (playerLog?.hosts || [])
+  // Hari ini / Kemarin come from the same owner read as 7 hari (WIB calendar days); nothing extra is fetched.
+  const healthMeta = HEALTH_RANGES.find((r) => r.key === healthRange) || HEALTH_RANGES[2];
+  const dayData = healthRange === "today" ? playerLog?.today : healthRange === "yesterday" ? playerLog?.yesterday : null;
+  const dayMissing = healthRange !== "week" && playerLog != null && !dayData;
+  const hostRows = (healthRange === "week" ? playerLog?.hosts || [] : dayData?.hosts || [])
     .map((h) => ({ ...h, label: hostLabel(h.host) }))
     .sort((a, b) => b.starts - a.starts);
 
@@ -784,10 +796,26 @@ export function OwnerOverview(props: {
     <section className={`${card} h-full`}>
       <div className={h2}>
         <span>Kesehatan player</span>
-        <span className={h2note}>7 hari · gagal dari klik play</span>
+        <span className={h2note}>gagal dari klik play</span>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-1.5" role="group" aria-label="Rentang Kesehatan player">
+        {HEALTH_RANGES.map((r) => (
+          <button
+            key={r.key}
+            type="button"
+            className={toggleCls(healthRange === r.key)}
+            aria-pressed={healthRange === r.key}
+            onClick={() => setHealthRange(r.key)}
+          >
+            {r.label}
+          </button>
+        ))}
+        {dayData?.day ? <span className="text-[13px] text-zinc-500">{dateText(dayData.day)} WIB</span> : null}
       </div>
       {playerLog == null ? (
         <p className="mt-3 text-sm text-zinc-400">Memuat…</p>
+      ) : dayMissing ? (
+        <p className="mt-3 text-sm text-zinc-400">Angka harian muncul setelah update terbaru selesai dipasang. Tekan Refresh.</p>
       ) : hostRows.length ? (
         <ul className="mt-3 space-y-2">
           {hostRows.map((h) => {
@@ -804,11 +832,12 @@ export function OwnerOverview(props: {
           })}
         </ul>
       ) : (
-        <p className="mt-3 text-sm text-zinc-400">Belum ada.</p>
+        <p className="mt-3 text-sm text-zinc-400">{healthRange === "week" ? "Belum ada." : `Belum ada klik play ${healthMeta.total}.`}</p>
       )}
       {hostRows.length ? (
         <p className="mt-3 border-t border-white/[0.06] pt-2 text-[13px] leading-snug text-zinc-400">
-          Total klik play 7 hari: <b className="font-medium text-zinc-200">{fmt(hostRows.reduce((n, h) => n + (Number(h.starts) || 0), 0))}</b>.
+          Total klik play {healthMeta.total}: <b className="font-medium text-zinc-200">{fmt(hostRows.reduce((n, h) => n + (Number(h.starts) || 0), 0))}</b>, gagal{" "}
+          <b className="font-medium text-zinc-200">{fmt(hostRows.reduce((n, h) => n + (Number(h.fails) || 0), 0))}</b>.
           Dihitung sekali per video per sesi saat tombol play ditekan (tidak termasuk Videy yang pakai player sendiri); tidak
           memastikan videonya benar-benar jalan sampai habis.
         </p>
