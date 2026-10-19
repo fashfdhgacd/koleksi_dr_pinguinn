@@ -10,8 +10,8 @@ import { popunderOnPlayTap } from "@/components/ts-videy-popunder";
  * Fullscreen (native video button): a landscape video locks the screen to landscape where the
  * browser allows it, and unlocks on exit.
  *
- * TrafficStars popunder (ts-videy-popunder.tsx): the first play tap of each video per session opens
- * the spot's direct link in a new tab; the tap still starts the video here.
+ * TrafficStars popunder (ts-videy-popunder.tsx): the first play tap of each video per session only
+ * opens the spot's direct link in a new tab (our tab stays here, paused); the next tap plays.
  *
  * Kesehatan player (/pemilik): the same /api/player-log beacons as the other hosts, once per video
  * per session (src/lib/player-log-client.ts), host "Videy":
@@ -172,8 +172,10 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
 
   const start = useCallback(() => {
     if (phase !== "idle") return;
-    // Popunder (direct link) synchronously inside the tap, once per video; video still starts.
-    popunderOnPlayTap(item.id);
+    // Popunder (direct link) synchronously inside the tap, once per video: when the ad tab opens,
+    // this tap does nothing else (the video stays on its poster; the next tap plays). If the
+    // popup was blocked, this same tap plays so the visitor is never stuck.
+    if (popunderOnPlayTap(item.id)) return;
     track.current = { startedAt: Date.now(), alive: false, settled: false };
     sendPlayerLog(item.id, "Videy", "start2");
     setPhase("main");
