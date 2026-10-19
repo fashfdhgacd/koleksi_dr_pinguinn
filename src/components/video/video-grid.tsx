@@ -2,8 +2,8 @@
 // Catalog grids (home, kategori; `ads` prop kept as the catalog-layout flag, no ads are rendered):
 // fluid columns filling the content width (1 / 3 / 4), card thumbs 300:250. Pages hold 36 videos
 // (DEFAULT_PAGE_SIZE), a multiple of 12, so every row is full at 1, 3 and 4 columns.
-// Two TrafficStars cards (ts-grid-ad.tsx): before video 10 (row 3, center column at 4 columns) and
-// before video 21; while shown, trailing videos are trimmed at 3/4 columns; each collapses if unfilled.
+// One TrafficStars card (ts-grid-ad.tsx) before video 10: row 3, center column at 4 columns;
+// while shown one trailing video is trimmed at 3/4 columns, and it collapses if unfilled.
 // The watch page keeps the default grid (no ad).
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { isRealMinor } from "@/lib/minor-terms";
@@ -43,24 +43,21 @@ export function VideoGrid({
 }: {
   items: VideoCardType[];
   eagerCount?: number;
-  /** Catalog layout (1 / 3 / 4 columns, 300:250 thumbs). Also enables the two TrafficStars grid cards. */
+  /** Catalog layout (1 / 3 / 4 columns, 300:250 thumbs). Also enables the TrafficStars grid card. */
   ads?: boolean;
 }) {
   const shown = visibleCards(items);
   const [empty, setEmpty] = useState<Record<number, true>>({});
   const onEmpty1 = useCallback(() => setEmpty((e) => ({ ...e, 1: true })), []);
-  const onEmpty2 = useCallback(() => setEmpty((e) => ({ ...e, 2: true })), []);
-  // Slot 1 before video 10 (row 3 center at 4 columns), slot 2 before video 21; each lazy-loads
-  // and collapses on its own if unfilled (the trimmed trailing video then returns).
+  // One slot before video 10 (row 3 center at 4 columns); lazy-loads and collapses if unfilled
+  // (the trimmed trailing video then returns).
   const at1 = ads && !empty[1] && shown.length >= 4 ? Math.min(AD_INDEX, shown.length) : -1;
-  const at2 = ads && !empty[2] && shown.length > AD_INDEX_2 ? AD_INDEX_2 : -1;
-  const cells = shown.length + (at1 >= 0 ? 1 : 0) + (at2 >= 0 ? 1 : 0);
+  const cells = shown.length + (at1 >= 0 ? 1 : 0);
   const ad1 = <TsGridAd key="ts-ad-1" onEmpty={onEmpty1} />;
-  const ad2 = <TsGridAd key="ts-ad-2" onEmpty={onEmpty2} />;
   return (
     <div className={ads ? CATALOG_GRID + trimClass(cells) : DEFAULT_GRID}>
       {shown.map((video, index) => (
-        <Cell key={video.id} ad={index === at1 ? ad1 : index === at2 ? ad2 : null}>
+        <Cell key={video.id} ad={index === at1 ? ad1 : null}>
           <VideoCard video={video} eager={index < eagerCount} />
         </Cell>
       ))}
@@ -70,7 +67,6 @@ export function VideoGrid({
 }
 
 const AD_INDEX = 9;
-const AD_INDEX_2 = 20;
 
 function Cell({ ad, children }: { ad: React.ReactNode; children: React.ReactNode }) {
   return (
