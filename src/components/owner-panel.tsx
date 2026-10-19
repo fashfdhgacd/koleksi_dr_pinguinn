@@ -216,7 +216,7 @@ export function OwnerDashboard() {
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6 sm:py-8">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">Dr. Pinguin</p>
+            <p className="text-[13px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Dr. Pinguin</p>
             <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight text-zinc-50">
               Pemilik
               <span className="size-2 bg-[#2dd4bf]" aria-hidden="true" />
@@ -234,7 +234,7 @@ export function OwnerDashboard() {
             </Link>
             {authed ? (
               <>
-                <span className="whitespace-nowrap text-[11px] text-zinc-500">
+                <span className="whitespace-nowrap text-[13px] text-zinc-400">
                   {lastText ? `Terakhir diperbarui ${lastText} WIB` : loading ? "Memuat…" : ""}
                 </span>
                 <button
@@ -321,14 +321,14 @@ export function OwnerDashboard() {
 }
 
 const headBtn =
-  "whitespace-nowrap rounded-md border border-white/[0.1] bg-[#16161a] px-2.5 py-1 text-xs text-zinc-300 transition hover:text-zinc-50 disabled:opacity-50";
+  "whitespace-nowrap rounded-md border border-white/[0.1] bg-[#16161a] px-2.5 py-1 text-[13px] text-zinc-300 transition hover:text-zinc-50 disabled:opacity-50";
 // Own class list (not headBtn + overrides) so the teal background never loses to bg-[#16161a] in CSS order.
 const headBtnPrimary =
-  "whitespace-nowrap rounded-md border border-[#2dd4bf] bg-[#2dd4bf] px-2.5 py-1 text-xs font-medium text-zinc-950 transition hover:bg-[#5eead4] disabled:opacity-50";
+  "whitespace-nowrap rounded-md border border-[#2dd4bf] bg-[#2dd4bf] px-2.5 py-1 text-[13px] font-medium text-zinc-950 transition hover:bg-[#5eead4] disabled:opacity-50";
 
 function Pill({ ok, label }: { ok: boolean | null; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border border-white/[0.08] px-2 py-1 text-[10px] uppercase tracking-[0.12em] text-zinc-400">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border border-white/[0.08] px-2 py-1 text-[13px] uppercase tracking-[0.12em] text-zinc-400">
       <span className={`size-1.5 ${ok == null ? "bg-zinc-600" : ok ? "bg-[#2dd4bf]" : "bg-amber-400"}`} />
       {label}
     </span>
@@ -354,10 +354,10 @@ function Collapse({ id, title, children }: { id: string; title: string; children
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]"
+        className="flex w-full items-center justify-between px-4 py-3 text-left text-[13px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]"
       >
         {title}
-        <span className="text-zinc-600">{open ? "-" : "+"}</span>
+        <span className="text-zinc-500">{open ? "-" : "+"}</span>
       </button>
       {open ? <div className="border-t border-white/[0.06] p-2 sm:p-3">{children}</div> : null}
     </div>
@@ -429,7 +429,7 @@ function PlayerErrorsSection({
   }
 
   const btn =
-    "rounded-md border border-white/[0.12] px-2 py-1 text-[11px] text-zinc-200 hover:bg-white/[0.06] disabled:opacity-50";
+    "rounded-md border border-white/[0.12] px-2 py-1 text-[13px] text-zinc-200 hover:bg-white/[0.06] disabled:opacity-50";
 
   function actions(r: PlayerErrorRow) {
     return (
@@ -471,22 +471,22 @@ function PlayerErrorsSection({
   return (
     <section id="player-error" className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Player error</h2>
+        <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Player error</h2>
         <Button type="button" size="sm" variant="outline" disabled={busy || !secret} onClick={() => void load()}>
           {busy ? "Memuat…" : "Muat ulang"}
         </Button>
       </div>
-      {note ? <p className="mt-2 text-xs text-zinc-400">{note}</p> : null}
-      {data?.storage === "none" ? <p className="mt-2 text-xs text-amber-400">Database D1 tidak terbaca.</p> : null}
+      {note ? <p className="mt-2 text-[13px] text-zinc-400">{note}</p> : null}
+      {data?.storage === "none" ? <p className="mt-2 text-[13px] text-amber-400">Database D1 tidak terbaca.</p> : null}
 
       {data ? (
         <>
           <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[560px] text-left text-xs text-zinc-300">
-              <thead className="text-zinc-500">
+            <table className="w-full min-w-[560px] text-left text-[13px] text-zinc-300">
+              <thead className="text-zinc-400">
                 <tr>
                   <th className="py-1 pr-3 font-normal">Host</th>
-                  <th className="py-1 pr-3 text-right font-normal">Putar</th>
+                  <th className="py-1 pr-3 text-right font-normal">Klik play</th>
                   <th className="py-1 pr-3 text-right font-normal">Lambat</th>
                   <th className="py-1 pr-3 text-right font-normal">Gagal</th>
                   <th className="py-1 pr-3 text-right font-normal">Lapor</th>
@@ -511,7 +511,7 @@ function PlayerErrorsSection({
                   ))
                 ) : (
                   <tr className="border-t border-white/[0.06]">
-                    <td colSpan={8} className="py-2 text-zinc-500">
+                    <td colSpan={8} className="py-2 text-zinc-400">
                       Belum ada data versi 2. Angka muncul setelah ada pengunjung yang memutar video.
                     </td>
                   </tr>
@@ -520,15 +520,15 @@ function PlayerErrorsSection({
             </table>
           </div>
 
-          <h3 className="mt-4 text-xs font-medium text-zinc-300">Paling sering gagal ({top.length})</h3>
+          <h3 className="mt-4 text-[13px] font-medium text-zinc-300">Paling sering gagal ({top.length})</h3>
           {top.length ? (
             <ul className="mt-1 divide-y divide-white/[0.06]">
               {top.map((r) => (
-                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-xs text-zinc-300">
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-[13px] text-zinc-300">
                   <span className="min-w-0 flex-1">
-                    <span className="mr-1.5 text-zinc-500">{hostLabel(r.host)}</span>
+                    <span className="mr-1.5 text-zinc-400">{hostLabel(r.host)}</span>
                     {title(r)}
-                    <span className="ml-1.5 tabular-nums text-zinc-500">
+                    <span className="ml-1.5 tabular-nums text-zinc-400">
                       {r.fails} gagal{r.reports ? ` · ${r.reports} lapor` : ""}
                       {r.gone ? " · dihapus oleh sumber" : ""}
                       {r.hidden ? " · disembunyikan" : ""}
@@ -539,40 +539,40 @@ function PlayerErrorsSection({
               ))}
             </ul>
           ) : (
-            <p className="mt-1 text-xs text-zinc-500">Belum ada.</p>
+            <p className="mt-1 text-[13px] text-zinc-400">Belum ada.</p>
           )}
 
-          <h3 className="mt-4 text-xs font-medium text-zinc-300">Dihapus oleh sumber ({gone.length})</h3>
-          <p className="text-[11px] text-zinc-500">
+          <h3 className="mt-4 text-[13px] font-medium text-zinc-300">Dihapus oleh sumber ({gone.length})</h3>
+          <p className="text-[13px] text-zinc-400">
             Cek otomatis tiap 12 jam, terakhir {wibTime(data.checkedAt)}. Ditandai setelah 2 kali cek berturut-turut
             {data.suspect ? `; ${data.suspect} lagi menunggu cek kedua` : ""}. Tidak disembunyikan otomatis.
           </p>
           {gone.length ? (
             <ul className="mt-1 max-h-80 divide-y divide-white/[0.06] overflow-y-auto">
               {gone.map((r) => (
-                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-xs text-zinc-300">
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-[13px] text-zinc-300">
                   <span className="min-w-0 flex-1">
-                    <span className="mr-1.5 text-zinc-500">{hostLabel(r.host)}</span>
+                    <span className="mr-1.5 text-zinc-400">{hostLabel(r.host)}</span>
                     {title(r)}
-                    {r.hidden ? <span className="ml-1.5 text-zinc-500">· disembunyikan</span> : null}
+                    {r.hidden ? <span className="ml-1.5 text-zinc-400">· disembunyikan</span> : null}
                   </span>
                   {actions(r)}
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="mt-1 text-xs text-zinc-500">Belum ada.</p>
+            <p className="mt-1 text-[13px] text-zinc-400">Belum ada.</p>
           )}
 
-          <h3 className="mt-4 text-xs font-medium text-zinc-300">Disembunyikan dari sini ({ownerHidden.length})</h3>
+          <h3 className="mt-4 text-[13px] font-medium text-zinc-300">Disembunyikan dari sini ({ownerHidden.length})</h3>
           {data.hideReadable === false ? (
-            <p className="mt-1 text-xs text-amber-400">KV tidak terbaca, daftar belum bisa dimuat.</p>
+            <p className="mt-1 text-[13px] text-amber-400">KV tidak terbaca, daftar belum bisa dimuat.</p>
           ) : ownerHidden.length ? (
             <ul className="mt-1 divide-y divide-white/[0.06]">
               {ownerHidden.map((r) => (
-                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-xs text-zinc-300">
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-[13px] text-zinc-300">
                   <span className="min-w-0 flex-1">
-                    <span className="mr-1.5 text-zinc-500">{hostLabel(r.host)}</span>
+                    <span className="mr-1.5 text-zinc-400">{hostLabel(r.host)}</span>
                     {title(r)}
                   </span>
                   {actions(r)}
@@ -580,7 +580,7 @@ function PlayerErrorsSection({
               ))}
             </ul>
           ) : (
-            <p className="mt-1 text-xs text-zinc-500">Tidak ada.</p>
+            <p className="mt-1 text-[13px] text-zinc-400">Tidak ada.</p>
           )}
         </>
       ) : null}

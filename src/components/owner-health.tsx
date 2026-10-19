@@ -73,13 +73,13 @@ type CostFile = {
 
 const COST = cost as CostFile;
 
-const card = "min-w-0 rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/35 bg-[#121215] p-4";
-const h2 = "flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]";
+const card = "min-w-0 rounded-xl border border-white/[0.08] border-t-[#2dd4bf]/40 bg-[#131316] p-4 sm:p-5";
+const h2 = "flex items-center justify-between gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]";
 const btn =
-  "shrink-0 whitespace-nowrap rounded-md border border-white/[0.12] bg-[#16161a] px-2 py-1 text-[11px] font-normal normal-case tracking-normal text-zinc-200 hover:bg-white/[0.06] disabled:opacity-50";
+  "shrink-0 whitespace-nowrap rounded-md border border-white/[0.12] bg-[#16161a] px-2 py-1 text-[13px] font-normal normal-case tracking-normal text-zinc-200 hover:bg-white/[0.06] disabled:opacity-50";
 const btnPrimary =
-  "shrink-0 whitespace-nowrap rounded-md border border-[#2dd4bf] bg-[#2dd4bf] px-2 py-1 text-[11px] font-medium text-zinc-950 hover:bg-[#5eead4] disabled:opacity-50";
-const input = "min-w-0 rounded-md border border-white/[0.1] bg-[#0c0c0e] px-2 py-1.5 text-xs text-zinc-200";
+  "shrink-0 whitespace-nowrap rounded-md border border-[#2dd4bf] bg-[#2dd4bf] px-2 py-1 text-[13px] font-medium text-zinc-950 hover:bg-[#5eead4] disabled:opacity-50";
+const input = "min-w-0 rounded-md border border-white/[0.1] bg-[#0c0c0e] px-2 py-1.5 text-[13px] text-zinc-200";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
@@ -113,7 +113,7 @@ export function AlertStrip(props: {
   const cf = COST.cloudflare;
   const cfSafe = cf.projectedTotalUsd < cf.ceilingUsd * 0.85;
   const ts = COST.ads.find((a) => a.name === "TrafficStars");
-  const item = "flex min-w-0 items-center gap-2.5 rounded-lg border bg-[#141418] px-3 py-2.5 text-xs text-zinc-300";
+  const item = "flex min-w-0 items-center gap-2.5 rounded-lg border bg-[#141418] px-3 py-2.5 text-[13px] text-zinc-300";
   return (
     <section>
       <div className={`${h2} mb-2`}>Perlu dicek</div>
@@ -125,7 +125,7 @@ export function AlertStrip(props: {
               {noThumb == null ? "…" : noThumb ? `${fmt(noThumb)} video bokep` : "Semua video bokep"}
             </b>{" "}
             {noThumb ? "masih pakai logo" : noThumb === 0 ? "sudah punya thumbnail" : ""}
-            <span className="block truncate text-[11px] text-zinc-500">Byse / Lulu / Dood tanpa thumbnail</span>
+            <span className="block text-[13px] leading-snug text-zinc-400">Byse / Lulu / Dood tanpa thumbnail</span>
           </span>
           {noThumb ? (
             <button type="button" className={btn} onClick={onShowThumbs}>
@@ -137,7 +137,7 @@ export function AlertStrip(props: {
           <Dot tone={gone == null ? "idle" : gone ? "bad" : "ok"} />
           <span className="min-w-0 flex-1">
             <b className="font-semibold text-zinc-50">{gone == null ? "…" : `${fmt(gone)} video`}</b> dihapus oleh sumber
-            <span className="block truncate text-[11px] text-zinc-500">
+            <span className="block text-[13px] leading-snug text-zinc-400">
               cek terakhir {wibDateTime(deadCheckedAt || null)}
               {suspect ? ` · ${fmt(suspect)} menunggu cek kedua` : ""}
             </span>
@@ -152,14 +152,14 @@ export function AlertStrip(props: {
           <Dot tone={ts?.status === "aktif" ? "ok" : "idle"} />
           <span className="min-w-0 flex-1">
             <b className="font-semibold text-zinc-50">TrafficStars</b> {ts?.status || "belum ada data"}
-            <span className="block truncate text-[11px] text-zinc-500">{ts?.note || ""}</span>
+            <span className="block text-[13px] leading-snug text-zinc-400">{ts?.note || ""}</span>
           </span>
         </div>
         <div className={`${item} ${cfSafe ? "border-white/[0.06]" : "border-amber-400/25"}`}>
           <Dot tone={cfSafe ? "ok" : "warn"} />
           <span className="min-w-0 flex-1">
             <b className="font-semibold text-zinc-50">{cfSafe ? "Biaya Cloudflare aman" : "Biaya Cloudflare mendekati batas"}</b>
-            <span className="block truncate text-[11px] text-zinc-500">
+            <span className="block text-[13px] leading-snug text-zinc-400">
               perkiraan {usd(cf.projectedTotalUsd)} dari batas {usd(cf.ceilingUsd)}
             </span>
           </span>
@@ -172,56 +172,74 @@ export function AlertStrip(props: {
 /* ---------- Uang & biaya ---------- */
 
 export function MoneyCard() {
+  const [open, setOpen] = useState(false);
   const cf = COST.cloudflare;
   const spentPct = Math.min(100, (cf.spentUsd / cf.ceilingUsd) * 100);
   const projPct = Math.min(100, (cf.projectedTotalUsd / cf.ceilingUsd) * 100);
-  const row = "flex items-baseline justify-between gap-3 border-t border-white/[0.05] py-1.5 text-xs";
+  const row = "flex items-baseline justify-between gap-3 border-t border-white/[0.06] py-2 text-sm";
+  const adsSummary = COST.ads.map((a) => `${a.name} ${a.status}`).join(" · ");
   return (
-    <section className={card}>
+    <section className={`${card} h-full`}>
       <div className={h2}>
         <span>Uang &amp; biaya</span>
-        <span className="text-[11px] font-normal normal-case tracking-normal text-zinc-600">
+        <span className="text-[13px] font-normal normal-case tracking-normal text-zinc-400">
           siklus {dayText(cf.cycleFrom)} – {dayText(cf.cycleTo)}
         </span>
       </div>
-      <div className="relative mt-3 h-2 overflow-hidden rounded bg-white/[0.06]" aria-hidden="true">
+      <div className="mt-3 flex items-baseline justify-between gap-3 text-sm">
+        <span className="text-zinc-300">Cloudflare (perkiraan)</span>
+        <span className="tabular-nums text-zinc-100">
+          <b className="font-semibold">{usd(cf.projectedTotalUsd)}</b> <span className="text-zinc-400">dari {usd(cf.ceilingUsd)}</span>
+        </span>
+      </div>
+      <div className="relative mt-2 h-2 overflow-hidden rounded bg-white/[0.07]" aria-hidden="true">
         <span className="absolute inset-y-0 left-0 rounded bg-[#2dd4bf]/35" style={{ width: `${projPct}%` }} />
         <span className="absolute inset-y-0 left-0 rounded bg-[#2dd4bf]" style={{ width: `${spentPct}%` }} />
       </div>
-      <p className="mt-1.5 text-[11px] text-zinc-500">
-        Cloudflare <b className="font-medium text-zinc-200">{usd(cf.spentUsd)} terpakai</b> · perkiraan akhir siklus{" "}
-        {usd(cf.projectedUsageUsd)} + dasar {usd(cf.baseUsd)} ≈ <b className="font-medium text-zinc-200">{usd(cf.projectedTotalUsd)}</b> dari
-        batas {usd(cf.ceilingUsd)}
-      </p>
-      <ul className="mt-2">
-        {cf.items.map((it) => (
-          <li key={it.label} className={row}>
-            <span className="shrink-0 text-zinc-400">{it.label}</span>
-            <span className="min-w-0 text-right tabular-nums text-zinc-200">
-              {usd(it.usd)}
-              {it.note ? <span className="block text-[11px] text-zinc-500">{it.note}</span> : null}
-            </span>
-          </li>
-        ))}
-        <li className={row}>
-          <span className="shrink-0 text-zinc-400">Pendapatan minggu ini</span>
-          <span className="text-right text-zinc-500">{usd(COST.earnings.weekUsd)}</span>
-        </li>
-        {COST.ads.map((a) => (
-          <li key={a.name} className={row}>
-            <span className="shrink-0 text-zinc-400">{a.name}</span>
-            <span className="min-w-0 text-right text-zinc-300">
-              {a.status}
-              <span className="block text-[11px] text-zinc-500">
-                {a.note ? `${a.note} · ` : ""}pendapatan {usd(a.earningsUsd)}
+      <p className="mt-1 text-[13px] text-zinc-400">{usd(cf.spentUsd)} sudah terpakai · termasuk dasar {usd(cf.baseUsd)}</p>
+      <div className={`${row} mt-2`}>
+        <span className="text-zinc-300">Pendapatan minggu ini</span>
+        <span className="text-zinc-400">{usd(COST.earnings.weekUsd)}</span>
+      </div>
+      <div className={row}>
+        <span className="shrink-0 text-zinc-300">Iklan</span>
+        <span className="min-w-0 text-right text-[13px] leading-snug text-zinc-300">{adsSummary}</span>
+      </div>
+      <button
+        type="button"
+        className="mt-2 text-[13px] text-[#5eead4] underline-offset-2 hover:underline"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {open ? "Tutup rincian" : "Rincian"}
+      </button>
+      {open ? (
+        <ul className="mt-1">
+          {cf.items.map((it) => (
+            <li key={it.label} className={row}>
+              <span className="shrink-0 text-zinc-300">{it.label}</span>
+              <span className="min-w-0 text-right tabular-nums text-zinc-100">
+                {usd(it.usd)}
+                {it.note ? <span className="block text-[13px] text-zinc-400">{it.note}</span> : null}
               </span>
-            </span>
+            </li>
+          ))}
+          {COST.ads.map((a) => (
+            <li key={a.name} className={row}>
+              <span className="shrink-0 text-zinc-300">{a.name}</span>
+              <span className="min-w-0 text-right text-zinc-200">
+                {a.status}
+                <span className="block text-[13px] text-zinc-400">
+                  {a.note ? `${a.note} · ` : ""}pendapatan {usd(a.earningsUsd)}
+                </span>
+              </span>
+            </li>
+          ))}
+          <li className="pt-2 text-[13px] text-zinc-400">
+            Data {dayText(COST.updated)}, diisi manual dari laporan mingguan (tidak ditarik langsung dari Cloudflare).
           </li>
-        ))}
-      </ul>
-      <p className="mt-2 text-[11px] text-zinc-600">
-        Data {dayText(COST.updated)}. Diisi manual dari laporan mingguan, tidak ditarik langsung dari Cloudflare (tidak menambah biaya).
-      </p>
+        </ul>
+      ) : null}
     </section>
   );
 }
@@ -303,24 +321,24 @@ export function ThumbMissingCard({ secret, reloadKey }: { secret: string; reload
           {busy ? "Memuat…" : "Muat ulang"}
         </button>
       </div>
-      <p className="mt-2 text-[11px] text-zinc-500">
+      <p className="mt-2 text-[13px] text-zinc-400">
         Video bokep Byse / Lulu / Dood ini tampil pakai logo penguin dan ditaruh di belakang katalog. Tempel link gambar (https://…), lalu
         simpan sekaligus: satu kali simpan = satu update, tampil setelah deploy berikutnya.
       </p>
-      {total === 0 ? <p className="mt-3 text-xs text-zinc-500">Tidak ada. Semua sudah punya thumbnail.</p> : null}
+      {total === 0 ? <p className="mt-3 text-[13px] text-zinc-400">Tidak ada. Semua sudah punya thumbnail.</p> : null}
       {rows.length ? (
         <ul className="mt-2">
           {rows.map((r) => (
             <li key={r.id} className="flex flex-wrap items-center gap-2 border-t border-white/[0.05] py-2 sm:flex-nowrap">
               <img src="/brand-poster-6x5.jpg" alt="" loading="lazy" className="h-9 w-16 shrink-0 rounded bg-zinc-900 object-contain" />
               <a href={`/watch/${r.id}`} target="_blank" rel="noopener" className="min-w-0 flex-1 basis-40">
-                <span className="block truncate text-xs text-zinc-100">{r.title.replace(/\s*-\s*koleksidrpinguin\.com$/i, "") || r.id}</span>
-                <span className="block truncate text-[11px] text-zinc-500">
+                <span className="line-clamp-2 text-sm leading-snug text-zinc-100">{r.title.replace(/\s*-\s*koleksidrpinguin\.com$/i, "") || r.id}</span>
+                <span className="block text-[13px] leading-snug text-zinc-400">
                   {r.source} · {r.id}
                 </span>
               </a>
               {saved[r.id] ? (
-                <span className="shrink-0 text-[11px] text-[#2dd4bf]">tersimpan</span>
+                <span className="shrink-0 text-[13px] text-[#2dd4bf]">tersimpan</span>
               ) : (
                 <input
                   className={`${input} w-full sm:w-56`}
@@ -334,7 +352,7 @@ export function ThumbMissingCard({ secret, reloadKey }: { secret: string; reload
           ))}
         </ul>
       ) : null}
-      {note ? <p className="mt-2 text-xs text-zinc-400">{note}</p> : null}
+      {note ? <p className="mt-2 text-[13px] text-zinc-400">{note}</p> : null}
       <div className="mt-2 flex flex-wrap gap-2">
         <button
           type="button"
@@ -390,18 +408,18 @@ export function StatusCard(props: {
     },
   ];
   return (
-    <section className={card}>
+    <section className={`${card} h-full`}>
       <div className={h2}>Status sistem</div>
       <ul className="mt-2">
         {rows.map((r) => (
-          <li key={r.name} className="flex items-center gap-2 border-t border-white/[0.05] py-1.5 text-xs">
+          <li key={r.name} className="flex items-center gap-2 border-t border-white/[0.06] py-2 text-sm">
             <Dot tone={r.tone} />
-            <span className="min-w-0 flex-1 truncate text-zinc-300">{r.name}</span>
-            <span className="shrink-0 text-right text-[11px] text-zinc-500">{r.value}</span>
+            <span className="min-w-0 flex-1 text-zinc-200">{r.name}</span>
+            <span className="shrink-0 text-right text-[13px] text-zinc-300">{r.value}</span>
           </li>
         ))}
       </ul>
-      {props.statsHint ? <p className="mt-2 text-[11px] text-zinc-600">{props.statsHint}</p> : null}
+      {props.statsHint ? <p className="mt-2 text-[13px] text-zinc-500">{props.statsHint}</p> : null}
     </section>
   );
 }

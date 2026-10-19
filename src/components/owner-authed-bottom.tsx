@@ -28,16 +28,16 @@ export function OwnerAuthedBottom(props: {
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex w-full items-center justify-between px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]"
+          className="flex w-full items-center justify-between px-4 py-3 text-left text-[13px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]"
         >
           Statistik 14 hari · perangkat · halaman · sumber
-          <span className="text-zinc-600">{open ? "-" : "+"}</span>
+          <span className="text-zinc-500">{open ? "-" : "+"}</span>
         </button>
         {open ? (
           <div className="flex flex-col gap-3 border-t border-white/[0.06] p-2 sm:p-3">
       {days.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Grafik 14 hari (WIB)</h2>
+                <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Kunjungan halaman 14 hari (WIB)</h2>
                 <div className="mt-3">
                   <OwnerChart days={days} />
                 </div>
@@ -46,13 +46,13 @@ export function OwnerAuthedBottom(props: {
 
             {days.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Riwayat 14 hari</h2>
+                <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Riwayat 14 hari</h2>
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="text-[11px] uppercase tracking-wide text-zinc-600">
+                    <thead className="text-[13px] uppercase tracking-wide text-zinc-500">
                       <tr>
                         <th className="pb-2 font-medium">Hari</th>
-                        <th className="pb-2 text-right font-medium">Tayang</th>
+                        <th className="pb-2 text-right font-medium">Kunjungan</th>
                         <th className="pb-2 text-right font-medium">Unik</th>
                         <th className="pb-2 text-right font-medium">Puncak</th>
                       </tr>
@@ -62,7 +62,7 @@ export function OwnerAuthedBottom(props: {
                         <tr key={row.day} className="border-t border-white/[0.06]">
                           <td className="py-2 text-zinc-300">
                             {dayLabel(row.day, i)}
-                            <span className="ml-2 text-[11px] text-zinc-600">{row.day}</span>
+                            <span className="ml-2 text-[13px] text-zinc-500">{row.day}</span>
                           </td>
                           <td className="py-2 text-right tabular-nums text-zinc-200">{fmt(row.views)}</td>
                           <td className="py-2 text-right tabular-nums text-zinc-400">{fmt(row.unique)}</td>
@@ -77,7 +77,7 @@ export function OwnerAuthedBottom(props: {
 
             {devices.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Perangkat hari ini (WIB)</h2>
+                <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Perangkat hari ini (WIB)</h2>
                 <ul className="mt-3 space-y-2">
                   {devices.map((d) => (
                     <li key={d.device} className="flex items-center gap-3 text-sm">
@@ -96,12 +96,12 @@ export function OwnerAuthedBottom(props: {
 
             {stats?.topPaths?.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Halaman hari ini (WIB)</h2>
+                <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Halaman hari ini (WIB)</h2>
                 <ul className="mt-3 space-y-2 text-sm">
                   {stats.topPaths.slice(0, 8).map((row) => (
                     <li key={row.path} className="flex justify-between gap-3">
                       <span className="truncate text-zinc-300">{row.path}</span>
-                      <span className="tabular-nums text-zinc-500">{fmt(row.views)}</span>
+                      <span className="tabular-nums text-zinc-400">{fmt(row.views)}</span>
                     </li>
                   ))}
                 </ul>
@@ -110,12 +110,12 @@ export function OwnerAuthedBottom(props: {
 
             {stats?.topRefs?.length ? (
               <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
-                <h2 className="text-[11px] uppercase tracking-[0.16em] text-zinc-500">Sumber hari ini (WIB)</h2>
+                <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Sumber hari ini (WIB)</h2>
                 <ul className="mt-3 space-y-2 text-sm">
                   {stats.topRefs.slice(0, 6).map((row) => (
                     <li key={row.ref} className="flex justify-between gap-3">
                       <span className="truncate text-zinc-300">{row.ref}</span>
-                      <span className="tabular-nums text-zinc-500">{fmt(row.views)}</span>
+                      <span className="tabular-nums text-zinc-400">{fmt(row.views)}</span>
                     </li>
                   ))}
                 </ul>
