@@ -62,11 +62,11 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     title: `Video Colmek Indo Viral Terbaru ${YEAR} | ${TITLE_SUFFIX}`,
     description: `Video colmek indo viral terbaru ${YEAR}: VCS dan rekaman pribadi yang lagi rame, langsung putar tanpa download.`,
   },
-  abg: {
-    h1: "Video Muda 18+ Terbaru",
-    intro: "Koleksi video muda 18+ pilihan, update terus.",
-    title: `Video Muda 18+ Terbaru ${YEAR} | ${TITLE_SUFFIX}`,
-    description: `Video muda 18+ terbaru ${YEAR}, langsung putar di HP.`,
+  "teen-18": {
+    h1: "Video Teen (18+) Terbaru",
+    intro: "Koleksi video Teen (18+): semua pemeran sudah dewasa, 18 tahun ke atas. Update terus.",
+    title: `Video Teen (18+) Terbaru ${YEAR} | ${TITLE_SUFFIX}`,
+    description: `Video Teen (18+) terbaru ${YEAR}, semua pemeran 18 tahun ke atas. Langsung putar di HP.`,
   },
   istri: {
     h1: "Bokep Istri Orang Viral",
@@ -122,11 +122,11 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     title: `Bokep Bule Terbaru ${YEAR} - Video Barat Pilihan | ${TITLE_SUFFIX}`,
     description: `Bokep bule terbaru ${YEAR}: video barat pilihan dan bule sama cewek asia, langsung putar di HP.`,
   },
-  mahasiswi: {
-    h1: "Bokep Mahasiswi Indo Viral",
-    intro: "Video mahasiswi dan anak kampus indo yang lagi viral, rekaman asli yang paling dicari.",
-    title: `Bokep Mahasiswi Indo Viral Terbaru ${YEAR} | ${TITLE_SUFFIX}`,
-    description: `Bokep mahasiswi indo viral terbaru ${YEAR}: rekaman anak kampus yang lagi rame, tonton langsung di HP.`,
+  "college-18": {
+    h1: "Bokep College (18+) Indo Viral",
+    intro: "Video College (18+): mahasiswi dan cewek kuliahan indo yang lagi viral, semua 18 tahun ke atas.",
+    title: `Bokep College (18+) Indo Viral Terbaru ${YEAR} | ${TITLE_SUFFIX}`,
+    description: `Bokep College (18+) indo viral terbaru ${YEAR}: mahasiswi dan cewek kuliahan yang lagi rame, tonton langsung di HP.`,
   },
   sepong: {
     h1: "Bokep Sepong Indo Viral",

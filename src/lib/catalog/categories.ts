@@ -14,7 +14,7 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "percakapan", label: "Percakapan", query: "percakapan" },
   { slug: "kosan", label: "Kosan", query: "kosan" },
   { slug: "colmek", label: "Colmek", query: "colmek" },
-  { slug: "abg", label: "Muda 18+", query: "abg" },
+  { slug: "teen-18", label: "Teen (18+)", query: "teen-18" },
   { slug: "istri", label: "Istri", query: "istri" },
   { slug: "live", label: "Live", query: "live" },
   { slug: "doggy", label: "Doggy", query: "doggy" },
@@ -24,7 +24,7 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "gangbang", label: "Threesome & Gangbang", query: "gangbang" },
   { slug: "selingkuh", label: "Selingkuh", query: "selingkuh" },
   { slug: "barat", label: "Bule", query: "barat" },
-  { slug: "mahasiswi", label: "Mahasiswi", query: "mahasiswi" },
+  { slug: "college-18", label: "College (18+)", query: "college-18" },
   { slug: "sepong", label: "Sepong", query: "sepong" },
   { slug: "tobrut", label: "Tobrut", query: "tobrut" },
   { slug: "selebgram", label: "Selebgram", query: "selebgram" },
@@ -41,8 +41,15 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "bokep", label: "Koleksi Dr. Pinguin Bokep", query: "bokep" },
 ];
 
-/** Kategori yang tidak dipromosikan publik (slug ber-istilah minor): keluar dari menu/sitemap, noindex. */
-export const UNLISTED_CATEGORY_SLUGS = new Set<string>(["abg"]);
+/** Kategori yang tidak dipromosikan publik: keluar dari menu/sitemap, noindex. (Kosong sejak abg -> teen-18.) */
+export const UNLISTED_CATEGORY_SLUGS = new Set<string>([]);
+
+/**
+ * Old category slugs (big-tube rename 2026-10-20, owner decision): /kategori/<old> answers 301 to the
+ * new slug, and every stored / bot / source value with the old name still lands in the new category.
+ * The title classifier keeps its internal keys "abg" / "mahasiswi"; slugOf() maps them here.
+ */
+export const LEGACY_CATEGORY_SLUGS: Record<string, string> = { abg: "teen-18", mahasiswi: "college-18" };
 
 export const CATEGORY_LIST: CategoryInfo[] = CATEGORIES.filter((c) => !UNLISTED_CATEGORY_SLUGS.has(c.slug)).map(
   ({ slug, label }) => ({ slug, label }),
@@ -83,5 +90,7 @@ export function findCategory(slug: string | null | undefined): CategoryDef | und
   if (key === "streamtape" || key === "streampie") {
     return CATEGORIES.find((c) => c.slug === "ai-plus");
   }
+  const legacy = LEGACY_CATEGORY_SLUGS[key];
+  if (legacy) return CATEGORIES.find((c) => c.slug === legacy);
   return CATEGORIES.find((c) => c.slug === key);
 }

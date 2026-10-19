@@ -1,11 +1,11 @@
 import { categorySeo } from "@/lib/catalog/category-seo";
 import { useEffect } from "react";
-import { Link, createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
+import { Link, createFileRoute, notFound, redirect, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { CatalogPager } from "@/components/video/catalog-pager";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
-import { UNLISTED_CATEGORY_SLUGS, findCategory } from "@/lib/catalog/categories";
+import { LEGACY_CATEGORY_SLUGS, UNLISTED_CATEGORY_SLUGS, findCategory } from "@/lib/catalog/categories";
 import { SafeBoundary } from "@/components/safe-boundary";
 import { rememberCatalog } from "@/lib/catalog/last-catalog";
 import { queryCatalog } from "@/lib/catalog/service";
@@ -38,7 +38,18 @@ export const Route = createFileRoute("/kategori/$slug")({
     page: parsePage(search.page),
     periode: parsePeriode(search.periode),
   }),
-  beforeLoad: ({ params }) => {
+  beforeLoad: ({ params, search }) => {
+    // Renamed categories (abg -> teen-18, mahasiswi -> college-18): permanent redirect, page kept.
+    const renamed = LEGACY_CATEGORY_SLUGS[String(params.slug || "").trim().toLowerCase()];
+    if (renamed) {
+      throw redirect({
+        to: "/kategori/$slug",
+        params: { slug: renamed },
+        search: { page: search.page, periode: undefined },
+        replace: true,
+        statusCode: 301,
+      });
+    }
     if (findRanking(params.slug)) return { cat: undefined };
     const cat = findCategory(params.slug);
     if (!cat) throw notFound();

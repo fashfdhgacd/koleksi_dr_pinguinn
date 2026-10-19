@@ -1,6 +1,6 @@
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
-import { findCategory } from "./categories";
+import { LEGACY_CATEGORY_SLUGS, findCategory } from "./categories";
 import {
   GENERIC_CATEGORY_SLUGS,
   RAW_CATEGORY_ALIASES,
@@ -223,7 +223,12 @@ export function classify(title: string): string {
     return "amatir";
   return "lainnya";
 }
+/** Public category slug of an item (internal classifier keys like "abg" mapped to their current slug). */
 export function slugOf(item: RawItem): string {
+  const s = slugOfRaw(item);
+  return LEGACY_CATEGORY_SLUGS[s] || s;
+}
+function slugOfRaw(item: RawItem): string {
   if (isVidey(item)) return "videy";
   if (isDrpBokep(item)) return DRP_CATEGORY;
   const raw = (item.category || "").toLowerCase().trim();
@@ -238,7 +243,8 @@ export function slugOf(item: RawItem): string {
   const mapped = raw && raw !== "lainnya" && !isSoft ? findCategory(raw) : undefined;
   if (mapped && mapped.slug !== "lainnya") {
     // Explicit categories stay; only the generic / unlisted buckets can be refined.
-    return mapped.slug === "amatir" || mapped.slug === "abg" ? refineCategory(mapped.slug, title) : mapped.slug;
+    if (mapped.slug === "teen-18") return refineCategory("abg", title);
+    return mapped.slug === "amatir" ? refineCategory(mapped.slug, title) : mapped.slug;
   }
   const base = classify(title);
   if (!GENERIC_CATEGORY_SLUGS.has(base)) return refineCategory(base, title);
