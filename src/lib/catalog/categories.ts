@@ -37,6 +37,8 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "ojol", label: "Ojol", query: "ojol" },
   { slug: "lainnya", label: "Lainnya", query: "lainnya" },
   { slug: "videy", label: "drpinguin videy", query: "videy" },
+  // Owner's own LuluStream / DoodStream / Byse uploads (src/lib/catalog/drp-hosts.js).
+  { slug: "bokep", label: "Koleksi Dr. Pinguin Bokep", query: "bokep" },
 ];
 
 /** Kategori yang tidak dipromosikan publik (slug ber-istilah minor): keluar dari menu/sitemap, noindex. */

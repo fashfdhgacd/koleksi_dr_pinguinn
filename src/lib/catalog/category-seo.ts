@@ -200,6 +200,12 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     title: `Video Viral Videy Terbaru ${YEAR} - Link Videy Indo | ${TITLE_SUFFIX}`,
     description: `Video viral videy terbaru ${YEAR}: kumpulan link videy dan bokep videy indo yang lagi rame, bisa langsung ditonton di HP tanpa buka link satu-satu.`,
   },
+  bokep: {
+    h1: "Koleksi Dr. Pinguin Bokep",
+    intro: "Koleksi pribadi Dr. Pinguin: bokep indo pilihan yang diunggah sendiri, langsung putar di HP tanpa download. Nambah terus tiap ada video baru.",
+    title: `Koleksi Dr. Pinguin Bokep Terbaru ${YEAR} - Bokep Indo Pilihan | ${TITLE_SUFFIX}`,
+    description: `Koleksi Dr. Pinguin Bokep terbaru ${YEAR}: bokep indo pilihan yang diunggah sendiri, langsung tonton di HP tanpa download.`,
+  },
 };
 
 export function categorySeo(slug: string): CategorySeo {

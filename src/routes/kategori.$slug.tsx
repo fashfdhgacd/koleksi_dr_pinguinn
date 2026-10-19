@@ -61,7 +61,7 @@ export const Route = createFileRoute("/kategori/$slug")({
     const page = parsePage(raw.page) || 1;
     return queryCatalog({ type: "category", category: cat.slug, page, limit: DEFAULT_PAGE_SIZE });
   },
-  head: ({ params, match }) => {
+  head: ({ params, match, loaderData }) => {
     const rank = findRanking(params.slug);
     const cat = rank ? undefined : findCategory(params.slug);
     const page = typeof match.search.page === "number" ? match.search.page : 1;
@@ -70,6 +70,10 @@ export const Route = createFileRoute("/kategori/$slug")({
     // A period tab without data yet (Minggu/Bulan ini "segera"): noindex,follow + canonical to the
     // Sepanjang-masa page. Becomes indexable automatically once rank-periods-meta.json has the period.
     const emptyPeriod = Boolean(rank && periode && !rankPeriodAvailable(rank.kind, periodFromKey(periode).period));
+    // A plain category without any video yet (e.g. a new one before its first upload): noindex,follow
+    // so Google does not index a thin page. Indexable automatically from the first video.
+    const ld = loaderData as { ok?: boolean; type?: string; total?: number } | undefined;
+    const emptyCategory = Boolean(!rank && cat && ld && ld.ok && ld.type === "category" && ld.total === 0);
     const qs = new URLSearchParams();
     if (periode && !emptyPeriod) qs.set("periode", periode);
     if (page > 1 && !emptyPeriod) qs.set("page", String(page));
@@ -83,7 +87,7 @@ export const Route = createFileRoute("/kategori/$slug")({
         { property: "og:url", content: url },
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
-        ...(emptyPeriod || page > DEEP_PAGE_NOINDEX
+        ...(emptyPeriod || emptyCategory || page > DEEP_PAGE_NOINDEX
           ? [
               { name: "robots", content: "noindex,follow" },
               { name: "googlebot", content: "noindex,follow" },
@@ -305,7 +309,25 @@ function PlainCategoryPage({ slug }: { slug: string }) {
         ) : feed.error && !feed.items.length ? (
           <ErrorState message={feed.error} onRetry={feed.retry} />
         ) : !feed.items.length ? (
-          <EmptyState title="Kosong" description="Belum ada video di kategori ini." />
+          page > 1 ? (
+            <EmptyState title="Kosong" description="Belum ada video di halaman ini." />
+          ) : (
+            <div>
+              <EmptyState
+                title="Video segera hadir"
+                description="Kategori ini baru dibuka. Videonya lagi disiapin, cek lagi sebentar lagi ya."
+              />
+              <div className="-mt-12 flex justify-center pb-12">
+                <Link
+                  to="/"
+                  search={{ q: undefined, category: undefined }}
+                  className="pixel inline-flex h-9 items-center rounded-none border border-white/35 px-3 text-[11px] text-white/80 hover:border-white/80 hover:text-white sm:text-xs"
+                >
+                  Tonton video terbaru dulu
+                </Link>
+              </div>
+            </div>
+          )
         ) : (
           <SafeBoundary>
             <VideoGrid items={feed.items} ads />
