@@ -134,6 +134,27 @@ for (const [msg, host] of msgs) {
   console.log(`${ok ? "OK  " : "FAIL"} pesan ${host}: ${JSON.stringify(v.title)}`);
 }
 
-const total = cases.length + msgs.length;
+// LuluStream mirror domains (luluvido.com share links, /d/ /e/ /<code>) -> same lu-<code> id, luluvdo.com embed
+const luluLinks = [
+  ["https://luluvido.com/d/mgul1d816cvk", "mgul1d816cvk"],
+  ["https://luluvido.com/d/8j2mu6sd5638", "8j2mu6sd5638"],
+  ["https://luluvido.com/mgul1d816cvk", "mgul1d816cvk"],
+  ["https://luluvido.com/e/mgul1d816cvk", "mgul1d816cvk"],
+  ["https://www.luluvido.com/d/mgul1d816cvk", "mgul1d816cvk"],
+  ["https://lulustream.com/mgul1d816cvk", "mgul1d816cvk"],
+  ["https://lulustream.com/e/mgul1d816cvk", "mgul1d816cvk"],
+  ["https://luluvdo.com/e/mgul1d816cvk", "mgul1d816cvk"],
+  ["https://luluvdo.com/d/mgul1d816cvk", "mgul1d816cvk"],
+  ["https://lulu.st/mgul1d816cvk", "mgul1d816cvk"],
+  ["https://luluvid.com/e/mgul1d816cvk", "mgul1d816cvk"],
+];
+for (const [url, code] of luluLinks) {
+  const v = parseMessage(`${url} ${CJK}`).videos[0] || {};
+  const ok = v.host === "lulu" && v.id === `lu-${code}` && v.embed === `https://luluvdo.com/e/${code}` && v.title === CJK;
+  if (!ok) fail++;
+  console.log(`${ok ? "OK  " : "FAIL"} lulu ${url} -> ${v.id} ${v.embed}`);
+}
+
+const total = cases.length + msgs.length + luluLinks.length;
 console.log(`\n${total - fail}/${total} lulus`);
 process.exit(fail ? 1 : 0);

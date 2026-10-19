@@ -17,10 +17,15 @@ export const DRP_SOURCES = { lulu: "LuluStream", dood: "DoodStream", byse: "Byse
 
 export const DRP_ID_PREFIX = { lulu: "lu-", dood: "dd-", byse: "by-" };
 
-/** LuluStream player + panel domains. luluvdo.com is the embed host (lulustream.com/e/ redirects there). */
+/**
+ * LuluStream player + panel domains. luluvdo.com is the embed host (lulustream.com/e/ redirects there).
+ * Any lulu<v…|stream…>.<tld> mirror also matches (LULU_MIRROR_RE), e.g. luluvido.com (share links
+ * https://luluvido.com/d/<code>, seen 2026-10-19).
+ */
 export const LULU_DOMAINS = [
   "luluvdo.com",
   "luluvdoo.com",
+  "luluvido.com",
   "lulustream.com",
   "lulustream.co",
   "luluvid.com",
@@ -69,6 +74,9 @@ export const BYSE_DOMAINS = [
   "bysezoxexe.com",
 ];
 
+/** LuluStream mirror family: luluvdo / luluvido / luluvid / lulustream on any TLD (and subdomains). */
+const LULU_MIRROR_RE = /^(?:[a-z0-9-]+\.)*lulu(?:v[a-z0-9]*|stream[a-z0-9]*)\.[a-z]{2,}$/;
+
 /** @param {unknown} hostname */
 function bareHost(hostname) {
   return String(hostname || "")
@@ -90,7 +98,7 @@ function inList(host, list) {
 export function drpKindOfHost(hostname) {
   const h = bareHost(hostname);
   if (!h) return "";
-  if (inList(h, LULU_DOMAINS)) return "lulu";
+  if (inList(h, LULU_DOMAINS) || LULU_MIRROR_RE.test(h)) return "lulu";
   if (inList(h, DOOD_DOMAINS) || /^(?:[a-z0-9-]+\.)*dood[a-z0-9]*\.[a-z]{2,}$/.test(h)) return "dood";
   if (inList(h, BYSE_DOMAINS) || /^(?:[a-z0-9-]+\.)*byse[a-z0-9]*\.[a-z]{2,}$/.test(h)) return "byse";
   return "";
