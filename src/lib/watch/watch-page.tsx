@@ -14,6 +14,7 @@ import { cleanDisplayTitle } from "@/lib/seo";
 import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { CatalogBackLink } from "@/components/video/catalog-back-link";
 import { WatchStats } from "@/components/video/watch-stats";
+import { DRP_CATEGORY, DRP_SOURCES, drpKindOfUrl } from "@/lib/catalog/drp-hosts.js";
 
 const routeApi = getRouteApi("/watch/$id");
 const SHARE_CARD_VERSION = "13";
@@ -37,6 +38,19 @@ const VIDEY_LABEL = "drpinguin videy";
 /** Videy plays in VideyPlayer (own HTML5 player) and has no "Buka Sumber". */
 function isVideyItem(item: VideoDetail): boolean {
   return item.creator === "Videy" || item.category === "videy";
+}
+
+const DRP_LABELS = new Set<string>(Object.values(DRP_SOURCES));
+
+/**
+ * Koleksi Dr. Pinguin Bokep (owner's own Byse / DoodStream / LuluStream uploads) has no "Buka Sumber"
+ * either: category "bokep", bot ids lu- / dd- / by-, or an embed on one of those hosts.
+ */
+function isDrpHostItem(item: VideoDetail): boolean {
+  if (item.category === DRP_CATEGORY) return true;
+  if (/^(?:by|lu|dd)-/i.test(String(item.id || ""))) return true;
+  if (DRP_LABELS.has(String(item.creator || ""))) return true;
+  return [item.video_url, ...item.qualities.map((q) => q.url)].some((u) => Boolean(u && drpKindOfUrl(u)));
 }
 
 function catalogPlayUrl(item: VideoDetail): string {
@@ -341,7 +355,7 @@ export function WatchPage() {
               >
                 Bagikan
               </button>
-              {isVideyItem(item) ? null : <button
+              {isVideyItem(item) || isDrpHostItem(item) ? null : <button
                 type="button"
                 className="h-12 min-w-[140px] rounded-xl bg-secondary px-5 text-base font-medium text-foreground active:scale-[0.98] disabled:opacity-50"
                 disabled={!catalogPlayUrl(item)}
