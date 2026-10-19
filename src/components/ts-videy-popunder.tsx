@@ -13,6 +13,15 @@ const DOMAIN = "fozekikikiminu.com";
 const KEY = "kdp_ts_pop_ids";
 const TAG_ID = "kdp-ts-popunder";
 let memory: string[] = [];
+let currentId = "";
+let listening = false;
+
+// The SDK opens on the first tap anywhere, sometimes before React's handler runs, and the opened
+// tab copies sessionStorage at that moment. So the id is recorded in a window capture listener
+// (runs before the SDK's own listener) and the new tab already knows this video has fired.
+function onFirstTap(): void {
+  if (currentId) markVideyPopunderTap(currentId);
+}
 
 function firedIds(): string[] {
   try {
@@ -34,7 +43,13 @@ function saveIds(ids: string[]): void {
 
 export function armVideyPopunder(videoId: string): void {
   if (typeof document === "undefined" || !videoId) return;
+  currentId = videoId;
   if (firedIds().includes(videoId)) return;
+  if (!listening) {
+    listening = true;
+    window.addEventListener("pointerdown", onFirstTap, true);
+    window.addEventListener("click", onFirstTap, true);
+  }
   if (document.getElementById(TAG_ID)) return;
   const s = document.createElement("script");
   s.id = TAG_ID;
