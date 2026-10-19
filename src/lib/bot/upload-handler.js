@@ -13,6 +13,7 @@ import { upsertVideosBatch } from "@/lib/bot/github.js";
 import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
 import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
 import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import { uploadRejectReason, uploadWarnReason } from "@/lib/bot/title-guard.js";
 
 /** Owner's own LuluStream / DoodStream / Byse uploads ("byse-probe" = Byse on a not-yet-listed domain). */
 const DRP_HOSTS = new Set(["lulu", "dood", "byse", "byse-probe"]);
@@ -233,6 +234,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   let createdTotal = 0;
   let skippedTotal = 0;
   let failedTotal = 0;
+  let rejectedTotal = 0;
   const posterBatch = {};
 
   const queue = [];
@@ -330,6 +332,14 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
       };
       if (meta.titleAuto) autoTitled.add(i);
     }
+    // Explicit minor wording (typed or from the host): never saved, the owner is told why.
+    const guardText = `${String(video.title || parsedMsg.title || "")} ${String(meta.title || "")}`;
+    const rejectReason = uploadRejectReason(guardText);
+    if (rejectReason) {
+      rejectedTotal += 1;
+      lines.push(`⛔ ${video.id}: Ditolak: judul nyebut "${rejectReason}". Video nggak dimasukin ke web.`);
+      continue;
+    }
     // Judul dasar (branding situs lain + pinguin lama sudah dibuang) untuk kategori & filter minor;
     // yang disimpan/ditampilkan: judul dasar + tepat satu " - koleksidrpinguin.com" (keputusan pemilik).
     const baseTitle = cleanTitle(meta.title || `Video ${video.id}`);
@@ -371,9 +381,10 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
       : deadVidey.has(i)
         ? { ...flagged, hidden: true, hidden_reason: DEAD_VIDEY_REASON }
         : flagged;
+    const warn = uploadWarnReason(`${guardText} ${baseTitle}`);
     const fileName = video.file || "videos.json";
     const list = byFile.get(fileName) || [];
-    list.push({ video, title, record });
+    list.push({ video, title, record, warn });
     byFile.set(fileName, list);
   }
 
@@ -411,6 +422,11 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
                 ? `🕒 ${it.record.id} — ${it.title} · disembunyikan: video mati`
                 : `🕒 ${it.record.id} — ${it.title} (antre, tayang saat flush berikutnya)`,
             );
+            if (it.warn && !it.record.hidden) {
+              lines.push(
+                `⚠️ Masuk, tapi judulnya nyebut "${it.warn}". Cek dulu ya, kalau kesannya di bawah umur, nggak sadar, atau dipaksa, mending disembunyiin.`,
+              );
+            }
           } else {
             keep.push(it);
           }
@@ -447,6 +463,11 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
           lines.push(
             `✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}${it.record.hidden_reason === DEAD_VIDEY_REASON ? " · disembunyikan: video mati" : it.record.hidden ? " · 🙈 disembunyikan (judul menyiratkan minor/sekolah)" : ""}`,
           );
+          if (it.warn && !it.record.hidden) {
+            lines.push(
+              `⚠️ Masuk, tapi judulnya nyebut "${it.warn}". Cek dulu ya, kalau kesannya di bawah umur, nggak sadar, atau dipaksa, mending disembunyiin.`,
+            );
+          }
         } else {
           lines.push(`⏭️ ${it.record.id} — ${it.title} (sudah ada)`);
         }
@@ -479,7 +500,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     }
   }
 
-  const summary = `✅ ${createdTotal} dibuat · ⏭️ ${skippedTotal} skip · ⚠️ ${failedTotal} gagal${queuedTotal ? ` · 🕒 ${queuedTotal} antre` : ""}`;
+  const summary = `✅ ${createdTotal} dibuat · ⏭️ ${skippedTotal} skip · ⚠️ ${failedTotal} gagal${queuedTotal ? ` · 🕒 ${queuedTotal} antre` : ""}${rejectedTotal ? ` · ⛔ ${rejectedTotal} ditolak` : ""}`;
   await tgSendChunks(
     token,
     chatId,

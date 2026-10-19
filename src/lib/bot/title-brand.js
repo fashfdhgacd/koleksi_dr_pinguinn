@@ -250,14 +250,14 @@ function stripLeading(t) {
 }
 
 /**
- * Kata usia ala aturan Pornhub: "teen/teens", "ABG", "remaja", "belia" -> "18+" (pemeran dewasa).
+ * Kata usia ala aturan Pornhub: "teen/teens/teenager(s)", "ABG", "remaja", "belia" -> "18+" (pemeran dewasa).
  * "Cewek ABG" -> "Cewek 18+", "ABG Hijab" -> "Cewek 18+ Hijab". Idempotent.
  */
 export function adultAgeWording(raw = "") {
   return String(raw ?? "")
-    .replace(/\b(cewek|cewe|cwe|gadis|girl)\s+(?:abg|teens?|remaja|belia)\b/gi, "$1 18+")
+    .replace(/\b(cewek|cewe|cwe|gadis|girl)\s+(?:abg|teens?|teenagers?|remaja|belia)\b/gi, "$1 18+")
     .replace(/\babg\b/gi, "Cewek 18+")
-    .replace(/\b(?:teens?|remaja|belia)\b/gi, "18+")
+    .replace(/\b(?:teenagers?|teens?|remaja|belia)\b/gi, "18+")
     .replace(/18\+(?:\s+18\+)+/g, "18+")
     .replace(/\s+/g, " ")
     .trim();
