@@ -36,8 +36,13 @@ function toSitemapLastmod(raw: unknown): string | undefined {
  * live, jadi upload baru (Videy juga) otomatis masuk; respons sitemap di-cache 1 jam.
  * Tidak memfilter silo (JAV/AI+/Indo) — GSC butuh daftar URL lengkap.
  */
+/** Entries per catalog build (the items array changes only on a rebuild); callers only read them. */
+const memo = new WeakMap<object, SitemapWatchEntry[]>();
+
 export async function listSitemapWatchEntries(): Promise<SitemapWatchEntry[]> {
   const { items } = await loadItems();
+  const hit = memo.get(items);
+  if (hit) return hit;
   const seen = new Set<string>();
   const out: SitemapWatchEntry[] = [];
   for (const it of items) {
@@ -66,5 +71,6 @@ export async function listSitemapWatchEntries(): Promise<SitemapWatchEntry[]> {
     if (da !== db) return db.localeCompare(da);
     return a.id.localeCompare(b.id);
   });
+  memo.set(items, out);
   return out;
 }

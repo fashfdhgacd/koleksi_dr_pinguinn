@@ -11,7 +11,9 @@ function statusFor(code: string | undefined, ok: boolean): number {
 function cacheControl(ok: boolean, type: string | null): string {
   if (!ok) return "private, no-store";
   if (type === "search") {
-    return "public, max-age=30, s-maxage=60, stale-while-revalidate=300";
+    // Edge 10 min like the other catalog JSON (was 60 s): new uploads arrive with a deploy, which
+    // starts a new edge cache key anyway (scripts/cf-worker-entry.mjs), so this only saves re-renders.
+    return "public, max-age=60, s-maxage=600, stale-while-revalidate=3600";
   }
   if (type === "detail" || type === "related") {
     return "public, max-age=120, s-maxage=600, stale-while-revalidate=86400";
