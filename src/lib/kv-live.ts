@@ -8,9 +8,11 @@
  * this roll is only used as a fallback for the top lists.
  *
  * KV write budget (Oct 2026: the free 1M writes/month ran out): when the D1 binding ANALYTICS_DB is
- * ready, presence lives in D1 analytics_sessions (touchOnline), so no online:<id> key is written and
- * no KV list() is made per heartbeat, and the roll is flushed at most once per ROLL_FLUSH_D1_MS per
- * isolate. Without D1 everything works exactly as before (KV presence + 20 s roll flush).
+ * ready, presence lives in D1 analytics_sessions (touchOnline) and the owner top lists come from D1
+ * analytics_events, so kvTouchLive does nothing at all: no online:<id> key, no KV list(), no roll.
+ * (The roll used to be flushed once per isolate on its first pageview, i.e. one KV write for every
+ * new Workers isolate, which was the bulk of the ~30k KV writes a day left after the D1 move.)
+ * Without D1 everything works exactly as before (KV presence + 20 s roll flush).
  */
 
 import { resolveAnalyticsKV, type KVNamespaceLike } from "@/lib/analytics-kv";
@@ -22,8 +24,6 @@ const ROLL_PREFIX = "roll:";
 const ONLINE_TTL_SEC = 180;
 const ROLL_TTL_SEC = 90 * 24 * 3600;
 const FLUSH_MS = 20_000;
-/** Roll flush interval when D1 is the source of truth (the roll is then only a fallback). */
-const ROLL_FLUSH_D1_MS = 60 * 60_000;
 const COUNT_CACHE_MS = 45_000;
 const HISTORY_CACHE_MS = 60_000;
 
@@ -187,20 +187,19 @@ export async function kvTouchLive(input: {
   if (!id) return false;
   let wrote = false;
   try {
+    // D1 holds presence, peak and the top lists: nothing to do in KV.
+    if (await d1Ready()) return false;
     const store = await kv();
     if (!store) return false;
     const now = Date.now();
     const day = dayKey(now);
-    const viaD1 = await d1Ready();
     let onlineNow = Math.max(1, Number(input.onlineGuess) || 0);
-    if (!viaD1) {
-      await store.put(`${ONLINE_PREFIX}${id}`, "1", { expirationTtl: ONLINE_TTL_SEC });
-      wrote = true;
-      // Cached list() (45s) — avoids one KV list per heartbeat. Real peak is
-      // recorded by touchOnline (Postgres sessions / KV daystats).
-      onlineNow = Math.max(onlineNow, await kvCountOnline());
-    }
-    const flushEvery = viaD1 ? ROLL_FLUSH_D1_MS : FLUSH_MS;
+    await store.put(`${ONLINE_PREFIX}${id}`, "1", { expirationTtl: ONLINE_TTL_SEC });
+    wrote = true;
+    // Cached list() (45s) — avoids one KV list per heartbeat. Real peak is
+    // recorded by touchOnline (Postgres sessions / KV daystats).
+    onlineNow = Math.max(onlineNow, await kvCountOnline());
+    const flushEvery = FLUSH_MS;
 
     if (!rollMem || rollDay !== day) {
       // New WIB day: save what is still buffered for the previous day first (one write).

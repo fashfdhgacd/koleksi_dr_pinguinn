@@ -41,8 +41,12 @@ import {
   writeDayStatsKv,
 } from "@/lib/owner-analytics-shared";
 
-/** How often today's KV daystats fallback is refreshed from D1 (whole site, not per isolate). */
-const DAYSTATS_MIRROR_MS = 15 * 60_000;
+/**
+ * How often today's KV daystats fallback is refreshed from D1 (whole site, not per isolate). 60 min
+ * (was 15): it is only a fallback now that D1 also keeps analytics_daily_summary, and KV's ~60 s
+ * read cache let several isolates write it in the same window.
+ */
+const DAYSTATS_MIRROR_MS = 60 * 60_000;
 const mirrorState = globalThis as typeof globalThis & { __kvDayMirrorAt__?: number };
 
 /**
