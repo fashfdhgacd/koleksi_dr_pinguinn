@@ -175,22 +175,31 @@ export async function listCategory(
   limit = DEFAULT_PAGE_SIZE,
   _signal?: AbortSignal,
 ): Promise<PagedVideos> {
-  const { items, posters, videyNo, bySlug, mainSorted, listOrder } = await loadItems();
+  const cache = await loadItems();
+  const { posters, videyNo } = cache;
+  return pageOf(categoryPool(cache, category), page, limit, posters, videyNo);
+}
+
+/**
+ * The list a category page shows (same pool for the page and for its count on /kategori):
+ * mixed order (listOrder: bokep with inserted IndoAV, jav interleave) when there is one, else the
+ * plain category. All lists are built once per catalog build, so this is a Map lookup.
+ */
+function categoryPool(cache: CatalogCache, category: string): RawItem[] {
+  const { items, bySlug, mainSorted, listOrder } = cache;
   const s = category.toLowerCase().trim();
-  let pool: RawItem[];
   const mixed = listOrder?.get(s === "streamtape" ? "ai-plus" : s);
-  if (mixed && mixed.length) {
-    pool = mixed;
-  } else if (s === "jav") {
+  if (mixed && mixed.length) return mixed;
+  if (s === "jav") {
     const hit = bySlug.get("jav");
-    pool = hit && hit.length ? hit : items.filter(isPutarin);
-  } else if (s === "ai-plus" || s === "streamtape") {
+    return hit && hit.length ? hit : items.filter(isPutarin);
+  }
+  if (s === "ai-plus" || s === "streamtape") {
     const hit = bySlug.get("ai-plus");
-    pool = hit && hit.length ? hit : items.filter(isStreamtape);
-  } else if (s === "videy") {
-    pool = bySlug.get("videy") || items.filter(isVidey);
-  } else pool = bySlug.get(s) || mainSorted.filter((x) => slugOf(x) === s);
-  return pageOf(pool, page, limit, posters, videyNo);
+    return hit && hit.length ? hit : items.filter(isStreamtape);
+  }
+  if (s === "videy") return bySlug.get("videy") || items.filter(isVidey);
+  return bySlug.get(s) || mainSorted.filter((x) => slugOf(x) === s);
 }
 
 /**
@@ -284,11 +293,12 @@ export async function listCategories(): Promise<{ slug: string; label: string; c
  * MIN_LISTED_CATEGORY_COUNT videos are left out (their pages still work).
  */
 export async function listListedCategories(): Promise<CategoryInfo[]> {
-  const { bySlug } = await loadItems();
+  const cache = await loadItems();
   const out: CategoryInfo[] = [];
   for (const c of CATEGORY_LIST) {
-    const pool = bySlug.get(c.slug) || [];
-    const count = pool.length;
+    // Same pool as the category page (bokep counts its inserted IndoAV videos, like its page total).
+    // Only known category slugs with videos: no fallback scan for empty ones.
+    const count = cache.bySlug.get(c.slug)?.length ? categoryPool(cache, c.slug).length : 0;
     // Videy is listed from its first video; other categories need MIN_LISTED_CATEGORY_COUNT.
     if (count >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && count > 0)) {
       out.push({ slug: c.slug, label: c.label, count });
