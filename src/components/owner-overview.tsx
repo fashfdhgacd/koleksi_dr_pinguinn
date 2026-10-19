@@ -838,7 +838,7 @@ export function OwnerOverview(props: {
         <p className="mt-3 border-t border-white/[0.06] pt-2 text-[13px] leading-snug text-zinc-400">
           Total klik play {healthMeta.total}: <b className="font-medium text-zinc-200">{fmt(hostRows.reduce((n, h) => n + (Number(h.starts) || 0), 0))}</b>, gagal{" "}
           <b className="font-medium text-zinc-200">{fmt(hostRows.reduce((n, h) => n + (Number(h.fails) || 0), 0))}</b>.
-          Dihitung sekali per video per sesi saat tombol play ditekan (tidak termasuk Videy yang pakai player sendiri); tidak
+          Dihitung sekali per video per sesi saat tombol play ditekan (Videy dihitung mulai 19 Okt malam); tidak
           memastikan videonya benar-benar jalan sampai habis.
         </p>
       ) : null}

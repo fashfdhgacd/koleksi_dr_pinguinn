@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VideoDetail } from "@/lib/catalog/types";
 import { maybeOpenMonetagDirectLink } from "@/lib/ads/monetag";
+import { sendPlayerLog } from "@/lib/player-log-client";
 
 /**
  * Videy player: the cdn mp4 plays straight from Videy in a native <video> (no crossorigin, so
@@ -12,7 +13,21 @@ import { maybeOpenMonetagDirectLink } from "@/lib/ads/monetag";
  * Monetag direct link (src/lib/ads/monetag.ts): a play tap (the poster overlay, or the native play
  * control after a pause) opens it in a new tab, at most 3 times per session and 20 s apart; the video
  * keeps playing here.
+ *
+ * Kesehatan player (/pemilik): the same /api/player-log beacons as the other hosts, once per video
+ * per session (src/lib/player-log-client.ts), host "Videy":
+ *  start2  the poster tap
+ *  fail2   the <video> reports an error before the first frame, or the visitor leaves 20-60 s after
+ *          the tap without a first frame
+ *  slow2   the first frame came only after 20 s, or the visitor stayed 60 s+ without one
+ * Same 20 s / 60 s rule as the iframe hosts in player.tsx. An error after the video already played
+ * (e.g. a network drop mid-video) is not counted as a failed start.
  */
+
+/** Ms without a first frame before a play counts as slow (same as player.tsx SLOW_HINT_MS). */
+const SLOW_MS = 20000;
+/** Visitor stayed this long without a first frame: slow, not failed (player.tsx STAYED_MS). */
+const STAYED_MS = 60000;
 
 function videyFileOf(item: VideoDetail): string {
   const urls = [item.video_url, ...item.qualities.map((q) => q.url)].filter((u): u is string => Boolean(u));
@@ -36,11 +51,24 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
   const [phase, setPhase] = useState<Phase>("idle");
   const file = videyFileOf(item);
   const poster = item.thumbnail || undefined;
+  // This play's log state: tap time, first frame seen, already settled (slow2/fail2 sent).
+  const track = useRef({ startedAt: 0, alive: false, settled: false });
+
+  const settle = useCallback(
+    (event: "slow2" | "fail2") => {
+      const t = track.current;
+      if (!t.startedAt || t.settled) return;
+      t.settled = true;
+      sendPlayerLog(item.id, "Videy", event);
+    },
+    [item.id],
+  );
 
   // New video (SPA navigation, e.g. Tonton juga): the old video is stopped and unloaded,
   // back to the poster.
   useEffect(() => {
     setPhase("idle");
+    track.current = { startedAt: 0, alive: false, settled: false };
     const v = videoRef.current;
     if (v) {
       v.pause();
@@ -102,6 +130,47 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     };
   }, []);
 
+  // Kesehatan player: first frame / error before it / leaving without one (see the header).
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const onAlive = () => {
+      const t = track.current;
+      if (!t.startedAt || t.alive) return;
+      t.alive = true;
+      if (Date.now() - t.startedAt >= SLOW_MS) settle("slow2");
+    };
+    const onError = () => {
+      const t = track.current;
+      // Only this play's file (unloading on a video change also raises "error"), before any frame.
+      if (!t.startedAt || t.alive || !v.error || !v.getAttribute("src")) return;
+      settle("fail2");
+    };
+    const onLeave = () => {
+      const t = track.current;
+      if (!t.startedAt || t.alive || t.settled) return;
+      const elapsed = Date.now() - t.startedAt;
+      if (elapsed < SLOW_MS) return;
+      settle(elapsed >= STAYED_MS ? "slow2" : "fail2");
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") onLeave();
+    };
+    v.addEventListener("playing", onAlive);
+    v.addEventListener("timeupdate", onAlive);
+    v.addEventListener("error", onError);
+    window.addEventListener("pagehide", onLeave);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      v.removeEventListener("playing", onAlive);
+      v.removeEventListener("timeupdate", onAlive);
+      v.removeEventListener("error", onError);
+      window.removeEventListener("pagehide", onLeave);
+      document.removeEventListener("visibilitychange", onVisibility);
+      onLeave(); // SPA navigation to another video
+    };
+  }, [item.id, settle]);
+
   // Resume taps on the native controls (after a pause / at the end). The play() started by the
   // poster tap itself is skipped: that tap already had its chance in start().
   const skipNextPlay = useRef(false);
@@ -123,6 +192,8 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     if (phase !== "idle") return;
     // Synchronously inside the tap, so popup blockers allow the new tab.
     maybeOpenMonetagDirectLink();
+    track.current = { startedAt: Date.now(), alive: false, settled: false };
+    sendPlayerLog(item.id, "Videy", "start2");
     skipNextPlay.current = true;
     setPhase("main");
     const v = videoRef.current;
@@ -132,7 +203,7 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     v.src = file;
     v.controls = true;
     void v.play().catch(() => undefined);
-  }, [phase, file]);
+  }, [phase, file, item.id]);
 
   return (
     <div
