@@ -5,18 +5,28 @@ import { Link } from "@tanstack/react-router";
 import {
   loadSecret,
   saveSecret,
-  deltaPct,
-  POLL_MS,
+  ownerToast,
+  OwnerToaster,
+  REFRESH_MIN_GAP_MS,
+  wibHourMinute,
   type OwnerStats,
 } from "@/components/owner-dashboard-shared";
 import { OwnerLoginForm } from "@/components/owner-login-form";
-import { OwnerAuthedTop } from "@/components/owner-authed-top";
+import { OwnerOverview } from "@/components/owner-overview";
 import { OwnerTools } from "@/components/owner-tools";
+import { OwnerVideyUntitled } from "@/components/owner-videy-untitled";
 import { OwnerAuthedBottom } from "@/components/owner-authed-bottom";
 import { HiddenListSection } from "@/components/owner-hidden-list";
 import { OwnerTelegramStatus } from "@/components/owner-telegram-status";
+import type { PlayerLogData } from "@/components/owner-health";
 import { Button } from "@/components/ui/button";
 
+/**
+ * /pemilik. Cloudflare cost: NO interval polling. Everything loads once when the panel opens (after
+ * the key), on the Refresh button, and when the tab becomes visible again, at most once per
+ * REFRESH_MIN_GAP_MS. The owner key stays in this tab's sessionStorage only (gone when the tab
+ * closes) and is sent as a header, never in a URL.
+ */
 export function OwnerDashboard() {
   const [secret, setSecret] = useState("");
   const [draft, setDraft] = useState("");
@@ -25,7 +35,10 @@ export function OwnerDashboard() {
   const [loading, setLoading] = useState(false);
   const [authed, setAuthed] = useState(false);
   const [tickAt, setTickAt] = useState<number>(0);
-  const timerRef = useRef<number | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [playerLog, setPlayerLog] = useState<PlayerLogData | null>(null);
+  const [playerBusy, setPlayerBusy] = useState(false);
+  const lastLoadRef = useRef(0);
 
   const fetchOnline = useCallback(async (key: string, quiet = false) => {
     if (!key) return;
@@ -58,11 +71,47 @@ export function OwnerDashboard() {
       saveSecret(key);
       setSecret(key);
     } catch {
-      if (!quiet) setError("Jaringan error.");
+      ownerToast("Gagal memuat statistik: jaringan error.", "error", { label: "Coba lagi", run: () => void fetchOnline(key) });
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const loadPlayerLog = useCallback(async (key: string) => {
+    if (!key) return;
+    setPlayerBusy(true);
+    try {
+      const res = await fetch("/api/player-log", { headers: { "x-online-key": key }, cache: "no-store" });
+      const d = (await res.json().catch(() => null)) as PlayerLogData | null;
+      if (!d || d.error) {
+        ownerToast(`Gagal memuat Kesehatan player: ${d?.error || `HTTP ${res.status}`}`, "error", {
+          label: "Coba lagi",
+          run: () => void loadPlayerLog(key),
+        });
+        setPlayerLog((cur) => cur || { hosts: [] });
+        return;
+      }
+      setPlayerLog(d);
+    } catch {
+      ownerToast("Gagal memuat Kesehatan player: jaringan error.", "error", { label: "Coba lagi", run: () => void loadPlayerLog(key) });
+      setPlayerLog((cur) => cur || { hosts: [] });
+    } finally {
+      setPlayerBusy(false);
+    }
+  }, []);
+
+  /** One full load: stats, player health, and (via reloadKey) the catalog overview + thumbnail list. */
+  const refreshAll = useCallback(
+    (key: string, quiet = false, reloadChildren = true) => {
+      if (!key) return;
+      lastLoadRef.current = Date.now();
+      void fetchOnline(key, quiet);
+      void loadPlayerLog(key);
+      // The overview and thumbnail list load by themselves when they mount (panel open).
+      if (reloadChildren) setReloadKey((n) => n + 1);
+    },
+    [fetchOnline, loadPlayerLog],
+  );
 
   useEffect(() => {
     const s = loadSecret();
@@ -72,19 +121,25 @@ export function OwnerDashboard() {
     }
   }, []);
 
+  // Panel open (after the key): load once. No interval.
+  const openedFor = useRef("");
+  useEffect(() => {
+    if (!authed || !secret || openedFor.current === secret) return;
+    openedFor.current = secret;
+    refreshAll(secret, false, false);
+  }, [authed, secret, refreshAll]);
+
+  // Tab visible again: reload, at most once per REFRESH_MIN_GAP_MS.
   useEffect(() => {
     if (!authed || !secret) return;
-    void fetchOnline(secret);
-    const tick = () => {
-      if (document.visibilityState === "visible") void fetchOnline(secret, true);
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - lastLoadRef.current < REFRESH_MIN_GAP_MS) return;
+      refreshAll(secret, true);
     };
-    timerRef.current = window.setInterval(tick, POLL_MS);
-    document.addEventListener("visibilitychange", tick);
-    return () => {
-      if (timerRef.current != null) window.clearInterval(timerRef.current);
-      document.removeEventListener("visibilitychange", tick);
-    };
-  }, [authed, secret, fetchOnline]);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [authed, secret, refreshAll]);
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -95,7 +150,6 @@ export function OwnerDashboard() {
     }
     setSecret(key);
     setAuthed(true);
-    void fetchOnline(key);
   }
 
   function logout() {
@@ -103,8 +157,10 @@ export function OwnerDashboard() {
     setSecret("");
     setAuthed(false);
     setStats(null);
+    setPlayerLog(null);
     setDraft("");
     setError(null);
+    openedFor.current = "";
   }
 
   const [botOk, setBotOk] = useState<boolean | null>(null);
@@ -144,8 +200,14 @@ export function OwnerDashboard() {
   }, [stats]);
 
   const days = stats?.days || [];
-  const vsViews = deltaPct(stats?.viewsToday || 0, stats?.yesterdayViews || 0);
-  const vsUniq = deltaPct(stats?.uniqueToday || 0, stats?.yesterdayUnique || 0);
+  const lastText = wibHourMinute(tickAt);
+
+  function showGone() {
+    window.dispatchEvent(new CustomEvent("drp-owner-open", { detail: "player-error" }));
+    window.setTimeout(() => {
+      document.getElementById("collapse-player-error")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
 
   return (
     <div className="min-h-dvh text-zinc-100" style={{ backgroundColor: "#0c0c0e" }}>
@@ -158,7 +220,7 @@ export function OwnerDashboard() {
               <span className="size-2 bg-[#2dd4bf]" aria-hidden="true" />
             </h1>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="flex flex-wrap items-center justify-end gap-1.5">
             {authed ? (
               <>
                 <Pill ok={botOk} label={botOk == null ? "Bot ..." : botOk ? "Bot aktif" : "Bot perlu dicek"} />
@@ -170,7 +232,15 @@ export function OwnerDashboard() {
             </Link>
             {authed ? (
               <>
-                <button type="button" className={headBtn} onClick={() => void fetchOnline(secret)} disabled={loading}>
+                <span className="whitespace-nowrap text-[11px] text-zinc-500">
+                  {lastText ? `Terakhir diperbarui ${lastText} WIB` : loading ? "Memuat…" : ""}
+                </span>
+                <button
+                  type="button"
+                  className={headBtnPrimary}
+                  onClick={() => refreshAll(secret)}
+                  disabled={loading}
+                >
                   {loading ? "..." : "Refresh"}
                 </button>
                 <button type="button" className={headBtn} onClick={logout}>
@@ -191,16 +261,18 @@ export function OwnerDashboard() {
           />
         ) : (
           <>
-            <OwnerAuthedTop
+            <OwnerOverview
+              secret={secret}
               online={online}
               stats={stats}
-              tickAt={tickAt}
-              error={error}
-              vsUniq={vsUniq}
-              vsViews={vsViews}
-              secret={secret}
               days={days}
               devices={devices}
+              tickAt={tickAt}
+              error={error}
+              reloadKey={reloadKey}
+              playerLog={playerLog}
+              botOk={botOk}
+              onShowGone={showGone}
             />
             <OwnerAuthedBottom
               days={days}
@@ -212,16 +284,27 @@ export function OwnerDashboard() {
               logout={logout}
               beforeFooter={
                 <>
-                  <Collapse title="Player error">
-                    <PlayerErrorsSection secret={secret} />
+                  <Collapse id="player-error" title="Player error (detail + sembunyikan)">
+                    <PlayerErrorsSection
+                      secret={secret}
+                      data={playerLog}
+                      busy={playerBusy}
+                      reload={() => loadPlayerLog(secret)}
+                    />
                   </Collapse>
-                  <Collapse title="Video disembunyikan">
+                  <Collapse id="hidden" title="Video disembunyikan">
                     <HiddenListSection secret={secret} />
                   </Collapse>
-                  <Collapse title="Poster video">
+                  <Collapse id="videy" title="Videy belum dikasih judul">
+                    <OwnerVideyUntitled secret={secret} />
+                  </Collapse>
+                  <Collapse id="tools" title="Tambah video · Ambil link">
+                    <OwnerTools secret={secret} />
+                  </Collapse>
+                  <Collapse id="poster" title="Poster video">
                     <OwnerTools secret={secret} part="poster" />
                   </Collapse>
-                  <Collapse title="Bot Telegram">
+                  <Collapse id="bot" title="Bot Telegram">
                     <OwnerTelegramStatus secret={secret} />
                   </Collapse>
                 </>
@@ -230,12 +313,16 @@ export function OwnerDashboard() {
           </>
         )}
       </div>
+      <OwnerToaster />
     </div>
   );
 }
 
 const headBtn =
   "whitespace-nowrap rounded-md border border-white/[0.1] bg-[#16161a] px-2.5 py-1 text-xs text-zinc-300 transition hover:text-zinc-50 disabled:opacity-50";
+// Own class list (not headBtn + overrides) so the teal background never loses to bg-[#16161a] in CSS order.
+const headBtnPrimary =
+  "whitespace-nowrap rounded-md border border-[#2dd4bf] bg-[#2dd4bf] px-2.5 py-1 text-xs font-medium text-zinc-950 transition hover:bg-[#5eead4] disabled:opacity-50";
 
 function Pill({ ok, label }: { ok: boolean | null; label: string }) {
   return (
@@ -246,11 +333,21 @@ function Pill({ ok, label }: { ok: boolean | null; label: string }) {
   );
 }
 
-/** Collapsed-by-default block for less used owner sections. Content mounts only when opened. */
-function Collapse({ title, children }: { title: string; children: React.ReactNode }) {
+/**
+ * Collapsed-by-default block for less used owner sections. Content mounts only when opened.
+ * Another part of the panel can open it with a "drp-owner-open" event naming its id.
+ */
+function Collapse({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      if ((e as CustomEvent<string>).detail === id) setOpen(true);
+    };
+    window.addEventListener("drp-owner-open", onOpen);
+    return () => window.removeEventListener("drp-owner-open", onOpen);
+  }, [id]);
   return (
-    <div className="rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/35 bg-[#121215]">
+    <div id={`collapse-${id}`} className="scroll-mt-4 rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/35 bg-[#121215]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -275,30 +372,7 @@ type PlayerErrorRow = {
   hidden: boolean;
 };
 
-type PlayerErrorsData = {
-  ok?: boolean;
-  error?: string;
-  storage?: string;
-  version?: number;
-  since?: string;
-  hosts?: {
-    host: string;
-    starts: number;
-    slow?: number;
-    fails: number;
-    reports: number;
-    retries: number;
-    openSource: number;
-    alt?: number;
-    rate: number | null;
-  }[];
-  top?: (PlayerErrorRow & { fails: number; starts: number; reports: number; gone: boolean })[];
-  gone?: (PlayerErrorRow & { since: string })[];
-  suspect?: number;
-  checkedAt?: string | null;
-  ownerHidden?: (PlayerErrorRow & { at: number | null })[];
-  hideReadable?: boolean;
-};
+type PlayerErrorsData = PlayerLogData;
 
 function hostLabel(host: string): string {
   return host === "Puterin" ? "Putarin" : host || "—";
@@ -316,34 +390,20 @@ function wibTime(iso: string | null | undefined): string {
  * failing videos, videos the 12-hour dead-video check marked "Dihapus oleh sumber", and the videos
  * hidden from here. "Sembunyikan" is reversible ("Tampilkan lagi"); nothing is deleted.
  */
-function PlayerErrorsSection({ secret }: { secret: string }) {
-  const [data, setData] = useState<PlayerErrorsData | null>(null);
+function PlayerErrorsSection({
+  secret,
+  data,
+  busy,
+  reload,
+}: {
+  secret: string;
+  data: PlayerErrorsData | null;
+  busy: boolean;
+  reload: () => Promise<void>;
+}) {
   const [note, setNote] = useState("");
-  const [busy, setBusy] = useState(false);
   const [busyId, setBusyId] = useState("");
-
-  const load = useCallback(async () => {
-    if (!secret) return;
-    setBusy(true);
-    try {
-      const res = await fetch("/api/player-log", { headers: { "x-online-key": secret }, cache: "no-store" });
-      const d = (await res.json().catch(() => null)) as PlayerErrorsData | null;
-      if (!d) setNote("Gagal membaca jawaban server.");
-      else if (d.error === "forbidden") setNote("Kunci salah.");
-      else {
-        setData(d);
-        setNote("");
-      }
-    } catch {
-      setNote("Jaringan error.");
-    } finally {
-      setBusy(false);
-    }
-  }, [secret]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const load = reload;
 
   async function toggleHide(id: string, hide: boolean) {
     setBusyId(id);
@@ -354,13 +414,13 @@ function PlayerErrorsSection({ secret }: { secret: string }) {
         body: JSON.stringify({ action: "owner-hide", id, hide }),
       });
       const d = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
-      if (!d?.ok) setNote(`Gagal: ${d?.error || res.status}`);
+      if (!d?.ok) ownerToast(`Gagal: ${d?.error || res.status}`);
       else {
         setNote(hide ? "Video disembunyikan (bisa ditampilkan lagi)." : "Video tampil lagi.");
         await load();
       }
     } catch {
-      setNote("Jaringan error.");
+      ownerToast("Jaringan error.");
     } finally {
       setBusyId("");
     }

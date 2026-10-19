@@ -1,11 +1,21 @@
 "use client";
 
-// /pemilik top half: stats row, chart (14 hari / 24 jam), recent uploads, search + edit,
-// categories today, player health, top videos with thumbnails. Edits and hides go through
-// owner-only APIs; the minor-lock is enforced on the server (owner-tools.ts).
+// /pemilik top half: "Perlu dicek", stats row, chart (24 jam / 14 hari), visitors + money,
+// recent uploads (source filter), search + edit, categories, player health per source, thumbnail
+// list, system status, top videos. Edits and hides go through owner-only APIs; the minor-lock is
+// enforced on the server (owner-tools.ts). Nothing here polls: data loads when the panel opens,
+// on Refresh, and when the tab comes back (owner-panel.tsx, at most once a minute).
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CATEGORY_LIST } from "@/lib/catalog/categories";
-import { fmt, type OwnerStats, type DayRow } from "@/components/owner-dashboard-shared";
+import { fmt, ownerToast, type OwnerStats, type DayRow } from "@/components/owner-dashboard-shared";
+import {
+  AlertStrip,
+  MoneyCard,
+  StatusCard,
+  ThumbMissingCard,
+  type OverviewStatus,
+  type PlayerLogData,
+} from "@/components/owner-health";
 
 const SITE_ORIGIN = "https://koleksidrpinguin.com";
 
@@ -89,6 +99,7 @@ export type CatalogRow = {
   createdAt: number;
   hidden: boolean;
   locked: boolean;
+  noThumb?: boolean;
 };
 
 type Overview = {
@@ -98,12 +109,18 @@ type Overview = {
   hidden?: number;
   uploadedToday?: number;
   uploadedWeek?: number;
+  todayBySource?: Record<string, number>;
+  bySource?: Record<string, number>;
+  categories?: { slug: string; label: string; count: number }[];
+  noThumb?: number;
   recent?: CatalogRow[];
   recentTotal?: number;
   offset?: number;
+  status?: OverviewStatus;
 };
 
-type HostRow = { host: string; starts: number; fails: number; rate: number | null };
+/** Upload list filter: "" = semua, a source label, or "nothumb". */
+type RecentFilter = string;
 
 const card = "min-w-0 rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/35 bg-[#121215] p-4";
 const h2 = "flex items-center justify-between gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]";
@@ -129,7 +146,17 @@ function hostLabel(host: string): string {
   if (h.includes("userbokep")) return "UserBokep";
   if (h.includes("putarin") || h.includes("puterin")) return "Putarin";
   if (h.includes("streamtape") || h.includes("tape")) return "Streamtape";
+  if (h.includes("byse")) return "Byse";
+  if (h.includes("lulu")) return "LuluStream";
+  if (h.includes("dood")) return "DoodStream";
+  if (h.includes("videy")) return "Videy";
   return host;
+}
+
+function shortSource(src: string): string {
+  if (src === "LuluStream") return "Lulu";
+  if (src === "DoodStream") return "Dood";
+  return src;
 }
 
 // Server sends hourly as 24 slots, oldest first, labelled with the WIB hour ("00".."23").
@@ -189,9 +216,9 @@ async function ownerPost<T extends { ok?: boolean; error?: string }>(
 
 function StatCell({ label, value, sub }: { label: string; value: string; sub?: string | null }) {
   return (
-    <div className="min-w-0 px-3 py-1 first:pl-0">
+    <div className="min-w-0 rounded-lg border border-white/[0.05] bg-[#0f0f12] px-3 py-2.5">
       <p className="truncate text-[10px] uppercase tracking-[0.12em] text-[#2dd4bf]/80">{label}</p>
-      <p className="mt-1 text-xl tabular-nums text-zinc-50 sm:text-[22px]">{value}</p>
+      <p className="mt-1 truncate text-xl tabular-nums text-zinc-50 sm:text-[22px]">{value}</p>
       {sub ? (
         <p className="truncate text-[11px] text-zinc-500">
           {sub}
@@ -201,6 +228,12 @@ function StatCell({ label, value, sub }: { label: string; value: string; sub?: s
   );
 }
 
+
+/** WIB calendar date of `ms` as "19 Okt". */
+function wibDayText(ms: number): string {
+  const d = new Date(ms + 7 * 3600_000);
+  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()] || ""}`.trim();
+}
 
 function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
   const [mode, setMode] = useState<"days" | "hours">("hours");
@@ -212,7 +245,7 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
     if (showHours) {
       const last = hourly.length - 1;
       return hourly.map((r, i) => ({
-        label: hourText(r.hour),
+        label: i === last ? "Sekarang" : hourText(r.hour),
         value: Number(r.views) || 0,
         show: (last - i) % 4 === 0,
         now: i === last,
@@ -229,10 +262,13 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
   }, [showHours, days, hourly]);
   const max = Math.max(1, ...series.map((s) => s.value));
   const bw = W / Math.max(1, series.length);
+  // 24-jam view: where today's 00.00 WIB starts (the slots are oldest first).
+  const midnight = showHours ? hourly.findIndex((r, i) => i > 0 && /^0?0$/.test(String(r.hour).match(/^(\d{1,2})/)?.[1] || "")) : -1;
+  const now = Date.now();
   return (
     <>
       <div className={h2}>
-        <span>Tayang</span>
+        <span>{showHours ? "Tayang · 24 jam terakhir" : "Tayang · 14 hari"}</span>
         <span className="flex gap-1">
           {hasHours ? (
             <button type="button" className={toggleCls(showHours)} aria-pressed={showHours} onClick={() => setMode("hours")}>
@@ -244,7 +280,8 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
           </button>
         </span>
       </div>
-      <svg viewBox={`0 -16 ${W} ${H + 34}`} className="mt-3 block h-auto w-full" role="img" aria-label="Grafik tayang">
+      <div className="-mx-1 overflow-x-auto px-1" ref={(el) => { if (el) el.scrollLeft = el.scrollWidth; }}>
+      <svg viewBox={`0 -32 ${W} ${H + 50}`} className="mt-3 block h-auto w-full min-w-[620px] sm:min-w-0" role="img" aria-label="Grafik tayang">
         <defs>
           <linearGradient id="owner-bar-now" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#2dd4bf" />
@@ -254,6 +291,21 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
         {[0, 1, 2, 3].map((k) => (
           <line key={k} x1={0} x2={W} y1={(H * k) / 4} y2={(H * k) / 4} stroke="#232326" strokeDasharray="2 4" />
         ))}
+        {showHours ? (
+          <>
+            <text x={4} y={-20} fontSize={11} className="fill-zinc-500">
+              {midnight > 0 ? `Kemarin · ${wibDayText(now - 86_400_000)}` : `Hari ini · ${wibDayText(now)}`}
+            </text>
+            {midnight > 0 ? (
+              <>
+                <line x1={midnight * bw} x2={midnight * bw} y1={-28} y2={H} stroke="#2dd4bf" strokeOpacity={0.35} strokeDasharray="3 3" />
+                <text x={midnight * bw + 4} y={-20} fontSize={11} className="fill-[#2dd4bf]">
+                  {`Hari ini · ${wibDayText(now)}`}
+                </text>
+              </>
+            ) : null}
+          </>
+        ) : null}
         {series.map((s, i) => {
           const h = (s.value / max) * H;
           return (
@@ -280,7 +332,13 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
                 </text>
               ) : null}
               {s.show ? (
-                <text x={i * bw + bw / 2} y={H + 15} textAnchor="middle" className="fill-zinc-600" fontSize={10}>
+                <text
+                  x={s.now ? i * bw + bw : i * bw + bw / 2}
+                  y={H + 15}
+                  textAnchor={s.now ? "end" : "middle"}
+                  className={s.now ? "fill-[#2dd4bf]" : "fill-zinc-600"}
+                  fontSize={10}
+                >
                   {s.label}
                 </text>
               ) : null}
@@ -288,6 +346,7 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
           );
         })}
       </svg>
+      </div>
     </>
   );
 }
@@ -361,6 +420,7 @@ function VideoRows({
   const [editing, setEditing] = useState("");
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
+  const [menu, setMenu] = useState("");
   // Saved edits shown right away (the server list catches up after its next catalog sync).
   const [patched, setPatched] = useState<Record<string, { title?: string; categoryLabel?: string; category?: string }>>({});
   async function hide(r: CatalogRow) {
@@ -372,10 +432,11 @@ function VideoRows({
         body: JSON.stringify({ action: "owner-hide", id: r.id, hide: true }),
       });
       const d = (await res.json().catch(() => null)) as { ok?: boolean; error?: string } | null;
-      setNote(d?.ok ? "Disembunyikan." : `Gagal: ${d?.error || res.status}`);
+      setNote(d?.ok ? "Disembunyikan (bisa ditampilkan lagi dari Player error)." : "");
+      if (!d?.ok) ownerToast(`Gagal menyembunyikan: ${d?.error || res.status}`);
       if (d?.ok) onChanged();
     } catch {
-      setNote("Jaringan error.");
+      ownerToast("Gagal menyembunyikan: jaringan error.");
     } finally {
       setBusy("");
     }
@@ -398,21 +459,59 @@ function VideoRows({
               />
               <a href={`/watch/${r.id}`} target="_blank" rel="noopener" className="min-w-0 flex-1">
                 <span className="block truncate text-xs text-zinc-100">{r.title || r.id}</span>
-                <span className="block truncate text-[11px] text-zinc-500">
+                <span className={`block truncate text-[11px] ${r.noThumb ? "text-amber-400/90" : "text-zinc-500"}`}>
                   {r.categoryLabel} · {r.source}
-                  {showTime && r.createdAt ? ` · ${timeWib(r.createdAt)}` : ""}
+                  {r.noThumb ? " · tanpa thumbnail" : showTime && r.createdAt ? ` · ${timeWib(r.createdAt)}` : ""}
                   {r.locked ? " · terkunci" : r.hidden ? " · tersembunyi" : ""}
                 </span>
               </a>
               {r.locked || r.hidden ? null : (
-                <span className="flex shrink-0 gap-1">
-                  <button type="button" className={btn} onClick={() => setEditing((v) => (v === r.id ? "" : r.id))}>
-                    Edit
-                  </button>
-                  <button type="button" className={btn} disabled={busy === r.id} onClick={() => void hide(r)}>
-                    Sembunyikan
-                  </button>
-                </span>
+                <>
+                  <span className="hidden shrink-0 gap-1 sm:flex">
+                    <button type="button" className={btn} onClick={() => setEditing((v) => (v === r.id ? "" : r.id))}>
+                      Edit
+                    </button>
+                    <button type="button" className={btn} disabled={busy === r.id} onClick={() => void hide(r)}>
+                      Sembunyikan
+                    </button>
+                  </span>
+                  <span className="relative shrink-0 sm:hidden">
+                    <button
+                      type="button"
+                      className={`${btn} px-2.5 text-sm leading-none`}
+                      aria-label="Menu video"
+                      aria-expanded={menu === r.id}
+                      onClick={() => setMenu((v) => (v === r.id ? "" : r.id))}
+                    >
+                      ⋯
+                    </button>
+                    {menu === r.id ? (
+                      <span className="absolute right-0 top-full z-20 mt-1 flex w-36 flex-col overflow-hidden rounded-md border border-white/[0.12] bg-[#18181c] shadow-xl shadow-black/50">
+                        <button
+                          type="button"
+                          className="px-3 py-2 text-left text-xs text-zinc-200 hover:bg-white/[0.06]"
+                          onClick={() => {
+                            setMenu("");
+                            setEditing((v) => (v === r.id ? "" : r.id));
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="border-t border-white/[0.06] px-3 py-2 text-left text-xs text-zinc-200 hover:bg-white/[0.06] disabled:opacity-50"
+                          disabled={busy === r.id}
+                          onClick={() => {
+                            setMenu("");
+                            void hide(r);
+                          }}
+                        >
+                          Sembunyikan
+                        </button>
+                      </span>
+                    ) : null}
+                  </span>
+                </>
               )}
             </div>
             {editing === r.id ? (
@@ -462,7 +561,8 @@ function SearchBox({ secret }: { secret: string }) {
         q: term,
       });
       setRows(d.items || []);
-      setSearchNote(d.ok ? (d.items?.length ? "" : "Tidak ditemukan.") : `Gagal: ${d.error || "jaringan"}`);
+      setSearchNote(d.ok ? (d.items?.length ? "" : "Tidak ditemukan.") : "");
+      if (!d.ok) ownerToast(`Pencarian gagal: ${d.error || "jaringan"}`);
     }, 300);
     return () => window.clearTimeout(t);
   }, [q, secret, tick]);
@@ -547,62 +647,69 @@ export function OwnerOverview(props: {
   devices: { device: string; views: number; pct: number }[];
   tickAt: number;
   error: string | null;
-  vsUniq: string | null;
-  vsViews: string | null;
+  /** Bumped by owner-panel on open / Refresh / tab back: reloads the catalog overview + thumbnail list. */
+  reloadKey?: number;
+  playerLog?: PlayerLogData | null;
+  botOk?: boolean | null;
+  onShowGone?: () => void;
+  /** Legacy props from owner-authed-top.tsx (no longer shown: no percentages). */
+  vsUniq?: string | null;
+  vsViews?: string | null;
 }) {
-  const { secret, online, days, devices, tickAt, error } = props;
+  const { secret, online, days, devices, error } = props;
+  const reloadKey = props.reloadKey ?? 0;
+  const playerLog = props.playerLog ?? null;
+  const botOk = props.botOk ?? null;
+  const onShowGone = props.onShowGone ?? (() => undefined);
   const stats = props.stats as Stats | null;
   const [ov, setOv] = useState<Overview | null>(null);
-  const [hosts, setHosts] = useState<HostRow[] | null>(null);
-
+  const [filter, setFilter] = useState<RecentFilter>("");
   const [ovBusy, setOvBusy] = useState(false);
+
+  const filterBody = useCallback(
+    (f: RecentFilter) => (f === "nothumb" ? { noThumb: true } : f ? { source: f } : {}),
+    [],
+  );
+
   const loadOverview = useCallback(async () => {
     if (!secret) return;
     setOvBusy(true);
     try {
-      const d = await ownerPost<Overview>(secret, { action: "catalog-overview" });
-      setOv((prev) => (d.ok ? d : { ...(prev || {}), ok: false, error: d.error || "Gagal memuat." }));
+      const d = await ownerPost<Overview>(secret, { action: "catalog-overview", ...filterBody(filter) });
+      if (d.ok) setOv(d);
+      else {
+        setOv((prev) => ({ ...(prev || {}), ok: false, error: d.error || "Gagal memuat." }));
+        ownerToast(`Gagal memuat katalog: ${d.error || "tidak diketahui"}`, "error", { label: "Coba lagi", run: () => void loadOverview() });
+      }
     } finally {
       setOvBusy(false);
     }
-  }, [secret]);
+  }, [secret, filter, filterBody]);
 
   const loadMore = useCallback(async () => {
     if (!secret || !ov?.recent) return;
     setOvBusy(true);
     try {
-      const d = await ownerPost<Overview>(secret, { action: "catalog-overview", offset: ov.recent.length, limit: 50 });
+      const d = await ownerPost<Overview>(secret, {
+        action: "catalog-overview",
+        offset: ov.recent.length,
+        limit: 50,
+        ...filterBody(filter),
+      });
       if (d.ok) {
         const have = new Set(ov.recent.map((r) => r.id));
         setOv({ ...d, recent: [...ov.recent, ...(d.recent || []).filter((r) => !have.has(r.id))] });
       } else {
-        setOv({ ...ov, error: d.error || "Gagal memuat." });
+        ownerToast(`Gagal memuat: ${d.error || "tidak diketahui"}`);
       }
     } finally {
       setOvBusy(false);
     }
-  }, [secret, ov]);
+  }, [secret, ov, filter, filterBody]);
 
   useEffect(() => {
     void loadOverview();
-  }, [loadOverview]);
-
-  useEffect(() => {
-    if (!secret) return;
-    let alive = true;
-    void (async () => {
-      try {
-        const res = await fetch("/api/player-log", { headers: { "x-online-key": secret }, cache: "no-store" });
-        const d = (await res.json().catch(() => null)) as { hosts?: HostRow[] } | null;
-        if (alive) setHosts(d?.hosts || []);
-      } catch {
-        if (alive) setHosts([]);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [secret]);
+  }, [loadOverview, reloadKey]);
 
   const hourly = stats?.hourly || [];
   const busiest = useMemo(() => {
@@ -636,35 +743,71 @@ export function OwnerOverview(props: {
     return { sources, deviceRows, browsers, countries };
   }, [stats, devices]);
 
-  const cats = useMemo(() => {
+  // Category with the most views among today's top videos (the only per-category views we have).
+  const topCat = useMemo(() => {
     const m = new Map<string, number>();
     for (const v of stats?.topVideos || []) {
-      const c = String(v.category || "").trim() || "lainnya";
+      const c = String(v.category || "").trim();
+      if (!c) continue;
       m.set(c, (m.get(c) || 0) + (Number(v.views) || 0));
     }
-    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+    const best = [...m.entries()].sort((a, b) => b[1] - a[1])[0];
+    return best ? { label: best[0], views: best[1] } : null;
   }, [stats]);
-  const catMax = Math.max(1, ...cats.map((c) => c[1]));
 
-  const hostRows = (hosts || [])
+  const cats = (ov?.categories || []).slice(0, 10);
+  const catMax = Math.max(1, ...cats.map((c) => c.count));
+
+  const todaySources = Object.entries(ov?.todayBySource || {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([k, n]) => `${shortSource(k)} ${fmt(n)}`)
+    .join(" · ");
+  const sourceChips = Object.entries(ov?.bySource || {})
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8);
+  const allCount = Object.values(ov?.bySource || {}).reduce((s, n) => s + n, 0);
+
+  const hostRows = (playerLog?.hosts || [])
     .map((h) => ({ ...h, label: hostLabel(h.host) }))
     .sort((a, b) => b.starts - a.starts);
 
+  function showThumbs() {
+    document.getElementById("thumb-kosong")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   return (
     <>
+      <AlertStrip
+        noThumb={ov?.noThumb ?? null}
+        gone={playerLog ? (playerLog.gone || []).length : null}
+        suspect={playerLog?.suspect || 0}
+        deadCheckedAt={ov?.status?.deadCheckedAt || playerLog?.checkedAt || null}
+        onShowThumbs={showThumbs}
+        onShowGone={onShowGone}
+      />
+
       <section className={card}>
-        <div className="grid grid-cols-4 gap-y-3 divide-white/[0.06] sm:grid-cols-8 sm:divide-x">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
           <StatCell label="Online" value={fmt(online)} sub={`puncak ${fmt(stats?.peakToday)}`} />
           <StatCell label="Unik" value={fmt(stats?.uniqueToday)} sub={`kemarin ${fmt(stats?.yesterdayUnique)}`} />
           <StatCell label="Tayang" value={fmt(stats?.viewsToday)} sub={`kemarin ${fmt(stats?.yesterdayViews)}`} />
           <StatCell label="7 hari" value={compact(stats?.views7d || 0)} sub="tayang" />
           <StatCell label="Total video" value={ov?.total != null ? fmt(ov.total) : "-"} sub="katalog" />
-          <StatCell label="Hari ini" value={ov?.uploadedToday != null ? fmt(ov.uploadedToday) : "-"} sub="upload" />
-          <StatCell label="Minggu ini" value={ov?.uploadedWeek != null ? fmt(ov.uploadedWeek) : "-"} sub="upload" />
+          <StatCell
+            label="Upload hari ini"
+            value={ov?.uploadedToday != null ? fmt(ov.uploadedToday) : "-"}
+            sub={todaySources || (ov?.uploadedWeek != null ? `minggu ini ${fmt(ov.uploadedWeek)}` : null)}
+          />
           <StatCell label="Tersembunyi" value={ov?.hidden != null ? fmt(ov.hidden) : "-"} sub="video" />
+          <StatCell
+            label="Kategori teratas"
+            value={topCat ? topCat.label : "-"}
+            sub={topCat ? `${fmt(topCat.views)} tayang (video terlaris)` : "belum ada data"}
+          />
         </div>
         <p className="mt-2 text-[11px] text-zinc-600">
-          {tickAt ? `update ${new Date(tickAt).toLocaleTimeString("id-ID")}` : ""}
+          Angka pengunjung disimpan sementara 5 menit di server (hemat Cloudflare); online dihitung langsung.
           {stats?.hint ? ` · ${stats.hint}` : ""}
         </p>
         {error ? <p className="mt-1 text-xs text-red-400">{error}</p> : null}
@@ -683,23 +826,26 @@ export function OwnerOverview(props: {
           ) : null}
           {mobile && deviceTotal > 0 ? (
             <span>
-              Dari HP: <b className="font-medium text-[#2dd4bf]">{fmt(mobile.views)}</b> dari {fmt(deviceTotal)}
+              Ditonton dari HP: <b className="font-medium text-[#2dd4bf]">{fmt(mobile.views)}</b> dari {fmt(deviceTotal)}
             </span>
           ) : null}
         </div>
       </section>
 
-      <section className={card}>
-        <div className={h2}>
-          <span>Pengunjung hari ini</span>
-        </div>
-        <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">
-          <CountList title="Sumber" rows={breakdown.sources} />
-          <CountList title="Perangkat" rows={breakdown.deviceRows} />
-          <CountList title="Browser" rows={breakdown.browsers} />
-          <CountList title="Negara" rows={breakdown.countries} />
-        </div>
-      </section>
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        <section className={`${card} lg:col-span-2`}>
+          <div className={h2}>
+            <span>Pengunjung hari ini</span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4 lg:grid-cols-4">
+            <CountList title="Sumber" rows={breakdown.sources} />
+            <CountList title="Perangkat" rows={breakdown.deviceRows} />
+            <CountList title="Browser" rows={breakdown.browsers} />
+            <CountList title="Negara" rows={breakdown.countries} />
+          </div>
+        </section>
+        <MoneyCard />
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <section className={`${card} lg:col-span-2`}>
@@ -709,6 +855,34 @@ export function OwnerOverview(props: {
               {ovBusy ? "Memuat…" : "Muat ulang"}
             </button>
           </div>
+          {sourceChips.length ? (
+            <div className="mt-3 flex flex-wrap gap-1">
+              <button type="button" className={toggleCls(filter === "")} aria-pressed={filter === ""} onClick={() => setFilter("")}>
+                Semua {fmt(allCount)}
+              </button>
+              {sourceChips.map(([src, n]) => (
+                <button
+                  key={src}
+                  type="button"
+                  className={toggleCls(filter === src)}
+                  aria-pressed={filter === src}
+                  onClick={() => setFilter(src)}
+                >
+                  {shortSource(src)} {fmt(n)}
+                </button>
+              ))}
+              {ov?.noThumb ? (
+                <button
+                  type="button"
+                  className={toggleCls(filter === "nothumb")}
+                  aria-pressed={filter === "nothumb"}
+                  onClick={() => setFilter("nothumb")}
+                >
+                  Tanpa thumbnail {fmt(ov.noThumb)}
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           {ov?.error ? <p className="mt-2 text-xs text-red-400">{ov.error}</p> : null}
           {ov?.recent?.length ? (
             <>
@@ -730,29 +904,35 @@ export function OwnerOverview(props: {
             <SearchBox secret={secret} />
           </section>
           <section className={card}>
-            <div className={h2}>Kategori hari ini</div>
+            <div className={h2}>
+              <span>Kategori</span>
+              <span className="text-[10px] font-normal normal-case tracking-normal text-zinc-600">jumlah video</span>
+            </div>
             {cats.length ? (
               <ul className="mt-2 space-y-1.5">
-                {cats.map(([c, n]) => (
-                  <li key={c} className="flex items-center gap-2 text-[11px]">
-                    <span className="w-20 shrink-0 truncate text-zinc-400">{c}</span>
+                {cats.map((c) => (
+                  <li key={c.slug} className="flex items-center gap-2 text-[11px]">
+                    <span className="w-24 shrink-0 truncate text-zinc-400">{c.label}</span>
                     <span className="h-1.5 flex-1 bg-white/[0.05]">
-                      <span className="block h-full bg-gradient-to-r from-[#14b8a6]/40 to-[#2dd4bf]" style={{ width: `${(n / catMax) * 100}%` }} />
+                      <span
+                        className="block h-full bg-gradient-to-r from-[#14b8a6]/40 to-[#2dd4bf]"
+                        style={{ width: `${(c.count / catMax) * 100}%` }}
+                      />
                     </span>
-                    <span className="w-10 shrink-0 text-right tabular-nums text-zinc-400">{fmt(n)}</span>
+                    <span className="w-12 shrink-0 text-right tabular-nums text-zinc-400">{fmt(c.count)}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="mt-3 text-xs text-zinc-600">Belum ada.</p>
+              <p className="mt-3 text-xs text-zinc-600">{ov ? "Belum ada." : "Memuat…"}</p>
             )}
           </section>
           <section className={card}>
             <div className={h2}>
               <span>Kesehatan player</span>
-              <span className="text-[10px] font-normal text-zinc-600">7 hari</span>
+              <span className="text-[10px] font-normal normal-case tracking-normal text-zinc-600">7 hari · gagal dari putar</span>
             </div>
-            {hosts == null ? (
+            {playerLog == null ? (
               <p className="mt-3 text-xs text-zinc-600">Memuat…</p>
             ) : hostRows.length ? (
               <ul className="mt-2 space-y-1.5">
@@ -760,7 +940,7 @@ export function OwnerOverview(props: {
                   const bad = h.starts > 0 && h.fails / h.starts >= 0.05;
                   return (
                     <li key={h.host} className="flex items-center gap-2 text-[11px]">
-                      <span className={`size-1.5 shrink-0 ${bad ? "bg-red-400" : "bg-emerald-400"}`} />
+                      <span className={`size-1.5 shrink-0 ${h.starts === 0 ? "bg-zinc-600" : bad ? "bg-red-400" : "bg-emerald-400"}`} />
                       <span className="flex-1 truncate text-zinc-300">{h.label}</span>
                       <span className={`tabular-nums ${bad ? "text-red-400" : "text-zinc-400"}`}>
                         {fmt(h.fails)} gagal dari {fmt(h.starts)}
@@ -774,6 +954,13 @@ export function OwnerOverview(props: {
             )}
           </section>
         </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="min-w-0 lg:col-span-2">
+          <ThumbMissingCard secret={secret} reloadKey={reloadKey} />
+        </div>
+        <StatusCard botOk={botOk} status={ov?.status || null} playerLog={playerLog} />
       </div>
 
       <section className={card}>
