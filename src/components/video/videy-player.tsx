@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VideoDetail } from "@/lib/catalog/types";
-import { maybeOpenMonetagDirectLink } from "@/lib/ads/monetag";
 import { sendPlayerLog } from "@/lib/player-log-client";
 
 /**
@@ -10,9 +9,7 @@ import { sendPlayerLog } from "@/lib/player-log-client";
  * Fullscreen (native video button): a landscape video locks the screen to landscape where the
  * browser allows it, and unlocks on exit.
  *
- * Monetag direct link (src/lib/ads/monetag.ts): a play tap (the poster overlay, or the native play
- * control after a pause) opens it in a new tab, at most 3 times per session and 20 s apart; the video
- * keeps playing here.
+ * No ads in the player: a play tap just plays (the Monetag direct link was removed).
  *
  * Kesehatan player (/pemilik): the same /api/player-log beacons as the other hosts, once per video
  * per session (src/lib/player-log-client.ts), host "Videy":
@@ -171,30 +168,10 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     };
   }, [item.id, settle]);
 
-  // Resume taps on the native controls (after a pause / at the end). The play() started by the
-  // poster tap itself is skipped: that tap already had its chance in start().
-  const skipNextPlay = useRef(false);
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
-    const onPlay = () => {
-      if (skipNextPlay.current) {
-        skipNextPlay.current = false;
-        return;
-      }
-      if (v.controls) maybeOpenMonetagDirectLink();
-    };
-    v.addEventListener("play", onPlay);
-    return () => v.removeEventListener("play", onPlay);
-  }, []);
-
   const start = useCallback(() => {
     if (phase !== "idle") return;
-    // Synchronously inside the tap, so popup blockers allow the new tab.
-    maybeOpenMonetagDirectLink();
     track.current = { startedAt: Date.now(), alive: false, settled: false };
     sendPlayerLog(item.id, "Videy", "start2");
-    skipNextPlay.current = true;
     setPhase("main");
     const v = videoRef.current;
     if (!v) return;

@@ -20,7 +20,7 @@
     "monthUsd": null
   },
   "ads": [
-    { "name": "Monetag", "status": "aktif", "note": "direct link di Videy, maks 3 per sesi", "earningsUsd": null },
+    { "name": "Monetag", "status": "dihapus", "note": "direct link dihapus, diganti TrafficStars di bawah player Videy", "earningsUsd": null },
     { "name": "TrafficStars", "status": "menunggu approve", "note": "situs 91976", "earningsUsd": null },
     { "name": "ExoClick", "status": "dicopot", "note": "dicopot 19 Okt ($1,79 dalam seminggu)", "earningsUsd": null }
   ]
