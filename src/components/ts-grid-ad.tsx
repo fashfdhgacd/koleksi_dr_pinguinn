@@ -20,22 +20,6 @@ export function TsGridAd({ className = "", onEmpty }: { className?: string; onEm
   const ref = useRef<HTMLDivElement>(null);
   const injected = useRef(false);
   const [state, setState] = useState<"wait" | "filled" | "empty">("wait");
-  const boxRef = useRef<HTMLDivElement>(null);
-  const [scale, setScale] = useState(1);
-
-  // Scale the 300x250 creative down when the cell is narrower (never up).
-  useEffect(() => {
-    const box = boxRef.current;
-    if (!box || typeof ResizeObserver === "undefined") return;
-    const ro = new ResizeObserver(() => {
-      const w = box.clientWidth;
-      const h = box.clientHeight;
-      if (w && h) setScale(Math.min(1, w / 300, h / 250));
-    });
-    ro.observe(box);
-    return () => ro.disconnect();
-  }, []);
-
   useEffect(() => {
     const el = ref.current;
     if (!el || injected.current) return;
@@ -89,19 +73,12 @@ export function TsGridAd({ className = "", onEmpty }: { className?: string; onEm
   }, [state, onEmpty]);
 
   if (state === "empty") return null;
-  // Same cell box as a video card: p-1/p-1.5 padding, 300:250 frame up front (no layout shift),
-  // plus the card's text-row height below so rows line up. Ad centered and clipped to the frame.
+  // Sizes to the rendered ad (no fixed frame, nothing clipped). Space for a 300x250 is reserved up
+  // front (min-height) so the grid does not jump when the ad arrives; full cell width on mobile.
   return (
     <div data-kdp-ad="trafficstars" className={"p-1 sm:p-1.5 " + className}>
-      <div
-        ref={boxRef}
-        className="relative flex aspect-[300/250] w-full items-center justify-center overflow-hidden rounded-xl bg-zinc-900/40"
-      >
-        <div
-          ref={ref}
-          style={{ width: 300, height: 250, transform: `scale(${scale})`, transformOrigin: "center" }}
-          className="flex shrink-0 items-center justify-center overflow-hidden"
-        />
+      <div className="flex min-h-[250px] w-full items-center justify-center">
+        <div ref={ref} className="w-full max-w-full" />
       </div>
       <p className="mt-2 text-[11px] uppercase tracking-wide text-zinc-500">Iklan</p>
     </div>
