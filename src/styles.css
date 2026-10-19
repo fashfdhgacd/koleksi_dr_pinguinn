@@ -121,3 +121,102 @@
   background-size: 200% 100%;
   animation: shimmer 1.4s linear infinite;
 }
+
+/* TrafficStars native in the catalog grid card (ts-grid-ad.tsx): dark, tidy, one unit, label kept.
+   Scoped to [data-kdp-ad]; !important because the SDK injects its own stylesheet after ours. */
+[data-kdp-ad="trafficstars"] .mn-related-container,
+[data-kdp-ad="trafficstars"] .mn-container,
+[data-kdp-ad="trafficstars"] .mn-outer {
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+[data-kdp-ad="trafficstars"] [id^="ts_ms_"] {
+  width: 100% !important;
+  height: 100% !important;
+}
+[data-kdp-ad="trafficstars"] .mn-outer {
+  display: block !important;
+}
+[data-kdp-ad="trafficstars"] .mn-thumb ~ .mn-thumb {
+  display: none !important;
+}
+[data-kdp-ad="trafficstars"] .mn-thumb {
+  position: relative !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 1px solid rgb(63 63 70) !important;
+  border-radius: 0.75rem !important;
+  background: rgb(24 24 27) !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+[data-kdp-ad="trafficstars"] .mn-thumb > a:first-of-type {
+  display: block !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  width: 100% !important;
+}
+[data-kdp-ad="trafficstars"] .mn-thumb__holder {
+  position: relative !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 0 !important;
+}
+[data-kdp-ad="trafficstars"] .mn-thumb__aspect {
+  display: none !important;
+}
+[data-kdp-ad="trafficstars"] .mn-thumb__img,
+[data-kdp-ad="trafficstars"] .mn-thumb__hls-wrapper,
+[data-kdp-ad="trafficstars"] .mn-thumb-stream-canvas {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background-size: cover !important;
+  background-position: center !important;
+  object-fit: cover !important;
+}
+[data-kdp-ad="trafficstars"] .mn-thumb__label {
+  position: static !important;
+  display: block !important;
+  flex: 0 0 auto !important;
+  width: 100% !important;
+  height: auto !important;
+  padding: 8px 36px 8px 10px !important;
+  background: rgb(24 24 27) !important;
+  color: rgb(244 244 245) !important;
+  text-align: left !important;
+}
+[data-kdp-ad="trafficstars"] .mn-thumb__label-title,
+[data-kdp-ad="trafficstars"] .mn-thumb__label-title-link {
+  display: block !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  color: rgb(244 244 245) !important;
+  font: 500 13px/1.3 inherit !important;
+  height: auto !important;
+}
+[data-kdp-ad="trafficstars"] .mn-thumb__label-brand,
+[data-kdp-ad="trafficstars"] .mn-thumb__label-brand-link {
+  display: block !important;
+  color: rgb(161 161 170) !important;
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+}
+[data-kdp-ad="trafficstars"] .mn-thumb__arrow {
+  top: auto !important;
+  bottom: 10px !important;
+  right: 10px !important;
+}
+[data-kdp-ad="trafficstars"] .dsa-icon__wrapper {
+  z-index: 3 !important;
+}
