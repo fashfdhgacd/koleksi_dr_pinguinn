@@ -1,9 +1,9 @@
-// Grid: 2 / 3 / 4 kolom (mobile / tablet / desktop) for the watch page; catalog grids 2 / 3 / 6.
-// Catalog grids (home, kategori; `ads` prop): 2 / 3 / 6 columns, card thumbs 300:250, and a
-// TrafficStars MasterSpot card (ts-grid-ad.tsx) as every 8th card (cells 8, 16, 24, 32; max 4),
-// each one card footprint, lazy-loaded, collapsing on its own if unfilled. Pages hold 36 videos;
-// trailing videos are trimmed at 3 / 6 columns so rows stay full (40 cells -> 36 at 3 and 6 cols;
-// 2 cols is always even). The watch page ("Tonton juga") keeps the default grid, no ads.
+// Grid: 2 / 3 / 4 kolom (mobile / tablet / desktop) for the watch page; catalog grids 1 / 3 / 4.
+// Catalog grids (home, kategori; `ads` prop): 1 / 3 / 4 columns (cards sized for a 300x250 ad),
+// card thumbs 300:250, and a TrafficStars MasterSpot card (ts-grid-ad.tsx) as every 8th card
+// (cells 8, 16, 24, 32; max 4), each one card footprint, lazy-loaded, collapsing on its own if
+// unfilled. Pages hold 36 videos; trailing videos are trimmed so rows stay full at 3 and 4 columns.
+// The watch page ("Tonton juga") keeps the default grid, no ads.
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { isRealMinor } from "@/lib/minor-terms";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,22 +14,27 @@ import { useCallback, useState } from "react";
 const DEFAULT_GRID =
   "grid grid-cols-2 gap-x-2.5 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 lg:grid-cols-4";
 const CATALOG_GRID =
-  "grid grid-cols-2 gap-x-2.5 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 lg:grid-cols-6 [&>a>div:first-child]:aspect-[300/250]";
+  "grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-3 sm:gap-y-7 lg:grid-cols-4 [&>a>div:first-child]:aspect-[300/250]";
 
 /**
- * Tablet/desktop: hide up to 3 trailing videos so cells fill whole rows at 3 and 4 columns
- * (multiple of 12, e.g. 39 videos -> 36). Static strings so Tailwind generates them.
+ * Rows full: hide trailing videos so the cell count (videos + ads) is a multiple of the column
+ * count, 3 on tablet (sm..lg) and 4 on laptop (lg+). Ads are divs, videos are links, so
+ * nth-last-of-type only counts videos. Static strings so Tailwind generates them.
  */
-const TRIM_CLASS = [
+const TRIM_SM = [
   "",
-  " sm:[&>a:nth-last-of-type(-n+1)]:hidden",
-  " sm:[&>a:nth-last-of-type(-n+2)]:hidden",
-  " sm:[&>a:nth-last-of-type(-n+3)]:hidden",
-  " sm:[&>a:nth-last-of-type(-n+4)]:hidden",
+  " sm:max-lg:[&>a:nth-last-of-type(-n+1)]:hidden",
+  " sm:max-lg:[&>a:nth-last-of-type(-n+2)]:hidden",
+];
+const TRIM_LG = [
+  "",
+  " lg:[&>a:nth-last-of-type(-n+1)]:hidden",
+  " lg:[&>a:nth-last-of-type(-n+2)]:hidden",
+  " lg:[&>a:nth-last-of-type(-n+3)]:hidden",
 ];
 function trimClass(count: number): string {
-  const extra = count % 12;
-  return count > 12 && extra > 0 && extra <= 4 ? TRIM_CLASS[extra] : "";
+  if (count <= 12) return "";
+  return TRIM_SM[count % 3] + TRIM_LG[count % 4];
 }
 
 function visibleCards(items: VideoCardType[]): VideoCardType[] {

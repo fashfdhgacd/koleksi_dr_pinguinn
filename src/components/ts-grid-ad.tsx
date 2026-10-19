@@ -20,6 +20,21 @@ export function TsGridAd({ className = "", onEmpty }: { className?: string; onEm
   const ref = useRef<HTMLDivElement>(null);
   const injected = useRef(false);
   const [state, setState] = useState<"wait" | "filled" | "empty">("wait");
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  // A fixed-size banner (iframe) narrower cell: shrink it to fit (never crop). Natives are fluid.
+  useEffect(() => {
+    const box = boxRef.current;
+    if (!box || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const hasBanner = Boolean(box.querySelector("iframe"));
+      const w = box.clientWidth;
+      setScale(hasBanner && w > 0 && w < 300 ? w / 300 : 1);
+    });
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [state]);
   useEffect(() => {
     const el = ref.current;
     if (!el || injected.current) return;
@@ -73,27 +88,23 @@ export function TsGridAd({ className = "", onEmpty }: { className?: string; onEm
   }, [state, onEmpty]);
 
   if (state === "empty") return null;
-  // One video-card footprint: until the ad arrives an invisible card-shaped placeholder (300:250
-  // thumb + two title lines + stats row, like VideoCard) holds the cell, so nothing shifts; the ad
-  // sits over it and takes its place once filled. Small IKLAN badge on the image.
+  // One video-card footprint, reserved from the first paint (no CLS): a dark 300:250 frame like the
+  // thumbs with the ad centered at its real size (a 300x250 banner only shrinks, never crops, when a
+  // cell is narrower than 300 px; a native unit flows to the width), then a text row with IKLAN.
+  // The frame grows with taller content instead of clipping it.
   return (
-    <div data-kdp-ad="trafficstars" className={"relative p-1 sm:p-1.5 " + className}>
-      {state === "filled" ? null : (
-        <div aria-hidden className="invisible">
-          <div className="aspect-[300/250] w-full" />
-          <div className="mt-3 min-h-[2.5em] text-[13px] leading-snug sm:text-[15px]">&nbsp;</div>
-          <div className="mt-1.5 text-[11px] sm:text-xs">&nbsp;</div>
-        </div>
-      )}
+    <div data-kdp-ad="trafficstars" className={"p-1 sm:p-1.5 " + className}>
       <div
-        ref={ref}
-        className={
-          state === "filled" ? "relative w-full" : "absolute inset-x-1 top-1 sm:inset-x-1.5 sm:top-1.5"
-        }
-      />
-      <span className="pointer-events-none absolute left-2.5 top-2.5 z-10 rounded bg-black/65 px-1.5 py-px text-[9px] font-medium uppercase tracking-wider text-zinc-300 sm:left-3 sm:top-3">
-        Iklan
-      </span>
+        ref={boxRef}
+        className="flex aspect-[300/250] w-full items-center justify-center rounded-xl bg-[#131316]"
+      >
+        <div
+          ref={ref}
+          className="w-full max-w-[300px]"
+          style={scale < 1 ? { zoom: scale } : undefined}
+        />
+      </div>
+      <p className="mt-3 text-[11px] font-medium uppercase tracking-wider text-zinc-500">Iklan</p>
     </div>
   );
 }

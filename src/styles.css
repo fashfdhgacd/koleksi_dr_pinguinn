@@ -122,8 +122,8 @@
   animation: shimmer 1.4s linear infinite;
 }
 
-/* TrafficStars native in the catalog grid cards (ts-grid-ad.tsx): one ad, one video-card footprint,
-   dark, image 300:250 like the thumbs, title with ellipsis below. Network's AD badge kept.
+/* TrafficStars native in the catalog grid cards (ts-grid-ad.tsx): one ad, max 300 px wide inside the
+   card's dark frame, image 300:250, title with ellipsis below. Network's AD badge kept.
    Scoped to [data-kdp-ad]; !important because the SDK injects its own stylesheet after ours. */
 [data-kdp-ad="trafficstars"] [id^="ts_ms_"],
 [data-kdp-ad="trafficstars"] .mn-related-container,
@@ -167,8 +167,11 @@
   position: relative !important;
   width: 100% !important;
   height: auto !important;
-  aspect-ratio: 300 / 250 !important;
   border-radius: 0 !important;
+}
+/* Only a holder that really has an image gets the thumb shape (no empty black frame). */
+[data-kdp-ad="trafficstars"] .mn-thumb__holder:has(.mn-thumb__img) {
+  aspect-ratio: 300 / 250 !important;
 }
 [data-kdp-ad="trafficstars"] .mn-thumb__aspect {
   display: none !important;
@@ -189,7 +192,7 @@
   display: block !important;
   width: 100% !important;
   height: auto !important;
-  margin-top: 0.75rem !important;
+  margin-top: 0.5rem !important;
   padding: 0 26px 0 0 !important;
   background: transparent !important;
   color: rgb(244 244 245) !important;
