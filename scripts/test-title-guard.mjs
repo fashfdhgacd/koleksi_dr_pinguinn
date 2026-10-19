@@ -51,6 +51,20 @@ for (const [title, want] of cases) {
   console.log(`${ok ? "OK  " : "FAIL"} ${want.padEnd(6)} ${JSON.stringify(title)}${ok ? "" : ` → ${got} (${r || w})`}`);
 }
 
+// Jav: no soft warning, hard reject still applies
+const jav = [
+  ["Istri dipaksa bosnya JAV", "jav", "ok"],
+  ["Sleeping wife JAV", "jav", "ok"],
+  ["Istri dipaksa bosnya", "amatir", "warn"],
+  ["Japanese schoolgirl JAV", "jav", "reject"],
+];
+for (const [title, cat, want] of jav) {
+  const got = uploadRejectReason(title) ? "reject" : uploadWarnReason(title, cat) ? "warn" : "ok";
+  const ok = got === want;
+  if (!ok) fail++;
+  console.log(`${ok ? "OK  " : "FAIL"} ${want.padEnd(6)} [${cat}] ${JSON.stringify(title)}${ok ? "" : ` → ${got}`}`);
+}
+
 // teenager(s) -> 18+
 const age = [
   ["Hot teenager couple", "Hot 18+ couple"],
@@ -64,6 +78,6 @@ for (const [input, base] of age) {
   console.log(`${ok ? "OK  " : "FAIL"} 18+    ${JSON.stringify(input)} → ${JSON.stringify(got)}`);
 }
 
-const total = cases.length + age.length;
+const total = cases.length + jav.length + age.length;
 console.log(`\n${total - fail}/${total} lulus`);
 process.exit(fail ? 1 : 0);

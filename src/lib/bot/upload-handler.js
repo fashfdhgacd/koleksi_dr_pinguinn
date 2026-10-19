@@ -381,7 +381,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
       : deadVidey.has(i)
         ? { ...flagged, hidden: true, hidden_reason: DEAD_VIDEY_REASON }
         : flagged;
-    const warn = uploadWarnReason(`${guardText} ${baseTitle}`);
+    const warn = uploadWarnReason(`${guardText} ${baseTitle}`, record.category);
     const fileName = video.file || "videos.json";
     const list = byFile.get(fileName) || [];
     list.push({ video, title, record, warn });

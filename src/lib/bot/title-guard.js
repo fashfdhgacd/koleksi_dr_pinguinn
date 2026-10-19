@@ -7,6 +7,7 @@
  * - uploadWarnReason():   school / force / sleeping / drunk words -> saved normally, the bot warns
  *                         so the owner can check and hide (too many false positives to reject).
  *
+ * No soft warning for category "jav" (scripted studio JAV); the reject applies to every category.
  * Whole words, case-insensitive. "guru"/"cikgu" never count. No imports: plain JS, testable with node.
  */
 
@@ -61,6 +62,8 @@ export function uploadRejectReason(text = "") {
 }
 
 /** Label of a school / force / sleeping / drunk term: the video is saved, the owner gets a warning. "" when none. */
-export function uploadWarnReason(text = "") {
+export function uploadWarnReason(text = "", category = "") {
+  // Jav = professional scripted studio videos: no soft warning (the hard reject above still applies).
+  if (String(category || "").trim().toLowerCase() === "jav") return "";
   return firstHit(WARN_RULES, text);
 }
