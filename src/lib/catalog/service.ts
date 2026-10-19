@@ -45,6 +45,19 @@ async function listFeaturedWithArt(page = 1, limit = 8, signal?: AbortSignal) {
   };
 }
 
+async function heroFeatured(signal?: AbortSignal): Promise<{ items: VideoCard[] }> {
+  try {
+    if (!import.meta.env.SSR) throw new Error("client");
+    const { heroState } = await import("./hero-pick");
+    const state = await heroState();
+    if (state.current) return { items: [state.current] };
+  } catch {
+    /* fall back below */
+  }
+  const old = await listFeaturedWithArt(1, 8, signal);
+  return { items: old.items.slice(0, 1) };
+}
+
 export type CatalogQuery = {
   type?: string | null;
   page?: string | number | null;
@@ -147,8 +160,9 @@ export async function queryCatalog(query: CatalogQuery, signal?: AbortSignal): P
         return { ok: true, type, item: itemV, related: await withVideyViews(related.items) };
       }
       case "home": {
+        // Hero: one video per WIB time slot (hero-pick.ts); old featured list only as a fallback.
         const [featured, latest] = await Promise.all([
-          listFeaturedWithArt(1, 8, signal),
+          heroFeatured(signal),
           listLatest(page ?? 1, limit ?? DEFAULT_PAGE_SIZE, signal),
         ]);
         return {

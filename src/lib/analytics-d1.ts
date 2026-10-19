@@ -467,6 +467,28 @@ export async function d1HistoryRows(
   return out;
 }
 
+/**
+ * Most-watched video pages (/watch/<id>) over the ROLLING last 24 hours: one aggregate query.
+ * Single source for the /pemilik "Video terpopuler" list and the home hero fallback
+ * (hero-pick.ts caches it per isolate for <= 10 min, so it never runs per visit).
+ */
+export function d1TopWatchRows24h(
+  db: D1DatabaseLike,
+  now = Date.now(),
+  limit = TOP_VIDEOS_LIMIT,
+): Promise<{ path: string; views: number; uniq: number }[]> {
+  return all<{ path: string; views: number; uniq: number }>(
+    db,
+    `select path, sum(vw * n) as views, sum(vw) as uniq from (
+       select path, visitor_id, max(${W}) as vw, count(*) as n from analytics_events
+        where event_type = 'pageview' and created_at >= ?1 and path like '/watch/%'
+        group by path, visitor_id
+     ) group by path order by views desc, uniq desc limit ?2`,
+    now - DAY_MS,
+    limit,
+  );
+}
+
 /** Dashboard aggregates for the owner stats (shapes match the Postgres path). */
 export async function d1StatsParts(db: D1DatabaseLike, today: string, now = Date.now()) {
   const t0 = wibDayStartMs(today);
@@ -510,18 +532,8 @@ export async function d1StatsParts(db: D1DatabaseLike, today: string, now = Date
         t0,
         t1,
       ),
-      // Video pages only (/watch/<id>) — separate from the mixed "Halaman" list.
-      all<{ path: string; views: number; uniq: number }>(
-        db,
-        `select path, sum(vw * n) as views, sum(vw) as uniq from (
-           select path, visitor_id, max(${W}) as vw, count(*) as n from analytics_events
-            where ${TODAY} and path like '/watch/%'
-            group by path, visitor_id
-         ) group by path order by views desc, uniq desc limit ?3`,
-        t0,
-        t1,
-        TOP_VIDEOS_LIMIT,
-      ),
+      // Video pages only (/watch/<id>), rolling last 24 h; the same query feeds the home hero.
+      d1TopWatchRows24h(db, now),
     ]);
   // Browser/country lists are optional extras: a failure here must not break the stats.
   const [browserRows, countryRows] = await Promise.all([

@@ -271,9 +271,9 @@ export async function getOwnerStats(): Promise<OwnerStats> {
         ),
         sql.query<{ path: string; views: number; uniq: number }>(
           `select path, count(*)::int as views, count(distinct visitor_id)::int as uniq from analytics_events
-         where ${TODAY_WINDOW} and event_type = 'pageview' and path like '/watch/%'
-         group by path order by views desc, uniq desc limit $2`,
-          [dk, TOP_VIDEOS_LIMIT],
+         where created_at >= now() - interval '24 hours' and event_type = 'pageview' and path like '/watch/%'
+         group by path order by views desc, uniq desc limit $1`,
+          [TOP_VIDEOS_LIMIT],
         ),
       ]);
       // Optional extras: older databases may lack the country column; never fail the stats for them.
