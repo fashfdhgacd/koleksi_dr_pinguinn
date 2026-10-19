@@ -1,8 +1,13 @@
 import { refineCategory } from "../catalog/title-category.js";
 import { cleanUploadTitle, brandUploadTitle } from "./title-brand.js";
+import {
+  DRP_ID_PREFIX,
+  DRP_SOURCES,
+  drpCodeFromUrl,
+  drpKindOfHost,
+} from "../catalog/drp-hosts.js";
 const STREAMTAPE_HOST = /(^|\.)(streamtape\.com|strcloud[a-z0-9]*)$/i;
 const PUTARIN_HOST = /(^|\.)(putarin\.com|puterin\.[a-z]+)$/i;
-const LULU_HOST = /(^|\.)(luluvdo\.com|lulustream\.com|luluvid\.com|lulu\.st)$/i;
 const INDOAV_HOST = /indoav\./i;
 const USERBOKEP_HOST = /userbokep\./i;
 const VIDEY_HOST = /(^|\.)videy\.co$/i;
@@ -75,7 +80,7 @@ export function isUploadHost(url) {
     return (
       STREAMTAPE_HOST.test(host) ||
       PUTARIN_HOST.test(host) ||
-      LULU_HOST.test(host) ||
+      Boolean(drpKindOfHost(host)) ||
       INDOAV_HOST.test(host) ||
       USERBOKEP_HOST.test(host) ||
       VIDEY_HOST.test(host)
@@ -161,22 +166,9 @@ export function parseVideoLink(url) {
     };
   }
 
-  if (LULU_HOST.test(host)) {
-    const m =
-      path.match(/\/(?:e|v|d)\/([A-Za-z0-9]+)/i) ||
-      [null, String(path.split("/").filter(Boolean).pop() || "").replace(/\.html$/i, "")];
-    const id = m && m[1];
-    if (!id) return null;
-    const embed = `https://luluvdo.com/e/${id}`;
-    return {
-      id,
-      host: "lulu",
-      source: "Lulustream",
-      embed,
-      direct: embed,
-      file: `campur.json`,
-    };
-  }
+  // Owner's own LuluStream / DoodStream / Byse uploads -> /kategori/bokep (src/lib/catalog/drp-hosts.js).
+  const drp = drpKindOfHost(host);
+  if (drp) return parseDrpLink(drp, parsed);
 
   if (VIDEY_HOST.test(host)) {
     // videy.co/v/?id=X or a direct file link cdn.videy.co/X.mp4 (cdn2, cdn3, ... too).
@@ -210,8 +202,70 @@ export function parseVideoLink(url) {
     };
   }
 
+  // Unknown domain with /e/<code>: maybe a Byse account's own embed domain. Only a candidate here;
+  // upload-handler keeps it only when Byse's public /api/videos/<code>/embed/details answers.
+  const pm = path.match(/^\/e\/([A-Za-z0-9]{6,40})\/?$/);
+  if (pm) {
+    const code = pm[1];
+    const embed = `${origin}/e/${code}`;
+    /** @type {Record<string, any>} */
+    const probe = {
+      id: `${DRP_ID_PREFIX.byse}${code}`,
+      code,
+      host: "byse-probe",
+      source: DRP_SOURCES.byse,
+      embed,
+      direct: embed,
+      origin,
+      file: `videos.json`,
+    };
+    return probe;
+  }
+
   return null;
 }
+
+/** Path words on these hosts that are pages, not file codes (dashboard links pasted by mistake). */
+const DRP_NOT_A_CODE = new Set([
+  "dashboard", "settings", "account", "videos", "folders", "folder", "upload", "uploads", "login",
+  "register", "signup", "logout", "premium", "earnings", "payments", "payouts", "affiliate", "support",
+  "contact", "privacy", "terms", "dmca", "faq", "about", "api", "apidocs", "reports", "panel", "home",
+]);
+
+/** Panel domains that do not play embeds themselves (Byse: each account has its own embed domain). */
+const BYSE_PANEL_HOST = /^(?:api\.)?byse\.sx$/i;
+
+/**
+ * LuluStream / DoodStream / Byse link -> record base. Ids are prefixed (lu-/dd-/by-) so they never
+ * clash with another host's id; `code` keeps the host's own file code for meta lookups.
+ * @param {"lulu" | "dood" | "byse"} kind
+ * @param {URL} parsed
+ * @returns {Record<string, any> | null}
+ */
+function parseDrpLink(kind, parsed) {
+  const host = parsed.hostname.replace(/^www\./i, "").toLowerCase();
+  const code = drpCodeFromUrl(parsed.href);
+  if (!code || DRP_NOT_A_CODE.has(code.toLowerCase())) return null;
+  let embed;
+  if (kind === "lulu") embed = `https://luluvdo.com/e/${code}`;
+  else if (kind === "dood") embed = `https://${host}/e/${code}`;
+  else embed = `${parsed.origin}/e/${code}`;
+  return {
+    id: `${DRP_ID_PREFIX[kind]}${code}`,
+    code,
+    host: kind,
+    source: DRP_SOURCES[kind],
+    embed,
+    direct: embed,
+    origin: parsed.origin,
+    file: `videos.json`,
+    // Byse panel link (byse.sx/...): the real embed domain comes from the details endpoint.
+    ...(kind === "byse" && BYSE_PANEL_HOST.test(host) ? { needsEmbedDomain: true } : {}),
+  };
+}
+
+/** Hosts whose "link judul" on one line means: the text after the link is that video's title. */
+const SAME_LINE_TITLE_HOSTS = new Set(["videy", "lulu", "dood", "byse", "byse-probe"]);
 
 export function parseMessage(text = "") {
   const lines = String(text)
@@ -235,12 +289,12 @@ export function parseMessage(text = "") {
     if (/^(?:title|judul|category|kategori|cat)\s*[:\-]/i.test(line)) continue;
     const lineUrls = extractUrls(line);
     if (lineUrls.length) {
-      // Videy: "link judul" on one line; the text after the link is that video's title.
+      // Videy / Lulu / Dood / Byse: "link judul" on one line; the text after the link is its title.
       let sameLine = "";
       if (lineUrls.length === 1) {
         const rest = line.split(lineUrls[0]).join(" ").replace(/\s+/g, " ").trim();
         const p0 = parseVideoLink(lineUrls[0]);
-        if (rest && p0 && p0.host === "videy") sameLine = rest;
+        if (rest && p0 && SAME_LINE_TITLE_HOSTS.has(p0.host)) sameLine = rest;
       }
       for (const url of lineUrls) {
         const parsed = parseVideoLink(url);

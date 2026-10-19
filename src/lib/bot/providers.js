@@ -1,3 +1,5 @@
+import { BYSE_DOMAINS } from "../catalog/drp-hosts.js";
+
 async function getJson(url, headers = {}) {
   const res = await fetch(url, { headers, redirect: "follow" });
   const text = await res.text();
@@ -128,6 +130,210 @@ export async function fetchEmbedPageMeta(embedUrl, id) {
     return { title: "", thumb: "" };
   };
   return withTimeout(run(), 6000, { title: "", thumb: "" });
+}
+
+/* ------------------------------------------------------------------------------------------------
+ * LuluStream / DoodStream / Byse ("Koleksi Dr. Pinguin Bokep"): title + poster, best effort, once at
+ * upload time (never per view). Any failure returns empty strings: the card then falls back to the
+ * site's brand poster (/thumb/<id>) and the title to an auto title the owner can fix in /pemilik.
+ * ---------------------------------------------------------------------------------------------- */
+
+const BROWSER_UA =
+  "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36";
+
+/** Titles that are a host/anti-bot page, not the video's name. */
+const JUNK_TITLE =
+  /^(?:video|watch|embed|player|loading|untitled|file|404|403)$|just a moment|attention required|ddos|cloudflare|access denied|not found|file (?:was )?(?:deleted|removed|not found)|video (?:not found|tidak ditemukan)|tidak ditemukan|captcha|verify|doodstream|lulustream|byse/i;
+
+function cleanHostTitle(raw = "") {
+  let t = decodeEntities(String(raw || ""))
+    .replace(/\s*[-|–—·]\s*(?:dood\s*stream|doodstream|dood|luluvdo|lulu\s*stream|lulustream|lulu|byse)[^|]*$/i, "")
+    .replace(/^(?:watch|nonton)\s+/i, "")
+    .replace(/\.(?:mp4|mkv|mov|avi|webm|m4v|ts)$/i, "")
+    .replace(/[_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!t || t.length < 3 || JUNK_TITLE.test(t)) return "";
+  if (t.length > 160) t = t.slice(0, 160).trim();
+  return t;
+}
+
+function absUrl(raw, base) {
+  const v = decodeEntities(String(raw || "")).replace(/\\\//g, "/").trim();
+  if (!v || /^data:/i.test(v)) return "";
+  try {
+    const u = new URL(v, base);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+/** Poster candidates in an embed page: og:image, <video poster>, player config image/poster/thumbnail. */
+function posterFromHtml(html, base) {
+  const pats = [
+    /<meta[^>]+property=["']og:image(?::secure_url)?["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i,
+    /<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i,
+    /<video[^>]+poster=["']([^"']+)["']/i,
+    /["']?(?:poster|image|thumbnail|thumb|splash|splash_img|single_img|poster_url|thumbnail_url)["']?\s*[:=]\s*["']([^"']+\.(?:jpe?g|png|webp)(?:\?[^"']*)?)["']/i,
+    /(https?:\/\/[^"'\s)]+\/(?:snaps|splash|thumbs?|posters?|images?)\/[^"'\s)]+\.(?:jpe?g|png|webp))/i,
+  ];
+  for (const re of pats) {
+    const m = html.match(re);
+    const u = m ? absUrl(m[1], base) : "";
+    if (u && !/placeholder|logo|favicon|sprite|blank|default|no-?image|avatar|icon/i.test(u)) return u;
+  }
+  return "";
+}
+
+function titleFromHtml(html) {
+  const pats = [
+    /<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:title["']/i,
+    /<meta[^>]+name=["']twitter:title["'][^>]+content=["']([^"']+)["']/i,
+    /<title[^>]*>([^<]+)<\/title>/i,
+    /<h[1-4][^>]*>([^<]{3,160})<\/h[1-4]>/i,
+  ];
+  for (const re of pats) {
+    const m = html.match(re);
+    const t = m ? cleanHostTitle(m[1]) : "";
+    if (t) return t;
+  }
+  return "";
+}
+
+/** True when the URL answers with an image (first bytes only). Unknown = false, so we never store junk. */
+async function looksLikeImage(url, referer) {
+  if (!/^https?:\/\//i.test(String(url || ""))) return false;
+  try {
+    const res = await fetch(url, {
+      headers: { "user-agent": BROWSER_UA, accept: "image/*", range: "bytes=0-2047", ...(referer ? { referer } : {}) },
+      redirect: "follow",
+      signal: AbortSignal.timeout(3500),
+    });
+    const type = String(res.headers.get("content-type") || "").toLowerCase();
+    try {
+      await res.body?.cancel();
+    } catch {
+      /* ignore */
+    }
+    return (res.status === 200 || res.status === 206) && type.startsWith("image/");
+  } catch {
+    return false;
+  }
+}
+
+async function fetchHtml(url, referer) {
+  try {
+    const res = await fetch(url, {
+      headers: {
+        accept: "text/html,application/xhtml+xml",
+        "accept-language": "id-ID,id;q=0.9,en;q=0.8",
+        "user-agent": BROWSER_UA,
+        ...(referer ? { referer } : {}),
+      },
+      redirect: "follow",
+      signal: AbortSignal.timeout(5000),
+    });
+    if (!res.ok) return { html: "", url: res.url || url };
+    const html = (await res.text()).slice(0, 400_000);
+    return { html, url: res.url || url };
+  } catch {
+    return { html: "", url };
+  }
+}
+
+/**
+ * LuluStream / DoodStream: scrape the public embed (and Dood /d/) page for title + poster.
+ * The poster is kept only if it really answers with an image. Never throws; 9 s cap.
+ */
+export async function fetchDrpPageMeta(kind, embedUrl, code) {
+  const empty = { title: "", thumb: "" };
+  if (!code || !embedUrl) return empty;
+  const run = async () => {
+    let origin = "";
+    try {
+      origin = new URL(embedUrl).origin;
+    } catch {
+      return empty;
+    }
+    const c = encodeURIComponent(code);
+    const pages =
+      kind === "dood"
+        ? [`${origin}/e/${c}`, `${origin}/d/${c}`]
+        : kind === "lulu"
+          ? [`https://luluvdo.com/e/${c}`, `https://lulustream.com/${c}.html`]
+          : [embedUrl];
+    let title = "";
+    let thumb = "";
+    for (const page of pages) {
+      const { html, url } = await fetchHtml(page, "https://koleksidrpinguin.com/");
+      if (!html) continue;
+      if (!title) title = titleFromHtml(html);
+      if (!thumb) {
+        const cand = posterFromHtml(html, url);
+        if (cand && (await looksLikeImage(cand, url))) thumb = cand;
+      }
+      if (title && thumb) break;
+    }
+    return { title, thumb };
+  };
+  return withTimeout(run(), 9000, empty);
+}
+
+/**
+ * Byse public player details (no API key): <embed domain>/api/videos/<code>/embed/details.
+ * Tries the link's own domain first, then the known Byse domains. ok=true only for a real Byse
+ * answer (used to accept links on an unknown domain). embed = Byse's own embed_frame_url when given.
+ */
+export async function fetchByseMeta(origin, code) {
+  const empty = { ok: false, title: "", thumb: "", embed: "", length: 0 };
+  if (!code || !/^[A-Za-z0-9]{4,40}$/.test(String(code))) return empty;
+  const run = async () => {
+    const bases = [];
+    const add = (b) => {
+      if (b && !bases.includes(b)) bases.push(b);
+    };
+    if (origin && !/^https?:\/\/(?:api\.)?byse\.sx$/i.test(origin)) add(origin);
+    for (const d of BYSE_DOMAINS) if (!/^(?:api\.)?byse\.sx$/i.test(d)) add(`https://${d}`);
+    for (const base of bases.slice(0, 4)) {
+      try {
+        const res = await fetch(`${base}/api/videos/${encodeURIComponent(code)}/embed/details`, {
+          headers: { accept: "application/json", "user-agent": BROWSER_UA, referer: `${base}/e/${code}` },
+          redirect: "follow",
+          signal: AbortSignal.timeout(4000),
+        });
+        if (!res.ok) continue;
+        const data = await res.json().catch(() => null);
+        const d = data && typeof data === "object" ? data.data || data.video || data.result || data : null;
+        if (!d || typeof d !== "object" || d.error) continue;
+        const frame = absUrl(d.embed_frame_url || d.embed_url || "", base);
+        const looksByse = Boolean(frame || d.code || d.file_code || d.title || d.poster_url);
+        if (!looksByse) continue;
+        const title = cleanHostTitle(d.title || d.name || "");
+        let thumb = absUrl(d.poster_url || d.thumbnail_url || d.thumbnail || d.poster || d.splash_url || "", base);
+        if (thumb && !(await looksLikeImage(thumb, `${base}/`))) thumb = "";
+        const len = Number(d.length_seconds || d.duration || d.length || 0);
+        return {
+          ok: true,
+          title,
+          thumb,
+          embed: frame && /\/e\//.test(frame) ? frame : "",
+          length: Number.isFinite(len) && len > 0 ? Math.round(len) : 0,
+        };
+      } catch {
+        /* next domain */
+      }
+    }
+    // Last resort for a known Byse domain: the embed page itself (og:image / <title>).
+    if (origin && !/^https?:\/\/(?:api\.)?byse\.sx$/i.test(origin)) {
+      const meta = await fetchDrpPageMeta("byse", `${origin}/e/${code}`, code);
+      return { ...empty, title: meta.title, thumb: meta.thumb };
+    }
+    return empty;
+  };
+  return withTimeout(run(), 12000, empty);
 }
 
 export async function fetchPutarinMeta(code, env) {

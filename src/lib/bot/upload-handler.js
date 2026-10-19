@@ -1,10 +1,32 @@
 import { parseMessage, detectCategory, cleanTitle, brandTitle } from "@/lib/bot/parse.js";
 import { toRecord } from "@/lib/bot/store.js";
-import { fetchPutarinMeta, fetchStreamtapeMeta, fetchEmbedPageMeta, expandPutarinFolder } from "@/lib/bot/providers.js";
+import {
+  fetchPutarinMeta,
+  fetchStreamtapeMeta,
+  fetchEmbedPageMeta,
+  expandPutarinFolder,
+  fetchByseMeta,
+  fetchDrpPageMeta,
+} from "@/lib/bot/providers.js";
+import { DRP_CATEGORY } from "@/lib/catalog/drp-hosts.js";
 import { upsertVideosBatch } from "@/lib/bot/github.js";
 import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
 import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
 import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+
+/** Owner's own LuluStream / DoodStream / Byse uploads ("byse-probe" = Byse on a not-yet-listed domain). */
+const DRP_HOSTS = new Set(["lulu", "dood", "byse", "byse-probe"]);
+function isDrpHost(host) {
+  return DRP_HOSTS.has(String(host || ""));
+}
+
+/**
+ * Title when Lulu/Dood/Byse give none (marked titleAuto so /pemilik lists it for a real title).
+ * No "Dr. Pinguin" words here: cleanTitle strips old pinguin branding, brandTitle adds the domain.
+ */
+function drpAutoTitle(video) {
+  return `Bokep Indo Pilihan ${String(video.code || video.id || "").replace(/^(?:lu|dd|by)-/i, "")}`.trim();
+}
 
 function hasUserTitle(raw) {
   const t = cleanTitle(String(raw || ""));
@@ -32,9 +54,34 @@ async function resolveMetaFast(video, givenTitle, env) {
       const meta = await fetchEmbedPageMeta(video.embed, video.id);
       if (!title && meta.title) title = cleanTitle(meta.title);
       if (!thumb && isHttpPoster(meta.thumb)) thumb = meta.thumb;
+    } else if (isDrpHost(video.host)) {
+      // Best effort, once per upload. Byse (incl. unknown domains) always asks the public details
+      // endpoint: it also confirms the link really is Byse and gives the real embed domain.
+      let embed = "";
+      let byseOk = false;
+      let length = 0;
+      if (video.host === "byse" || video.host === "byse-probe") {
+        const meta = await fetchByseMeta(video.origin, video.code);
+        byseOk = Boolean(meta.ok);
+        if (!title && meta.title) title = cleanTitle(meta.title);
+        if (!thumb && isHttpPoster(meta.thumb)) thumb = meta.thumb;
+        if (meta.embed) embed = meta.embed;
+        if (meta.length) length = meta.length;
+      } else if (!thumb || !title) {
+        const meta = await fetchDrpPageMeta(video.host, video.embed, video.code);
+        if (!title && meta.title) title = cleanTitle(meta.title);
+        if (!thumb && isHttpPoster(meta.thumb)) thumb = meta.thumb;
+      }
+      const auto = !title || title === "Video";
+      return { title: auto ? drpAutoTitle(video) : title, thumb, embed, byseOk, length, titleAuto: auto };
     }
   } catch {
     /* fallback */
+  }
+
+  if (isDrpHost(video.host)) {
+    const auto = !title || title === "Video";
+    return { title: auto ? drpAutoTitle(video) : title, thumb, embed: "", byseOk: false, length: 0, titleAuto: auto };
   }
 
   if (!title) {
@@ -174,7 +221,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     await tgSend(
       token,
       chatId,
-      "❌ Tidak ada link IndoAV / UserBokep / Puterin / Streamtape / Lulu / Videy yang valid.\n\nKirim link lengkap, atau pakai tombol menu.",
+      "❌ Tidak ada link IndoAV / UserBokep / Puterin / Streamtape / Videy / LuluStream / DoodStream / Byse yang valid.\n\nKirim link lengkap, atau pakai tombol menu.",
       { reply_markup: MAIN_KEYBOARD }
     );
     return;
@@ -258,8 +305,31 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
 
   const byFile = new Map();
   for (let i = 0; i < queue.length; i++) {
-    const video = queue[i];
+    let video = queue[i];
     const meta = metas[i] || { title: `Video ${video.id}`, thumb: "" };
+    if (isDrpHost(video.host)) {
+      // Byse on a domain not in drp-hosts.js: kept only when Byse's details endpoint knew the code.
+      if (video.host === "byse-probe" && !meta.byseOk) {
+        failedTotal += 1;
+        lines.push(`⚠️ Link tidak dikenal (bukan LuluStream/DoodStream/Byse): ${video.embed}`);
+        continue;
+      }
+      const byseEmbed = (video.host === "byse" || video.host === "byse-probe") && /^https:\/\/[^/]+\/e\/[A-Za-z0-9]+/i.test(String(meta.embed || ""))
+        ? String(meta.embed)
+        : "";
+      if (video.needsEmbedDomain && !byseEmbed) {
+        // byse.sx itself does not play embeds; without the account's embed domain the video would not play.
+        failedTotal += 1;
+        lines.push(`⚠️ ${video.id}: link panel byse.sx — kirim link embed dari tombol Embed (domain akun Byse)`);
+        continue;
+      }
+      video = {
+        ...video,
+        host: video.host === "byse-probe" ? "byse" : video.host,
+        ...(byseEmbed ? { embed: byseEmbed, direct: byseEmbed } : {}),
+      };
+      if (meta.titleAuto) autoTitled.add(i);
+    }
     // Judul dasar (branding situs lain + pinguin lama sudah dibuang) untuk kategori & filter minor;
     // yang disimpan/ditampilkan: judul dasar + tepat satu " - koleksidrpinguin.com" (keputusan pemilik).
     const baseTitle = cleanTitle(meta.title || `Video ${video.id}`);
@@ -270,7 +340,9 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const generic = !given || ["amatir", "umum", "lainnya", "bokep"].includes(given);
     const detected = detectCategory(baseTitle);
     const category =
-      video.host === "videy"
+      isDrpHost(video.host)
+        ? DRP_CATEGORY
+        : video.host === "videy"
         ? "videy"
         : video.host === "putarin" || video.host === "putarin-folder"
         ? parsedMsg.category || "jav"
@@ -280,11 +352,16 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
             ? given
             : detected !== "lainnya"
               ? detected
-              : given || (video.host === "indoav" || video.host === "userbokep" ? "amatir" : "lainnya");
+              : (given && given !== DRP_CATEGORY ? given : "") ||
+                (video.host === "indoav" || video.host === "userbokep" ? "amatir" : "lainnya");
     const withPoster = isHttpPoster(meta.thumb)
       ? { ...video, poster: meta.thumb, thumbnail: meta.thumb }
       : video;
-    const baseRecord = toRecord({ parsed: withPoster, title, category });
+    const recordBase = toRecord({ parsed: withPoster, title, category });
+    // Lulu/Dood/Byse: keep the host's own file code (meta refresh later) and Byse's duration when known.
+    const baseRecord = isDrpHost(video.host)
+      ? { ...recordBase, code: video.code, ...(meta.length ? { duration: meta.length } : {}) }
+      : recordBase;
     // School/minor-themed titles are stored but flagged hidden (the catalog never shows them).
     const minorText = `${baseTitle} ${String(video.title || parsedMsg.title || "")} ${String(meta.title || "")}`;
     const hiddenReason = minorContentReason(minorText) || lockedMinorReason(minorText);

@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { collectSharePool } from "@/lib/bot/share-pool";
 import { loadShareUsed, saveShareUsed } from "@/lib/bot/share-used";
 import { processUploadBatch } from "@/lib/bot/upload-handler.js";
+import { parseMessage } from "@/lib/bot/parse.js";
 import { isOwnerRequest } from "@/lib/owner-auth";
 import {
   TELEGRAM_SECRET_HEADER,
@@ -311,7 +312,8 @@ async function handlePost(request: Request): Promise<Response> {
       [
         "Bot aktif.",
         "",
-        "\ud83d\udce4 Upload: IndoAV / UserBokep / Puterin / Streamtape / Lulu / Videy",
+        "\ud83d\udce4 Upload: IndoAV / UserBokep / Puterin / Streamtape / Videy",
+        "\ud83d\udc27 Koleksi Dr. Pinguin Bokep: link LuluStream / DoodStream / Byse",
         "\ud83d\udce5 Minta: 10, 25, atau 100",
       ].join("\n"),
       { reply_markup: MAIN_KEYBOARD },
@@ -319,11 +321,14 @@ async function handlePost(request: Request): Promise<Response> {
     return Response.json({ ok: true });
   }
 
+  // Known hosts by name, plus anything the bot parser accepts (LuluStream / DoodStream mirrors /
+  // Byse on its own embed domains: src/lib/catalog/drp-hosts.js).
   const hasUploadLink =
     /https?:\/\//i.test(text) &&
-    /streamtape\.com|strcloud|putarin\.com|puterin\.|panel\.putarin|luluvdo|lulustream|luluvid|lulu\.st|indoav\.|userbokep|videy\.co/i.test(
+    (/streamtape\.com|strcloud|putarin\.com|puterin\.|panel\.putarin|luluvdo|lulustream|luluvid|lulu\.st|indoav\.|userbokep|videy\.co/i.test(
       text,
-    );
+    ) ||
+      parseMessage(text).videos.length > 0);
 
   if (hasUploadLink) {
     const work = processUploadBatch({
