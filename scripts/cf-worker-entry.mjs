@@ -44,8 +44,13 @@ import nitroHandler from "../node_modules/nitro/dist/presets/cloudflare/runtime/
 import { brandUploadTitle } from "../src/lib/bot/title-brand.js";
 import { fetchJsonFromGithub, upsertVideosBatch } from "../src/lib/bot/github.js";
 
-/** Longest time (s) a cached HTML page counts as fresh. */
-const HTML_FRESH_MAX = 180;
+/**
+ * Longest time (s) a cached HTML page counts as fresh. 600 s (Oct 2026, cost cut, was 180): new uploads
+ * still show at once because every upload lands through a GitHub commit + deploy, and the cache key
+ * carries the deploy version; owner edits are purged (purgeAfterEdit). Only an owner hide waits up to
+ * this long (then the stale copy is dropped when the refresh no longer gets a 200).
+ */
+const HTML_FRESH_MAX = 600;
 /** Longest stale window (s) for HTML when the page sets a larger stale-while-revalidate. */
 const HTML_STALE_MAX = 86_400;
 /** Longest time (s) any other cached response (images, xml, json) is kept. */

@@ -88,8 +88,10 @@ export default async function cacheHeadersMiddleware(
   ) {
     return withHeaders(result, "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400");
   }
+  // Home and other pages: edge-fresh 10 min (scripts/cf-worker-entry.mjs HTML_FRESH_MAX); a deploy
+  // (= every upload) starts a new cache, so new videos still appear right away.
   if (type.includes("text/html") && !result.headers.get("cache-control")) {
-    return withHeaders(result, "public, max-age=60, s-maxage=120, stale-while-revalidate=600");
+    return withHeaders(result, "public, max-age=60, s-maxage=600, stale-while-revalidate=3600");
   }
   // Semua response lain tetap dapat Referrer-Policy
   return withHeaders(result);
