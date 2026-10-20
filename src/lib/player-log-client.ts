@@ -6,12 +6,22 @@
  * exactly what a play on any other host costs: one D1 upsert per video+event per session.
  */
 
-export type PlayerLogEvent = "start2" | "slow2" | "fail2" | "pop_fire" | "pop_ok" | "pop_block";
+export type PlayerLogEvent =
+  | "start2"
+  | "slow2"
+  | "fail2"
+  | "pop_fire"
+  | "pop_ok"
+  | "pop_block"
+  | "popc_fire"
+  | "popc_ok"
+  | "popc_block";
+export type PlayerLogHost = "IndoAV" | "UserBokep" | "Streamtape" | "Putarin" | "Videy" | "Arsip" | "Lainnya";
 
 const LOG_KEY = "kdp-plog";
 const loggedMem = new Set<string>();
 
-export function sendPlayerLog(id: string, host: "Videy", event: PlayerLogEvent): void {
+export function sendPlayerLog(id: string, host: PlayerLogHost, event: PlayerLogEvent): void {
   if (typeof window === "undefined" || !id) return;
   const tag = `${id}|${event}`;
   if (loggedMem.has(tag)) return;

@@ -8,6 +8,7 @@ import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { isRealMinor } from "@/lib/minor-terms";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TsGridAd } from "@/components/ts-grid-ad";
+import { onCatalogCardClick } from "@/components/card-popunder";
 import { VideoCard } from "./video-card";
 import { useCallback, useState } from "react";
 
@@ -61,7 +62,11 @@ export function VideoGrid({
     : [];
   const cells = shown.length + slots.length;
   return (
-    <div className={ads ? CATALOG_GRID + trimClass(cells) : DEFAULT_GRID}>
+    <div
+      className={ads ? CATALOG_GRID + trimClass(cells) : DEFAULT_GRID}
+      // Catalog grids only: first video-card click per session also opens the popunder.
+      onClickCapture={ads ? (e) => onCatalogCardClick(e, (id) => String(shown.find((v) => v.id === id)?.creator || "")) : undefined}
+    >
       {shown.map((video, index) => {
         const s = slots.find((x) => x.at === index);
         return (

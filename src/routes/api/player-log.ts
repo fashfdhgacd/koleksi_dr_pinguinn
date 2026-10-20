@@ -77,6 +77,10 @@ const EVENTS: Record<string, number> = {
   pop_fire: 1,
   pop_ok: 1,
   pop_block: 1,
+  // Catalog card-click popunder (card-popunder.ts), once per session: same three steps.
+  popc_fire: 1,
+  popc_ok: 1,
+  popc_block: 1,
 };
 const V2_EVENTS = ["start2", "slow2", "fail2", "retry2", "open2", "report2", "alt2"];
 const ID_RE = /^[A-Za-z0-9_-]{3,64}$/;
@@ -298,7 +302,9 @@ async function handleOwnerView(): Promise<Response> {
     }
   }
   // Videy popunder counters for today / yesterday (one small grouped read on the owner view).
-  const popunder: Record<string, { fire: number; ok: number; block: number }> = {};
+  type Pop = { fire: number; ok: number; block: number; cardFire: number; cardOk: number; cardBlock: number };
+  const emptyPop = (): Pop => ({ fire: 0, ok: 0, block: 0, cardFire: 0, cardOk: 0, cardBlock: 0 });
+  const popunder: Record<string, Pop> = {};
   if (db) {
     try {
       const rows =
@@ -306,17 +312,18 @@ async function handleOwnerView(): Promise<Response> {
           await db
             .prepare(
               `select day, event, sum(n) as n from player_errors
-               where day >= ? and event in ('pop_fire','pop_ok','pop_block') group by day, event`,
+               where day >= ? and event in ('pop_fire','pop_ok','pop_block','popc_fire','popc_ok','popc_block') group by day, event`,
             )
             .bind(yesterday)
             .all<{ day: string; event: string; n: number }>()
         ).results || [];
       for (const r of rows) {
-        const cur = (popunder[r.day] ||= { fire: 0, ok: 0, block: 0 });
+        const cur = (popunder[r.day] ||= emptyPop());
         const n = Number(r.n) || 0;
-        if (r.event === "pop_fire") cur.fire += n;
-        else if (r.event === "pop_ok") cur.ok += n;
-        else cur.block += n;
+        const key = ({ pop_fire: "fire", pop_ok: "ok", pop_block: "block", popc_fire: "cardFire", popc_ok: "cardOk", popc_block: "cardBlock" } as const)[
+          r.event as "pop_fire"
+        ];
+        if (key) cur[key] += n;
       }
     } catch {
       /* optional */
@@ -423,8 +430,8 @@ async function handleOwnerView(): Promise<Response> {
     today: { day: today, hosts: hostsFor(today) },
     yesterday: { day: yesterday, hosts: hostsFor(yesterday) },
     popunder: {
-      today: popunder[today] || { fire: 0, ok: 0, block: 0 },
-      yesterday: popunder[yesterday] || { fire: 0, ok: 0, block: 0 },
+      today: popunder[today] || emptyPop(),
+      yesterday: popunder[yesterday] || emptyPop(),
     },
     top,
     gone,
