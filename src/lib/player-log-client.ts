@@ -15,7 +15,10 @@ export type PlayerLogEvent =
   | "pop_block"
   | "popc_fire"
   | "popc_ok"
-  | "popc_block";
+  | "popc_block"
+  | "pre_req"
+  | "pre_fill"
+  | "pre_done";
 export type PlayerLogHost = "IndoAV" | "UserBokep" | "Streamtape" | "Putarin" | "Videy" | "Arsip" | "Lainnya";
 
 const LOG_KEY = "kdp-plog";

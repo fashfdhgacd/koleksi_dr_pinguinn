@@ -30,7 +30,7 @@ export type PlayerLogRow = {
   hidden: boolean;
 };
 
-type PopCounts = { fire: number; ok: number; block: number; cardFire?: number; cardOk?: number; cardBlock?: number };
+type PopCounts = { fire: number; ok: number; block: number; cardFire?: number; cardOk?: number; cardBlock?: number; preReq?: number; preFill?: number; preDone?: number };
 
 export type PlayerLogData = {
   ok?: boolean;
@@ -417,6 +417,13 @@ export function StatusCard(props: {
       tone: !playerLog?.popunder ? "idle" : (playerLog.popunder.today.cardOk || 0) > 0 ? "ok" : (playerLog.popunder.today.cardFire || 0) > 0 ? "warn" : "idle",
       value: playerLog?.popunder
         ? `klik ${playerLog.popunder.today.cardFire || 0} · buka ${playerLog.popunder.today.cardOk || 0} · diblok ${playerLog.popunder.today.cardBlock || 0} (kemarin buka ${playerLog.popunder.yesterday.cardOk || 0})`
+        : "…",
+    },
+    {
+      name: "Pre-roll Videy hari ini",
+      tone: !playerLog?.popunder ? "idle" : (playerLog.popunder.today.preDone || 0) > 0 ? "ok" : (playerLog.popunder.today.preReq || 0) > 0 ? "warn" : "idle",
+      value: playerLog?.popunder
+        ? `minta ${playerLog.popunder.today.preReq || 0} · ada iklan ${playerLog.popunder.today.preFill || 0} · selesai ${playerLog.popunder.today.preDone || 0} (kemarin selesai ${playerLog.popunder.yesterday.preDone || 0})`
         : "…",
     },
     { name: "Thumbnail R2", tone: status?.thumbsAt ? "ok" : "idle", value: status ? wibDateTime(status.thumbsAt || null) : "…" },
