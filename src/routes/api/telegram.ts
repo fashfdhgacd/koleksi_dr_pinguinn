@@ -65,6 +65,17 @@ async function deferWork(promise: Promise<unknown>): Promise<boolean> {
   } catch {
     /* ignore */
   }
+  // Cloudflare Workers: waitUntil from the runtime module, so the webhook answers Telegram at once
+  // and a big batch keeps running after the 200 (otherwise Telegram times out and marks an error).
+  try {
+    const cf = (await import("cloudflare:workers")) as { waitUntil?: (p: Promise<unknown>) => void };
+    if (typeof cf.waitUntil === "function") {
+      cf.waitUntil(promise);
+      return true;
+    }
+  } catch {
+    /* not on Workers */
+  }
   try {
     const mod = await import("@vercel/functions");
     if (typeof (mod as { waitUntil?: (p: Promise<unknown>) => void }).waitUntil === "function") {

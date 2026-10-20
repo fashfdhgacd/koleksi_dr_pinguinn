@@ -179,9 +179,12 @@ export function OwnerDashboard() {
         const d = (await res.json().catch(() => null)) as {
           ok?: boolean;
           urlOk?: boolean;
-          info?: { lastErrorMessage?: string } | null;
+          info?: { lastErrorMessage?: string | null; lastErrorDate?: string | null } | null;
         } | null;
-        if (alive) setBotOk(Boolean(d?.ok && d.urlOk && d.info && !d.info.lastErrorMessage));
+        // Telegram keeps the last delivery error for good; only an error in the last hour counts.
+        const errAt = Date.parse(String(d?.info?.lastErrorDate || ""));
+        const freshError = Boolean(d?.info?.lastErrorMessage) && (!Number.isFinite(errAt) || Date.now() - errAt < 3600_000);
+        if (alive) setBotOk(Boolean(d?.ok && d.urlOk && d.info && !freshError));
       } catch {
         if (alive) setBotOk(false);
       }
