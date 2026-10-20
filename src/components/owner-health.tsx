@@ -30,6 +30,8 @@ export type PlayerLogRow = {
   hidden: boolean;
 };
 
+type PopCounts = { fire: number; ok: number; block: number; cardFire?: number; cardOk?: number; cardBlock?: number };
+
 export type PlayerLogData = {
   ok?: boolean;
   error?: string;
@@ -41,7 +43,7 @@ export type PlayerLogData = {
   today?: { day: string; hosts: PlayerLogHost[] };
   yesterday?: { day: string; hosts: PlayerLogHost[] };
   /** Videy popunder: tap handler ran / ad tab opened / open blocked (once per video per session). */
-  popunder?: { today: { fire: number; ok: number; block: number }; yesterday: { fire: number; ok: number; block: number } };
+  popunder?: { today: PopCounts; yesterday: PopCounts };
   top?: (PlayerLogRow & { fails: number; starts: number; reports: number; gone: boolean })[];
   gone?: (PlayerLogRow & { since: string })[];
   suspect?: number;
@@ -408,6 +410,13 @@ export function StatusCard(props: {
       tone: !playerLog?.popunder ? "idle" : playerLog.popunder.today.ok > 0 ? "ok" : playerLog.popunder.today.fire > 0 ? "warn" : "idle",
       value: playerLog?.popunder
         ? `tap ${playerLog.popunder.today.fire} · buka ${playerLog.popunder.today.ok} · diblok ${playerLog.popunder.today.block} (kemarin buka ${playerLog.popunder.yesterday.ok})`
+        : "…",
+    },
+    {
+      name: "Popunder kartu hari ini",
+      tone: !playerLog?.popunder ? "idle" : (playerLog.popunder.today.cardOk || 0) > 0 ? "ok" : (playerLog.popunder.today.cardFire || 0) > 0 ? "warn" : "idle",
+      value: playerLog?.popunder
+        ? `klik ${playerLog.popunder.today.cardFire || 0} · buka ${playerLog.popunder.today.cardOk || 0} · diblok ${playerLog.popunder.today.cardBlock || 0} (kemarin buka ${playerLog.popunder.yesterday.cardOk || 0})`
         : "…",
     },
     { name: "Thumbnail R2", tone: status?.thumbsAt ? "ok" : "idle", value: status ? wibDateTime(status.thumbsAt || null) : "…" },
