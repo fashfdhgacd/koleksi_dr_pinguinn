@@ -197,12 +197,14 @@ function videyFileUrl(id) {
 }
 
 /** True only when cdn.videy.co answers 404/410 on 3 tries (cache-busted, ~1.5 s apart). */
-async function isDeadVideyFile(id) {
+async function isDeadVideyFile(id, file = "") {
   if (!/^[A-Za-z0-9]{4,40}$/.test(String(id || ""))) return false;
+  // Videy mirror (cdn2.aceimg.com/<id>.mp4): check that exact file, not cdn.videy.co.
+  const url = /^https:\/\/cdn\d*\.aceimg\.com\//i.test(String(file || "")) ? String(file) : videyFileUrl(id);
   for (let t = 0; t < 3; t++) {
     if (t) await new Promise((r) => setTimeout(r, 1500));
     try {
-      const r = await fetch(`${videyFileUrl(id)}?cb=${Date.now()}${t}`, {
+      const r = await fetch(`${url}?cb=${Date.now()}${t}`, {
         headers: { Range: "bytes=0-1", "User-Agent": "Mozilla/5.0" },
         redirect: "follow",
       });
@@ -332,9 +334,10 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   const deadVidey = new Set();
   await mapPool(
     queue.map((v, i) => [v, i]).filter(([v]) => v.host === "videy"),
-    4,
+    // 8 at a time: a 100+ link batch must finish well inside the Worker's waitUntil budget.
+    8,
     async ([v, i]) => {
-      if (await isDeadVideyFile(v.id)) deadVidey.add(i);
+      if (await isDeadVideyFile(v.id, v.direct)) deadVidey.add(i);
     },
   );
 
