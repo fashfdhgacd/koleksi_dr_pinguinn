@@ -328,6 +328,18 @@ export function useCatalogFeed(params: BrowseParams, ssrSeed?: CatalogFeedSeed |
   useEffect(() => {
     const onPageShow = (event: PageTransitionEvent) => {
       if (!event.persisted) return;
+      // Keep the visitor's place: the grid reloads, then scrolls back to where it was.
+      const y = window.scrollY;
+      if (y > 0) {
+        try {
+          sessionStorage.setItem(
+            "kdp:catalog-restore",
+            JSON.stringify({ path: `${window.location.pathname}${window.location.search}`, y, idx: null }),
+          );
+        } catch {
+          /* ignore */
+        }
+      }
       setItems([]);
       itemsRef.current = [];
       setStatus("loading");

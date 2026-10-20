@@ -57,6 +57,19 @@ type Phase = "idle" | "ad" | "main";
 
 /** Our own Skip button appears after this many seconds (or the VAST skipoffset if shorter). */
 const SKIP_AFTER_S = 5;
+/** Film position saved to sessionStorage at most this often, so a reloaded tab resumes there. */
+const RESUME_SAVE_MS = 5000;
+const resumeKey = (id: string) => `kdp:videy-t:${id}`;
+
+function readResume(id: string): number {
+  try {
+    const t = Number(sessionStorage.getItem(resumeKey(id)));
+    return Number.isFinite(t) && t > 3 ? t : 0;
+  } catch {
+    return 0;
+  }
+}
+
 /** The ad media must start playing within this long, else the film plays. */
 const AD_START_MS = 4000;
 
@@ -206,8 +219,50 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     v.muted = false;
     v.src = file;
     v.controls = true;
+    // Tab reloaded (e.g. Android discarded it while the ad tab was open): resume where it was.
+    const resume = readResume(item.id);
+    if (resume) {
+      v.addEventListener(
+        "loadedmetadata",
+        () => {
+          if (v.getAttribute("src") === file && resume < (v.duration || Infinity) - 3) v.currentTime = resume;
+        },
+        { once: true },
+      );
+    }
     void v.play().catch(() => undefined);
   }, [file, item.id]);
+
+  // Film playing: remember the position (sessionStorage, at most every 5 s; client only).
+  useEffect(() => {
+    if (phase !== "main") return;
+    const v = videoRef.current;
+    if (!v) return;
+    let last = 0;
+    const save = () => {
+      if (v.getAttribute("src") !== file || !(v.currentTime > 0)) return;
+      const now = Date.now();
+      if (now - last < RESUME_SAVE_MS) return;
+      last = now;
+      try {
+        sessionStorage.setItem(resumeKey(item.id), String(Math.floor(v.currentTime)));
+      } catch {
+        /* ignore */
+      }
+    };
+    const flush = () => {
+      last = 0;
+      save();
+    };
+    v.addEventListener("timeupdate", save);
+    v.addEventListener("pause", flush);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      v.removeEventListener("timeupdate", save);
+      v.removeEventListener("pause", flush);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [phase, file, item.id]);
 
   const endAd = useCallback(
     (how: "complete" | "skip" | "fail") => {
