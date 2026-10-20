@@ -274,6 +274,8 @@ export function videyFile(item: RawItem): string {
   if (!item.id || !isVidey(item)) return "";
   const direct = String(item.direct || item.embed || "");
   if (/cdn\.videy\.co/i.test(direct)) return direct;
+  // Videy mirror file (cdn2.aceimg.com/<id>.mp4), played as stored.
+  if (/^https:\/\/cdn\d*\.aceimg\.com\/[A-Za-z0-9]+\.mp4$/i.test(direct)) return direct;
   return "";
 }
 

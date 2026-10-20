@@ -332,12 +332,14 @@ async function handlePost(request: Request): Promise<Response> {
 
   // Known hosts by name, plus anything the bot parser accepts (LuluStream / DoodStream mirrors /
   // Byse on its own embed domains: src/lib/catalog/drp-hosts.js).
+  // Bare Videy ids (no https) count too: parseMessage turns them into Videy links.
   const hasUploadLink =
-    /https?:\/\//i.test(text) &&
+    (/https?:\/\//i.test(text) &&
     (/streamtape\.com|strcloud|putarin\.com|puterin\.|panel\.putarin|luluvdo|lulustream|luluvid|lulu\.st|indoav\.|userbokep|videy\.co/i.test(
       text,
     ) ||
-      parseMessage(text).videos.length > 0);
+      parseMessage(text).videos.length > 0)) ||
+    parseMessage(text).videos.length > 0;
 
   if (hasUploadLink) {
     const work = processUploadBatch({

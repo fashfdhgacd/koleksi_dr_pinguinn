@@ -11,6 +11,10 @@ const PUTARIN_HOST = /(^|\.)(putarin\.com|puterin\.[a-z]+)$/i;
 const INDOAV_HOST = /indoav\./i;
 const USERBOKEP_HOST = /userbokep\./i;
 const VIDEY_HOST = /(^|\.)videy\.co$/i;
+/** Videy mirror (cdn2.aceimg.com/<id>.mp4): stored as a Videy item that plays this exact file. */
+const ACEIMG_HOST = /(^|\.)aceimg\.com$/i;
+/** A bare Videy id as people paste them (9 chars, last one 1 = mp4, 2 = mov). */
+const VIDEY_ID_RE = /^[A-Za-z0-9]{8}[12]$/;
 
 /** Spesifik dulu. Imbuhan Indonesia (ber-, di-, nge-) ikut. Amatir (umum) paling akhir. */
 const CATEGORY_RULES = [
@@ -83,7 +87,8 @@ export function isUploadHost(url) {
       Boolean(drpKindOfHost(host)) ||
       INDOAV_HOST.test(host) ||
       USERBOKEP_HOST.test(host) ||
-      VIDEY_HOST.test(host)
+      VIDEY_HOST.test(host) ||
+      ACEIMG_HOST.test(host)
     );
   } catch {
     return false;
@@ -169,6 +174,13 @@ export function parseVideoLink(url) {
   // Owner's own LuluStream / DoodStream / Byse uploads -> /kategori/bokep (src/lib/catalog/drp-hosts.js).
   const drp = drpKindOfHost(host);
   if (drp) return parseDrpLink(drp, parsed);
+
+  if (ACEIMG_HOST.test(host)) {
+    const am = path.match(/^\/([A-Za-z0-9]+)\.mp4$/i);
+    if (!am) return null;
+    const file = `https://${host.toLowerCase()}/${am[1]}.mp4`;
+    return { id: am[1], host: "videy", source: "Videy", embed: file, direct: file, file: `videos.json` };
+  }
 
   if (VIDEY_HOST.test(host)) {
     // videy.co/v/?id=X or a direct file link cdn.videy.co/X.mp4 (cdn2, cdn3, ... too).
@@ -284,10 +296,25 @@ export function parseMessage(text = "") {
 
   const urls = extractUrls(text);
   const videos = [];
+  // Bare Videy ids (no link): a line of 3+ ids, or a message that is nothing but ids.
+  const idLine = (line) => {
+    const toks = line.split(/[\s,;]+/).filter(Boolean);
+    return toks.length > 0 && toks.every((t) => VIDEY_ID_RE.test(t)) ? toks : null;
+  };
+  const onlyIds = !urls.length && lines.length > 0 && lines.every((l) => idLine(l));
   let pendingTitle = "";
   for (const line of lines) {
     if (/^(?:title|judul|category|kategori|cat)\s*[:\-]/i.test(line)) continue;
     const lineUrls = extractUrls(line);
+    const ids = lineUrls.length ? null : idLine(line);
+    if (ids && (onlyIds || ids.length >= 3)) {
+      for (const id of ids) {
+        const parsed = parseVideoLink(`https://videy.co/v/?id=${id}`);
+        if (parsed) videos.push(parsed);
+      }
+      pendingTitle = "";
+      continue;
+    }
     if (lineUrls.length) {
       // Videy / Lulu / Dood / Byse: "link judul" on one line; the text after the link is its title.
       let sameLine = "";

@@ -39,6 +39,9 @@ function videyFileOf(item: VideoDetail): string {
   const urls = [item.video_url, ...item.qualities.map((q) => q.url)].filter((u): u is string => Boolean(u));
   const direct = urls.find((u) => /^https:\/\/cdn\d*\.videy\.co\/[A-Za-z0-9]+\.(mp4|mov)$/i.test(u));
   if (direct) return direct.replace(/^https:\/\/cdn\d*\./i, "https://cdn.");
+  // Videy mirror file (cdn2.aceimg.com/<id>.mp4): played exactly as stored.
+  const mirror = urls.find((u) => /^https:\/\/cdn\d*\.aceimg\.com\/[A-Za-z0-9]+\.mp4$/i.test(u));
+  if (mirror) return mirror;
   return `https://cdn.videy.co/${encodeURIComponent(item.id)}.mp4`;
 }
 
