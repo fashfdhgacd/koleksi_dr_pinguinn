@@ -73,6 +73,10 @@ const EVENTS: Record<string, number> = {
   open2: 1,
   report2: 1,
   alt2: 1,
+  // Videy popunder (ts-videy-popunder.tsx): tap handler ran / ad tab opened / open blocked.
+  pop_fire: 1,
+  pop_ok: 1,
+  pop_block: 1,
 };
 const V2_EVENTS = ["start2", "slow2", "fail2", "retry2", "open2", "report2", "alt2"];
 const ID_RE = /^[A-Za-z0-9_-]{3,64}$/;
@@ -293,6 +297,31 @@ async function handleOwnerView(): Promise<Response> {
       console.error("player-log owner view:", err instanceof Error ? err.message.slice(0, 160) : "d1 error");
     }
   }
+  // Videy popunder counters for today / yesterday (one small grouped read on the owner view).
+  const popunder: Record<string, { fire: number; ok: number; block: number }> = {};
+  if (db) {
+    try {
+      const rows =
+        (
+          await db
+            .prepare(
+              `select day, event, sum(n) as n from player_errors
+               where day >= ? and event in ('pop_fire','pop_ok','pop_block') group by day, event`,
+            )
+            .bind(yesterday)
+            .all<{ day: string; event: string; n: number }>()
+        ).results || [];
+      for (const r of rows) {
+        const cur = (popunder[r.day] ||= { fire: 0, ok: 0, block: 0 });
+        const n = Number(r.n) || 0;
+        if (r.event === "pop_fire") cur.fire += n;
+        else if (r.event === "pop_ok") cur.ok += n;
+        else cur.block += n;
+      }
+    } catch {
+      /* optional */
+    }
+  }
   const items = await rawById();
   // "Lainnya" per video, so it can be split by catalog source (one small grouped read).
   let otherRows: { day: string; id: string; event: string; n: number }[] | null = null;
@@ -393,6 +422,10 @@ async function handleOwnerView(): Promise<Response> {
     hosts,
     today: { day: today, hosts: hostsFor(today) },
     yesterday: { day: yesterday, hosts: hostsFor(yesterday) },
+    popunder: {
+      today: popunder[today] || { fire: 0, ok: 0, block: 0 },
+      yesterday: popunder[yesterday] || { fire: 0, ok: 0, block: 0 },
+    },
     top,
     gone,
     suspect: Object.keys(dead.suspect || {}).length,

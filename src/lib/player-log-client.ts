@@ -6,7 +6,7 @@
  * exactly what a play on any other host costs: one D1 upsert per video+event per session.
  */
 
-export type PlayerLogEvent = "start2" | "slow2" | "fail2";
+export type PlayerLogEvent = "start2" | "slow2" | "fail2" | "pop_fire" | "pop_ok" | "pop_block";
 
 const LOG_KEY = "kdp-plog";
 const loggedMem = new Set<string>();

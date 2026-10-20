@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VideoDetail } from "@/lib/catalog/types";
 import { sendPlayerLog } from "@/lib/player-log-client";
-import { POP_ATTR, consumeTap, ensureVideyPopunderSdk, owesAd } from "@/components/ts-videy-popunder";
+import { popTap } from "@/components/ts-videy-popunder";
 
 /**
  * Videy player: the cdn mp4 plays straight from Videy in a native <video> (no crossorigin, so
@@ -10,9 +10,8 @@ import { POP_ATTR, consumeTap, ensureVideyPopunderSdk, owesAd } from "@/componen
  * Fullscreen (native video button): a landscape video locks the screen to landscape where the
  * browser allows it, and unlocks on exit.
  *
- * TrafficStars popunder (ts-videy-popunder.tsx, official SDK bound to this play button only): the
- * first play tap of each video per session opens the ad in a new tab (our tab stays, paused); the
- * next tap plays.
+ * TrafficStars popunder (ts-videy-popunder.tsx): the poster overlay is our tap-catcher; its first tap
+ * per video per session opens the direct link in a new tab (our tab stays, paused); the next tap plays.
  *
  * Kesehatan player (/pemilik): the same /api/player-log beacons as the other hosts, once per video
  * per session (src/lib/player-log-client.ts), host "Videy":
@@ -171,23 +170,13 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     };
   }, [item.id, settle]);
 
-  // Popunder SDK: loaded once per page while a Videy video is shown; the play button carries
-  // POP_ATTR (the SDK's only allowed trigger) while this video still owes its ad.
-  const [, setAdTick] = useState(0);
-  useEffect(() => {
-    ensureVideyPopunderSdk();
-  }, [item.id]);
-  const popProps = owesAd(item.id) ? { [POP_ATTR]: "" } : {};
-
   const start = useCallback(() => {
     if (phase !== "idle") return;
-    // Popunder: the SDK already opened (or failed to open) the ad in its own listener for this
-    // tap. A tap used for the ad (opened, or failed with a retry left) does nothing else; the next
-    // tap plays. After 2 failed attempts the tap plays so ad-blocker visitors are never stuck.
-    if (consumeTap(item.id)) {
-      setAdTick((n) => n + 1);
-      return;
-    }
+    // Popunder: this overlay is our own element (not an iframe), so the tap is a user gesture on
+    // our page. popTap opens the direct link synchronously; a tap used for the ad (opened, or
+    // blocked with a retry left) does nothing else and the next tap plays. After 2 blocked tries
+    // the tap plays so ad-blocker visitors are never stuck.
+    if (popTap(item.id)) return;
     track.current = { startedAt: Date.now(), alive: false, settled: false };
     sendPlayerLog(item.id, "Videy", "start2");
     setPhase("main");
@@ -217,7 +206,6 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
         <button
           type="button"
           onClick={start}
-          {...popProps}
           aria-label={`Putar ${item.title}`}
           className="absolute inset-0 flex items-center justify-center bg-black/30"
         >
