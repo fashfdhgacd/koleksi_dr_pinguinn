@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { lastCatalogHref } from "@/lib/catalog/last-catalog";
+import { backToCatalog, lastCatalogHref } from "@/lib/catalog/last-catalog";
 import { findCategory } from "@/lib/catalog/categories";
 import type { VideoDetail } from "@/lib/catalog/types";
 
@@ -20,7 +20,15 @@ export function CatalogBackLink({ item }: { item: VideoDetail }) {
   }, [fallback]);
 
   return (
-    <a href={href} className="flex h-12 items-center rounded-xl bg-secondary px-5 text-base text-foreground">
+    <a
+      href={href}
+      onClick={(e) => {
+        // Same grid page, same scroll: history back when the grid is the previous entry, else a
+        // normal load of href that restores the saved scroll position.
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+        if (backToCatalog(href)) e.preventDefault();
+      }}
+      className="flex h-12 items-center rounded-xl bg-secondary px-5 text-base text-foreground">
       Kembali ke katalog
     </a>
   );

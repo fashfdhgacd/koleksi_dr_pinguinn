@@ -10,7 +10,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { TsGridAd } from "@/components/ts-grid-ad";
 import { onCatalogCardClick } from "@/components/card-popunder";
 import { VideoCard } from "./video-card";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { restoreCatalogScroll } from "@/lib/catalog/last-catalog";
 
 const DEFAULT_GRID =
   "grid grid-cols-2 gap-x-2.5 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 lg:grid-cols-4";
@@ -61,6 +62,11 @@ export function VideoGrid({
     ? AD_POSITIONS.map((at, slot) => ({ at, slot })).filter((x) => x.at < shown.length && !empty[x.slot])
     : [];
   const cells = shown.length + slots.length;
+  // "Kembali ke katalog" with a full load: scroll back to where the card was clicked.
+  const hasItems = shown.length > 0;
+  useEffect(() => {
+    if (ads && hasItems) restoreCatalogScroll();
+  }, [ads, hasItems]);
   return (
     <div
       className={ads ? CATALOG_GRID + trimClass(cells) : DEFAULT_GRID}
