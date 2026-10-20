@@ -85,6 +85,7 @@ const EVENTS: Record<string, number> = {
   pre_req: 1,
   pre_fill: 1,
   pre_done: 1,
+  pre_skip: 1,
 };
 const V2_EVENTS = ["start2", "slow2", "fail2", "retry2", "open2", "report2", "alt2"];
 const ID_RE = /^[A-Za-z0-9_-]{3,64}$/;
@@ -306,8 +307,8 @@ async function handleOwnerView(): Promise<Response> {
     }
   }
   // Videy popunder counters for today / yesterday (one small grouped read on the owner view).
-  type Pop = { fire: number; ok: number; block: number; cardFire: number; cardOk: number; cardBlock: number; preReq: number; preFill: number; preDone: number };
-  const emptyPop = (): Pop => ({ fire: 0, ok: 0, block: 0, cardFire: 0, cardOk: 0, cardBlock: 0, preReq: 0, preFill: 0, preDone: 0 });
+  type Pop = { fire: number; ok: number; block: number; cardFire: number; cardOk: number; cardBlock: number; preReq: number; preFill: number; preDone: number; preSkip: number };
+  const emptyPop = (): Pop => ({ fire: 0, ok: 0, block: 0, cardFire: 0, cardOk: 0, cardBlock: 0, preReq: 0, preFill: 0, preDone: 0, preSkip: 0 });
   const popunder: Record<string, Pop> = {};
   if (db) {
     try {
@@ -316,7 +317,7 @@ async function handleOwnerView(): Promise<Response> {
           await db
             .prepare(
               `select day, event, sum(n) as n from player_errors
-               where day >= ? and event in ('pop_fire','pop_ok','pop_block','popc_fire','popc_ok','popc_block','pre_req','pre_fill','pre_done') group by day, event`,
+               where day >= ? and event in ('pop_fire','pop_ok','pop_block','popc_fire','popc_ok','popc_block','pre_req','pre_fill','pre_done','pre_skip') group by day, event`,
             )
             .bind(yesterday)
             .all<{ day: string; event: string; n: number }>()
@@ -324,7 +325,7 @@ async function handleOwnerView(): Promise<Response> {
       for (const r of rows) {
         const cur = (popunder[r.day] ||= emptyPop());
         const n = Number(r.n) || 0;
-        const key = ({ pop_fire: "fire", pop_ok: "ok", pop_block: "block", popc_fire: "cardFire", popc_ok: "cardOk", popc_block: "cardBlock", pre_req: "preReq", pre_fill: "preFill", pre_done: "preDone" } as const)[
+        const key = ({ pop_fire: "fire", pop_ok: "ok", pop_block: "block", popc_fire: "cardFire", popc_ok: "cardOk", popc_block: "cardBlock", pre_req: "preReq", pre_fill: "preFill", pre_done: "preDone", pre_skip: "preSkip" } as const)[
           r.event as "pop_fire"
         ];
         if (key) cur[key] += n;

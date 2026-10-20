@@ -18,7 +18,8 @@ export type PlayerLogEvent =
   | "popc_block"
   | "pre_req"
   | "pre_fill"
-  | "pre_done";
+  | "pre_done"
+  | "pre_skip";
 export type PlayerLogHost = "IndoAV" | "UserBokep" | "Streamtape" | "Putarin" | "Videy" | "Arsip" | "Lainnya";
 
 const LOG_KEY = "kdp-plog";

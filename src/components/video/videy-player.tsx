@@ -12,7 +12,8 @@ import { loadVast, ping, prerollDue, VAST_TIMEOUT_MS, type VastAd } from "@/comp
  * play tap first fetches the VAST (3.5 s budget) and plays the ad mp4 in the same <video>, with our
  * own Skip button after 5 s (or the VAST skipoffset if shorter); tapping the ad opens ClickThrough.
  * No fill, error, timeout or an ad that does not start within 4 s goes straight to the film.
- * Counters (player-log, once per video per session): pre_req / pre_fill / pre_done.
+ * Counters (player-log, once per video per session): pre_req / pre_fill / pre_done (played to the end)
+ * / pre_skip (Skip tapped).
  *
  * Fullscreen (native video button): a landscape video locks the screen to landscape where the
  * browser allows it, and unlocks on exit.
@@ -215,7 +216,10 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
       if (how === "complete") {
         ping(cur.ad.events.complete);
         sendPlayerLog(item.id, "Videy", "pre_done");
-      } else if (how === "skip") ping(cur.ad.events.skip);
+      } else if (how === "skip") {
+        ping(cur.ad.events.skip);
+        sendPlayerLog(item.id, "Videy", "pre_skip");
+      }
       else ping(cur.ad.error.map((u) => u.replace(/\[ERRORCODE\]/gi, "405")));
       playFilm();
     },
