@@ -74,7 +74,12 @@ type CostFile = {
     ceilingUsd: number;
     items: CostItem[];
   };
-  earnings: { weekUsd: number | null; monthUsd: number | null };
+  earnings: {
+    weekUsd: number | null;
+    monthUsd: number | null;
+    /** Last single day from the ad dashboard (manual). */
+    lastDay?: { date: string; usd: number; impressions: number; source: string };
+  };
   ads: AdRow[];
 };
 
@@ -208,6 +213,17 @@ export function MoneyCard() {
         <span className="text-zinc-300">Pendapatan minggu ini</span>
         <span className="text-zinc-400">{usd(COST.earnings.weekUsd)}</span>
       </div>
+      {COST.earnings.lastDay ? (
+        <div className={row}>
+          <span className="text-zinc-300">Pendapatan {dayText(COST.earnings.lastDay.date)}</span>
+          <span className="tabular-nums text-zinc-100">
+            {usd(COST.earnings.lastDay.usd)}{" "}
+            <span className="text-[13px] text-zinc-400">
+              {COST.earnings.lastDay.source} · {COST.earnings.lastDay.impressions.toLocaleString("id-ID")} impresi
+            </span>
+          </span>
+        </div>
+      ) : null}
       <div className={row}>
         <span className="shrink-0 text-zinc-300">Iklan</span>
         <span className="min-w-0 text-right text-[13px] leading-snug text-zinc-300">{adsSummary}</span>
@@ -243,7 +259,7 @@ export function MoneyCard() {
             </li>
           ))}
           <li className="pt-2 text-[13px] text-zinc-400">
-            Data {dayText(COST.updated)}, diisi manual dari laporan mingguan (tidak ditarik langsung dari Cloudflare).
+            Data manual, diperbarui {dayText(COST.updated)} (tidak ditarik langsung dari Cloudflare / TrafficStars).
           </li>
         </ul>
       ) : null}

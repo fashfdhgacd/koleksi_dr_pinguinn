@@ -1,27 +1,28 @@
 {
-  "updated": "2026-10-19",
-  "note": "Diisi dari audit tagihan Cloudflare 19 Okt 2026. Diperbarui manual / dari laporan mingguan, tidak ditarik langsung dari Cloudflare.",
+  "updated": "2026-10-20",
+  "note": "Data manual, diperbarui 20 Okt 2026 dari tagihan Cloudflare dan dashboard TrafficStars. Tidak ditarik langsung dari Cloudflare / TrafficStars.",
   "cloudflare": {
     "cycleFrom": "2026-09-22",
     "cycleTo": "2026-10-21",
     "spentUsd": 8.64,
-    "projectedUsageUsd": 9.26,
+    "projectedUsageUsd": 3.94,
     "baseUsd": 5,
-    "projectedTotalUsd": 14.26,
+    "projectedTotalUsd": 8.94,
     "ceilingUsd": 20,
     "items": [
       { "label": "KV writes", "usd": 5.0, "note": "1,51 jt write (dr-pinguin-analytics 1,31 jt); hampir 0 sejak 19 Okt" },
-      { "label": "Workers CPU", "usd": 3.04, "note": "181 jt ms; naik dari $0,24 ke $0,46 per hari (12-18 Okt)" },
+      { "label": "Workers CPU", "usd": 3.04, "note": "181 jt ms" },
       { "label": "Requests", "usd": 0.6, "note": "11,94 jt request" }
     ]
   },
   "earnings": {
     "weekUsd": null,
-    "monthUsd": null
+    "monthUsd": null,
+    "lastDay": { "date": "2026-10-19", "usd": 0.25, "impressions": 23785, "source": "TrafficStars" }
   },
   "ads": [
-    { "name": "Monetag", "status": "dihapus", "note": "direct link dihapus, diganti TrafficStars di bawah player Videy", "earningsUsd": null },
-    { "name": "TrafficStars", "status": "menunggu approve", "note": "situs 91976", "earningsUsd": null },
-    { "name": "ExoClick", "status": "dicopot", "note": "dicopot 19 Okt ($1,79 dalam seminggu)", "earningsUsd": null }
+    { "name": "TrafficStars", "status": "aktif", "note": "situs 91976 · MasterSpot grid, popunder 5210859 (Videy + klik kartu/hero), pre-roll video 5210886 (Videy) · 19 Okt: 23.785 impresi", "earningsUsd": 0.25 },
+    { "name": "ExoClick", "status": "dicopot", "note": "dicopot 19 Okt ($1,79 dalam seminggu sebelumnya)", "earningsUsd": 1.79 },
+    { "name": "Monetag", "status": "dihapus", "note": "direct link dihapus", "earningsUsd": null }
   ]
 }
