@@ -2,10 +2,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { VideoDetail } from "@/lib/catalog/types";
 import { sendPlayerLog } from "@/lib/player-log-client";
 import { popTap } from "@/components/ts-videy-popunder";
+import { loadVast, ping, prerollDue, VAST_TIMEOUT_MS, type VastAd } from "@/components/videy-preroll";
 
 /**
  * Videy player: the cdn mp4 plays straight from Videy in a native <video> (no crossorigin, so
- * nothing passes through our Worker). No pre-roll: a tap on the poster starts the video.
+ * nothing passes through our Worker).
+ *
+ * Pre-roll (videy-preroll.ts, TrafficStars VAST spot 5210886): on about every 2nd Videy play the
+ * play tap first fetches the VAST (3.5 s budget) and plays the ad mp4 in the same <video>, with our
+ * own Skip button after 5 s (or the VAST skipoffset if shorter); tapping the ad opens ClickThrough.
+ * No fill, error, timeout or an ad that does not start within 4 s goes straight to the film.
+ * Counters (player-log, once per video per session): pre_req / pre_fill / pre_done.
  *
  * Fullscreen (native video button): a landscape video locks the screen to landscape where the
  * browser allows it, and unlocks on exit.
@@ -42,7 +49,12 @@ function fullscreenEl(): Element | null {
   return d.fullscreenElement || d.webkitFullscreenElement || null;
 }
 
-type Phase = "idle" | "main";
+type Phase = "idle" | "ad" | "main";
+
+/** Our own Skip button appears after this many seconds (or the VAST skipoffset if shorter). */
+const SKIP_AFTER_S = 5;
+/** The ad media must start playing within this long, else the film plays. */
+const AD_START_MS = 4000;
 
 export function VideyPlayer({ item }: { item: VideoDetail }) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -52,6 +64,10 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
   const poster = item.thumbnail || undefined;
   // This play's log state: tap time, first frame seen, already settled (slow2/fail2 sent).
   const track = useRef({ startedAt: 0, alive: false, settled: false });
+  // Current pre-roll (null outside the ad phase); fired quartiles; a token so stale async work quits.
+  const adRef = useRef<{ ad: VastAd; fired: Set<string>; token: number } | null>(null);
+  const tokenRef = useRef(0);
+  const [skipIn, setSkipIn] = useState<number | null>(null);
 
   const settle = useCallback(
     (event: "slow2" | "fail2") => {
@@ -66,6 +82,9 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
   // New video (SPA navigation, e.g. Tonton juga): the old video is stopped and unloaded,
   // back to the poster.
   useEffect(() => {
+    tokenRef.current += 1;
+    adRef.current = null;
+    setSkipIn(null);
     setPhase("idle");
     track.current = { startedAt: 0, alive: false, settled: false };
     const v = videoRef.current;
@@ -170,6 +189,72 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     };
   }, [item.id, settle]);
 
+  /** Starts the film in the <video> (after the tap, or after / instead of the pre-roll). */
+  const playFilm = useCallback(() => {
+    tokenRef.current += 1;
+    adRef.current = null;
+    setSkipIn(null);
+    track.current = { startedAt: Date.now(), alive: false, settled: false };
+    sendPlayerLog(item.id, "Videy", "start2");
+    setPhase("main");
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = false;
+    v.src = file;
+    v.controls = true;
+    void v.play().catch(() => undefined);
+  }, [file, item.id]);
+
+  const endAd = useCallback(
+    (how: "complete" | "skip" | "fail") => {
+      const cur = adRef.current;
+      if (!cur) return;
+      if (how === "complete") {
+        ping(cur.ad.events.complete);
+        sendPlayerLog(item.id, "Videy", "pre_done");
+      } else if (how === "skip") ping(cur.ad.events.skip);
+      else ping(cur.ad.error.map((u) => u.replace(/\[ERRORCODE\]/gi, "405")));
+      playFilm();
+    },
+    [item.id, playFilm],
+  );
+
+  // Ad phase: quartile tracking, skip countdown, completion and errors.
+  useEffect(() => {
+    if (phase !== "ad") return;
+    const v = videoRef.current;
+    if (!v) return;
+    const onTime = () => {
+      const cur = adRef.current;
+      if (!cur) return;
+      const t = v.currentTime;
+      const d = v.duration;
+      const fire = (ev: string) => {
+        if (cur.fired.has(ev)) return;
+        cur.fired.add(ev);
+        ping(cur.ad.events[ev]);
+      };
+      if (t > 0) fire("start");
+      if (d > 0 && Number.isFinite(d)) {
+        if (t >= d * 0.25) fire("firstQuartile");
+        if (t >= d * 0.5) fire("midpoint");
+        if (t >= d * 0.75) fire("thirdQuartile");
+      }
+      const off = Math.min(SKIP_AFTER_S, cur.ad.skipOffset ?? SKIP_AFTER_S);
+      setSkipIn(Math.max(0, Math.ceil(off - t)));
+    };
+    const onEnded = () => endAd("complete");
+    const onError = () => endAd("fail");
+    v.addEventListener("timeupdate", onTime);
+    v.addEventListener("ended", onEnded);
+    v.addEventListener("error", onError);
+    return () => {
+      v.removeEventListener("timeupdate", onTime);
+      v.removeEventListener("ended", onEnded);
+      v.removeEventListener("error", onError);
+    };
+  }, [phase, endAd]);
+
   const start = useCallback(() => {
     if (phase !== "idle") return;
     // Popunder: this overlay is our own element (not an iframe), so the tap is a user gesture on
@@ -177,17 +262,75 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     // blocked with a retry left) does nothing else and the next tap plays. After 2 blocked tries
     // the tap plays so ad-blocker visitors are never stuck.
     if (popTap(item.id)) return;
-    track.current = { startedAt: Date.now(), alive: false, settled: false };
-    sendPlayerLog(item.id, "Videy", "start2");
-    setPhase("main");
+    if (!prerollDue()) {
+      playFilm();
+      return;
+    }
+    // Pre-roll: fetch the VAST within the budget; anything but a fill plays the film.
+    sendPlayerLog(item.id, "Videy", "pre_req");
+    const token = ++tokenRef.current;
+    setPhase("ad");
+    setSkipIn(null);
     const v = videoRef.current;
-    if (!v) return;
-    // Inside the tap, so mobile browsers allow playback with sound.
-    v.muted = false;
-    v.src = file;
-    v.controls = true;
-    void v.play().catch(() => undefined);
-  }, [phase, file, item.id]);
+    if (v) {
+      // Unlock the element inside the tap so the ad can play with sound once it arrives.
+      v.muted = false;
+      v.controls = false;
+    }
+    const ctrl = new AbortController();
+    const timer = window.setTimeout(() => ctrl.abort(), VAST_TIMEOUT_MS);
+    void loadVast(ctrl.signal).then(({ ad }) => {
+      window.clearTimeout(timer);
+      if (tokenRef.current !== token) return;
+      const el = videoRef.current;
+      if (!ad || !el) {
+        playFilm();
+        return;
+      }
+      sendPlayerLog(item.id, "Videy", "pre_fill");
+      adRef.current = { ad, fired: new Set(), token };
+      el.src = ad.media;
+      el.controls = false;
+      // The ad must actually start soon, otherwise the film plays.
+      const guard = window.setTimeout(() => {
+        if (tokenRef.current === token && adRef.current && !(el.currentTime > 0)) endAd("fail");
+      }, AD_START_MS);
+      const go = () => {
+        window.clearTimeout(guard);
+        if (tokenRef.current !== token) return;
+        ping(ad.impression);
+      };
+      el.play()
+        .then(go)
+        .catch(() => {
+          // Sound not allowed without a fresh gesture: try muted, else the film.
+          if (tokenRef.current !== token) return;
+          el.muted = true;
+          el.play()
+            .then(go)
+            .catch(() => {
+              window.clearTimeout(guard);
+              if (tokenRef.current === token) endAd("fail");
+            });
+        });
+    });
+  }, [phase, item.id, playFilm, endAd]);
+
+  const adClick = useCallback(() => {
+    const cur = adRef.current;
+    if (!cur) return;
+    ping(cur.ad.clickTracking);
+    if (cur.ad.clickThrough) {
+      try {
+        const w = window.open(cur.ad.clickThrough, "_blank");
+        if (w) w.opener = null;
+      } catch {
+        /* blocked */
+      }
+    }
+    const v = videoRef.current;
+    if (v && v.muted) v.muted = false;
+  }, []);
 
   return (
     <div
@@ -215,6 +358,24 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
             </svg>
           </span>
         </button>
+      ) : null}
+      {phase === "ad" ? (
+        <>
+          <button type="button" onClick={adClick} aria-label="Iklan" className="absolute inset-0 bg-transparent" />
+          <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-xs text-white">
+            {adRef.current ? "Iklan" : "Memuat…"}
+          </span>
+          {skipIn !== null ? (
+            <button
+              type="button"
+              disabled={skipIn > 0}
+              onClick={() => endAd("skip")}
+              className="absolute bottom-3 right-0 rounded-l-md border border-white/30 bg-black/75 px-4 py-2 text-sm text-white disabled:opacity-80"
+            >
+              {skipIn > 0 ? `Lewati dalam ${skipIn}` : "Lewati iklan ▸"}
+            </button>
+          ) : null}
+        </>
       ) : null}
     </div>
   );
