@@ -3,6 +3,7 @@ import { collectSharePool } from "@/lib/bot/share-pool";
 import { loadShareUsed, saveShareUsed } from "@/lib/bot/share-used";
 import { processUploadBatch } from "@/lib/bot/upload-handler.js";
 import { parseMessage } from "@/lib/bot/parse.js";
+import { handleMyChatMember, postNewVideosToChannel } from "@/lib/bot/channel-post";
 import { isOwnerRequest } from "@/lib/owner-auth";
 import {
   TELEGRAM_SECRET_HEADER,
@@ -306,6 +307,19 @@ async function handlePost(request: Request): Promise<Response> {
     return ack();
   }
 
+  // Bot promoted to admin in a channel by a trusted admin: remember it for auto-posting.
+  if (update.my_chat_member) {
+    if (viaIpFallback) await markIpFallbackUpdate().catch(() => undefined);
+    const work = handleMyChatMember(
+      token,
+      update.my_chat_member as Parameters<typeof handleMyChatMember>[1],
+      allowed,
+      (id, t) => tgSend(token, id, t),
+    ).catch(() => false);
+    if (!(await deferWork(work))) await work;
+    return ack();
+  }
+
   const msg = update.message as
     | { text?: string; caption?: string; chat?: { id?: number }; from?: { id?: number; is_bot?: boolean } }
     | undefined;
@@ -361,7 +375,14 @@ async function handlePost(request: Request): Promise<Response> {
       tgSend,
       tgSendChunks,
       MAIN_KEYBOARD,
-    }).catch((err) => console.error("handleUpload", redactToken(err instanceof Error ? err.message : err, token)));
+    })
+      .then(async (res: { created?: { id: string; title: string; poster?: string; hidden?: boolean }[] } | void) => {
+        // Once per upload batch: post new visible videos to the owner's channel (errors swallowed).
+        if (res && Array.isArray(res.created) && res.created.length) {
+          await postNewVideosToChannel(token, res.created).catch(() => 0);
+        }
+      })
+      .catch((err) => console.error("handleUpload", redactToken(err instanceof Error ? err.message : err, token)));
     if (!(await deferWork(work))) {
       await work;
     }

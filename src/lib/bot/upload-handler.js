@@ -260,6 +260,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   let failedTotal = 0;
   let rejectedTotal = 0;
   const posterBatch = {};
+  const createdRecords = [];
 
   const queue = [];
   for (const video of parsedMsg.videos) {
@@ -496,6 +497,12 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
         const poster = String(it.record.poster || it.record.thumbnail || "").trim();
         if (isHttpPoster(poster)) posterBatch[it.record.id] = poster;
         if (createdIds.has(idKey)) {
+          createdRecords.push({
+            id: String(it.record.id),
+            title: String(it.title || it.record.title || it.record.id),
+            poster: isHttpPoster(poster) ? poster : "",
+            hidden: Boolean(it.record.hidden),
+          });
           lines.push(
             `✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}${it.record.hidden_reason === DEAD_VIDEY_REASON ? " · disembunyikan: video mati" : it.record.hidden ? " · 🙈 disembunyikan (judul menyiratkan minor/sekolah)" : ""}`,
           );
@@ -543,5 +550,6 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     [summary, "", ...lines].join("\n").trim() || "Tidak ada yang diproses.",
     { reply_markup: MAIN_KEYBOARD },
   );
+  return { created: createdRecords };
 }
 
