@@ -14,6 +14,7 @@ import {
   toCard,
 } from "./local-shared";
 import { runtime } from "./local-shared";
+import { titleTags } from "./title-tags";
 import { normalizeSearchText, parseSearchQuery, scoreSearch } from "./search-rank";
 import { isPublicHidden, loadItems, pageOf, sortByNewest } from "./local-cache";
 import type { CatalogCache } from "./local-shared";
@@ -268,39 +269,28 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
 /** Max category chips on a watch page. */
 const MAX_WATCH_CATEGORIES = 10;
 
-/**
- * id -> listed category slugs, from the SAME pools the category pages and /kategori counts use
- * (categoryPool + the listListedCategories threshold). Built once per catalog build (WeakMap on the
- * cache), so a watch page costs one Map lookup and no extra queries.
- */
-const membershipMemo = new WeakMap<object, Map<string, string[]>>();
-function categoryMembership(cache: CatalogCache): Map<string, string[]> {
-  let map = membershipMemo.get(cache);
-  if (map) return map;
-  map = new Map();
+/** Listed category slugs (same rule as listListedCategories), once per catalog build. */
+const listedMemo = new WeakMap<object, Set<string>>();
+function listedSlugs(cache: CatalogCache): Set<string> {
+  let set = listedMemo.get(cache);
+  if (set) return set;
+  set = new Set();
   for (const c of CATEGORY_LIST) {
     if (!cache.bySlug.get(c.slug)?.length) continue;
-    const pool = categoryPool(cache, c.slug);
-    if (!(pool.length >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && pool.length > 0))) continue;
-    for (const it of pool) {
-      const list = map.get(it.id);
-      if (!list) map.set(it.id, [c.slug]);
-      else if (!list.includes(c.slug)) list.push(c.slug);
-    }
+    const n = categoryPool(cache, c.slug).length;
+    if (n >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && n > 0)) set.add(c.slug);
   }
-  membershipMemo.set(cache, map);
-  return map;
+  listedMemo.set(cache, set);
+  return set;
 }
 
 function videoCategories(cache: CatalogCache, item: RawItem): CategoryInfo[] {
-  const slugs = [...(categoryMembership(cache).get(item.id) || [])];
-  // The video's own category first, the rest in /kategori menu order.
-  const own = slugOf(item);
-  const i = slugs.indexOf(own);
-  if (i > 0) slugs.unshift(...slugs.splice(i, 1));
+  // Same tags that put the video into the category pages (buildIndexes), primary first.
+  const listed = listedSlugs(cache);
   const out: CategoryInfo[] = [];
-  for (const slug of slugs.slice(0, MAX_WATCH_CATEGORIES)) {
-    const cat = findCategory(slug);
+  for (const slug of titleTags(item.title, slugOf(item))) {
+    if (out.length >= MAX_WATCH_CATEGORIES) break;
+    const cat = listed.has(slug) ? findCategory(slug) : undefined;
     if (cat) out.push({ slug: cat.slug, label: cat.label });
   }
   return out;

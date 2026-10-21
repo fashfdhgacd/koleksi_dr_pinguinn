@@ -1,4 +1,5 @@
-import { itemDate } from "./feed-order";
+import { DEFAULT_PAGE_SIZE } from "./types";
+import { titleTags } from "./title-tags";
 import { findCategory } from "./categories";
 import type { PagedVideos } from "./types";
 import {
@@ -325,45 +326,36 @@ function withStats(it: RawItem): RawItem {
 
 /**
  * Terbaru (homepage list, /api/data?type=latest) ordering, deterministic for pagination/SEO
- * (owner rule 2026-10-21): IndoAV, its sister site UserBokep and Videy only.
- *  - base: IndoAV with every 4th card UserBokep (newest first each; IndoAV/UserBokep mostly have no
- *    date, so their stored order is kept).
- *  - Videy (newest first by parsed date) mixed in as every 3rd card: base, base, Videy. When one list
- *    runs out the other continues, so IndoAV stays the majority.
- * Koleksi Dr. Pinguin Bokep (Byse / DoodStream / LuluStream), Puterin, Streamtape and every other
- * source live only in their own categories. The hero stays IndoAV (hero-pick.ts).
+ * (owner rule 2026-10-19):
+ *  - page 1 (positions 1..36): IndoAV only
+ *  - from page 2: every 4th card is UserBokep (newest first), the rest IndoAV = 27 IndoAV + 9
+ *    UserBokep per 36; when one of the two runs out, the other continues.
+ *  - ONLY IndoAV and its sister site UserBokep. Videy, Koleksi Dr. Pinguin Bokep (Byse / DoodStream /
+ *    LuluStream), Puterin, Streamtape and every other source live only in their own categories.
  * Built once per catalog build (buildIndexes). Category pages keep their own ordering (listOrder).
  */
+const TERBARU_FIRST_PAGE = DEFAULT_PAGE_SIZE;
 const TERBARU_UB_EVERY = 4;
 export function terbaruOrder(sorted: RawItem[]): RawItem[] {
   const indo: RawItem[] = [];
   const ub: RawItem[] = [];
-  const videy: { it: RawItem; t: number }[] = [];
   for (const it of sorted) {
-    if (isDrpBokep(it) || isPutarin(it)) continue;
-    if (isVidey(it)) videy.push({ it, t: itemDate(it) });
-    else if (isIndoAv(it)) indo.push(it);
+    if (isVidey(it) || isDrpBokep(it) || isPutarin(it)) continue;
+    if (isIndoAv(it)) indo.push(it);
     else if (isUserBokep(it)) ub.push(it);
   }
-  const base: RawItem[] = [];
-  let i = 0;
+  const out: RawItem[] = indo.slice(0, TERBARU_FIRST_PAGE);
+  let i = TERBARU_FIRST_PAGE;
   let u = 0;
   let slot = 0;
   while (u < ub.length && i < indo.length) {
-    if (slot % TERBARU_UB_EVERY === TERBARU_UB_EVERY - 1) base.push(ub[u++]);
-    else base.push(indo[i++]);
+    if (slot % TERBARU_UB_EVERY === TERBARU_UB_EVERY - 1) out.push(ub[u++]);
+    else out.push(indo[i++]);
     slot++;
   }
-  while (u < ub.length) base.push(ub[u++]);
-  while (i < indo.length) base.push(indo[i++]);
-  // Stable sort: same day keeps the stored order.
-  videy.sort((a, b) => b.t - a.t);
-  return interleave(
-    base,
-    videy.map((v) => v.it),
-    2,
-    1,
-  );
+  while (u < ub.length) out.push(ub[u++]);
+  while (i < indo.length) out.push(indo[i++]);
+  return out;
 }
 
 /**
@@ -449,10 +441,12 @@ export function buildIndexes(
   lastHiddenIds = hiddenIds;
   for (const it of items) {
     byId.set(it.id, it);
-    const slug = slugOf(it);
-    const bucket = bySlug.get(slug);
-    if (bucket) bucket.push(it);
-    else bySlug.set(slug, [it]);
+    // Multi-category (title-tags.ts): the video joins its primary category and every tag category.
+    for (const slug of titleTags(it.title, slugOf(it))) {
+      const bucket = bySlug.get(slug);
+      if (bucket) bucket.push(it);
+      else bySlug.set(slug, [it]);
+    }
     haystack.push({
       item: it,
       hay: `${(it.title || "").toLowerCase()} ${it.id.toLowerCase()}`,
