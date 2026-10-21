@@ -3,7 +3,8 @@
  * /kategori categories. Deterministic keyword rules on the title (word boundaries, Indonesian +
  * common English synonyms) on top of the video's primary category (slugOf), max MAX_TAGS.
  * Computed once per catalog build (buildIndexes) for category membership, and per watch render for
- * the chips; no DB/KV. Source-only categories (videy, bokep) only ever come from the primary slug.
+ * the chips; no DB/KV. Source-pure categories (jav, videy, bokep) only ever come from the primary
+ * slug, so Jav holds only Jav and Videy only Videy; Jav/Videy videos may still join other categories.
  * teen-18 is never added by keywords; college-18 only via campus wording and never when the title
  * has any school/child word.
  */
@@ -59,19 +60,24 @@ function stripTemplate(title: string): string {
     .replace(/m\.s\.b\.?/gi, " ");
 }
 
+/** Words the Videy title templates are built from; removed before tagging Videy titles. */
+function stripVideyTemplate(title: string): string {
+  return title.replace(
+    /\b(?:videy|viral|terbaru|terbaik|indo|indonesia|video|vidio|bokep|link|hari ini|lagi rame|rame|trending|heboh|update|full|new|baru|\d+)\b/gi,
+    " ",
+  );
+}
+
 /**
  * @param title video title
  * @param primary the video's primary category slug (slugOf); always first.
  */
 export function titleTags(title: string | undefined, primary: string): string[] {
   const out: string[] = primary ? [primary] : [];
-  // Videy titles are generated SEO templates ("Videy Viral Terbaru 484"), not about the video.
-  if (primary === "videy") return out;
-  // Owner rule: Jav (Putarin and JAV-coded titles) lives ONLY in Jav, never in other categories.
-  if (primary === "jav") return out;
-  const t = normCategoryText(stripTemplate(title || ""));
+  // Videy titles are mostly generated SEO templates ("Videy Viral Terbaru 484"): tag only real words.
+  const raw = stripTemplate(title || "");
+  const t = normCategoryText(primary === "videy" ? stripVideyTemplate(raw) : raw);
   if (!t) return out;
-  if (extra.get("jav")!.test(t)) return ["jav"];
   const minor = MINOR_WORDS.test(t);
   if (!minor && mahasiswiRule && mahasiswiRule.test(t) && !out.includes("college-18")) out.push("college-18");
   for (const [slug, re] of TAG_RULES) {
