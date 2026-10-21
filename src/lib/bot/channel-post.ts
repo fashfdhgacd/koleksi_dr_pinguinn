@@ -13,8 +13,10 @@ const KEY_ID = "tg_channel_id";
 const KEY_TITLE = "tg_channel_title";
 const MAX_POSTS = 20;
 const GAP_MS = 1100;
-/** Owner's public channel; used when no channel id was captured via my_chat_member. */
-const DEFAULT_CHANNEL = "@joswoa";
+/** Owner's channel "koleksidrpinguin.com" (private; bot is admin). Used when no valid override is stored. */
+const DEFAULT_CHANNEL = "-1004457868656";
+/** Old public username that the bot was never admin of; a stored override with it is ignored. */
+const STALE_CHANNELS = new Set(["@joswoa", "joswoa"]);
 
 const g = globalThis as typeof globalThis & { __botSettingsSchema__?: Promise<void> };
 
@@ -67,6 +69,7 @@ export async function loadChannel(): Promise<{ id: string; title: string } | nul
       .all<{ key: string; value: string }>();
     const map = new Map((res.results || []).map((r) => [r.key, r.value]));
     const id = String(map.get(KEY_ID) || "").trim();
+    if (STALE_CHANNELS.has(id.toLowerCase())) return null;
     return id ? { id, title: String(map.get(KEY_TITLE) || "") } : null;
   } catch (err) {
     console.error("loadChannel", err instanceof Error ? err.message : err);
