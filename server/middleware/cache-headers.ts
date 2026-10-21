@@ -81,12 +81,17 @@ export default async function cacheHeadersMiddleware(
     res.headers.set("x-robots-tag", "noindex, follow");
     return res;
   }
+  // Watch pages: edge-fresh 6 h, stale up to 7 days (scripts/cf-worker-entry.mjs WATCH_*_MAX; a
+  // deploy = new cache key, owner edit/hide purges). Category lists: 30 min / 1 day.
+  if (type.includes("text/html") && result.status === 200 && path.startsWith("/watch/")) {
+    return withHeaders(result, "public, max-age=60, s-maxage=21600, stale-while-revalidate=604800");
+  }
   if (
     type.includes("text/html") &&
     result.status === 200 &&
-    (path.startsWith("/watch/") || path === "/kategori" || path.startsWith("/kategori/"))
+    (path === "/kategori" || path.startsWith("/kategori/"))
   ) {
-    return withHeaders(result, "public, max-age=60, s-maxage=3600, stale-while-revalidate=86400");
+    return withHeaders(result, "public, max-age=60, s-maxage=1800, stale-while-revalidate=86400");
   }
   // Home and other pages: edge-fresh 10 min (scripts/cf-worker-entry.mjs HTML_FRESH_MAX); a deploy
   // (= every upload) starts a new cache, so new videos still appear right away.

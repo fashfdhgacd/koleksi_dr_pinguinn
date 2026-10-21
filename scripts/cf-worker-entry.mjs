@@ -67,6 +67,20 @@ function valveBusy() {
 }
 /** Longest stale window (s) for HTML when the page sets a larger stale-while-revalidate. */
 const HTML_STALE_MAX = 86_400;
+/**
+ * Longer edge freshness (Oct 2026, TTFB): a watch page only changes on a deploy (new cache key),
+ * an owner edit or an owner hide (both purged, see purgeAfterEdit), so it may stay fresh 6 h and be
+ * served stale up to 7 days while one background render refreshes it. Category lists 30 min / 1 day.
+ * Home and every other page keep HTML_FRESH_MAX.
+ */
+const WATCH_FRESH_MAX = 21_600;
+const WATCH_STALE_MAX = 604_800;
+const CATEGORY_FRESH_MAX = 1_800;
+function htmlLimits(path) {
+  if (path.startsWith("/watch/")) return [WATCH_FRESH_MAX, WATCH_STALE_MAX];
+  if (path === "/kategori" || path.startsWith("/kategori/")) return [CATEGORY_FRESH_MAX, HTML_STALE_MAX];
+  return [HTML_FRESH_MAX, HTML_STALE_MAX];
+}
 /** Longest time (s) any other cached response (images, xml, json) is kept. */
 const OTHER_TTL_MAX = 86_400;
 /** Background refreshes in flight in this isolate, so one stale page triggers one render. */
@@ -136,7 +150,7 @@ function directive(cc, name) {
 }
 
 /** Fresh/stale seconds for a response, or null when it must not be shared. */
-function cachePolicy(response) {
+function cachePolicy(response, path = "") {
   if (response.status !== 200) return null;
   if (response.headers.has("set-cookie")) return null;
   // /thumb placeholder (no poster yet): kept only briefly, so a real image takes over soon.
@@ -148,7 +162,8 @@ function cachePolicy(response) {
   const type = response.headers.get("content-type") || "";
   if (type.includes("text/html")) {
     const swr = directive(cc, "stale-while-revalidate") || 0;
-    return { fresh: Math.min(ttl, HTML_FRESH_MAX), stale: Math.min(swr, HTML_STALE_MAX) };
+    const [freshMax, staleMax] = htmlLimits(path);
+    return { fresh: Math.min(ttl, freshMax), stale: Math.min(swr, staleMax) };
   }
   // Catalog JSON feeds the same lists as the pages, so it follows the HTML freshness limit.
   if (type.includes("json")) return { fresh: Math.min(ttl, HTML_FRESH_MAX), stale: 0 };
@@ -182,7 +197,7 @@ function fromCache(hit, state) {
 
 async function renderAndStore(request, env, context, cache, key) {
   const response = await nitroHandler.fetch(request, env, context);
-  const policy = cachePolicy(response);
+  const policy = cachePolicy(response, new URL(request.url).pathname);
   if (policy) store(cache, key, response, policy, context);
   // No longer cacheable (e.g. a video was hidden and now 404s): drop the old copy right away.
   else if (context?.waitUntil) context.waitUntil(cache.delete(key).catch(() => undefined));
@@ -226,7 +241,7 @@ async function cachedFetch(request, env, context, url) {
   }
 
   const response = await renderAndStore(request, env, context, cache, key);
-  if (!cachePolicy(response)) return response;
+  if (!cachePolicy(response, url.pathname)) return response;
   const headers = new Headers(response.headers);
   headers.set("x-edge-cache", "MISS");
   return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
@@ -306,7 +321,8 @@ async function purgeAfterEdit(request, response, env, context) {
     return;
   }
   const id = typeof data?.id === "string" ? data.id : "";
-  if (!data?.ok || !/^[A-Za-z0-9_-]{3,64}$/.test(id) || (!data.title && !data.category)) return;
+  const hideChange = typeof data?.hidden === "boolean";
+  if (!data?.ok || !/^[A-Za-z0-9_-]{3,64}$/.test(id) || (!data.title && !data.category && !hideChange)) return;
   const keys = purgeKeys(env, id, typeof data.category === "string" ? data.category : "");
   const run = () => Promise.all(keys.map((k) => cache.delete(k).catch(() => false)));
   context.waitUntil(
@@ -669,6 +685,14 @@ export default {
     if (request.method === "POST" && (url.pathname === "/api/owner-videy" || url.pathname === "/api/owner-tools")) {
       const req = url.pathname === "/api/owner-tools" ? await brandEditRequest(request).catch(() => request) : request;
       const response = await nitroHandler.fetch(req, env, context);
+      await purgeAfterEdit(request, response, env, context).catch(() => undefined);
+      return response;
+    }
+    // Owner hide/unhide (POST /api/player-log, action owner-hide): purge the cached watch page so a
+    // hidden video disappears now instead of after the 6 h watch freshness. Only owner requests
+    // (key header) are inspected; visitor logs pass straight through.
+    if (request.method === "POST" && url.pathname === "/api/player-log" && request.headers.has("x-online-key")) {
+      const response = await nitroHandler.fetch(request, env, context);
       await purgeAfterEdit(request, response, env, context).catch(() => undefined);
       return response;
     }
