@@ -1,3 +1,4 @@
+import { itemDate } from "./feed-order";
 import { findCategory } from "./categories";
 import type { PagedVideos } from "./types";
 import {
@@ -330,9 +331,14 @@ function withStats(it: RawItem): RawItem {
  * Built once per catalog build (buildIndexes). Category pages keep their own ordering (listOrder).
  */
 export function terbaruOrder(sorted: RawItem[]): RawItem[] {
-  return sorted.filter(
-    (it) => !isDrpBokep(it) && !isPutarin(it) && (isVidey(it) || isIndoAv(it) || isUserBokep(it)),
-  );
+  // Dates are mostly day strings ("2026-10-21"), which sortByNewest's Number() cannot read, so it
+  // effectively orders by source priority. Re-sort by parsed date (itemDate); Array.sort is stable,
+  // so within one day the IndoAV-first order stays.
+  const keyed = sorted
+    .filter((it) => !isDrpBokep(it) && !isPutarin(it) && (isVidey(it) || isIndoAv(it) || isUserBokep(it)))
+    .map((it) => ({ it, t: itemDate(it) }));
+  keyed.sort((a, b) => b.t - a.t);
+  return keyed.map((k) => k.it);
 }
 
 /**
