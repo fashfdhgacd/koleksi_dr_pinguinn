@@ -325,20 +325,45 @@ function withStats(it: RawItem): RawItem {
 
 /**
  * Terbaru (homepage list, /api/data?type=latest) ordering, deterministic for pagination/SEO
- * (owner rule 2026-10-21): IndoAV, its sister site UserBokep and Videy, mixed, newest first.
+ * (owner rule 2026-10-21): IndoAV, its sister site UserBokep and Videy only.
+ *  - base: IndoAV with every 4th card UserBokep (newest first each; IndoAV/UserBokep mostly have no
+ *    date, so their stored order is kept).
+ *  - Videy (newest first by parsed date) mixed in as every 3rd card: base, base, Videy. When one list
+ *    runs out the other continues, so IndoAV stays the majority.
  * Koleksi Dr. Pinguin Bokep (Byse / DoodStream / LuluStream), Puterin, Streamtape and every other
  * source live only in their own categories. The hero stays IndoAV (hero-pick.ts).
  * Built once per catalog build (buildIndexes). Category pages keep their own ordering (listOrder).
  */
+const TERBARU_UB_EVERY = 4;
 export function terbaruOrder(sorted: RawItem[]): RawItem[] {
-  // Dates are mostly day strings ("2026-10-21"), which sortByNewest's Number() cannot read, so it
-  // effectively orders by source priority. Re-sort by parsed date (itemDate); Array.sort is stable,
-  // so within one day the IndoAV-first order stays.
-  const keyed = sorted
-    .filter((it) => !isDrpBokep(it) && !isPutarin(it) && (isVidey(it) || isIndoAv(it) || isUserBokep(it)))
-    .map((it) => ({ it, t: itemDate(it) }));
-  keyed.sort((a, b) => b.t - a.t);
-  return keyed.map((k) => k.it);
+  const indo: RawItem[] = [];
+  const ub: RawItem[] = [];
+  const videy: { it: RawItem; t: number }[] = [];
+  for (const it of sorted) {
+    if (isDrpBokep(it) || isPutarin(it)) continue;
+    if (isVidey(it)) videy.push({ it, t: itemDate(it) });
+    else if (isIndoAv(it)) indo.push(it);
+    else if (isUserBokep(it)) ub.push(it);
+  }
+  const base: RawItem[] = [];
+  let i = 0;
+  let u = 0;
+  let slot = 0;
+  while (u < ub.length && i < indo.length) {
+    if (slot % TERBARU_UB_EVERY === TERBARU_UB_EVERY - 1) base.push(ub[u++]);
+    else base.push(indo[i++]);
+    slot++;
+  }
+  while (u < ub.length) base.push(ub[u++]);
+  while (i < indo.length) base.push(indo[i++]);
+  // Stable sort: same day keeps the stored order.
+  videy.sort((a, b) => b.t - a.t);
+  return interleave(
+    base,
+    videy.map((v) => v.it),
+    2,
+    1,
+  );
 }
 
 /**
