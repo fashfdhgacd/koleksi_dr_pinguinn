@@ -347,6 +347,23 @@ export function WatchPage() {
             </p>
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{cleanDisplayTitle(item.title)}</h1>
             <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>
+            {item.categories && item.categories.length ? (
+              <nav aria-label="Kategori" className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Kategori</p>
+                <ul className="flex flex-wrap gap-2">
+                  {item.categories.map((c) => (
+                    <li key={c.slug}>
+                      <a
+                        href={`/kategori/${c.slug}`}
+                        className="inline-flex h-9 items-center rounded-full bg-secondary px-4 text-sm font-medium text-foreground hover:bg-primary hover:text-primary-foreground"
+                      >
+                        {c.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            ) : null}
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"

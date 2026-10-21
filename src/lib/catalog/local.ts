@@ -261,7 +261,49 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
     qualities: embed ? [{ label: card.quality, url: embed, format: "embed" }] : [],
     subjects: [],
     playable: Boolean(embed),
+    categories: videoCategories(bag, item),
   };
+}
+
+/** Max category chips on a watch page. */
+const MAX_WATCH_CATEGORIES = 10;
+
+/**
+ * id -> listed category slugs, from the SAME pools the category pages and /kategori counts use
+ * (categoryPool + the listListedCategories threshold). Built once per catalog build (WeakMap on the
+ * cache), so a watch page costs one Map lookup and no extra queries.
+ */
+const membershipMemo = new WeakMap<object, Map<string, string[]>>();
+function categoryMembership(cache: CatalogCache): Map<string, string[]> {
+  let map = membershipMemo.get(cache);
+  if (map) return map;
+  map = new Map();
+  for (const c of CATEGORY_LIST) {
+    if (!cache.bySlug.get(c.slug)?.length) continue;
+    const pool = categoryPool(cache, c.slug);
+    if (!(pool.length >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && pool.length > 0))) continue;
+    for (const it of pool) {
+      const list = map.get(it.id);
+      if (!list) map.set(it.id, [c.slug]);
+      else if (!list.includes(c.slug)) list.push(c.slug);
+    }
+  }
+  membershipMemo.set(cache, map);
+  return map;
+}
+
+function videoCategories(cache: CatalogCache, item: RawItem): CategoryInfo[] {
+  const slugs = [...(categoryMembership(cache).get(item.id) || [])];
+  // The video's own category first, the rest in /kategori menu order.
+  const own = slugOf(item);
+  const i = slugs.indexOf(own);
+  if (i > 0) slugs.unshift(...slugs.splice(i, 1));
+  const out: CategoryInfo[] = [];
+  for (const slug of slugs.slice(0, MAX_WATCH_CATEGORIES)) {
+    const cat = findCategory(slug);
+    if (cat) out.push({ slug: cat.slug, label: cat.label });
+  }
+  return out;
 }
 
 export async function listRelated(id: string, limit = 12, _signal?: AbortSignal): Promise<PagedVideos> {

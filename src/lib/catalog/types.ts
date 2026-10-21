@@ -44,6 +44,8 @@ export type VideoDetail = VideoCard & {
   qualities: VideoQuality[];
   subjects: string[];
   playable: boolean;
+  /** Every listed /kategori category this video is in (same pools as the category pages), max 10. */
+  categories?: CategoryInfo[];
 };
 
 export type CategoryInfo = {
