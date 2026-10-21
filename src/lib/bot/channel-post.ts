@@ -12,6 +12,8 @@ const HOST = "https://koleksidrpinguin.com";
 const KEY_ID = "tg_channel_id";
 const KEY_TITLE = "tg_channel_title";
 const MAX_POSTS = 20;
+/** Safe brand card (penguin logo, "Koleksi Dr. Pinguin", 18+); the site's og:image fallback. */
+const BRAND_PHOTO = `${HOST}/og-v2.jpg?v=14`;
 const GAP_MS = 1100;
 /** Owner's channel "koleksidrpinguin.com" (private; bot is admin). Used when no valid override is stored. */
 const DEFAULT_CHANNEL = "-1004457868656";
@@ -234,8 +236,9 @@ export async function postNewVideosToChannelReport(passedToken: string, videos: 
       if (i > 0) await new Promise((r) => setTimeout(r, GAP_MS));
       const v = list[i];
       const caption = `${String(v.title || v.id).slice(0, 900)}\nTonton: ${HOST}/watch/${encodeURIComponent(v.id)}`;
-      let poster = String(v.poster || "").trim();
-      if (!/^https?:\/\//i.test(poster)) poster = await hostPoster(String(v.id));
+      // Never the video's own poster/host thumbnail (explicit images could get the channel banned):
+      // always the site's brand card (same image as the og:image fallback).
+      const poster = BRAND_PHOTO;
       let res: TgResult = { ok: false, error: "" };
       if (/^https?:\/\//i.test(poster)) {
         res = await tgCall(token, "sendPhoto", { chat_id: ch.id, photo: poster, caption });
