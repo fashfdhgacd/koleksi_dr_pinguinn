@@ -2,9 +2,11 @@ import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
 import { LEGACY_CATEGORY_SLUGS, findCategory } from "./categories";
 import {
+  EXTRA_CATEGORY_RULES,
   GENERIC_CATEGORY_SLUGS,
   RAW_CATEGORY_ALIASES,
   SOFT_RAW_CATEGORY_ALIASES,
+  normCategoryText,
   refineCategory,
 } from "./title-category.js";
 import siteLikesSnapshot from "./site-likes.json";
@@ -225,8 +227,22 @@ export function classify(title: string): string {
 }
 /** Public category slug of an item (internal classifier keys like "abg" mapped to their current slug). */
 export function slugOf(item: RawItem): string {
-  const s = slugOfRaw(item);
+  let s = slugOfRaw(item);
+  // Owner rule 2026-10-22: /kategori/jav holds ONLY Putarin. Other sources with a JAV-ish title or a
+  // "jav" source label get their next-best category instead (never hidden).
+  if (s === "jav" && !isPutarin(item)) s = nonJavSlug(item);
   return LEGACY_CATEGORY_SLUGS[s] || s;
+}
+function nonJavSlug(item: RawItem): string {
+  const title = item.title || "";
+  const base = classify(title);
+  if (!GENERIC_CATEGORY_SLUGS.has(base)) return base === "abg" ? refineCategory(base, title) : base;
+  const t = normCategoryText(title);
+  for (const [slug, re] of EXTRA_CATEGORY_RULES as [string, RegExp][]) {
+    if (slug !== "jav" && re.test(t)) return slug;
+  }
+  if (isIndoAv(item) || isUserBokep(item)) return "amatir";
+  return "lainnya";
 }
 function slugOfRaw(item: RawItem): string {
   if (isVidey(item)) return "videy";
