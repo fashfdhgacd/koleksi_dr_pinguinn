@@ -14,7 +14,7 @@ import {
   toCard,
 } from "./local-shared";
 import { runtime } from "./local-shared";
-import { titleTags } from "./title-tags";
+import { popularIds, tagOptions, titleTags } from "./title-tags";
 import { normalizeSearchText, parseSearchQuery, scoreSearch } from "./search-rank";
 import { isPublicHidden, loadItems, pageOf, sortByNewest } from "./local-cache";
 import type { CatalogCache } from "./local-shared";
@@ -288,7 +288,7 @@ function videoCategories(cache: CatalogCache, item: RawItem): CategoryInfo[] {
   // Same tags that put the video into the category pages (buildIndexes), primary first.
   const listed = listedSlugs(cache);
   const out: CategoryInfo[] = [];
-  for (const slug of titleTags(item.title, slugOf(item))) {
+  for (const slug of titleTags(item.title, slugOf(item), tagOptions(item, popularIds(cache.items)))) {
     if (out.length >= MAX_WATCH_CATEGORIES) break;
     const cat = listed.has(slug) ? findCategory(slug) : undefined;
     if (cat) out.push({ slug: cat.slug, label: cat.label });

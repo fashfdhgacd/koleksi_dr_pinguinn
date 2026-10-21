@@ -1,5 +1,5 @@
 import { DEFAULT_PAGE_SIZE } from "./types";
-import { titleTags } from "./title-tags";
+import { popularIds, tagOptions, titleTags } from "./title-tags";
 import { findCategory } from "./categories";
 import type { PagedVideos } from "./types";
 import {
@@ -439,10 +439,11 @@ export function buildIndexes(
     })
     .map(withStats);
   lastHiddenIds = hiddenIds;
+  const popular = popularIds(items);
   for (const it of items) {
     byId.set(it.id, it);
     // Multi-category (title-tags.ts): the video joins its primary category and every tag category.
-    for (const slug of titleTags(it.title, slugOf(it))) {
+    for (const slug of titleTags(it.title, slugOf(it), tagOptions(it, popular))) {
       const bucket = bySlug.get(slug);
       if (bucket) bucket.push(it);
       else bySlug.set(slug, [it]);

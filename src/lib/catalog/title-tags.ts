@@ -49,7 +49,39 @@ const TAG_RULES: [string, RegExp][] = [
   ["percakapan", /\b(?:percakapan|obrolan|ngobrol|dialog|ngomong jorok|dirty talk)\b/],
   ["viral", /\b(?:viral|trending|lagi rame|heboh)\b/],
   ["amatir", /\b(?:amatir|amateur|homemade|home made|real ?couple|reallife|real life|rekam sendiri|pacar|pacarnya)\b/],
+  // More everyday Indonesian wording (2026-10-22), word boundaries only.
+  ["jilbab", /\b(?:ukhti|akhwat|jilbaber|kerudungan|hijaban)\b/],
+  ["tobrut", /\b(?:montok|semok|bohay|toket|tetek|pentil|susu montok)\b/],
+  ["colmek", /\b(?:ngocok sendiri|colok memek|mainin memek|gesek gesek)\b/],
+  ["crot-dalam", /\b(?:crot dalem|keluarin dalem|hamilin)\b/],
+  ["outdoor", /\b(?:di mobil|dalam mobil|semak semak|kebun|ladang|empang|pinggir jalan)\b/],
+  ["percakapan", /\b(?:sambil ngobrol|ngobrol jorok|suara jelas|desahan jelas)\b/],
+  ["amatir", /\b(?:mesum|rekaman|direkam|ngewe|ngentot|ngentotin|dientot|skandal|video pribadi)\b/],
 ];
+
+/** Fraction of the catalog (by real view stats) tagged Viral. */
+const POPULAR_SHARE = 0.1;
+const popularMemo = new WeakMap<object, Set<string>>();
+/**
+ * Top ~10% most-viewed ids (stored view stats), computed once per catalog build (memo on the items
+ * array) and shared by category membership and watch chips.
+ */
+export function popularIds(items: { id: string; views?: unknown }[]): Set<string> {
+  let set = popularMemo.get(items);
+  if (set) return set;
+  const withViews = items.filter((it) => typeof it.views === "number" && (it.views as number) > 0);
+  const sorted = [...withViews].sort((a, b) => (b.views as number) - (a.views as number));
+  set = new Set(sorted.slice(0, Math.floor(sorted.length * POPULAR_SHARE)).map((it) => it.id));
+  popularMemo.set(items, set);
+  return set;
+}
+
+export type TagOptions = {
+  /** IndoAV / UserBokep / Putarin: an "Indo" title from these is a real amateur Indonesian video. */
+  indoSource?: boolean;
+  /** In the top POPULAR_SHARE by real views. */
+  popular?: boolean;
+};
 
 /** Auto-generated / branding text that says nothing about the video (bot and import templates). */
 function stripTemplate(title: string): string {
@@ -72,17 +104,31 @@ function stripVideyTemplate(title: string): string {
  * @param title video title
  * @param primary the video's primary category slug (slugOf); always first.
  */
-export function titleTags(title: string | undefined, primary: string): string[] {
+export function titleTags(title: string | undefined, primary: string, opts: TagOptions = {}): string[] {
   const out: string[] = primary ? [primary] : [];
   // Videy titles are mostly generated SEO templates ("Videy Viral Terbaru 484"): tag only real words.
   const raw = stripTemplate(title || "");
   const t = normCategoryText(primary === "videy" ? stripVideyTemplate(raw) : raw);
-  if (!t) return out;
+  if (!t) return opts.popular && !out.includes("viral") ? [...out, "viral"] : out;
   const minor = MINOR_WORDS.test(t);
   if (!minor && mahasiswiRule && mahasiswiRule.test(t) && !out.includes("college-18")) out.push("college-18");
+  if (opts.popular && !out.includes("viral")) out.push("viral");
   for (const [slug, re] of TAG_RULES) {
     if (out.length >= MAX_TAGS) break;
     if (!out.includes(slug) && re.test(t)) out.push(slug);
   }
+  // Source-true: IndoAV / UserBokep / Putarin videos titled "Indo ..." are Indonesian amateur clips.
+  if (opts.indoSource && out.length < MAX_TAGS && !out.includes("amatir") && /\b(?:indo|indonesia|bokep indo)\b/.test(t)) {
+    out.push("amatir");
+  }
   return out.slice(0, MAX_TAGS);
+}
+
+/** Tag options for a catalog item (source flags + popularity). */
+export function tagOptions(
+  item: { id: string; embed?: string; source?: string; direct?: string },
+  popular: Set<string>,
+): TagOptions {
+  const blob = `${item.embed || ""} ${item.source || ""} ${item.direct || ""}`;
+  return { indoSource: /indoav|userbokep|putarin|puterin/i.test(blob), popular: popular.has(item.id) };
 }
