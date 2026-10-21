@@ -127,14 +127,15 @@ async function tgCall(token: string, method: string, body: Record<string, unknow
     let desc = "";
     let ok = res.ok;
     try {
-      const j = JSON.parse(t) as { ok?: boolean; description?: string };
+      const j = JSON.parse(t) as { ok?: boolean; description?: string; error_code?: number };
       if (j && j.ok === false) ok = false;
       desc = String(j?.description || "");
+      if (j?.error_code) desc = `${j.error_code} ${desc}`;
     } catch {
       /* not json */
     }
     if (!ok) {
-      const error = redactToken(desc || `HTTP ${res.status} ${t.slice(0, 120)}`, token).slice(0, 200);
+      const error = `${method}: ${redactToken(desc || `HTTP ${res.status} ${t.slice(0, 120)}`, token)}`.slice(0, 200);
       console.error("channel", method, res.status, error);
       return { ok: false, error };
     }
@@ -188,6 +189,18 @@ async function hostPoster(id: string): Promise<string> {
   return "";
 }
 
+/**
+ * Failure diagnostics (only after a failed post): token shape (never the token itself), getMe and
+ * getChat for the target, so the uploader's ACK shows which side is wrong.
+ */
+async function probe(token: string, chatId: string): Promise<string> {
+  const t = String(token || "");
+  const shape = !t ? "token kosong" : /^\d{6,12}:[A-Za-z0-9_-]{30,}$/.test(t) ? "token ok" : `token aneh (len ${t.length})`;
+  const me = await tgCall(token, "getMe", {});
+  const chat = await tgCall(token, "getChat", { chat_id: chatId });
+  return `${shape} · ${me.ok ? "getMe ok" : me.error} · ${chat.ok ? "getChat ok" : chat.error}`;
+}
+
 export type ChannelReport = { posted: number; total: number; chat: string; error: string };
 
 /**
@@ -219,6 +232,7 @@ export async function postNewVideosToChannelReport(token: string, videos: Create
       }
       if (res.ok) report.posted++;
     }
+    if (report.posted < report.total) report.error = `${report.error} · ${await probe(token, ch.id)}`.slice(0, 400);
     return report;
   } catch (err) {
     report.error = redactToken(err instanceof Error ? err.message : String(err), token).slice(0, 200);
