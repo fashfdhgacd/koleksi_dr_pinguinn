@@ -6,7 +6,7 @@
  *   upload flow can never break because of the channel.
  */
 import { getD1, type D1DatabaseLike } from "@/lib/analytics-d1";
-import { redactToken } from "@/lib/telegram-webhook";
+import { botToken, redactToken } from "@/lib/telegram-webhook";
 
 const HOST = "https://koleksidrpinguin.com";
 const KEY_ID = "tg_channel_id";
@@ -195,10 +195,24 @@ async function hostPoster(id: string): Promise<string> {
  */
 async function probe(token: string, chatId: string): Promise<string> {
   const t = String(token || "");
-  const shape = !t ? "token kosong" : /^\d{6,12}:[A-Za-z0-9_-]{30,}$/.test(t) ? "token ok" : `token aneh (len ${t.length})`;
+  const shape = !t ? "token kosong" : TOKEN_SHAPE.test(t) ? "token ok" : `token aneh (len ${t.length})`;
   const me = await tgCall(token, "getMe", {});
   const chat = await tgCall(token, "getChat", { chat_id: chatId });
   return `${shape} · ${me.ok ? "getMe ok" : me.error} · ${chat.ok ? "getChat ok" : chat.error}`;
+}
+
+const TOKEN_SHAPE = /^\d{6,12}:[A-Za-z0-9_-]{30,}$/;
+
+/**
+ * The exact bot token the webhook uses (BOT_TOKEN / TELEGRAM_BOT_TOKEN, same as envToken() in
+ * /api/telegram). A passed value is used only when it is shaped like a bot token; otherwise the env
+ * token wins. `src` names which one was used (never the value).
+ */
+function resolveToken(passed: unknown): { token: string; src: string } {
+  const p = typeof passed === "string" ? passed.trim() : "";
+  if (TOKEN_SHAPE.test(p)) return { token: p, src: "arg" };
+  const e = botToken();
+  return { token: e, src: `env (arg ${typeof passed}${p ? ` len ${p.length}` : ""})` };
 }
 
 export type ChannelReport = { posted: number; total: number; chat: string; error: string };
@@ -207,7 +221,8 @@ export type ChannelReport = { posted: number; total: number; chat: string; error
  * Post up to MAX_POSTS new (visible) videos to the stored channel, ~1.1s apart. Never throws.
  * Returns how many went out plus the last Telegram error description (for the uploader's ACK).
  */
-export async function postNewVideosToChannelReport(token: string, videos: CreatedVideo[]): Promise<ChannelReport> {
+export async function postNewVideosToChannelReport(passedToken: string, videos: CreatedVideo[]): Promise<ChannelReport> {
+  const { token, src } = resolveToken(passedToken);
   const report: ChannelReport = { posted: 0, total: 0, chat: DEFAULT_CHANNEL, error: "" };
   try {
     const list = (Array.isArray(videos) ? videos : []).filter((v) => v && v.id && !v.hidden).slice(0, MAX_POSTS);
@@ -232,7 +247,7 @@ export async function postNewVideosToChannelReport(token: string, videos: Create
       }
       if (res.ok) report.posted++;
     }
-    if (report.posted < report.total) report.error = `${report.error} · ${await probe(token, ch.id)}`.slice(0, 400);
+    if (report.posted < report.total) report.error = `${report.error} · token src ${src} · ${await probe(token, ch.id)}`.slice(0, 400);
     return report;
   } catch (err) {
     report.error = redactToken(err instanceof Error ? err.message : String(err), token).slice(0, 200);
