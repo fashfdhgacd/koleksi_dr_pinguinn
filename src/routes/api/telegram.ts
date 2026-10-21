@@ -3,7 +3,7 @@ import { collectSharePool } from "@/lib/bot/share-pool";
 import { loadShareUsed, saveShareUsed } from "@/lib/bot/share-used";
 import { processUploadBatch } from "@/lib/bot/upload-handler.js";
 import { parseMessage } from "@/lib/bot/parse.js";
-import { handleMyChatMember, postNewVideosToChannel } from "@/lib/bot/channel-post";
+import { handleMyChatMember } from "@/lib/bot/channel-post";
 import { isOwnerRequest } from "@/lib/owner-auth";
 import {
   TELEGRAM_SECRET_HEADER,
@@ -376,12 +376,7 @@ async function handlePost(request: Request): Promise<Response> {
       tgSendChunks,
       MAIN_KEYBOARD,
     })
-      .then(async (res: { created?: { id: string; title: string; poster?: string; hidden?: boolean }[] } | void) => {
-        // Once per upload batch: post new visible videos to the owner's channel (errors swallowed).
-        if (res && Array.isArray(res.created) && res.created.length) {
-          await postNewVideosToChannel(token, res.created).catch(() => 0);
-        }
-      })
+      // The channel post now runs inside processUploadBatch (before the final ACK, which reports it).
       .catch((err) => console.error("handleUpload", redactToken(err instanceof Error ? err.message : err, token)));
     if (!(await deferWork(work))) {
       await work;

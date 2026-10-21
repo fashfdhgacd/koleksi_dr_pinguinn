@@ -113,22 +113,36 @@ export async function handleMyChatMember(
 
 export type CreatedVideo = { id: string; title: string; poster?: string; hidden?: boolean };
 
-async function tgCall(token: string, method: string, body: Record<string, unknown>): Promise<boolean> {
+type TgResult = { ok: boolean; error: string };
+
+async function tgCall(token: string, method: string, body: Record<string, unknown>): Promise<TgResult> {
   try {
     const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000),
     });
-    if (!res.ok) {
-      const t = await res.text().catch(() => "");
-      console.error("channel", method, res.status, redactToken(t.slice(0, 200), token));
-      return false;
+    const t = await res.text().catch(() => "");
+    let desc = "";
+    let ok = res.ok;
+    try {
+      const j = JSON.parse(t) as { ok?: boolean; description?: string };
+      if (j && j.ok === false) ok = false;
+      desc = String(j?.description || "");
+    } catch {
+      /* not json */
     }
-    return true;
+    if (!ok) {
+      const error = redactToken(desc || `HTTP ${res.status} ${t.slice(0, 120)}`, token).slice(0, 200);
+      console.error("channel", method, res.status, error);
+      return { ok: false, error };
+    }
+    return { ok: true, error: "" };
   } catch (err) {
-    console.error("channel", method, redactToken(err instanceof Error ? err.message : err, token));
-    return false;
+    const error = redactToken(err instanceof Error ? err.message : String(err), token).slice(0, 200);
+    console.error("channel", method, error);
+    return { ok: false, error };
   }
 }
 
@@ -174,29 +188,55 @@ async function hostPoster(id: string): Promise<string> {
   return "";
 }
 
-/** Post up to MAX_POSTS new (visible) videos to the stored channel, ~1.1s apart. Never throws. */
-export async function postNewVideosToChannel(token: string, videos: CreatedVideo[]): Promise<number> {
+export type ChannelReport = { posted: number; total: number; chat: string; error: string };
+
+/**
+ * Post up to MAX_POSTS new (visible) videos to the stored channel, ~1.1s apart. Never throws.
+ * Returns how many went out plus the last Telegram error description (for the uploader's ACK).
+ */
+export async function postNewVideosToChannelReport(token: string, videos: CreatedVideo[]): Promise<ChannelReport> {
+  const report: ChannelReport = { posted: 0, total: 0, chat: DEFAULT_CHANNEL, error: "" };
   try {
     const list = (Array.isArray(videos) ? videos : []).filter((v) => v && v.id && !v.hidden).slice(0, MAX_POSTS);
-    if (!list.length) return 0;
+    report.total = list.length;
+    if (!list.length) return report;
     const ch = (await loadChannel()) || { id: DEFAULT_CHANNEL, title: DEFAULT_CHANNEL };
-    let posted = 0;
+    report.chat = ch.id;
     for (let i = 0; i < list.length; i++) {
       if (i > 0) await new Promise((r) => setTimeout(r, GAP_MS));
       const v = list[i];
       const caption = `${String(v.title || v.id).slice(0, 900)}\nTonton: ${HOST}/watch/${encodeURIComponent(v.id)}`;
       let poster = String(v.poster || "").trim();
       if (!/^https?:\/\//i.test(poster)) poster = await hostPoster(String(v.id));
-      let ok = false;
+      let res: TgResult = { ok: false, error: "" };
       if (/^https?:\/\//i.test(poster)) {
-        ok = await tgCall(token, "sendPhoto", { chat_id: ch.id, photo: poster, caption });
+        res = await tgCall(token, "sendPhoto", { chat_id: ch.id, photo: poster, caption });
+        if (!res.ok) report.error = res.error;
       }
-      if (!ok) ok = await tgCall(token, "sendMessage", { chat_id: ch.id, text: caption });
-      if (ok) posted++;
+      if (!res.ok) {
+        res = await tgCall(token, "sendMessage", { chat_id: ch.id, text: caption });
+        if (!res.ok) report.error = res.error;
+      }
+      if (res.ok) report.posted++;
     }
-    return posted;
+    return report;
   } catch (err) {
-    console.error("postNewVideosToChannel", redactToken(err instanceof Error ? err.message : err, token));
-    return 0;
+    report.error = redactToken(err instanceof Error ? err.message : String(err), token).slice(0, 200);
+    console.error("postNewVideosToChannel", report.error);
+    return report;
   }
+}
+
+/** Post new videos to the channel; returns the number posted. Never throws. */
+export async function postNewVideosToChannel(token: string, videos: CreatedVideo[]): Promise<number> {
+  return (await postNewVideosToChannelReport(token, videos)).posted;
+}
+
+/** One ACK line for the uploader, e.g. "📣 Channel: 4 terkirim" or "📣 Channel gagal: <reason>". */
+export function channelReportLine(r: ChannelReport): string {
+  if (!r.total) return "";
+  if (r.posted === r.total) return `📣 Channel: ${r.posted} terkirim`;
+  const why = r.error || "tidak diketahui";
+  if (r.posted > 0) return `📣 Channel: ${r.posted}/${r.total} terkirim · gagal: ${why}`;
+  return `📣 Channel gagal (${r.chat}): ${why}`;
 }

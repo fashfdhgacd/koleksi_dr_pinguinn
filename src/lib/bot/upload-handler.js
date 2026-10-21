@@ -10,6 +10,7 @@ import {
 } from "@/lib/bot/providers.js";
 import { DRP_CATEGORY } from "@/lib/catalog/drp-hosts.js";
 import { upsertVideosBatch } from "@/lib/bot/github.js";
+import { postNewVideosToChannelReport, channelReportLine } from "@/lib/bot/channel-post";
 import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
 import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
 import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
@@ -540,6 +541,18 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       lines.push(`⚠️ Poster map error: ${msg}`);
+    }
+  }
+
+  // Once per upload batch: post new visible videos to the owner's channel before the final ACK,
+  // so the ACK can say whether it worked (errors never break the upload).
+  if (createdRecords.length) {
+    try {
+      const rep = await postNewVideosToChannelReport(token, createdRecords);
+      const line = channelReportLine(rep);
+      if (line) lines.push(line);
+    } catch (err) {
+      lines.push(`📣 Channel gagal: ${err instanceof Error ? err.message : String(err)}`.slice(0, 220));
     }
   }
 
