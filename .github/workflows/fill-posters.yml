@@ -63,7 +63,7 @@ jobs:
                 const m =
                   html.match(/poster=["'](https?:\/\/[^"']*embedan[^"']+)["']/i) ||
                   html.match(/poster=["'](https?:\/\/[^"']+\.(?:webp|jpg|jpeg|png)[^"']*)["']/i) ||
-                  html.match(/property=["']og:image["']\s+content=["'](https?:\/\/[^"']+)["']/i);
+                  html.match(/(?:property|name)=["']og:image["']\s+content=["'](https?:\/\/[^"']+)["']/i);
                 const url = m?.[1]?.replace(/&/g, "&")?.trim();
                 if (url?.startsWith("http") && !DEAD.test(url)) return url;
               } catch {}
@@ -154,6 +154,78 @@ jobs:
           })().catch(e => { console.error(e); process.exit(1); });
           SCRIPT
 
+      - name: Owner-host posters (Byse / LuluStream / DoodStream)
+        # Byse: https://img-place.com/<code>_xt.jpg (_t.jpg fallback). Lulu: https://img.lulucdn.com/<code>_xt.jpg
+        # (_t.jpg fallback). Dood (playmogo): og:image of the public embed page (imgds.net/splash/...).
+        # Set only when the URL answers 200 with a real jpeg/png/webp; otherwise retried next run.
+        run: |
+          node --input-type=commonjs <<'SCRIPT'
+          const fs = require("fs");
+          const latestPath = "data/latest-posters.json";
+          const load = (p, fb) => { try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return fb; } };
+          const asList = (d) => (Array.isArray(d) ? d : (d && Array.isArray(d.items) ? d.items : []));
+          const posters = load("src/lib/catalog/posters.json", {});
+          const latest = load(latestPath, {});
+          const real = (u) => typeof u === "string" && /^https?:\/\//i.test(u) && !/placeholder|brand-poster|data:image/i.test(u);
+          const UA = { "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36" };
+          function codeOf(v) {
+            const m = String(v.embed || v.direct || "").match(/\/(?:e|d|v)\/([A-Za-z0-9]+)/);
+            const c = String(v.code || "") || (m ? m[1] : "") || String(v.id || "").replace(/^(?:by|lu|dd)-/, "");
+            return /^[A-Za-z0-9]{6,40}$/.test(c) ? c : "";
+          }
+          async function isImage(url) {
+            try {
+              const res = await fetch(url, { headers: { ...UA, accept: "image/*" }, redirect: "follow", signal: AbortSignal.timeout(10000) });
+              const type = String(res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+              if (res.status !== 200 || !/^image\/(?:jpeg|jpg|png|webp)$/.test(type)) { await res.body?.cancel().catch(() => {}); return false; }
+              return (await res.arrayBuffer()).byteLength >= 1500;
+            } catch { return false; }
+          }
+          // Dood's embed page answers Node's fetch with 403 (bot check), curl gets the page.
+          function doodOg(code) {
+            try {
+              const html = require("child_process").execFileSync(
+                "curl",
+                ["-sL", "--max-time", "10", "-A", UA["user-agent"], `https://playmogo.com/e/${code}`],
+                { encoding: "utf8", maxBuffer: 4 << 20 },
+              );
+              const m = html.match(/(?:property|name)=["']og:image["']\s+content=["'](https?:\/\/[^"']+)["']/i);
+              return m ? m[1] : "";
+            } catch { return ""; }
+          }
+          async function candidates(kind, code) {
+            if (kind === "by") return [`https://img-place.com/${code}_xt.jpg`, `https://img-place.com/${code}_t.jpg`];
+            if (kind === "lu") return [`https://img.lulucdn.com/${code}_xt.jpg`, `https://img.lulucdn.com/${code}_t.jpg`];
+            const og = doodOg(code);
+            return og ? [og] : [];
+          }
+          (async () => {
+            const seen = new Set();
+            const need = [];
+            for (const v of [...asList(load("data/drp-bokep.json", [])), ...asList(load("data/videos-latest.json", []))]) {
+              const id = String(v?.id || "");
+              const kind = (id.match(/^(by|lu|dd)-/) || [])[1];
+              if (!kind || seen.has(id)) continue;
+              seen.add(id);
+              if (real(v.poster) || real(v.thumbnail) || real(posters[id]) || real(latest[id])) continue;
+              const code = codeOf(v);
+              if (code) need.push({ id, kind, code });
+            }
+            const stat = {};
+            for (let i = 0; i < need.length; i += 6) {
+              await Promise.all(need.slice(i, i + 6).map(async ({ id, kind, code }) => {
+                stat[kind] = stat[kind] || { missing: 0, filled: 0 };
+                stat[kind].missing++;
+                for (const url of await candidates(kind, code)) {
+                  if (await isImage(url)) { latest[id] = url; stat[kind].filled++; return; }
+                }
+              }));
+            }
+            fs.writeFileSync(latestPath, JSON.stringify(latest, null, 2) + "\n");
+            console.log("Owner-host posters:", JSON.stringify(stat));
+          })().catch((e) => { console.error(e); process.exit(1); });
+          SCRIPT
+
       - name: Commit posters
         run: |
           set -e
@@ -165,7 +237,7 @@ jobs:
             exit 0
           fi
           COUNT=$(node --input-type=commonjs -e "try{console.log(Object.keys(require('./src/lib/catalog/jav-posters.json')).length)}catch(e){console.log(0)}")
-          git commit -m "chore(posters): auto-fill jav+missing ($COUNT jav)"
+          git commit -m "chore(posters): auto-fill jav+missing+owner hosts ($COUNT jav)"
           for i in 1 2 3 4 5; do
             git pull --rebase origin main || true
             if git push origin HEAD:main; then
