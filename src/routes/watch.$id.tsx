@@ -7,6 +7,7 @@ import {
   SITE_ORIGIN,
   categoryKeywords,
   cleanDisplayTitle,
+  generatedVideoSeo,
   resolveVideoSeoDescription,
   videoJsonLd,
   videoSeoTitle,
@@ -40,11 +41,19 @@ export const Route = createFileRoute("/watch/$id")({
   head: ({ loaderData }) => {
     const ok = loaderData && loaderData.ok === true && loaderData.type === "detail";
     const item = ok ? loaderData.item : null;
-    const title = item ? videoSeoTitle(item.title, item.category) : "Video tidak ditemukan | koleksidrpinguin.com";
-    const ogTitle = item ? cleanDisplayTitle(item.title) : title;
-    const description = item
-      ? resolveVideoSeoDescription(item)
-      : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
+    // Placeholder / non-Latin titles get a search-friendly generated title (head only; H1 unchanged).
+    const gen = item ? generatedVideoSeo(item) : null;
+    const title = gen
+      ? gen.title
+      : item
+        ? videoSeoTitle(item.title, item.category)
+        : "Video tidak ditemukan | koleksidrpinguin.com";
+    const ogTitle = gen ? gen.ogTitle : item ? cleanDisplayTitle(item.title) : title;
+    const description = gen
+      ? gen.description
+      : item
+        ? resolveVideoSeoDescription(item)
+        : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
     const image = item ? shareCardImage(item.thumbnail) : DEFAULT_OG;
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
     const embedUrl = item
