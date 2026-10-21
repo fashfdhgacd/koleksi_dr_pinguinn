@@ -129,6 +129,48 @@ async function tgCall(token: string, method: string, body: Record<string, unknow
   }
 }
 
+/** True when `url` answers 200 with a real jpeg/png/webp (not an SVG placeholder or 404 page). */
+async function isImage(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url, { headers: { accept: "image/*" }, signal: AbortSignal.timeout(6000) });
+    const type = String(res.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+    const len = Number(res.headers.get("content-length") || 0);
+    await res.body?.cancel().catch(() => undefined);
+    return res.status === 200 && /^image\/(?:jpeg|jpg|png|webp)$/.test(type) && (!len || len >= 1500);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Poster for a just-uploaded video without one: the owner hosts' public thumbnail URL, used only
+ * when it really is an image (Byse img-place, LuluStream lulucdn, DoodStream embed og:image).
+ * Videy (and anything else) gets none: the post falls back to text. No waiting, no retries.
+ */
+async function hostPoster(id: string): Promise<string> {
+  const m = /^(by|lu|dd)-([A-Za-z0-9]{6,40})$/.exec(id);
+  if (!m) return "";
+  const [, kind, code] = m;
+  let urls: string[] = [];
+  if (kind === "by") urls = [`https://img-place.com/${code}_xt.jpg`, `https://img-place.com/${code}_t.jpg`];
+  else if (kind === "lu") urls = [`https://img.lulucdn.com/${code}_xt.jpg`, `https://img.lulucdn.com/${code}_t.jpg`];
+  else {
+    try {
+      const res = await fetch(`https://playmogo.com/e/${code}`, {
+        headers: { accept: "text/html", "user-agent": "Mozilla/5.0" },
+        signal: AbortSignal.timeout(6000),
+      });
+      const html = res.ok ? await res.text() : "";
+      const og = html.match(/(?:property|name)=["']og:image["']\s+content=["'](https?:\/\/[^"']+)["']/i);
+      if (og) urls = [og[1]];
+    } catch {
+      urls = [];
+    }
+  }
+  for (const u of urls) if (await isImage(u)) return u;
+  return "";
+}
+
 /** Post up to MAX_POSTS new (visible) videos to the stored channel, ~1.1s apart. Never throws. */
 export async function postNewVideosToChannel(token: string, videos: CreatedVideo[]): Promise<number> {
   try {
@@ -140,7 +182,8 @@ export async function postNewVideosToChannel(token: string, videos: CreatedVideo
       if (i > 0) await new Promise((r) => setTimeout(r, GAP_MS));
       const v = list[i];
       const caption = `${String(v.title || v.id).slice(0, 900)}\nTonton: ${HOST}/watch/${encodeURIComponent(v.id)}`;
-      const poster = String(v.poster || "").trim();
+      let poster = String(v.poster || "").trim();
+      if (!/^https?:\/\//i.test(poster)) poster = await hostPoster(String(v.id));
       let ok = false;
       if (/^https?:\/\//i.test(poster)) {
         ok = await tgCall(token, "sendPhoto", { chat_id: ch.id, photo: poster, caption });
