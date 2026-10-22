@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VideoDetail } from "@/lib/catalog/types";
 import { sendPlayerLog } from "@/lib/player-log-client";
-import { popTap } from "@/components/ts-videy-popunder";
+import { armNoFillPop, disarmNoFillPop, popTap } from "@/components/ts-videy-popunder";
 import { loadVast, ping, prerollDue, VAST_TIMEOUT_MS, type VastAd } from "@/components/videy-preroll";
 
 /**
@@ -95,6 +95,9 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     },
     [item.id],
   );
+
+  // A pending no-fill popunder belongs to this video only.
+  useEffect(() => () => disarmNoFillPop(), [item.id]);
 
   // New video (SPA navigation, e.g. Tonton juga): the old video is stopped and unloaded,
   // back to the poster.
@@ -346,6 +349,8 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
       if (tokenRef.current !== token) return;
       const el = videoRef.current;
       if (!ad || !el) {
+        // No fill / error / timeout: the viewer's next tap opens the Videy popunder once.
+        if (!ad) armNoFillPop(item.id);
         playFilm();
         return;
       }
