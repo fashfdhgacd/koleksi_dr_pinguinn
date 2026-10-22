@@ -1,4 +1,4 @@
-/* KDP LuluStream popunder - up to 3 per video (keyed by Lulu code), 30s gap, safety cap 30 per 24h per browser */
+/* KDP LuluStream popunder - up to 3 per video (keyed by Lulu code), click-triggered (IndoAV style), 10s gap, safety cap 30 per 24h per browser */
 (function () {
   'use strict';
   if (window.__kdpLuluPop) return;
@@ -9,7 +9,7 @@
   var CAP = 30;
   var PER_VIDEO = 3;
   var DAY = 24 * 60 * 60 * 1000;
-  var GAP = 30 * 1000;
+  var GAP = 10 * 1000;
   var MAX_CODES = 200;
   var memState = { t: 0, n: 0, last: 0, done: {} };
 
