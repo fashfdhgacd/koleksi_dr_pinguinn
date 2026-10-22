@@ -1,14 +1,15 @@
-/* KDP LuluStream popunder - once per video (keyed by Lulu code), 60s gap, safety cap 10 per 24h per browser */
+/* KDP LuluStream popunder - up to 3 per video (keyed by Lulu code), 30s gap, safety cap 30 per 24h per browser */
 (function () {
   'use strict';
   if (window.__kdpLuluPop) return;
   window.__kdpLuluPop = true;
 
   var URL = 'https://fozekikikiminu.com/api/v1/direct/587547ff73c844b39ab9f02d1285154b';
-  var KEY = 'kdp_lulu_pop_v2';
-  var CAP = 10;
+  var KEY = 'kdp_lulu_pop_v3';
+  var CAP = 30;
+  var PER_VIDEO = 3;
   var DAY = 24 * 60 * 60 * 1000;
-  var GAP = 60 * 1000;
+  var GAP = 30 * 1000;
   var MAX_CODES = 200;
   var memState = { t: 0, n: 0, last: 0, done: {} };
 
@@ -51,7 +52,9 @@
     }
     var k;
     for (k in s.done) {
-      if (Object.prototype.hasOwnProperty.call(s.done, k) && now - s.done[k] > DAY) delete s.done[k];
+      if (!Object.prototype.hasOwnProperty.call(s.done, k)) continue;
+      var e = s.done[k];
+      if (!e || typeof e.c !== 'number' || typeof e.t !== 'number' || now - e.t > DAY) delete s.done[k];
     }
     return s;
   }
@@ -63,7 +66,7 @@
       if (Object.prototype.hasOwnProperty.call(s.done, k)) keys.push(k);
     }
     if (keys.length <= MAX_CODES) return;
-    keys.sort(function (a, b) { return s.done[a] - s.done[b]; });
+    keys.sort(function (a, b) { return s.done[a].t - s.done[b].t; });
     for (var i = 0; i < keys.length - MAX_CODES; i++) delete s.done[keys[i]];
   }
 
@@ -78,7 +81,8 @@
   function onTap() {
     var s = load();
     var now = new Date().getTime();
-    if (s.done[CODE]) return;
+    var v = s.done[CODE];
+    if (v && v.c >= PER_VIDEO) return;
     if (s.n >= CAP) return;
     if (s.last && now - s.last < GAP) return;
     var w = null;
@@ -87,9 +91,11 @@
       try { w.opener = null; } catch (e) {}
       s.n = s.n + 1;
       s.last = now;
-      s.done[CODE] = now;
+      if (!v) v = { c: 0, t: now };
+      v.c = v.c + 1;
+      s.done[CODE] = v;
       save(s);
-      try {
+      if (v.c >= PER_VIDEO) try {
         document.removeEventListener('click', onTap, true);
         document.removeEventListener('touchend', onTap, true);
       } catch (e) {}
