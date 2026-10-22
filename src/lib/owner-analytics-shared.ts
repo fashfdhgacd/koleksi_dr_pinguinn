@@ -243,7 +243,53 @@ export async function writeDayStatsKv(dk: string, stats: DayStatsKv): Promise<vo
   );
 }
 
-/** Persist pageview counters to KV when Postgres is down (or as parallel backup). */
+/**
+ * KV fallback counters (only used when D1/Postgres is unavailable or failing).
+ * Budget guard: hits are buffered in isolate memory and flushed to KV at most once per
+ * KV_FALLBACK_FLUSH_MS per isolate (one daystats write), and no per-visitor uv:<day>:<id> key is
+ * written any more. Before this, an outage of the database meant 2 KV writes per pageview, which
+ * alone could burn the 1M writes/month in a day or two. Unique visitors are approximated from
+ * distinct ids seen by this isolate inside the buffer window (undercount, fallback only).
+ */
+const KV_FALLBACK_FLUSH_MS = 60_000;
+type KvHitBuffer = { day: string; views: number; ids: Set<string>; peak: number; lastFlush: number };
+const kvHitState = globalThis as typeof globalThis & { __kdpKvHitBuf__?: KvHitBuffer };
+
+function kvHitBuffer(dk: string): KvHitBuffer {
+  let b = kvHitState.__kdpKvHitBuf__;
+  if (!b || b.day !== dk) {
+    b = { day: dk, views: 0, ids: new Set<string>(), peak: 0, lastFlush: b?.day === dk ? b.lastFlush : 0 };
+    kvHitState.__kdpKvHitBuf__ = b;
+  }
+  return b;
+}
+
+async function flushKvHitBuffer(dk: string, force = false): Promise<DayStatsKv> {
+  const b = kvHitBuffer(dk);
+  const now = Date.now();
+  const stats = await readDayStatsKv(dk);
+  const pending = b.views > 0 || b.peak > stats.peak;
+  if (!pending) return stats;
+  if (!force && b.lastFlush && now - b.lastFlush < KV_FALLBACK_FLUSH_MS) {
+    return {
+      views: stats.views + b.views,
+      unique: stats.unique + b.ids.size,
+      peak: Math.max(stats.peak, b.peak),
+    };
+  }
+  const next: DayStatsKv = {
+    views: stats.views + b.views,
+    unique: stats.unique + b.ids.size,
+    peak: Math.max(stats.peak, b.peak),
+  };
+  b.views = 0;
+  b.ids = new Set<string>();
+  b.lastFlush = now;
+  await writeDayStatsKv(dk, next);
+  return next;
+}
+
+/** Persist pageview counters to KV when Postgres is down (or as parallel backup). Buffered. */
 export async function recordHitKv(input: {
   visitorId: string;
   sessionId: string;
@@ -251,35 +297,22 @@ export async function recordHitKv(input: {
   onlineHint?: number;
 }): Promise<DayStatsKv> {
   const dk = dayKey();
-  const stats = await readDayStatsKv(dk);
-  stats.views += 1;
-
+  const b = kvHitBuffer(dk);
+  b.views += 1;
   const vid = input.visitorId || input.sessionId;
-  if (vid) {
-    const uvKey = `${UV_KV_PREFIX}${dk}:${vid}`;
-    const existed = await optionalKvGet(uvKey);
-    if (!existed) {
-      stats.unique += 1;
-      await optionalKvPut(uvKey, "1", UV_TTL_SEC);
-    }
-  }
-
+  if (vid && b.ids.size < 5000) b.ids.add(vid);
   // Peak = real concurrent count (bumpPeakKv from presence); only raise, never fake.
   const hint = Math.max(0, Number(input.onlineHint) || 0);
-  if (hint > stats.peak) stats.peak = hint;
-
-  await writeDayStatsKv(dk, stats);
-  return stats;
+  if (hint > b.peak) b.peak = hint;
+  return flushKvHitBuffer(dk);
 }
 
 export async function bumpPeakKv(online: number): Promise<void> {
   if (online <= 0) return;
   const dk = dayKey();
-  const stats = await readDayStatsKv(dk);
-  if (online > stats.peak) {
-    stats.peak = online;
-    await writeDayStatsKv(dk, stats);
-  }
+  const b = kvHitBuffer(dk);
+  if (online > b.peak) b.peak = online;
+  await flushKvHitBuffer(dk);
 }
 
 /** WIB day keys, newest first: [today, yesterday, ...]. */
