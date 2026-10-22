@@ -505,4 +505,90 @@ function PlayerErrorsSection({
                   hosts.map((h) => (
                     <tr key={h.host} className="border-t border-white/[0.06] tabular-nums">
                       <td className="py-1 pr-3">{hostLabel(h.host)}</td>
-                  [+4138 bytes at .content[1].resource.text]
+                      <td className="py-1 pr-3 text-right">{h.starts}</td>
+                      <td className="py-1 pr-3 text-right">{h.slow ?? 0}</td>
+                      <td className="py-1 pr-3 text-right">{h.fails}</td>
+                      <td className="py-1 pr-3 text-right">{h.reports}</td>
+                      <td className="py-1 pr-3 text-right">{h.retries}</td>
+                      <td className="py-1 pr-3 text-right">{h.openSource}</td>
+                      <td className="py-1 text-right">{h.alt ?? 0}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr className="border-t border-white/[0.06]">
+                    <td colSpan={8} className="py-2 text-zinc-400">
+                      Belum ada data versi 2. Angka muncul setelah ada pengunjung yang memutar video.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <h3 className="mt-4 text-[13px] font-medium text-zinc-300">Paling sering gagal ({top.length})</h3>
+          {top.length ? (
+            <ul className="mt-1 divide-y divide-white/[0.06]">
+              {top.map((r) => (
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-[13px] text-zinc-300">
+                  <span className="min-w-0 flex-1">
+                    <span className="mr-1.5 text-zinc-400">{hostLabel(r.host)}</span>
+                    {title(r)}
+                    <span className="ml-1.5 tabular-nums text-zinc-400">
+                      {r.fails} gagal{r.reports ? ` · ${r.reports} lapor` : ""}
+                      {r.gone ? " · dihapus oleh sumber" : ""}
+                      {r.hidden ? " · disembunyikan" : ""}
+                    </span>
+                  </span>
+                  {actions(r)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-[13px] text-zinc-400">Belum ada.</p>
+          )}
+
+          <h3 className="mt-4 text-[13px] font-medium text-zinc-300">Dihapus oleh sumber ({gone.length})</h3>
+          <p className="text-[13px] text-zinc-400">
+            Cek otomatis tiap 12 jam, terakhir {wibTime(data.checkedAt)}. Ditandai setelah 2 kali cek berturut-turut
+            {data.suspect ? `; ${data.suspect} lagi menunggu cek kedua` : ""}. Tidak disembunyikan otomatis.
+          </p>
+          {gone.length ? (
+            <ul className="mt-1 max-h-80 divide-y divide-white/[0.06] overflow-y-auto">
+              {gone.map((r) => (
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-[13px] text-zinc-300">
+                  <span className="min-w-0 flex-1">
+                    <span className="mr-1.5 text-zinc-400">{hostLabel(r.host)}</span>
+                    {title(r)}
+                    {r.hidden ? <span className="ml-1.5 text-zinc-400">· disembunyikan</span> : null}
+                  </span>
+                  {actions(r)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-[13px] text-zinc-400">Belum ada.</p>
+          )}
+
+          <h3 className="mt-4 text-[13px] font-medium text-zinc-300">Disembunyikan dari sini ({ownerHidden.length})</h3>
+          {data.hideReadable === false ? (
+            <p className="mt-1 text-[13px] text-amber-400">KV tidak terbaca, daftar belum bisa dimuat.</p>
+          ) : ownerHidden.length ? (
+            <ul className="mt-1 divide-y divide-white/[0.06]">
+              {ownerHidden.map((r) => (
+                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5 text-[13px] text-zinc-300">
+                  <span className="min-w-0 flex-1">
+                    <span className="mr-1.5 text-zinc-400">{hostLabel(r.host)}</span>
+                    {title(r)}
+                  </span>
+                  {actions(r)}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-[13px] text-zinc-400">Tidak ada.</p>
+          )}
+        </>
+      ) : null}
+    </section>
+  );
+}
