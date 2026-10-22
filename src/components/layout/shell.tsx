@@ -29,6 +29,7 @@ export function Shell({
                 </a>{" "}
                 · 18+
               </p>
+              <p className="text-xs text-white/80 sm:text-sm">Koleksi Dr. Pinguin — situs resmi koleksidrpinguin.com</p>
               <p className="text-[11px] text-white/65 sm:text-xs">
                 Koleksi ini dimaksudkan untuk pengguna dewasa. Pastikan Anda berusia 18+ sebelum melanjutkan.
               </p>

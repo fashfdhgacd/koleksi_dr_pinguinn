@@ -14,8 +14,8 @@ interface SitemapEvent {
   req: { method: string; headers: Headers };
 }
 
-/** Soft chunk under Google's 50_000 URL / sitemap limit. */
-const WATCH_CHUNK = 45_000;
+/** Small child sitemaps (≤1000 URLs) so Google fetches/processes each quickly. */
+const WATCH_CHUNK = 1_000;
 
 const LEGAL_PATHS = ["/syarat", "/privasi", "/2257", "/dmca", "/kontak"] as const;
 
@@ -153,33 +153,30 @@ async function buildWatchXml(chunkIndex?: number): Promise<{ xml: string; total:
   };
 }
 
+function maxLastmod(list: Array<{ lastmod?: string }>): string | undefined {
+  let best: string | undefined;
+  for (const e of list) if (e.lastmod && (!best || e.lastmod > best)) best = e.lastmod;
+  return best;
+}
+
 async function buildRootXml(): Promise<string> {
+  // Always a sitemap index: pages + watch chunks of ≤1000 URLs, ordered by popularity.
   const entries = await listSitemapWatchEntries();
-  const pages = pageEntries(await listListedCategories());
-  const pageCount = pages.length;
-  const total = pageCount + entries.length;
   const watchChunks = Math.max(1, Math.ceil(Math.max(entries.length, 1) / WATCH_CHUNK));
-
-  // Single urlset when under the 50k limit; otherwise sitemap index.
-  if (total <= 50_000 && watchChunks === 1) {
-    return wrapUrlset([
-      ...pages,
-      ...watchEntries(entries, 0, entries.length),
-    ]);
-  }
-
-  const latest = entries.find((e) => e.lastmod)?.lastmod;
   const locs: Array<{ loc: string; lastmod?: string }> = [
-    { loc: `${SITE_ORIGIN}/sitemap-pages.xml` },
+    { loc: `${SITE_ORIGIN}/sitemap-pages.xml`, lastmod: maxLastmod(entries) },
   ];
-  if (watchChunks === 1) {
-    locs.push({ loc: `${SITE_ORIGIN}/sitemap-watch.xml`, lastmod: latest });
-  } else {
-    for (let i = 1; i <= watchChunks; i++) {
-      locs.push({ loc: `${SITE_ORIGIN}/sitemap-watch-${i}.xml`, lastmod: latest });
-    }
+  for (let i = 1; i <= watchChunks; i++) {
+    const slice = entries.slice((i - 1) * WATCH_CHUNK, i * WATCH_CHUNK);
+    locs.push({ loc: `${SITE_ORIGIN}/sitemap-watch-${i}.xml`, lastmod: maxLastmod(slice) });
   }
   return wrapIndex(locs);
+}
+
+type EdgeCache = { match(req: Request): Promise<Response | undefined>; put(req: Request, res: Response): Promise<void> };
+
+function edgeCache(): EdgeCache | undefined {
+  return (globalThis as unknown as { caches?: { default?: EdgeCache } }).caches?.default;
 }
 
 export default async function sitemapMiddleware(
@@ -196,21 +193,35 @@ export default async function sitemapMiddleware(
   const watchChunkMatch = path.match(/^\/sitemap-watch-(\d+)\.xml$/);
   if (!isRoot && !isPages && !isWatch && !watchChunkMatch) return next();
 
+  // Edge cache (Cache API, per colo, 1 jam): bots hitting the sitemap don't rebuild it each time.
+  const edge = edgeCache();
+  const key = new Request(`${SITE_ORIGIN}${path}`);
+  if (edge) {
+    const hit = await edge.match(key).catch(() => undefined);
+    if (hit) {
+      return new Response(method === "HEAD" ? null : hit.body, {
+        status: 200,
+        headers: {
+          "content-type": "application/xml; charset=utf-8",
+          "cache-control": "public, max-age=3600, s-maxage=3600, stale-while-revalidate=86400",
+          "x-sitemap-cache": "HIT",
+        },
+      });
+    }
+  }
+
   try {
-    if (isPages) return xmlResponse(method, await buildPagesXml());
-    if (isWatch) {
-      const { xml } = await buildWatchXml(0);
-      return xmlResponse(method, xml);
-    }
-    if (watchChunkMatch) {
+    let xml: string;
+    if (isPages) xml = await buildPagesXml();
+    else if (isWatch) xml = (await buildWatchXml(0)).xml;
+    else if (watchChunkMatch) {
       const n = Number(watchChunkMatch[1]);
-      const { xml, chunks } = await buildWatchXml(n - 1);
-      if (n < 1 || n > chunks) {
-        return new Response("Not Found", { status: 404 });
-      }
-      return xmlResponse(method, xml);
-    }
-    return xmlResponse(method, await buildRootXml());
+      const built = await buildWatchXml(n - 1);
+      if (n < 1 || n > built.chunks) return new Response("Not Found", { status: 404 });
+      xml = built.xml;
+    } else xml = await buildRootXml();
+    if (edge) await edge.put(key, xmlResponse("GET", xml)).catch(() => undefined);
+    return xmlResponse(method, xml);
   } catch (err) {
     const message = err instanceof Error ? err.message : "sitemap error";
     return errorXml(method, message);

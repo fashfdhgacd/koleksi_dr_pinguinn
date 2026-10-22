@@ -21,7 +21,7 @@ export const HOME_TITLE = `${BRAND_NAME} - Bokep Indo Viral Terbaru | ${TITLE_SU
 
 /** Kalimat pendek di bawah H1 beranda. */
 export const HOME_INTRO =
-  "Bokep indo viral terbaru, video viral videy, JAV dan AI+ yang lagi rame, semua bisa langsung ditonton di HP.";
+  "Koleksi Dr. Pinguin (Koleksi Dr Pinguin) adalah situs resmi koleksidrpinguin.com. Bokep indo viral terbaru, video viral videy, JAV dan AI+ yang lagi rame, semua bisa langsung ditonton di HP.";
 
 function categoryLabel(slugOrLabel?: string | null): string {
   const key = (slugOrLabel || "").trim().toLowerCase();
@@ -398,6 +398,10 @@ const BRAND_ALT_NAMES = [
   "M.S.B.",
   "bokep dr pinguin",
   "koleksidrpinguin.com",
+  "Koleksi Dr Pinguin",
+  "Dr Pinguin",
+  "koleksidrpinguin",
+  "Bokep Dr Pinguin",
 ];
 
 function websiteNode() {

@@ -9,6 +9,7 @@ export type SitemapWatchEntry = {
   embed?: string;
   thumbnail?: string;
   duration?: number;
+  views?: number;
 };
 
 function str(v: unknown): string {
@@ -63,9 +64,14 @@ export async function listSitemapWatchEntries(): Promise<SitemapWatchEntry[]> {
     if (typeof it.duration === "number" && Number.isFinite(it.duration) && it.duration > 0) {
       entry.duration = Math.round(it.duration);
     }
+    if (typeof it.views === "number" && Number.isFinite(it.views) && it.views > 0) entry.views = it.views;
     out.push(entry);
   }
+  // Paling ditonton dulu (child sitemap 1 = video terpopuler), lalu terbaru.
   out.sort((a, b) => {
+    const va = a.views || 0;
+    const vb = b.views || 0;
+    if (va !== vb) return vb - va;
     const da = a.lastmod || "";
     const db = b.lastmod || "";
     if (da !== db) return db.localeCompare(da);
