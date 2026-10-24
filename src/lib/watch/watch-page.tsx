@@ -14,7 +14,6 @@ import { cleanDisplayTitle } from "@/lib/seo";
 import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { CatalogBackLink } from "@/components/video/catalog-back-link";
 import { WatchStats } from "@/components/video/watch-stats";
-import { TsWatchExtraAds } from "@/components/ts-watch-extra-ads";
 import { DRP_CATEGORY, DRP_SOURCES, drpKindOfUrl } from "@/lib/catalog/drp-hosts.js";
 
 const routeApi = getRouteApi("/watch/$id");
@@ -52,14 +51,6 @@ function isDrpHostItem(item: VideoDetail): boolean {
   if (/^(?:by|lu|dd)-/i.test(String(item.id || ""))) return true;
   if (DRP_LABELS.has(String(item.creator || ""))) return true;
   return [item.video_url, ...item.qualities.map((q) => q.url)].some((u) => Boolean(u && drpKindOfUrl(u)));
-}
-
-/** In-Page Push + Video Slider only where no ads of ours / no IndoAV bonus already run. */
-function wantsExtraAds(item: VideoDetail): boolean {
-  if (isVideyItem(item) || isDrpHostItem(item)) return false;
-  const urls = [item.video_url, ...item.qualities.map((q) => q.url)].filter(Boolean).join(" ");
-  if (/indoav/i.test(urls) || /indoav/i.test(String(item.creator || ""))) return false;
-  return Boolean(urls);
 }
 
 function catalogPlayUrl(item: VideoDetail): string {
@@ -411,7 +402,6 @@ export function WatchPage() {
           ) : item ? null : (
             <VideoGridSkeleton count={6} />
           )}
-          {item ? <TsWatchExtraAds key={item.id} enabled={wantsExtraAds(item)} /> : null}
           {item ? (
             <ShareSheet open={shareOpen} title={item.title} id={item.id} onClose={closeShare} />
           ) : null}

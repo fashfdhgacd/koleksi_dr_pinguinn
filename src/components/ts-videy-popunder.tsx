@@ -5,9 +5,6 @@
 // marked done for this session, the tap does nothing else (video stays paused, our tab stays);
 // blocked -> the overlay stays and the next tap retries; after 2 blocked tries the tap plays.
 // Counters (player-log, once per video per session): pop_fire / pop_ok / pop_block.
-// No-fill fallback (armNoFillPop): when the Videy VAST pre-roll returns no ad / error / timeout, the
-// viewer's NEXT tap or click on the page (never automatic) opens the same direct link once per video
-// per session, recorded in the same sessionStorage state (id "nf:<videoId>"). Blocked -> given up.
 import { sendPlayerLog } from "@/lib/player-log-client";
 
 const DIRECT_LINK = "https://fozekikikiminu.com/api/v1/direct/587547ff73c844b39ab9f02d1285154b";
@@ -63,47 +60,4 @@ export function popTap(videoId: string): boolean {
   const n = (failures.get(videoId) || 0) + 1;
   failures.set(videoId, n);
   return n < MAX_FAILS;
-}
-
-let armedFor = "";
-let disarm: (() => void) | null = null;
-
-/**
- * Pre-roll had no fill: the viewer's next tap/click opens the direct link once for this video
- * (same session state as popTap, key "nf:<id>"). Never opens without a user gesture.
- */
-export function armNoFillPop(videoId: string): void {
-  if (typeof window === "undefined" || !videoId) return;
-  const key = "nf:" + videoId;
-  if (firedIds().includes(key) || armedFor === key) return;
-  disarm?.();
-  armedFor = key;
-  const onTap = () => {
-    cleanup();
-    if (firedIds().includes(key)) return;
-    sendPlayerLog(videoId, "Videy", "pop_fire");
-    let w: Window | null = null;
-    try {
-      w = window.open(DIRECT_LINK, "_blank");
-      if (w) w.opener = null;
-    } catch {
-      w = null;
-    }
-    saveIds(firedIds().concat(key)); // once per video per session, opened or blocked
-    sendPlayerLog(videoId, "Videy", w ? "pop_ok" : "pop_block");
-  };
-  function cleanup() {
-    document.removeEventListener("click", onTap, true);
-    document.removeEventListener("touchend", onTap, true);
-    if (armedFor === key) armedFor = "";
-    disarm = null;
-  }
-  disarm = cleanup;
-  document.addEventListener("click", onTap, true);
-  document.addEventListener("touchend", onTap, true);
-}
-
-/** Drop a pending no-fill pop (video changed / player unmounted). */
-export function disarmNoFillPop(): void {
-  disarm?.();
 }
