@@ -55,11 +55,22 @@ function sourcePriority(item: RawItem): number {
 }
 
 /**
- * Same order as before (source priority, then createdAt/date newest first; stable), but the keys are
- * computed once per item instead of 3 regex tests per comparison.
+ * Upload time in ms. Bot records carry ISO strings (`date: "2026-10-24"`, `updated_at`), which
+ * Number() turned into NaN, so new Puterin uploads never sorted to the top of their category.
  */
-export function sortByNewest(items: RawItem[]): RawItem[] {
-  const keyed = items.map((it) => ({ it, p: sourcePriority(it), t: Number(it.createdAt || it.date || 0) }));
+function timeKey(it: RawItem): number {
+  const extra = it as RawItem & { updated_at?: unknown; created_at?: unknown };
+  for (const v of [it.createdAt, extra.created_at, extra.updated_at, it.date]) {
+    if (v == null || v === "") continue;
+    const n = typeof v === "number" ? v : /^\d+$/.test(String(v)) ? Number(v) : Date.parse(String(v));
+    if (Number.isFinite(n) && n > 0) return n < 1e12 ? n * 1000 : n;
+  }
+  return 0;
+}
+
+/** sourceFirst=false: pure newest-first (category pages), so a fresh upload from any source leads. */
+export function sortByNewest(items: RawItem[], sourceFirst = true): RawItem[] {
+  const keyed = items.map((it) => ({ it, p: sourceFirst ? sourcePriority(it) : 0, t: timeKey(it) }));
   keyed.sort((a, b) => b.p - a.p || b.t - a.t);
   return keyed.map((k) => k.it);
 }
@@ -457,7 +468,7 @@ export function buildIndexes(
   // Homepage = semua item (urut tanggal), tanpa batasi cuma IndoAV/UserBokep
   const mainSorted = sortByNewest(core);
   for (const [slug, list] of bySlug) {
-    const sorted = sortByNewest(list);
+    const sorted = sortByNewest(list, false);
     // /kategori/bokep: videos with a real poster in data first, logo-only ones after (stable, so the
     // newest-first order holds inside each group). A poster added to data/drp-bokep.json later moves
     // the video up on the next build. Other categories keep their order.
