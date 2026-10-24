@@ -13,6 +13,7 @@ const QUICK_CATS = [
   { slug: "bokep", label: "Koleksi Dr. Pinguin Bokep" },
   { slug: "paling-ditonton", label: "Paling Banyak Ditonton" },
   { slug: "jav", label: "Jav" },
+  { slug: "hentai", label: "Hentai" },
   { slug: "ai-plus", label: "AI+" },
   { slug: "videy", label: "drpinguin videy" },
   { slug: "paling-disukai", label: "Paling Banyak Disukai" },

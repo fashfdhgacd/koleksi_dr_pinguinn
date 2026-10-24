@@ -6,6 +6,7 @@ export type CategoryDef = CategoryInfo & {
 
 export const CATEGORIES: CategoryDef[] = [
   { slug: "jav", label: "Jav", query: "jav" },
+  { slug: "hentai", label: "Hentai", query: "hentai" },
   { slug: "ai-plus", label: "AI+", query: "ai-plus" },
   { slug: "jilbab", label: "Jilbab", query: "jilbab" },
   { slug: "tante", label: "Tante", query: "tante" },
@@ -61,6 +62,7 @@ export const MIN_LISTED_CATEGORY_COUNT = 20;
 /** Chip utama di header; sisanya di menu "Lainnya". */
 export const PRIMARY_CATEGORY_SLUGS = [
   "jav",
+  "hentai",
   "ai-plus",
   "jilbab",
   "tante",
@@ -83,6 +85,9 @@ export function findCategory(slug: string | null | undefined): CategoryDef | und
   const key = slug.trim().toLowerCase();
   if (key === "ai" || key === "ai+") {
     return CATEGORIES.find((c) => c.slug === "ai-plus");
+  }
+  if (key === "anime" || key === "animasi") {
+    return CATEGORIES.find((c) => c.slug === "hentai");
   }
   if (key === "puterin" || key === "putarin") {
     return CATEGORIES.find((c) => c.slug === "jav");

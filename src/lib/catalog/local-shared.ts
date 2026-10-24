@@ -226,8 +226,28 @@ export function classify(title: string): string {
   return "lainnya";
 }
 /** Public category slug of an item (internal classifier keys like "abg" mapped to their current slug). */
+/**
+ * Anime / hentai by title, any source (Putarin, IndoAV, UserBokep, Lulu/Dood/Byse, Streamtape, Videy).
+ * Real JAV (product code / FC2) never matches, so /kategori/jav stays live-action only.
+ */
+const JAV_CODE_RE = /\b[a-z]{2,6}[-_ ]?\d{3,5}\b|\bfc2\b/i;
+const INDO_WORD_RE =
+  /\b(?:indo|bokep|ngentot|ngewe|cewek|cowok|yang|sama|lagi|pacar|tante|abg|viral|colmek|jilbab|hijab|live|mesum|sange|toket|memek|kontol|tobrut|mahasiswi|janda|istri|suami|dientot|crot|mesra|video|toge|mulus)\b/i;
+const HENTAI_STRONG_RE = /\bhentai\b|\bthe animation\b|\bova\b/i;
+const ANIME_EP_RE = /\beps?\s*\d{1,3}\b|\bs\d{1,2}e\d{1,3}\b/i;
+const ROMAJI_RE =
+  /\b(?:tsuma|netori|ojisan|nikubenki|hitozuma|onee|imouto|oppai|ecchi|kyoushitsu|seikatsu|gakuen|ojou|yuusha|hime|joushi|kanojo|musume|desuga|shitara|ikasetara)\b/i;
+const PARTICLE_RE = /\b(?:wa|ga|wo|ni|no|desu)\b/gi;
+export function isHentaiTitle(title: string): boolean {
+  const t = String(title || "").trim();
+  if (!t || JAV_CODE_RE.test(t) || INDO_WORD_RE.test(t)) return false;
+  if (HENTAI_STRONG_RE.test(t) || ANIME_EP_RE.test(t) || ROMAJI_RE.test(t)) return true;
+  return new Set(t.toLowerCase().match(PARTICLE_RE) || []).size >= 2;
+}
 export function slugOf(item: RawItem): string {
+  if (isHentaiTitle(item.title || "")) return "hentai";
   let s = slugOfRaw(item);
+
   // Owner rule 2026-10-22: /kategori/jav holds ONLY Putarin. Other sources with a JAV-ish title or a
   // "jav" source label get their next-best category instead (never hidden).
   if (s === "jav" && !isPutarin(item)) s = nonJavSlug(item);
