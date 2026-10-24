@@ -115,6 +115,7 @@ type Overview = {
   categories?: { slug: string; label: string; count: number }[];
   noThumb?: number;
   recent?: CatalogRow[];
+  checkJav?: CatalogRow[];
   recentTotal?: number;
   offset?: number;
   status?: OverviewStatus;
@@ -984,6 +985,29 @@ export function OwnerOverview(props: {
               </p>
             ) : null}
             {ov?.error ? <p className="mt-2 text-sm text-red-300">{ov.error}</p> : null}
+            {ov?.checkJav?.length ? (
+              <div className="mt-3 rounded-md border border-amber-400/30 p-2">
+                <p className="text-sm font-semibold text-amber-300">Perlu dicek: Jav berjudul Episode/Ep ({ov.checkJav.length})</p>
+                {ov.checkJav.map((r) => (
+                  <div key={r.id} className="mt-1 flex items-center gap-2 text-[13px]">
+                    <a className="min-w-0 flex-1 truncate text-zinc-300" href={`/watch/${r.id}`} target="_blank" rel="noreferrer">
+                      {r.title}
+                    </a>
+                    <button
+                      type="button"
+                      className={toggleCls(true)}
+                      onClick={async () => {
+                        const d = await ownerPost<{ ok?: boolean; error?: string }>(secret, { action: "edit-video", id: r.id, category: "hentai" });
+                        if (!d.ok) window.alert(`Gagal: ${d.error || "tidak diketahui"}`);
+                        void loadOverview();
+                      }}
+                    >
+                      → Hentai
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
             {ov?.recent?.length ? (
               <>
                 <VideoRows rows={ov.recent} secret={secret} showTime onChanged={() => void loadOverview()} />

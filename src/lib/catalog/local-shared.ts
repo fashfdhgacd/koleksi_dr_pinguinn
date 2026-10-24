@@ -245,6 +245,9 @@ export function isHentaiTitle(title: string): boolean {
   return new Set(t.toLowerCase().match(PARTICLE_RE) || []).size >= 2;
 }
 export function slugOf(item: RawItem): string {
+  // Owner override from /pemilik (KV owner:edit:v1, set in local-cache.ts) beats every auto rule.
+  const owner = typeof item.ownerCategory === "string" ? findCategory(item.ownerCategory) : undefined;
+  if (owner) return owner.slug;
   if (isHentaiTitle(item.title || "")) return "hentai";
   let s = slugOfRaw(item);
 

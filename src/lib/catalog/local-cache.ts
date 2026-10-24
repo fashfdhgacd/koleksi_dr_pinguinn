@@ -315,7 +315,7 @@ function withStats(it: RawItem): RawItem {
     out = {
       ...out,
       ...(ed.title ? { title: ed.title } : {}),
-      ...(ed.category ? { category: ed.category } : {}),
+      ...(ed.category ? { category: ed.category, ownerCategory: ed.category } : {}),
     };
   }
   const title = typeof out.title === "string" ? out.title : "";

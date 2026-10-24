@@ -478,9 +478,16 @@ async function handleCatalogOverview(
   const page = recent0
     .slice(offset, offset + limit)
     .map(({ it }) => toCatalogRow(it, cache.byId?.get(it.id), hidden.has(it.id), posters));
+  // "Perlu dicek": Jav items whose title looks like an episode (maybe hentai). Owner moves them in one tap.
+  const EP_RE = /\b(?:episode|ep)\.?\s*\d{1,3}\b/i;
+  const checkRows = cache.items
+    .filter((it) => slugOf(it) === "jav" && EP_RE.test(String(it.title || "")))
+    .slice(0, 40)
+    .map((it) => toCatalogRow(it, cache.byId?.get(it.id), hidden.has(it.id), posters));
   const dead = deadSources as { checkedAt?: string | null };
   return json({
     ok: true,
+    checkJav: offset === 0 ? checkRows : undefined,
     total: cache.items.length,
     hidden: hidden.size,
     uploadedToday: today,
