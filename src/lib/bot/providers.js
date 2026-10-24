@@ -442,7 +442,7 @@ export async function expandPutarinFolder(folderId, folderTitle = "") {
           "user-agent": "Mozilla/5.0 (compatible; kdp-bot/1.0)",
         },
         redirect: "follow",
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(12000),
       });
       if (!res.ok) continue;
       html = await res.text();

@@ -264,27 +264,38 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   const createdRecords = [];
 
   const queue = [];
-  for (const video of parsedMsg.videos) {
+  // Folder pages are fetched in parallel (puterin.biz can take 3-25 s per page): a sequential loop
+  // over 10+ folders ran past the Worker's waitUntil budget and the batch died with no reply.
+  const folderKids = await mapPool(parsedMsg.videos, 6, async (video) => {
+    if (!(video.host === "putarin-folder" || video.folder)) return null;
     const folderTitle = cleanTitle(String(video.title || parsedMsg.title || ""));
-    if (video.host === "putarin-folder" || video.folder) {
-      try {
-        const kids = await expandPutarinFolder(video.id, folderTitle);
-        if (!kids.length) {
-          lines.push(`⚠️ Folder kosong / gagal dibaca: ${video.id}`);
-          failedTotal += 1;
-          continue;
-        }
-        lines.push(`📁 Folder ${video.id}: ${kids.length} video`);
-        for (const kid of kids) queue.push(kid);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        lines.push(`⚠️ Gagal baca folder ${video.id}: ${msg}`);
+    try {
+      return { kids: await expandPutarinFolder(video.id, folderTitle) };
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+  parsedMsg.videos.forEach((video, i) => {
+    const folderTitle = cleanTitle(String(video.title || parsedMsg.title || ""));
+    const res = folderKids[i];
+    if (res) {
+      if (res.error) {
+        lines.push(`⚠️ Gagal baca folder ${video.id}: ${res.error}`);
         failedTotal += 1;
+        return;
       }
-      continue;
+      const kids = res.kids || [];
+      if (!kids.length) {
+        lines.push(`⚠️ Folder kosong / gagal dibaca: ${video.id}`);
+        failedTotal += 1;
+        return;
+      }
+      lines.push(`📁 Folder ${video.id}: ${kids.length} video`);
+      for (const kid of kids) queue.push(kid);
+      return;
     }
     queue.push(folderTitle && folderTitle !== "Video" ? { ...video, title: folderTitle } : video);
-  }
+  });
 
   if (!queue.length) {
     await tgSendChunks(
