@@ -41,7 +41,7 @@ const RULES = [
   ["classroom", /\b(?:di ?dalam kelas|dalam kelas|di kelas|kelas sepi)\b/],
   [
     "incest-child",
-    /\b(?:ayah|bapak|bapa|papa|daddy)\b.*\banak ?(?:perempuan|gadis|dara|cewek)\b|\banak ?(?:perempuan|gadis|dara|cewek)\b.*\b(?:ayah|bapak|papa|daddy)\b/,
+    /\b(?:ayah|bapak|bapa|papa|daddy|ibu|mama)\b.*\banak ?(?:kecil|sd|smp|balita|bocil)\b|\banak ?(?:kecil|sd|smp|balita|bocil)\b.*\b(?:ayah|bapak|papa|daddy|ibu|mama)\b/,
   ],
 ];
 
