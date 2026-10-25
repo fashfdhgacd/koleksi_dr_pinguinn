@@ -50,7 +50,8 @@ const COLLEGE = /\b(?:mahasisw\w*|kampus|kuliah|dosen|universit\w*|college|uitm)
 // JAV product code (e.g. "SSIS-123", "FC2-PPV-1234567"): English/Japanese genre wording on these is
 // costume-genre tag text; minor-title-guard.ts strips it at display time. Explicit minor terms and
 // Indonesian school words still block.
-const JAV_CODE = /(?<![a-z0-9])(?:[a-z]{2,6}-\d{2,5}|fc2-ppv-\d{5,8})(?![a-z0-9])/i;
+const JAV_CODE =
+  /(?<![A-Za-z0-9])(?:[A-Za-z]{2,6}-\d{2,5}|[Ff][Cc]2-[Pp][Pp][Vv]-\d{5,8}|(?!(?:HD|FHD|UHD|SD|EP|EPS|PART|VOL|NO|MP|CAM|VID|IMG|TOP|FULL|SMA|SMP|SMU|SMK)\b)[A-Z]{2,5} \d{3,4})(?![A-Za-z0-9])/;
 const JAV_GENRE_REASONS = new Set(["school", "school-uniform", "teacher-student", "classroom", "masked-school-term"]);
 const CHILD_GRADE = /\b(?:smp|sd|sekolah dasar|osis|pramuka|anak pesantren|putih biru|esema)\b/;
 
