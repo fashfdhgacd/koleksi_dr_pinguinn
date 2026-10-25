@@ -188,7 +188,7 @@ export function hiddenReasonRaw(it: RawItem): string {
 }
 
 /** Clear school/minor theme (minor-lock.js): hidden even when the owner pressed Unhide. */
-function isLockedMinor(it: RawItem): boolean {
+export function isLockedMinor(it: RawItem): boolean {
   if (isLockedMinorId(it.id)) return true;
   if (EDITS[it.id]?.title && lockedReasonMemo(String(EDITS[it.id]?.title)) !== "") return true;
   return lockedReasonMemo(String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "")) !== "";

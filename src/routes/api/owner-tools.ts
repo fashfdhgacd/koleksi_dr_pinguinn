@@ -13,6 +13,7 @@ import { listHiddenForReview, setReviewMark } from "@/lib/owner-hidden-review";
 import {
   listHiddenCandidates,
   applyUnhidden,
+  isLockedMinor,
   loadItemsRaw,
   type HiddenCandidate,
 } from "@/lib/catalog/local-cache";
@@ -23,7 +24,7 @@ import latestPosters from "../../../data/latest-posters.json";
 import thumbsDeploy from "../../../data/.thumbs-deploy.json";
 import { findCategory } from "@/lib/catalog/categories";
 import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
-import { isLockedMinorId, lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
@@ -391,10 +392,9 @@ function createdMs(it: RawItem): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// Same decision as the catalog (local-cache.ts), so the panel label never disagrees with what is hidden.
 function isLockedItem(it: RawItem): boolean {
-  if (isLockedMinorId(it.id)) return true;
-  const ov = (itemOverrides as Record<string, { title?: string }>)[it.id];
-  return Boolean(lockedMinorReason(String(it.title || "")) || lockedMinorReason(String(ov?.title || "")));
+  return isLockedMinor(it);
 }
 
 function toCatalogRow(
