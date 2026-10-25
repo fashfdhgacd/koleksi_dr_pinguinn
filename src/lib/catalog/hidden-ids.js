@@ -27,7 +27,7 @@ const RULES = [
     "school",
     /\b(?:(?:anak|cewek|cewe|abg|gadis|bocah|seragam|kelas|pacar|temen|teman|guru|pake|pakai) sma|sma (?:kelas|negeri|swasta|\d+)|smp|smu|smk|esema|siswi|siswa|murid|murit|pelajar|sekolah\w*|osis|pramuka|anak pesantren|putih abu(?: abu)?|putih biru|kakak kelas|adik kelas|anak sd|guru sd|murid sd)\b/,
   ],
-  ["school-uniform", /\bseragam\s?(?:18yo|sekolah|olahraga)\b|\b(?:masih|baru pulang masih) pake seragam\b|\babg seragam/],
+  ["school-uniform", /\bseragam\s?(?:18yo|sekolah|olahraga\s+(?:sekolah|smp|sma|sd|siswi|murid))\b|\b(?:masih|baru pulang masih) pa(?:ke|kai) seragam (?:sekolah|sma|smp|sd|putih|pramuka)\b|\babg seragam/],
   ["minor", /\b(?:bocil|di ?bawah umur|under ?age\w*|lolita|loli|shota\w*|anak kecil|gadis kecil|adek kecil|adik kecil|masih kecil|belum sunat|masih abe?ge\w*|umur masih muda)\b/],
   [
     "anime-school",
@@ -35,13 +35,13 @@ const RULES = [
   ],
   [
     "teacher-student",
-    /\b(?:teachers? teach students|my student|hot student)\b|\bguru les\b|\bdihukum guru\b|\bgadis berseragam\b.*\bguru\b|\bguru\b.*\b(?:wisuda|kemah|perawanku|mengajar|ngajar)\b|\b(?:kemah|perawank(?:an)?|wisuda)\b/,
+    /\b(?:teachers? teach students|my student|hot student)\b|\bdihukum guru\b|\bgadis berseragam\b.*\bguru\b|\bguru\b.*\b(?:wisuda|kemah|perawanku|mengajar|ngajar)\b/,
   ],
   // Classroom setting (not "kelas bintang/atas", not college).
   ["classroom", /\b(?:di ?dalam kelas|dalam kelas|di kelas|kelas sepi)\b/],
   [
     "incest-child",
-    /\b(?:ayah|bapak|bapa|papa|daddy)\b.*\banak ?(?:nya|perempuan|ku|sendiri)?\b|\banak ?(?:nya|perempuan)?\b.*\b(?:ayah|bapak)\b|\banak dan ibu\b|\bibu kandung\b|\banak kandung\b|\borang tua dan anak\b/,
+    /\b(?:ayah|bapak|bapa|papa|daddy|ibu|mama)\b.*\banak ?(?:kecil|sd|smp|balita|bocil)\b|\banak ?(?:kecil|sd|smp|balita|bocil)\b.*\b(?:ayah|bapak|papa|daddy|ibu|mama)\b/,
   ],
 ];
 

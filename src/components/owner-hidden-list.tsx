@@ -92,6 +92,34 @@ export function HiddenListSection({ secret }: { secret: string }) {
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
   const [bulkMsg, setBulkMsg] = useState<string | null>(null);
   const [open, setOpen] = useState(true);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editMsg, setEditMsg] = useState<string | null>(null);
+
+  async function saveEdit(row: Row) {
+    const title = editTitle.replace(/\s+/g, " ").trim();
+    if (!title || title === row.title) {
+      setEditId(null);
+      return;
+    }
+    setBusy(row.id);
+    setErr(null);
+    setEditMsg(null);
+    try {
+      const d = await call({ action: "edit-video", id: row.id, title });
+      if (!d?.ok) {
+        setErr(d?.error || "gagal");
+        return;
+      }
+      setEditId(null);
+      setEditMsg(`Judul disimpan. Kalau judul barunya lolos filter, video tampil lagi dalam ±1 menit: ${title}`);
+      await load();
+    } catch {
+      setErr("gagal");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   const call = useCallback(
     async (body: Record<string, unknown>) => {
@@ -366,6 +394,7 @@ export function HiddenListSection({ secret }: { secret: string }) {
                 </span>
               </div>
               {bulkMsg ? <p className="mt-2 text-xs text-emerald-300">{bulkMsg}</p> : null}
+              {editMsg ? <p className="mt-2 text-xs text-emerald-300">{editMsg}</p> : null}
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full min-w-[760px] text-left text-xs">
                   <thead className="text-[10px] uppercase tracking-wide text-zinc-600">
@@ -393,7 +422,27 @@ export function HiddenListSection({ secret }: { secret: string }) {
                           <input type="checkbox" aria-label={`Pilih ${r.title}`} checked={selected.has(r.id)} onChange={() => toggleSelect(r.id)} />
                         </td>
                         <td className="py-2 pr-3 text-zinc-200">
-                          <div className="break-words">{r.title}</div>
+                          {editId === r.id ? (
+                            <div className="flex flex-col gap-1.5">
+                              <input
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                maxLength={200}
+                                className="w-full min-w-[16rem] rounded-md border border-white/[0.12] bg-[#0f0f11] px-2 py-1 text-xs text-zinc-100"
+                                autoFocus
+                              />
+                              <div className="flex gap-1.5">
+                                <button type="button" className={`${btn} border-emerald-400/40 text-emerald-200`} disabled={busy === r.id} onClick={() => void saveEdit(r)}>
+                                  {busy === r.id ? "…" : "Simpan judul"}
+                                </button>
+                                <button type="button" className={btn} onClick={() => setEditId(null)}>
+                                  Batal
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="break-words">{r.title}</div>
+                          )}
                           <div className="mt-0.5 text-[10px] text-zinc-600">
                             {r.id}
                             {r.unhidden ? (
@@ -436,6 +485,18 @@ export function HiddenListSection({ secret }: { secret: string }) {
                           {r.reasonLabel}
                         </td>
                         <td className="py-2 text-right whitespace-nowrap">
+                          <button
+                            type="button"
+                            className={`${btn} mr-1.5`}
+                            disabled={busy === r.id}
+                            onClick={() => {
+                              setEditId(r.id);
+                              setEditTitle(r.title);
+                              setEditMsg(null);
+                            }}
+                          >
+                            Edit
+                          </button>
                           {r.unhidden ? (
                             <button type="button" className={btn} disabled={busy === r.id} onClick={() => void toggle(r, false)}>
                               {busy === r.id ? "…" : "Sembunyikan lagi"}
