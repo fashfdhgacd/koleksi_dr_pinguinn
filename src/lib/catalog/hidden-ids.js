@@ -35,13 +35,13 @@ const RULES = [
   ],
   [
     "teacher-student",
-    /\b(?:teachers? teach students|my student|hot student)\b|\bguru les\b|\bdihukum guru\b|\bgadis berseragam\b.*\bguru\b|\bguru\b.*\b(?:wisuda|kemah|perawanku|mengajar|ngajar)\b|\b(?:kemah|perawank(?:an)?|wisuda)\b/,
+    /\b(?:teachers? teach students|my student|hot student)\b|\bdihukum guru\b|\bgadis berseragam\b.*\bguru\b|\bguru\b.*\b(?:wisuda|kemah|perawanku|mengajar|ngajar)\b/,
   ],
   // Classroom setting (not "kelas bintang/atas", not college).
   ["classroom", /\b(?:di ?dalam kelas|dalam kelas|di kelas|kelas sepi)\b/],
   [
     "incest-child",
-    /\b(?:ayah|bapak|bapa|papa|daddy)\b.*\banak ?(?:nya|perempuan|ku|sendiri)?\b|\banak ?(?:nya|perempuan)?\b.*\b(?:ayah|bapak)\b|\banak dan ibu\b|\bibu kandung\b|\banak kandung\b|\borang tua dan anak\b/,
+    /\b(?:ayah|bapak|bapa|papa|daddy)\b.*\banak ?(?:nya|perempuan|ku|sendiri)?\b|\banak ?(?:nya|perempuan)?\b.*\b(?:ayah|bapak)\b/,
   ],
 ];
 
