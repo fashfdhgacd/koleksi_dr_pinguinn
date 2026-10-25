@@ -57,6 +57,9 @@ export function minorContentReason(title = "") {
   for (const [reason, re] of RULES) {
     if (!re.test(t)) continue;
     if (reason === "classroom" && COLLEGE.test(t)) continue;
+    // College context: generic wording ("wisuda", "kemah", "guru les", "kakak kelas") is adult, not school.
+    if (reason === "teacher-student" && COLLEGE.test(t)) continue;
+    if (reason === "school" && COLLEGE.test(t) && !re.test(t.replace(/\b(?:kakak|adik) kelas\b/g, " "))) continue;
     // Tag dumps translated from English ("Lolita, Wanita dewasa, Mahasiswi") are renamed, not hidden.
     if (reason === "minor" && /\blol(?:ita|i)\b/.test(t) && (COLLEGE.test(t) || /\bdewasa\b/.test(t))) continue;
     // "Bapak/Ayah ... anak buah/anak kos/anak tiri" style false positives.
