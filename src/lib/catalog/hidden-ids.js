@@ -86,6 +86,11 @@ export function isMinorContentTitle(title = "") {
   return minorContentReason(title) !== "";
 }
 
+/** JAV-coded title without a child grade level (SD/SMP/...): school wording is only genre text. */
+export function isJavGenreTitle(title = "") {
+  return JAV_CODE.test(String(title)) && !CHILD_GRADE.test(norm(title));
+}
+
 /**
  * Owner review priority for a hidden item (does NOT change hidden state):
  *  "check" = "Cek dulu" (likely false positive): unresolved/ambiguous "***" censor, a bare "sma"
