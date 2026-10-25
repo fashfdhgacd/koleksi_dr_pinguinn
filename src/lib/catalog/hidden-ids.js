@@ -33,12 +33,15 @@ const RULES = [
     "anime-school",
     /\b(?:jk|joshi ?kou?sei|school ?girls?|school ?boys?|high ?school|kyou?shitsu|classroom|gakuen|seitokai|j class girl)\b|molestific mikoto/,
   ],
-  ["teacher-student", /\b(?:teachers? teach students|my student|hot student)\b|\bguru les\b|\bdihukum guru\b|\bgadis berseragam\b.*\bguru\b|\bguru\b.*\b(?:wisuda|kemah|perawanku)\b|\b(?:kemah|perawank[...],
+  [
+    "teacher-student",
+    /\b(?:teachers? teach students|my student|hot student)\b|\bguru les\b|\bdihukum guru\b|\bgadis berseragam\b.*\bguru\b|\bguru\b.*\b(?:wisuda|kemah|perawanku|mengajar|ngajar)\b|\b(?:kemah|perawank(?:an)?|wisuda)\b/,
+  ],
   // Classroom setting (not "kelas bintang/atas", not college).
   ["classroom", /\b(?:di ?dalam kelas|dalam kelas|di kelas|kelas sepi)\b/],
   [
     "incest-child",
-    /\b(?:ayah|bapak|bapa|papa|daddy)\b.*\banak ?(?:nya|perempuan|ku|sendiri)?\b|\banak ?(?:nya|perempuan)?\b.*\b(?:ayah|bapak)\b|\banak dan ibu\b|\bibu kandung\b|\banak kandung\b|\borang tua dan anak[...]
+    /\b(?:ayah|bapak|bapa|papa|daddy)\b.*\banak ?(?:nya|perempuan|ku|sendiri)?\b|\banak ?(?:nya|perempuan)?\b.*\b(?:ayah|bapak)\b|\banak dan ibu\b|\bibu kandung\b|\banak kandung\b|\borang tua dan anak\b/,
   ],
 ];
 
