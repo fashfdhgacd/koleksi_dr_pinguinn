@@ -179,6 +179,8 @@ function buildSentences(item: SeoVideoInput): { lead: string; detail: string; cl
     `Tonton ${subj}, salah satu video ${label}${dur ? ` dengan durasi ${dur}` : ""}.`,
     `Video ${label} ${subj}${dur ? ` berjalan sekitar ${dur}` : " siap diputar"}.`,
     `${subj} hadir di rak ${label}${year ? ` (${year})` : ""}${dur ? `, durasi ${dur}` : ""}.`,
+    `Nonton streaming ${subj} online, video ${label}${dur ? ` ${dur}` : ""} terbaru tanpa daftar.`,
+    `Streaming ${subj} gratis di koleksi ${label}${dur ? `, durasi ${dur}` : ""}.`,
   ];
   const details = [
     src ? `Diunggah lewat ${src}${tagTxt ? `, bertema ${tagTxt}` : ""}.` : tagTxt ? `Temanya seputar ${tagTxt}.` : "Diputar lewat embed dari hoster pihak ketiga.",
