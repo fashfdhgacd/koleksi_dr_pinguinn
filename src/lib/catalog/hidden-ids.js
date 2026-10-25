@@ -10,9 +10,8 @@
 /** @param {string} t */
 function norm(t = "") {
   return String(t)
-    .normalize("NFKC")
     .toLowerCase()
-    .replace(/[\u2010-\u2015\u2212_./|()[\]:!?,"“”'’]+/g, " ")
+    .replace(/[\u2000-\u200f\u2028-\u202f\u205f\u3000_+&=%#@~^*`\-–—./|()[\]:!?,"“”'’…·•×]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -34,7 +33,7 @@ const RULES = [
     "anime-school",
     /\b(?:jk|joshi ?kou?sei|school ?girls?|school ?boys?|high ?school|kyou?shitsu|classroom|gakuen|seitokai|j class girl)\b|molestific mikoto/,
   ],
-  ["teacher-student", /\b(?:teachers? teach students|my student|hot student)\b|\bguru les\b|\bdihukum guru\b|\bgadis berseragam\b.*\bguru\b|\bguru\b.*\b(?:wisuda|kemah|perawanku)\b|\b(?:kemah|perawank[...]
+  ["teacher-student", /\b(?:teachers? teach students|my student|hot student)\b|\bguru les\b|\bdihukum guru\b|\bgadis berseragam\b.*\bguru\b|\bguru\b.*\b(?:wisuda|kemah|perawanku)\b|\b(?:kemah|perawank[...],
   // Classroom setting (not "kelas bintang/atas", not college).
   ["classroom", /\b(?:di ?dalam kelas|dalam kelas|di kelas|kelas sepi)\b/],
   [
@@ -81,28 +80,15 @@ export function isMinorContentTitle(title = "") {
  */
 export function reviewPriority(reason = "", title = "") {
   const r = String(reason || "");
+  if (r === "masked-school-term" || r.startsWith("masked-check:")) return "check";
+  if (r.startsWith("masked-school:")) return "clear";
+  if (r === "bot-flag") return "check";
   const t = norm(title);
-
-  if (r === "masked-school-term" || r.startsWith("masked-check:") || r === "bot-flag") {
-    return "check";
-  }
-  if (r.startsWith("masked-school:")) {
-    return "clear";
-  }
-
-  if (r === "school" && /\bsma\b/.test(t) && !minorContentReason(t.replace(/\bsma\b/g, " "))) {
-    return "check";
-  }
-
+  if (r === "school" && /\bsma\b/.test(t) && !minorContentReason(t.replace(/\bsma\b/g, " "))) return "check";
   if (r === "minor") {
-    const rest = t
-      .replace(/\b(?:anak|gadis|adek|adik|masih)\s+kecil\b/g, " ")
-      .replace(/\bumur\s+masih\s+muda\b/g, " ")
-      .replace(/\bmasih\s+abe?ge\w*\b/g, " ");
-
+    const rest = t.replace(/\b(?:anak|gadis|adek|adik|masih) kecil\b|\bumur masih muda\b|\bmasih abe?ge\w*/g, " ");
     if (!minorContentReason(rest)) return "check";
   }
-
   return "clear";
 }
 
@@ -373,7 +359,7 @@ export const HIDDEN_IDS = {
   "nuXMGvN428": "masked-school-term",
   "nzWMDZy5XkqV": "masked-check:sma",
   "o0uxsDKW5Wu2": "masked-check:sma",
-  "oCo8mH4mCfVNB": "masked-check:sma",
+  "oCo8h4mCfVNB": "masked-check:sma",
   "ojY4CAmckLXi": "school-uniform",
   "oogSzEfYYYio": "masked-school:pulang sekolah",
   "p1ztmFOptEv6": "incest-child",
