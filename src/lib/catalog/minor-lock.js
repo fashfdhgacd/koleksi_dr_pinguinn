@@ -16,7 +16,7 @@
  * Deliberately NOT locked (left to the owner's review): a bare "sma" (often a typo of
  * "sama"), loose "kecil"/"muda"/"abege" phrases, and adult incest wording (mother/aunt).
  */
-import { minorContentReason, reviewPriority } from "./hidden-ids.js";
+import { isJavGenreTitle, minorContentReason, reviewPriority } from "./hidden-ids.js";
 
 /** Reasons from hidden-ids.js that count as a clear school/minor theme. */
 const CLEAR_REASONS = new Set([
@@ -75,6 +75,8 @@ export function lockedMinorReason(title = "") {
       return `locked:${reason}`;
     }
   }
+  // Same JAV exemption as hidden-ids.js: the spelling patterns also match the plain words.
+  if (isJavGenreTitle(title)) return "";
   for (const re of OBFUSCATED) {
     if (re.test(raw)) return "locked:school-obfuscated";
   }
