@@ -25,7 +25,7 @@ const RULES = [
   ["masked-school-term", /\*\*\*/],
   [
     "school",
-    /\b(?:sma|smp|smu|smk|esema|siswi|siswa|murid|murit|pelajar|sekolah\w*|osis|pramuka|anak pesantren|putih abu(?: abu)?|putih biru|kakak kelas|adik kelas|anak sd|guru sd|murid sd)\b/,
+    /\b(?:(?:anak|cewek|cewe|abg|gadis|bocah|seragam|kelas|pacar|temen|teman|guru|pake|pakai) sma|sma (?:kelas|negeri|swasta|\d+)|smp|smu|smk|esema|siswi|siswa|murid|murit|pelajar|sekolah\w*|osis|pramuka|anak pesantren|putih abu(?: abu)?|putih biru|kakak kelas|adik kelas|anak sd|guru sd|murid sd)\b/,
   ],
   ["school-uniform", /\bseragam\s?(?:18yo|sekolah|olahraga)\b|\b(?:masih|baru pulang masih) pake seragam\b|\babg seragam/],
   ["minor", /\b(?:bocil|di ?bawah umur|under ?age\w*|lolita|loli|shota\w*|anak kecil|gadis kecil|adek kecil|adik kecil|masih kecil|belum sunat|masih abe?ge\w*|umur masih muda)\b/],
