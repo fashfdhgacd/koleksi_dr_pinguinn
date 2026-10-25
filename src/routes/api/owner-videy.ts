@@ -124,7 +124,7 @@ async function saveTitle(body: { id?: unknown; title?: unknown }) {
   } catch {
     /* the regular 30 s sync applies it */
   }
-  return json({ ok: true, id, title: saved.title || null });
+  return json({ ok: true, id, title: saved?.title || null });
 }
 
 export const Route = createFileRoute("/api/owner-videy")({

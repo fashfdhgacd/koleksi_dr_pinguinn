@@ -32,11 +32,15 @@ export const Route = createFileRoute("/api/hidden-ids")({
         } catch {
           ownerHidden = undefined;
         }
-        let edits: Record<string, { title?: string; category?: string }> | undefined;
+        let edits: Record<string, { title?: string; category?: string; extra?: string[] }> | undefined;
         try {
           edits = {};
           for (const [id, e] of Object.entries((await readOwnerEditState()).ids)) {
-            edits[id] = { ...(e.title ? { title: e.title } : {}), ...(e.category ? { category: e.category } : {}) };
+            edits[id] = {
+              ...(e.title ? { title: e.title } : {}),
+              ...(e.category ? { category: e.category } : {}),
+              ...(e.extra?.length ? { extra: e.extra } : {}),
+            };
           }
         } catch {
           edits = undefined;

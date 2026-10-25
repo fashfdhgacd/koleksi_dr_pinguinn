@@ -96,6 +96,7 @@ export type CatalogRow = {
   title: string;
   category: string;
   categoryLabel: string;
+  extra?: string[];
   source: string;
   createdAt: number;
   hidden: boolean;
@@ -371,39 +372,49 @@ function EditRow({
 }: {
   row: CatalogRow;
   secret: string;
-  onDone: (note: string, saved?: { title?: string | null; category?: string | null }) => void;
+  onDone: (note: string, saved?: { title?: string | null; category?: string | null; extra?: string[] }) => void;
 }) {
   const [title, setTitle] = useState(row.title);
   const [cat, setCat] = useState(row.category);
+  const [extra, setExtra] = useState<string[]>(row.extra || []);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const extraChanged = [...extra].sort().join(",") !== [...(row.extra || [])].sort().join(",");
+  function toggleExtra(slug: string) {
+    setExtra((cur) => (cur.includes(slug) ? cur.filter((s) => s !== slug) : [...cur, slug]));
+  }
   async function save() {
     setBusy(true);
     const body: Record<string, unknown> = { action: "edit-video", id: row.id };
     if (title.trim() && title.trim() !== row.title) body.title = title.trim();
     if (cat && cat !== row.category) body.category = cat;
-    if (!body.title && !body.category) {
+    // The main category is never repeated in the extra list.
+    if (extraChanged) body.extra = extra.filter((s) => s !== cat);
+    if (!body.title && !body.category && !body.extra) {
       setBusy(false);
       onDone("Tidak ada perubahan.");
       return;
     }
     setErr("");
-    const d = await ownerPost<{ ok?: boolean; error?: string; title?: string | null; category?: string | null }>(
-      secret,
-      body,
-    );
+    const d = await ownerPost<{
+      ok?: boolean;
+      error?: string;
+      title?: string | null;
+      category?: string | null;
+      extra?: string[];
+    }>(secret, body);
     setBusy(false);
     // Failure keeps the editor open with the server's message next to the fields.
     if (!d.ok) {
       setErr(`Gagal: ${d.error || "tidak diketahui"}`);
       return;
     }
-    onDone("Tersimpan. Tampil di situs dalam ±1 menit.", { title: d.title, category: d.category });
+    onDone("Tersimpan. Tampil di situs dalam ±1 menit.", { title: d.title, category: d.category, extra: d.extra });
   }
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-white/[0.07] p-2">
       <input className={`${input} min-w-0 flex-1 basis-48`} value={title} onChange={(e) => setTitle(e.target.value)} aria-label="Judul" />
-      <select className={input} value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Kategori">
+      <select className={input} value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Kategori utama">
         {CATEGORY_LIST.some((c) => c.slug === row.category) ? null : <option value={row.category}>{row.categoryLabel}</option>}
         {CATEGORY_LIST.map((c) => (
           <option key={c.slug} value={c.slug}>
@@ -414,6 +425,22 @@ function EditRow({
       <button type="button" className={toggleCls(true)} disabled={busy} onClick={() => void save()}>
         {busy ? "..." : "Simpan"}
       </button>
+      <div className="basis-full">
+        <p className="mb-1 text-[13px] text-zinc-400">Tampil juga di kategori (opsional, maks. 6):</p>
+        <div className="flex flex-wrap gap-1.5">
+          {CATEGORY_LIST.filter((c) => c.slug !== cat).map((c) => (
+            <button
+              key={c.slug}
+              type="button"
+              aria-pressed={extra.includes(c.slug)}
+              className={toggleCls(extra.includes(c.slug))}
+              onClick={() => toggleExtra(c.slug)}
+            >
+              {c.label}
+            </button>
+          ))}
+        </div>
+      </div>
       {err ? <p className="basis-full text-[13px] text-red-400">{err}</p> : null}
     </div>
   );
@@ -435,7 +462,9 @@ function VideoRows({
   const [note, setNote] = useState("");
   const [menu, setMenu] = useState("");
   // Saved edits shown right away (the server list catches up after its next catalog sync).
-  const [patched, setPatched] = useState<Record<string, { title?: string; categoryLabel?: string; category?: string }>>({});
+  const [patched, setPatched] = useState<
+    Record<string, { title?: string; categoryLabel?: string; category?: string; extra?: string[] }>
+  >({});
   async function hide(r: CatalogRow) {
     setBusy(r.id);
     try {
@@ -473,7 +502,11 @@ function VideoRows({
               <a href={`/watch/${r.id}`} target="_blank" rel="noopener" className="min-w-0 flex-1">
                 <span className="line-clamp-2 text-sm leading-snug text-zinc-100">{r.title || r.id}</span>
                 <span className={`mt-0.5 block text-[13px] leading-snug ${r.noThumb ? "text-amber-300" : "text-zinc-400"}`}>
-                  {r.categoryLabel} · {r.source}
+                  {r.categoryLabel}
+                  {r.extra?.length
+                    ? ` + ${r.extra.map((s) => CATEGORY_LIST.find((c) => c.slug === s)?.label || s).join(", ")}`
+                    : ""}{" "}
+                  · {r.source}
                   {r.noThumb ? " · tanpa thumbnail" : showTime && r.createdAt ? ` · ${timeWib(r.createdAt)}` : ""}
                   {r.locked ? " · terkunci" : r.hidden ? " · tersembunyi" : ""}
                 </span>
@@ -546,6 +579,7 @@ function VideoRows({
                         ...(p[r.id] || {}),
                         ...(saved.title ? { title: saved.title } : {}),
                         ...(saved.category ? { category: saved.category, categoryLabel: cat?.label || saved.category } : {}),
+                        ...(saved.extra ? { extra: saved.extra } : {}),
                       },
                     }));
                   }
