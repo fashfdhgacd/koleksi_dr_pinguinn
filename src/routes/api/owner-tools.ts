@@ -13,7 +13,6 @@ import { listHiddenForReview, setReviewMark } from "@/lib/owner-hidden-review";
 import {
   listHiddenCandidates,
   applyUnhidden,
-  hiddenReasonRaw,
   loadItemsRaw,
   type HiddenCandidate,
 } from "@/lib/catalog/local-cache";
@@ -561,10 +560,9 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
   const { raw } = await catalogBase();
   const item = raw.find((it) => it?.id === id);
   if (!item) return json({ ok: false, error: "Video tidak ditemukan di katalog." }, 404);
-  // Minor-lock: locked or flagged items cannot be edited from the panel, and a new title must
-  // not carry a school/minor theme. local-cache.ts checks edited titles again when it builds.
-  if (isLockedItem(item)) return json({ ok: false, error: "Video ini terkunci (minor-lock), tidak bisa diedit." }, 403);
-  if (hiddenReasonRaw(item)) return json({ ok: false, error: "Video ini ditandai/tersembunyi, tidak bisa diedit." }, 403);
+  // Locked/hidden items may be edited (metadata correction), but an edit never unhides: local-cache.ts
+  // checks the stored title as well as the edit, so the item stays hidden. A new title must not carry
+  // a school/minor theme.
   if (title && (lockedMinorReason(title) || minorContentReason(title))) {
     return json({ ok: false, error: "Judul ditolak: bertema sekolah/di bawah umur." }, 403);
   }

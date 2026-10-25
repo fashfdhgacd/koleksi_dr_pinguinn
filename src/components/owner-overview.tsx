@@ -478,7 +478,11 @@ function VideoRows({
                   {r.locked ? " · terkunci" : r.hidden ? " · tersembunyi" : ""}
                 </span>
               </a>
-              {r.locked || r.hidden ? null : (
+              {r.locked || r.hidden ? (
+                <button type="button" className={btn} onClick={() => setEditing((v) => (v === r.id ? "" : r.id))}>
+                  Edit
+                </button>
+              ) : (
                 <>
                   <span className="hidden shrink-0 gap-1 sm:flex">
                     <button type="button" className={btn} onClick={() => setEditing((v) => (v === r.id ? "" : r.id))}>
