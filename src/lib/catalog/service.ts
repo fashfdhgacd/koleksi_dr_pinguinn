@@ -1,180 +1,34 @@
-import { CATEGORY_LIST, findCategory } from "./categories";
-import {
-  getDetail,
-  listCategory,
-  listFeatured,
-  listLatest,
-  listListedCategories,
-  listRelated,
-  listSearch,
-} from "./local";
 import { fetchCatalog } from "./client";
-import { listRanking, withVideyViews } from "./ranking-list";
-import { parseRankingKey } from "./rankings";
-import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./types";
-import type { CatalogError, CatalogResponse, CatalogType, VideoCard } from "./types";
+import type { CatalogQuery } from "./service-server";
+import type { CatalogResponse } from "./types";
 
-/** Featured/hero: only keep thumbs that are known real art (not brand / speculative *-thumb). */
-function isRealFeaturedThumb(url: string | null | undefined): boolean {
-  const u = (url || "").trim();
-  if (!u || /brand-poster/i.test(u)) return false;
-  if (/\/api\/embed-thumb\?/i.test(u)) return false;
-  if (/\/api\/(tape|puterin)-thumb\?/i.test(u)) return false;
-  // Videy removed — never treat CDN / raw video as featured art.
-  if (/cdn\.videy\.co\/|videy\.co\//i.test(u)) return false;
-  if (/\.(mp4|mov|webm)(\?|$)/i.test(u)) return false;
-  if (/\/api\/img-proxy\?/i.test(u)) return false;
-  if (/^https?:\/\//i.test(u)) return true;
-  return false;
-}
+export type { CatalogQuery } from "./service-server";
 
-async function listFeaturedWithArt(page = 1, limit = 8, signal?: AbortSignal) {
-  const want = Math.max(1, limit);
-  // Over-fetch so we can drop speculative embed-thumb leftovers and still fill `limit`.
-  const raw = await listFeatured(page, Math.max(want * 8, 64), signal);
-  const withArt = raw.items.filter((x) => isRealFeaturedThumb(x.thumbnail));
-  // Homepage page 1 (hero included) is IndoAV-only; UserBokep starts from Terbaru page 2.
-  const indo = withArt.filter((x) => x.creator === "IndoAV");
-  const items = (indo.length >= want ? indo : withArt).slice(0, want);
-  return {
-    ...raw,
-    limit: want,
-    total: items.length,
-    hasMore: false,
-    items,
-  };
-}
-
-async function heroFeatured(signal?: AbortSignal): Promise<{ items: VideoCard[] }> {
-  try {
-    if (!import.meta.env.SSR) throw new Error("client");
-    const { heroState } = await import("./hero-pick");
-    const state = await heroState();
-    if (state.current) return { items: [state.current] };
-  } catch {
-    /* fall back below */
-  }
-  const old = await listFeaturedWithArt(1, 8, signal);
-  return { items: old.items.slice(0, 1) };
-}
-
-export type CatalogQuery = {
-  type?: string | null;
-  page?: string | number | null;
-  limit?: string | number | null;
-  category?: string | null;
-  q?: string | null;
-  id?: string | null;
-};
-
-function toInt(value: string | number | null | undefined): number | undefined {
+function toNum(value: string | number | null | undefined): number | undefined {
   if (value == null || value === "") return undefined;
   const n = typeof value === "number" ? value : Number(value);
   return Number.isFinite(n) ? n : undefined;
 }
 
-function parseType(raw: string | null | undefined): CatalogType {
-  const type = (raw || "latest").trim().toLowerCase();
-  switch (type) {
-    case "home":
-    case "latest":
-    case "featured":
-    case "category":
-    case "search":
-    case "detail":
-    case "related":
-    case "categories":
-      return type;
-    default:
-      throw Object.assign(new Error("Tipe permintaan tidak dikenal"), { code: "bad_request" as const });
-  }
-}
-
-function wrapError(err: unknown): CatalogError {
-  const code =
-    err && typeof err === "object" && "code" in err ? String((err as { code?: unknown }).code) : "";
-  const message = err instanceof Error && err.message ? err.message : "Gagal memuat katalog.";
-  if (code === "bad_request") return { ok: false, error: message, code: "bad_request" };
-  if (code === "not_found") return { ok: false, error: message, code: "not_found" };
-  return { ok: false, error: message, code: "upstream" };
-}
-
+/**
+ * Server: reads the bundled catalog directly (service-server.ts). Browser: asks /api/data (edge
+ * cached) instead. The server module is only reachable through the SSR branch, so the browser bundle
+ * no longer carries the whole video catalog (it was ~1.3 MB of JS on every first visit).
+ */
 export async function queryCatalog(query: CatalogQuery, signal?: AbortSignal): Promise<CatalogResponse> {
-  try {
-    const type = parseType(query.type);
-    const page = toInt(query.page);
-    const limit = toInt(query.limit);
-
-    if (limit != null && (limit < 1 || limit > MAX_PAGE_SIZE)) {
-      return { ok: false, error: `Limit harus 1–${MAX_PAGE_SIZE}.`, code: "bad_request" };
-    }
-
-    switch (type) {
-      case "categories":
-        return { ok: true, type, categories: await listListedCategories() };
-      case "latest": {
-        const data = await listLatest(page, limit, signal);
-        return { ok: true, type, ...data, items: await withVideyViews(data.items) };
-      }
-      case "featured": {
-        const data = await listFeaturedWithArt(page, limit ?? 1, signal);
-        return { ok: true, type, ...data };
-      }
-      case "category": {
-        const slug = (query.category || "").trim();
-        if (!slug) return { ok: false, error: "Kategori wajib diisi.", code: "bad_request" };
-        // Ranking pages (paling-ditonton / paling-disukai, optional "~minggu" / "~bulan").
-        const rank = parseRankingKey(slug);
-        if (rank) {
-          // D1/KV likes only exist on the server: in the browser ask /api/data (edge cached).
-          if (typeof window !== "undefined") {
-            return fetchCatalog({ type: "category", category: slug, page: page ?? 1, limit: limit ?? DEFAULT_PAGE_SIZE }, signal);
-          }
-          const data = await listRanking(rank.def.kind, rank.period.period, page ?? 1, limit ?? DEFAULT_PAGE_SIZE);
-          return { ok: true, type, ...data, items: await withVideyViews(data.items) };
-        }
-        if (!findCategory(slug)) return { ok: false, error: "Kategori tidak dikenal.", code: "bad_request" };
-        const data = await listCategory(slug, page, limit, signal);
-        return { ok: true, type, ...data, items: await withVideyViews(data.items) };
-      }
-      case "search": {
-        const q = (query.q || "").trim();
-        if (!q) return { ok: false, error: "Kata kunci wajib diisi.", code: "bad_request" };
-        const data = await listSearch(q, page, limit, signal);
-        return { ok: true, type, ...data, items: await withVideyViews(data.items) };
-      }
-      case "related": {
-        const id = (query.id || "").trim();
-        if (!id) return { ok: false, error: "ID wajib diisi.", code: "bad_request" };
-        const data = await listRelated(id, limit ?? 12, signal);
-        return { ok: true, type, ...data, items: await withVideyViews(data.items) };
-      }
-      case "detail": {
-        const id = (query.id || "").trim();
-        if (!id) return { ok: false, error: "ID wajib diisi.", code: "bad_request" };
-        const [item, related] = await Promise.all([
-          getDetail(id, signal),
-          listRelated(id, 12, signal).catch(() => ({ items: [] as VideoCard[] })),
-        ]);
-        const [itemV] = await withVideyViews([item]);
-        return { ok: true, type, item: itemV, related: await withVideyViews(related.items) };
-      }
-      case "home": {
-        // Hero: one video per WIB time slot (hero-pick.ts); old featured list only as a fallback.
-        const [featured, latest] = await Promise.all([
-          heroFeatured(signal),
-          listLatest(page ?? 1, limit ?? DEFAULT_PAGE_SIZE, signal),
-        ]);
-        return {
-          ok: true,
-          type,
-          featured: featured.items,
-          latest: { ...latest, items: await withVideyViews(latest.items) },
-          categories: CATEGORY_LIST,
-        };
-      }
-    }
-  } catch (err) {
-    return wrapError(err);
+  if (import.meta.env.SSR) {
+    const { queryCatalogServer } = await import("./service-server");
+    return queryCatalogServer(query, signal);
   }
+  return fetchCatalog(
+    {
+      type: String(query.type || "latest"),
+      page: toNum(query.page),
+      limit: toNum(query.limit),
+      category: query.category || undefined,
+      q: query.q || undefined,
+      id: query.id || undefined,
+    },
+    signal,
+  );
 }
