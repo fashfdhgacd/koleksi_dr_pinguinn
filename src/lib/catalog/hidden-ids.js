@@ -459,6 +459,19 @@ export const HIDDEN_IDS = {
   "lu-mhqs7o3ss9pa": "drp-sync-skip-non-consent",
   "lu-j5cremegmdy6": "drp-sync-skip-minor",
   "lu-q8cvfd0ka3tu": "drp-sync-skip-non-consent",
+  "lu-8ez9rb7ort2k": "anime-minor-character",
+  "lu-auttm4u2nolb": "anime-minor-character",
+  "lu-9ky5v6vgott7": "anime-minor-character",
+  "lu-3v5g86d3hrrq": "anime-minor-risk",
+  "lu-3fguh78hn3hu": "drp-sync-skip-minor",
+  "lu-vja9cicmtu20": "drp-sync-skip-minor",
+  "lu-1lnloglqrq06": "drp-sync-skip-minor",
+  "lu-zn9ra9wdnac8": "drp-sync-skip-minor",
+  "lu-eyi5v51rojeb": "drp-sync-skip-minor",
+  "lu-hud4jsvmubmr": "drp-sync-skip-minor",
+  "by-y7tdtuk1p414": "drp-sync-skip-minor",
+  "by-cxsn4r6qwwbt": "drp-sync-skip-minor",
+  "by-bpkr3994v2xt": "drp-sync-skip-minor",
 };
 
 /**
