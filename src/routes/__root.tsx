@@ -2,6 +2,7 @@ import { createRootRoute, HeadContent, Outlet, Scripts, redirect } from "@tansta
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PresencePing } from "@/components/presence-ping";
+import { SwCleanup } from "@/components/sw-cleanup";
 import { DEFAULT_OG, HOME_TITLE, OG_SITE_NAME } from "@/lib/seo";
 import appCss from "../styles.css?url";
 
@@ -87,6 +88,7 @@ function RootComponent() {
         <HeadContent />
       </head>
       <body className="min-h-dvh bg-background font-sans text-foreground">
+        <SwCleanup />
         <PreviewHostBridge />
         <PresencePing />
         <AuthProvider>
