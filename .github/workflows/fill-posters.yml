@@ -226,6 +226,69 @@ jobs:
           })().catch((e) => { console.error(e); process.exit(1); });
           SCRIPT
 
+      - name: Putarin thumbnails (dev API)
+        # Needs the repo secret PUTARIN_API_KEY (same key the Worker bot uses). Without it this step skips.
+        # Takes the thumbnail the Putarin dev API lists for each video code that has no poster yet.
+        env:
+          PUTARIN_API_KEY: ${{ secrets.PUTARIN_API_KEY }}
+          PUTARIN_API_BASE: ${{ secrets.PUTARIN_API_BASE }}
+        run: |
+          node --input-type=commonjs <<'SCRIPT'
+          const fs = require("fs");
+          const key = process.env.PUTARIN_API_KEY || "";
+          if (!key) { console.log("Putarin thumbs: no PUTARIN_API_KEY, skipped"); process.exit(0); }
+          const base = (process.env.PUTARIN_API_BASE || "https://panel.putarin.com/api/dev").replace(/\/$/, "");
+          const load = (p, fb) => { try { return JSON.parse(fs.readFileSync(p, "utf8")); } catch { return fb; } };
+          const asList = (d) => (Array.isArray(d) ? d : (d && Array.isArray(d.items) ? d.items : []));
+          const latestPath = "data/latest-posters.json";
+          const latest = load(latestPath, {});
+          const maps = [load("src/lib/catalog/posters.json", {}), load("src/lib/catalog/jav-posters.json", {}), latest];
+          const real = (u) => typeof u === "string" && /^https?:\/\//i.test(u) && !/placeholder|brand-poster|data:image/i.test(u);
+          const codeOf = (v) => {
+            const m = `${v.embed || ""} ${v.direct || ""}`.match(/(?:puterin|putarin)\.[a-z]+\/(?:e|v|d)\/([A-Za-z0-9_-]+)/i);
+            return m ? m[1].toLowerCase() : "";
+          };
+          const need = new Map();
+          const seen = new Set();
+          for (const v of [...asList(load("data/putarin-latest.json", [])), ...asList(load("src/lib/catalog/putarin.json", [])), ...asList(load("data/videos-latest.json", []))]) {
+            const id = String(v?.id || "");
+            if (!id || seen.has(id)) continue;
+            seen.add(id);
+            if (real(v.poster) || real(v.thumbnail) || maps.some((m) => real(m[id]))) continue;
+            const code = codeOf(v);
+            if (code) need.set(code, id);
+          }
+          console.log("Putarin thumbs: need", need.size);
+          const IMG_KEY = /thumb|poster|cover|image|preview|splash|snapshot/i;
+          const pickThumb = (v) => {
+            for (const [k, val] of Object.entries(v)) {
+              if (IMG_KEY.test(k) && typeof val === "string" && /^https:\/\//i.test(val) && !/\.(mp4|m3u8|webm)(\?|$)/i.test(val)) return val;
+            }
+            return "";
+          };
+          (async () => {
+            let ok = 0, shown = false;
+            for (let page = 1; page <= 200 && need.size; page++) {
+              const res = await fetch(`${base}/videos?page=${page}`, { headers: { "X-API-Key": key, accept: "application/json" }, signal: AbortSignal.timeout(20000) }).catch(() => null);
+              if (!res || !res.ok) { console.log("list page", page, "HTTP", res && res.status, "- stop"); break; }
+              const d = await res.json().catch(() => null);
+              const videos = (d && (d.videos || d.data)) || [];
+              if (!Array.isArray(videos) || !videos.length) break;
+              if (!shown) { console.log("list fields:", Object.keys(videos[0] || {}).join(",")); shown = true; }
+              for (const v of videos) {
+                const code = String(v?.code || "").toLowerCase();
+                const id = need.get(code);
+                if (!id) continue;
+                const url = pickThumb(v);
+                if (url) { latest[id] = url; need.delete(code); ok++; }
+              }
+              await new Promise((r) => setTimeout(r, 800));
+            }
+            fs.writeFileSync(latestPath, JSON.stringify(latest, null, 2) + "\n");
+            console.log("Putarin thumbs: filled", ok, "left", need.size);
+          })().catch((e) => { console.error(e); process.exit(0); });
+          SCRIPT
+
       - name: Hentai covers (AniList)
         # Putarin hentai episodes have no JAV code and no public poster. Cover = AniList cover for the
         # series, accepted only when the cleaned title equals / contains one of the AniList titles.
