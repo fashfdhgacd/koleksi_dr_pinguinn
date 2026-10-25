@@ -1,0 +1,30 @@
+name: Warm cache
+
+# Setelah deploy, edge cache kosong: pengunjung pertama tiap halaman menunggu render penuh (1.5-3 dtk).
+# Workflow ini membuka beranda dan kategori utama sekali (~30 request) supaya sudah HIT.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "data/**"
+      - "**/*.md"
+  workflow_dispatch:
+
+concurrency:
+  group: warm-cache
+  cancel-in-progress: true
+
+jobs:
+  warm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Wait for Cloudflare deploy, then warm
+        run: |
+          sleep 180
+          BASE="https://koleksidrpinguin.com"
+          for p in "" kategori kategori/jav kategori/hentai kategori/bokep kategori/ai-plus kategori/jilbab kategori/tante kategori/amatir kategori/viral kategori/percakapan kategori/kosan kategori/colmek kategori/istri kategori/live kategori/doggy kategori/open-bo kategori/malaysia kategori/chindo kategori/gangbang kategori/selingkuh kategori/barat; do
+            code=$(curl -s -o /dev/null -w "%{http_code} %{time_total}s" -m 30 -A "Mozilla/5.0 (warm-cache)" "$BASE/$p" || true)
+            echo "/$p -> $code"
+            sleep 1
+          done
