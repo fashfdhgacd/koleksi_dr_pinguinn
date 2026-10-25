@@ -167,8 +167,19 @@ let unhideCheckedAt = 0;
 let unhideInflight: Promise<void> | null = null;
 const UNHIDE_TTL_MS = 30_000;
 
+/** Owner-edited title that passes both detectors: it replaces the stored title for title-based rules. */
+function hasCleanEdit(id: string): boolean {
+  const t = EDITS[id]?.title;
+  return Boolean(t) && !minorReasonMemo(String(t)) && !lockedReasonMemo(String(t));
+}
+
 /** Why an item is hidden by default ("" = not hidden). Ignores owner Unhide overrides. */
 export function hiddenReasonRaw(it: RawItem): string {
+  if (hasCleanEdit(it.id)) {
+    const rec = it as { hidden?: unknown; hidden_reason?: unknown };
+    if (rec.hidden === true) return String(rec.hidden_reason || "bot-flag");
+    return String(OVERRIDES[it.id]?.hidden || "");
+  }
   const listed = HIDDEN_REASONS[it.id];
   if (listed) return listed;
   const rec = it as { hidden?: unknown; hidden_reason?: unknown };
@@ -176,8 +187,8 @@ export function hiddenReasonRaw(it: RawItem): string {
   const ovHidden = OVERRIDES[it.id]?.hidden;
   if (ovHidden) return String(ovHidden);
   // Reviewed real title (owner edit, overrides.json, or "***" restored to "Tocil ..." via
-  // RESTORED_TITLES) is checked instead of a masked stored title. An owner edit is checked as well
-  // as the stored title, so editing can never take a flagged video out of the hidden list.
+  // RESTORED_TITLES) is checked instead of a masked stored title. An owner edit that is itself
+  // flagged is checked as well as the stored title (a clean edit is handled above).
   const title = String(overrideTitle(it.id) || RESTORED[it.id] || it.title || "");
   const edited = EDITS[it.id]?.title ? String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "") : "";
   return (
@@ -190,6 +201,7 @@ export function hiddenReasonRaw(it: RawItem): string {
 /** Clear school/minor theme (minor-lock.js): hidden even when the owner pressed Unhide. */
 export function isLockedMinor(it: RawItem): boolean {
   if (isLockedMinorId(it.id)) return true;
+  if (hasCleanEdit(it.id)) return false;
   if (EDITS[it.id]?.title && lockedReasonMemo(String(EDITS[it.id]?.title)) !== "") return true;
   return lockedReasonMemo(String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "")) !== "";
 }
