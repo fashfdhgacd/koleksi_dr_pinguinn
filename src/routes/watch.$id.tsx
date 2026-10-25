@@ -1,4 +1,5 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
+import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { queryCatalog } from "@/lib/catalog/service";
 import { jsonLdString } from "@/lib/json-ld";
 import {
@@ -25,6 +26,19 @@ function shareCardImage(thumbnail: string | null | undefined): string {
   if (!absolute) return DEFAULT_OG;
   if (/\.(mp4|webm|m3u8|mov)(?:$|\?)/i.test(absolute)) return DEFAULT_OG;
   return absolute;
+}
+
+/** BreadcrumbList (Beranda > Kategori > Video) so Google can show the path in the result. */
+function watchBreadcrumb(category: string | null | undefined, title: string, url: string) {
+  const slug = categorySlugFor(category);
+  const crumbs: Array<{ name: string; url: string }> = [{ name: "Beranda", url: SITE_ORIGIN }];
+  if (slug && category) crumbs.push({ name: String(category), url: `${SITE_ORIGIN}/kategori/${slug}` });
+  crumbs.push({ name: title, url });
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: crumbs.map((c, i) => ({ "@type": "ListItem", position: i + 1, name: c.name, item: c.url })),
+  };
 }
 
 export const Route = createFileRoute("/watch/$id")({
@@ -104,7 +118,13 @@ export const Route = createFileRoute("/watch/$id")({
       ],
       links: [{ rel: "canonical", href: url }],
       scripts: jsonLd
-        ? [{ type: "application/ld+json", children: jsonLdString(jsonLd) }]
+        ? [
+            { type: "application/ld+json", children: jsonLdString(jsonLd) },
+            {
+              type: "application/ld+json",
+              children: jsonLdString(watchBreadcrumb(item!.category, cleanDisplayTitle(item!.title), url)),
+            },
+          ]
         : [],
     };
   },
