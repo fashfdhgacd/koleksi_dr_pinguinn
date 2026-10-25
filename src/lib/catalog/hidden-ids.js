@@ -47,6 +47,11 @@ const RULES = [
 
 const COLLEGE = /\b(?:mahasisw\w*|kampus|kuliah|dosen|universit\w*|college|uitm)\b/;
 
+// JAV product code (e.g. "SSIS-123", "FC2-PPV-1234567"): English/Japanese genre wording on these is
+// costume-genre tag text; minor-title-guard.ts strips it at display time. Explicit minor terms and
+// Indonesian school words still block.
+const JAV_CODE = /(?<![a-z0-9])(?:[a-z]{2,6}-\d{2,5}|fc2-ppv-\d{5,8})(?![a-z0-9])/i;
+
 /**
  * @param {string} title raw title (before display renaming)
  * @returns {string} reason, or "" when the item may be shown
@@ -54,8 +59,10 @@ const COLLEGE = /\b(?:mahasisw\w*|kampus|kuliah|dosen|universit\w*|college|uitm)
 export function minorContentReason(title = "") {
   const t = norm(title);
   if (!t) return "";
+  const isJav = JAV_CODE.test(String(title));
   for (const [reason, re] of RULES) {
     if (!re.test(t)) continue;
+    if (isJav && reason === "anime-school") continue;
     if (reason === "classroom" && COLLEGE.test(t)) continue;
     // College context: generic wording ("wisuda", "kemah", "guru les", "kakak kelas") is adult, not school.
     if (reason === "teacher-student" && COLLEGE.test(t)) continue;
