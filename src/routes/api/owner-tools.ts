@@ -13,7 +13,7 @@ import { listHiddenForReview, setReviewMark } from "@/lib/owner-hidden-review";
 import {
   listHiddenCandidates,
   applyUnhidden,
-  hiddenReasonRaw,
+  isLockedMinor,
   loadItemsRaw,
   type HiddenCandidate,
 } from "@/lib/catalog/local-cache";
@@ -24,7 +24,7 @@ import latestPosters from "../../../data/latest-posters.json";
 import thumbsDeploy from "../../../data/.thumbs-deploy.json";
 import { findCategory } from "@/lib/catalog/categories";
 import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
-import { isLockedMinorId, lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
@@ -392,10 +392,9 @@ function createdMs(it: RawItem): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// Same decision as the catalog (local-cache.ts), so the panel label never disagrees with what is hidden.
 function isLockedItem(it: RawItem): boolean {
-  if (isLockedMinorId(it.id)) return true;
-  const ov = (itemOverrides as Record<string, { title?: string }>)[it.id];
-  return Boolean(lockedMinorReason(String(it.title || "")) || lockedMinorReason(String(ov?.title || "")));
+  return isLockedMinor(it);
 }
 
 function toCatalogRow(
@@ -561,10 +560,9 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
   const { raw } = await catalogBase();
   const item = raw.find((it) => it?.id === id);
   if (!item) return json({ ok: false, error: "Video tidak ditemukan di katalog." }, 404);
-  // Minor-lock: locked or flagged items cannot be edited from the panel, and a new title must
-  // not carry a school/minor theme. local-cache.ts checks edited titles again when it builds.
-  if (isLockedItem(item)) return json({ ok: false, error: "Video ini terkunci (minor-lock), tidak bisa diedit." }, 403);
-  if (hiddenReasonRaw(item)) return json({ ok: false, error: "Video ini ditandai/tersembunyi, tidak bisa diedit." }, 403);
+  // Locked/hidden items may be edited (metadata correction), but an edit never unhides: local-cache.ts
+  // checks the stored title as well as the edit, so the item stays hidden. A new title must not carry
+  // a school/minor theme.
   if (title && (lockedMinorReason(title) || minorContentReason(title))) {
     return json({ ok: false, error: "Judul ditolak: bertema sekolah/di bawah umur." }, 403);
   }

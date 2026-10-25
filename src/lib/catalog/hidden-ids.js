@@ -25,7 +25,7 @@ const RULES = [
   ["masked-school-term", /\*\*\*/],
   [
     "school",
-    /\b(?:sma|smp|smu|smk|esema|siswi|siswa|murid|murit|pelajar|sekolah\w*|osis|pramuka|anak pesantren|putih abu(?: abu)?|putih biru|kakak kelas|adik kelas|anak sd|guru sd|murid sd)\b/,
+    /\b(?:(?:anak|cewek|cewe|abg|gadis|bocah|seragam|kelas|pacar|temen|teman|guru|pake|pakai) sma|sma (?:kelas|negeri|swasta|\d+)|smp|smu|smk|esema|siswi|siswa|murid|murit|pelajar|sekolah\w*|osis|pramuka|anak pesantren|putih abu(?: abu)?|putih biru|kakak kelas|adik kelas|anak sd|guru sd|murid sd)\b/,
   ],
   ["school-uniform", /\bseragam\s?(?:18yo|sekolah|olahraga)\b|\b(?:masih|baru pulang masih) pake seragam\b|\babg seragam/],
   ["minor", /\b(?:bocil|di ?bawah umur|under ?age\w*|lolita|loli|shota\w*|anak kecil|gadis kecil|adek kecil|adik kecil|masih kecil|belum sunat|masih abe?ge\w*|umur masih muda)\b/],
@@ -47,6 +47,13 @@ const RULES = [
 
 const COLLEGE = /\b(?:mahasisw\w*|kampus|kuliah|dosen|universit\w*|college|uitm)\b/;
 
+// JAV product code (e.g. "SSIS-123", "FC2-PPV-1234567"): English/Japanese genre wording on these is
+// costume-genre tag text; minor-title-guard.ts strips it at display time. Explicit minor terms and
+// Indonesian school words still block.
+const JAV_CODE = /(?<![a-z0-9])(?:[a-z]{2,6}-\d{2,5}|fc2-ppv-\d{5,8})(?![a-z0-9])/i;
+const JAV_GENRE_REASONS = new Set(["school", "school-uniform", "teacher-student", "classroom", "masked-school-term"]);
+const CHILD_GRADE = /\b(?:smp|sd|sekolah dasar|osis|pramuka|anak pesantren|putih biru|esema)\b/;
+
 /**
  * @param {string} title raw title (before display renaming)
  * @returns {string} reason, or "" when the item may be shown
@@ -54,9 +61,17 @@ const COLLEGE = /\b(?:mahasisw\w*|kampus|kuliah|dosen|universit\w*|college|uitm)
 export function minorContentReason(title = "") {
   const t = norm(title);
   if (!t) return "";
+  const isJav = JAV_CODE.test(String(title));
   for (const [reason, re] of RULES) {
     if (!re.test(t)) continue;
+    if (isJav && reason === "anime-school") continue;
+    // Translated JAV costume-genre wording ("siswi", "seragam sekolah", "di kelas", "guru") is not a
+    // minor signal by itself; only child grade levels (SD/SMP) still block.
+    if (isJav && JAV_GENRE_REASONS.has(reason) && !CHILD_GRADE.test(t)) continue;
     if (reason === "classroom" && COLLEGE.test(t)) continue;
+    // College context: generic wording ("wisuda", "kemah", "guru les", "kakak kelas") is adult, not school.
+    if (reason === "teacher-student" && COLLEGE.test(t)) continue;
+    if (reason === "school" && COLLEGE.test(t) && !re.test(t.replace(/\b(?:kakak|adik) kelas\b/g, " "))) continue;
     // Tag dumps translated from English ("Lolita, Wanita dewasa, Mahasiswi") are renamed, not hidden.
     if (reason === "minor" && /\blol(?:ita|i)\b/.test(t) && (COLLEGE.test(t) || /\bdewasa\b/.test(t))) continue;
     // "Bapak/Ayah ... anak buah/anak kos/anak tiri" style false positives.
