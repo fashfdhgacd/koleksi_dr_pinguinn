@@ -28,7 +28,7 @@ import { isLockedMinorId, lockedMinorReason } from "@/lib/catalog/minor-lock.js"
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
-import { readOwnerEditState, setOwnerEdit } from "@/lib/catalog/owner-edit-store";
+import { MAX_EXTRA_CATEGORIES, readOwnerEditState, setOwnerEdit } from "@/lib/catalog/owner-edit-store";
 import { isOwnerRequest, ownerSecret } from "@/lib/owner-auth";
 import {
   getWebhookInfo,
@@ -343,6 +343,7 @@ type CatalogRow = {
   title: string;
   category: string;
   categoryLabel: string;
+  extra?: string[];
   source: string;
   createdAt: number;
   hidden: boolean;
@@ -412,6 +413,9 @@ function toCatalogRow(
     title: String(view.title || ""),
     category: slug,
     categoryLabel: findCategory(slug)?.label || slug,
+    ...(Array.isArray(view.ownerExtraCategories) && view.ownerExtraCategories.length
+      ? { extra: (view.ownerExtraCategories as unknown[]).map(String) }
+      : {}),
     source: sourceLabel(it),
     createdAt: createdMs(it),
     hidden,
@@ -546,12 +550,21 @@ async function handleCatalogSearch(body: { q?: unknown }) {
   return json({ ok: true, items: out });
 }
 
-async function handleEditVideo(body: { id?: unknown; title?: unknown; category?: unknown }) {
+async function handleEditVideo(body: { id?: unknown; title?: unknown; category?: unknown; extra?: unknown }) {
   const id = String(body.id || "").trim();
   if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return json({ ok: false, error: "ID video tidak valid." }, 400);
   const title = typeof body.title === "string" ? body.title.replace(/\s+/g, " ").trim() : "";
   const category = typeof body.category === "string" ? body.category.trim() : "";
-  if (!title && !category) return json({ ok: false, error: "Tidak ada perubahan." }, 400);
+  let extra: string[] | undefined;
+  if (Array.isArray(body.extra)) {
+    extra = [...new Set(body.extra.map((s) => String(s).trim()).filter(Boolean))];
+    const bad = extra.find((s) => !findCategory(s));
+    if (bad) return json({ ok: false, error: `Kategori tidak dikenal: ${bad}` }, 400);
+    if (extra.length > MAX_EXTRA_CATEGORIES) {
+      return json({ ok: false, error: `Maksimal ${MAX_EXTRA_CATEGORIES} kategori tambahan.` }, 400);
+    }
+  }
+  if (!title && !category && !extra) return json({ ok: false, error: "Tidak ada perubahan." }, 400);
   // Chinese/Japanese/Korean titles are dense: 2 characters ("龍女") is already a real title.
   const minTitle = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(title) ? 2 : 4;
   if (title && (title.length < minTitle || title.length > 200)) {
@@ -581,7 +594,7 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
   // no GitHub token needed in the Worker.
   let saved;
   try {
-    saved = await setOwnerEdit(id, { title, category });
+    saved = await setOwnerEdit(id, { title, category, ...(extra ? { extra } : {}) });
   } catch (err) {
     const msg = String((err as Error)?.message || err);
     return json(
@@ -600,7 +613,13 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
   } catch {
     /* the regular 30 s sync applies it */
   }
-  return json({ ok: true, id, title: saved.title || null, category: saved.category || null });
+  return json({
+    ok: true,
+    id,
+    title: saved?.title || null,
+    category: saved?.category || null,
+    ...(extra ? { extra: saved?.extra || [] } : {}),
+  });
 }
 
 type OwnerBody = {
@@ -617,6 +636,7 @@ type OwnerBody = {
   key?: string;
   q?: string;
   title?: string;
+  extra?: string[];
   offset?: number;
   noThumb?: boolean;
   posters?: Record<string, string>;

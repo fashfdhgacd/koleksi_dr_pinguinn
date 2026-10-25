@@ -10,7 +10,9 @@
  */
 import { resolveAnalyticsKV } from "@/lib/analytics-kv";
 
-export type OwnerEdit = { title?: string; category?: string; at: number };
+/** `extra`: additional category slugs the video also appears in (besides its main `category`). */
+export type OwnerEdit = { title?: string; category?: string; extra?: string[]; at: number };
+export const MAX_EXTRA_CATEGORIES = 6;
 export type OwnerEditState = { ids: Record<string, OwnerEdit> };
 
 const KEY = "owner:edit:v1";
@@ -23,13 +25,20 @@ function clean(raw: unknown): OwnerEditState {
   if (!ids || typeof ids !== "object") return out;
   for (const [id, v] of Object.entries(ids as Record<string, unknown>)) {
     if (!ID_RE.test(id) || !v || typeof v !== "object") continue;
-    const rec = v as { title?: unknown; category?: unknown; at?: unknown };
+    const rec = v as { title?: unknown; category?: unknown; extra?: unknown; at?: unknown };
     const title = typeof rec.title === "string" ? rec.title.replace(/\s+/g, " ").trim().slice(0, 200) : "";
     const category = typeof rec.category === "string" && SLUG_RE.test(rec.category) ? rec.category : "";
-    if (!title && !category) continue;
+    const extra = Array.isArray(rec.extra)
+      ? [...new Set(rec.extra.filter((s): s is string => typeof s === "string" && SLUG_RE.test(s) && s !== category))].slice(
+          0,
+          MAX_EXTRA_CATEGORIES,
+        )
+      : [];
+    if (!title && !category && !extra.length) continue;
     out.ids[id] = {
       ...(title ? { title } : {}),
       ...(category ? { category } : {}),
+      ...(extra.length ? { extra } : {}),
       at: Number(rec.at) || 0,
     };
   }
@@ -50,7 +59,10 @@ export async function readOwnerEditState(): Promise<OwnerEditState> {
 }
 
 /** Merges one edit (title and/or category) for `id`. Returns the stored edit. */
-export async function setOwnerEdit(id: string, edit: { title?: string; category?: string }): Promise<OwnerEdit> {
+export async function setOwnerEdit(
+  id: string,
+  edit: { title?: string; category?: string; extra?: string[] },
+): Promise<OwnerEdit | null> {
   if (!ID_RE.test(id)) throw new Error("bad_id");
   const r = await resolveAnalyticsKV();
   if (!r) throw new Error("kv_unavailable");
@@ -60,11 +72,12 @@ export async function setOwnerEdit(id: string, edit: { title?: string; category?
     ...prev,
     ...(edit.title ? { title: edit.title } : {}),
     ...(edit.category ? { category: edit.category } : {}),
+    // An array (even empty) replaces the stored extra categories; undefined leaves them alone.
+    ...(edit.extra ? { extra: edit.extra } : {}),
     at: Date.now(),
   };
   const next = clean(state);
   await r.kv.put(KEY, JSON.stringify(next));
-  const saved = next.ids[id];
-  if (!saved) throw new Error("edit_rejected");
-  return saved;
+  // null = the edit only cleared the last extra category, nothing is stored for this id any more.
+  return next.ids[id] || null;
 }

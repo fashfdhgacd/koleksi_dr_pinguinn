@@ -101,7 +101,8 @@ const STATS = videoStats as unknown as Record<string, [number, number, number]>;
 type ItemOverride = { title?: string; category?: string; poster?: string; hidden?: string };
 const OVERRIDES = itemOverrides as Record<string, ItemOverride>;
 /** Owner edits from /pemilik (KV owner:edit:v1, owner-edit-store.ts), applied on top of OVERRIDES. */
-let EDITS: Record<string, { title?: string; category?: string }> = {};
+type OwnerEditLite = { title?: string; category?: string; extra?: string[] };
+let EDITS: Record<string, OwnerEditLite> = {};
 let editsKey = "";
 
 function overrideTitle(id: string): string {
@@ -222,7 +223,7 @@ type HideLists = {
   unhidden: string[];
   ownerHidden: string[] | null;
   /** Owner edits (null = could not read them; keep the previous ones). */
-  edits: Record<string, { title?: string; category?: string }> | null;
+  edits: Record<string, OwnerEditLite> | null;
 };
 
 async function fetchUnhiddenIds(): Promise<HideLists | null> {
@@ -255,7 +256,7 @@ async function fetchUnhiddenIds(): Promise<HideLists | null> {
       ownerHidden: Array.isArray(data.ownerHidden) ? data.ownerHidden.map(String) : null,
       edits:
         data.edits && typeof data.edits === "object" && !Array.isArray(data.edits)
-          ? (data.edits as Record<string, { title?: string; category?: string }>)
+          ? (data.edits as Record<string, OwnerEditLite>)
           : null,
     };
   } catch {
@@ -270,7 +271,7 @@ async function fetchUnhiddenIds(): Promise<HideLists | null> {
 export function applyUnhidden(
   ids: Iterable<string>,
   ownerHidden?: Iterable<string> | null,
-  edits?: Record<string, { title?: string; category?: string }> | null,
+  edits?: Record<string, OwnerEditLite> | null,
 ): void {
   const next = new Set<string>(ids);
   const nextHidden = ownerHidden ? new Set<string>(ownerHidden) : OWNER_HIDDEN;
@@ -339,6 +340,7 @@ function withStats(it: RawItem): RawItem {
       ...out,
       ...(ed.title ? { title: ed.title } : {}),
       ...(ed.category ? { category: ed.category, ownerCategory: ed.category } : {}),
+      ...(ed.extra?.length ? { ownerExtraCategories: ed.extra } : {}),
     };
   }
   const title = typeof out.title === "string" ? out.title : "";
@@ -466,7 +468,14 @@ export function buildIndexes(
   for (const it of items) {
     byId.set(it.id, it);
     // Multi-category (title-tags.ts): the video joins its primary category and every tag category.
-    for (const slug of titleTags(it.title, slugOf(it), tagOptions(it, popular))) {
+    const slugs = titleTags(it.title, slugOf(it), tagOptions(it, popular));
+    // Owner-chosen extra categories (/pemilik > Edit): the video also shows up in each of them.
+    const extra = Array.isArray(it.ownerExtraCategories) ? (it.ownerExtraCategories as unknown[]) : [];
+    for (const x of extra) {
+      const cat = typeof x === "string" ? findCategory(x) : undefined;
+      if (cat && !slugs.includes(cat.slug)) slugs.push(cat.slug);
+    }
+    for (const slug of slugs) {
       const bucket = bySlug.get(slug);
       if (bucket) bucket.push(it);
       else bySlug.set(slug, [it]);
@@ -612,7 +621,7 @@ async function loadItemsInner(): Promise<CatalogCache> {
   return runtime.cache;
 }
 
-/** Fitur 'Tidak publish' / hidden review DINONAKTIFKAN — selalu return set kosong. */
+/** Fitur 'Tidak publish' / hidden review DINONAKTIFKAN â€” selalu return set kosong. */
 export async function getUnpublished(): Promise<Set<string>> {
   return new Set();
 }
@@ -663,3 +672,4 @@ export async function listHiddenCandidates(unhideAt: Record<string, number> = {}
 export async function loadItems(): Promise<CatalogCache> {
   return loadItemsRaw();
 }
+
