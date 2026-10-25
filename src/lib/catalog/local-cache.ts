@@ -629,11 +629,20 @@ export async function listHiddenCandidates(unhideAt: Record<string, number> = {}
   const out: HiddenCandidate[] = [];
   const seen = new Set<string>();
   for (const it of cache.raw || cache.items) {
-    if (!it?.id || seen.has(it.id) || isVidey(it)) continue;
+    if (!it?.id || seen.has(it.id)) continue;
     seen.add(it.id);
-    const reason = hiddenReasonRaw(it);
+    // Same sources as isHiddenRaw, so this list always matches the "Tersembunyi" count.
+    const ownerHidden = OWNER_HIDDEN.has(it.id);
+    const locked = !ownerHidden && isLockedMinor(it);
+    const reason = hiddenReasonRaw(it) || (ownerHidden ? "owner-hide" : locked ? "minor-lock" : "");
     if (!reason) continue;
-    out.push({ item: it, reason, unhidden: UNHIDDEN.has(it.id), unhiddenAt: unhideAt[it.id] || 0 });
+    const forced = ownerHidden || locked;
+    out.push({
+      item: it,
+      reason,
+      unhidden: !forced && UNHIDDEN.has(it.id),
+      unhiddenAt: unhideAt[it.id] || 0,
+    });
   }
   return out;
 }

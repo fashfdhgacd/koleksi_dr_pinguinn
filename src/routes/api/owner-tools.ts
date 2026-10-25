@@ -60,6 +60,8 @@ type HiddenListRow = {
 };
 
 const HIDE_REASON_LABELS: Record<string, string> = {
+  "minor-lock": "Terkunci (ID/judul jelas bertema minor/sekolah), tidak bisa di-Unhide",
+  "owner-hide": "Disembunyikan manual dari kartu Player error",
   "masked-school-term": "Kata bertema sekolah disensor (***) di judul sumber",
   school: "Kata sekolah (SMA/SMP/siswi/pelajar/sekolah…)",
   "school-uniform": "Seragam sekolah",
