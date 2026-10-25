@@ -101,6 +101,8 @@ export function reviewPriority(reason = "", title = "") {
   if (r === "masked-school-term" || r.startsWith("masked-check:")) return "check";
   if (r.startsWith("masked-school:")) return "clear";
   if (r === "bot-flag") return "check";
+  // Weak, context-only signals: hidden by default but never hard-locked; the owner can Unhide.
+  if (r === "teacher-student" || r === "classroom") return "check";
   const t = norm(title);
   if (r === "school" && /\bsma\b/.test(t) && !minorContentReason(t.replace(/\bsma\b/g, " "))) return "check";
   if (r === "minor") {
