@@ -1,13 +1,17 @@
 import { createFileRoute } from "@tanstack/react-router";
-import posters from "@/lib/catalog/posters.json";
-import javPosters from "@/lib/catalog/jav-posters.json";
-import latestPosters from "../../data/latest-posters.json";
-import folderBatch20261007 from "@/lib/catalog/folder-batch-20261007.json";
-import drpBokepBatch from "../../data/drp-bokep.json";
-import itemOverrides from "@/lib/catalog/overrides.json";
 import { resolvePostersBucket } from "@/lib/poster-r2";
 
-function sourceFor(id: string): string {
+// Poster maps are large: load them lazily (only on an edge-cache + R2 miss) instead of parsing
+// them in every isolate at boot.
+async function sourceFor(id: string): Promise<string> {
+  const [posters, javPosters, latestPosters, folderBatch20261007, drpBokepBatch, itemOverrides] = await Promise.all([
+    import("@/lib/catalog/posters.json").then((m) => m.default),
+    import("@/lib/catalog/jav-posters.json").then((m) => m.default),
+    import("../../data/latest-posters.json").then((m) => m.default),
+    import("@/lib/catalog/folder-batch-20261007.json").then((m) => m.default),
+    import("../../data/drp-bokep.json").then((m) => m.default),
+    import("@/lib/catalog/overrides.json").then((m) => m.default),
+  ]);
   const maps = [posters, javPosters, latestPosters] as Array<Record<string, string>>;
   for (const map of maps) {
     const url = map?.[id];
@@ -65,6 +69,17 @@ async function fallback(request: Request): Promise<Response> {
   });
 }
 
+/** Fallback redirect kept in the edge cache (5 min) so repeated misses skip R2 and the poster lookup. */
+async function cachedFallback(request: Request): Promise<Response> {
+  const res = await fallback(request);
+  try {
+    await caches.default.put(request, res.clone());
+  } catch {
+    /* cache optional */
+  }
+  return res;
+}
+
 /**
  * Videy videos have no remote poster: their frame is a static file grabbed by the videy-thumbs
  * workflow (public/videy-thumbs/<id>.jpg). /thumb/<id> (e.g. /pemilik "Upload terbaru") serves
@@ -116,10 +131,10 @@ export const Route = createFileRoute("/thumb/$id")({
             }
           }
 
-          const source = sourceFor(id);
+          const source = await sourceFor(id);
           if (!source) {
             const vy = await videyStatic(id, request);
-            if (!vy) return fallback(request);
+            if (!vy) return await cachedFallback(request);
             try {
               await caches.default.put(request, vy.clone());
             } catch {
@@ -131,10 +146,10 @@ export const Route = createFileRoute("/thumb/$id")({
             headers: { "user-agent": "kdp-poster/1" },
             signal: AbortSignal.timeout(8000),
           }).catch(() => null);
-          if (!remote?.ok) return fallback(request);
+          if (!remote?.ok) return await cachedFallback(request);
           const buf = await remote.arrayBuffer().catch(() => null);
           const type = buf ? sniffType(buf) : "";
-          if (!buf || !type || buf.byteLength < 800) return fallback(request);
+          if (!buf || !type || buf.byteLength < 800) return await cachedFallback(request);
           if (bucket) {
             await bucket.put(key, buf, { httpMetadata: { contentType: type } }).catch(() => undefined);
           }
