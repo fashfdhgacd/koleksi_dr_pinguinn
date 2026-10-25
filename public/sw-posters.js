@@ -1,5 +1,7 @@
-/* Poster only. Tidak menyentuh /api atau HTML. */
-const CACHE = "dp-posters-v1";
+// Poster SW disabled.
+// Posters are served from R2 (img.koleksidrpinguin.com) with /thumb and brand fallbacks.
+// Aggressive Cache Storage was causing large visitor disk usage.
+// This file now only cleans up old caches and unregisters itself.
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
@@ -7,31 +9,20 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))),
-    ).then(() => self.clients.claim()),
+    (async () => {
+      try {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      } catch {
+        /* ignore */
+      }
+      try {
+        await self.registration.unregister();
+      } catch {
+        /* ignore */
+      }
+    })(),
   );
 });
 
-self.addEventListener("fetch", (event) => {
-  const req = event.request;
-  if (req.method !== "GET") return;
-  if (req.destination !== "image") return;
-  event.respondWith(
-    caches.open(CACHE).then(async (cache) => {
-      const hit = await cache.match(req);
-      if (hit) return hit;
-      try {
-        const res = await fetch(req);
-        if (res && (res.ok || res.type === "opaque")) {
-          cache.put(req, res.clone()).catch(() => {});
-        }
-        return res;
-      } catch (err) {
-        const fallback = await cache.match(req);
-        if (fallback) return fallback;
-        throw err;
-      }
-    }),
-  );
-});
+self.addEventListener("fetch", () => {});
