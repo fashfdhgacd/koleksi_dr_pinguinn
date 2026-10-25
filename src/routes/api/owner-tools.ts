@@ -24,7 +24,7 @@ import latestPosters from "../../../data/latest-posters.json";
 import thumbsDeploy from "../../../data/.thumbs-deploy.json";
 import { findCategory } from "@/lib/catalog/categories";
 import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
-import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import { isLockedMinorId, lockedMinorReason } from "@/lib/catalog/minor-lock.js";
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
@@ -567,6 +567,14 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
   // a school/minor theme.
   if (title && (lockedMinorReason(title) || minorContentReason(title))) {
     return json({ ok: false, error: "Judul ditolak: bertema sekolah/di bawah umur." }, 403);
+  }
+
+  // Ids on the reviewed lock list stay locked whatever the title says, so a title edit would be a silent no-op.
+  if (title && isLockedMinorId(id)) {
+    return json(
+      { ok: false, error: "Video ini dikunci per-ID (hasil review: indikasi di bawah umur). Ganti judul tidak membukanya." },
+      403,
+    );
   }
 
   // Stored in KV (owner:edit:v1) and applied by the catalog at load time: no commit, no rebuild,
