@@ -1,6 +1,6 @@
 // Tes kunci judul sekolah/minor yang JELAS (tidak bisa di-Unhide): node scripts/test-minor-lock.mjs
 // Exit 1 kalau ada yang gagal. Murni kode, tanpa jaringan.
-import { isLockedMinorId, lockedMinorReason, ownerEditBlockReason, hasAdultAgeMarker } from "../src/lib/catalog/minor-lock.js";
+import { isLockedMinorId, lockedMinorReason, ownerEditBlockReason, hasAdultAgeMarker, schoolReason } from "../src/lib/catalog/minor-lock.js";
 import { ownerChecked18, schoolReviewCue } from "../src/lib/catalog/minor-context.js";
 
 // Keputusan pemilik 2026-10-26: isyarat sekolah ini masuk "Perlu dicek" (review), TIDAK dikunci.
@@ -92,7 +92,7 @@ if (isLockedMinorId("4ZXhcgRSVCT3qX")) {
 // Owner exception 2026-10-26: school-uniform + adult age marker → not locked, edit allowed.
 const uniformAdult = ["🎬 Indo Ngentot Masih Pake Seragam 18yo", "Abg Seragam 18 yo", "Seragam 18yo cantik", "abg seragam 20 tahun"];
 for (const t of uniformAdult) {
-  if (lockedMinorReason(t) || ownerEditBlockReason(t)) { fail++; console.log(`GAGAL (seragam+18yo harus lolos edit) ${JSON.stringify(t)} → ${lockedMinorReason(t)}|${ownerEditBlockReason(t)}`); }
+  if (lockedMinorReason(t) || ownerEditBlockReason(t) || schoolReason(t) || schoolReviewCue(t)) { fail++; console.log(`GAGAL (seragam+18yo harus lolos edit) ${JSON.stringify(t)} → ${lockedMinorReason(t)}|${ownerEditBlockReason(t)}`); }
 }
 const uniformStill = ["Masih pakai seragam sekolah 19+", "Masih pake seragam sekolah Eps 18", "abg seragam Part 18", "Seragam SMA 18yo", "Siswi SMP seragam 18yo", "anak sd seragam 18+", "di bawah umur seragam 18yo"];
 for (const t of uniformStill) {

@@ -35,10 +35,10 @@ export function hasAdultAgeMarker(title = "") {
  * re-checked without the uniform word: any other rule still decides; otherwise "" (review only).
  * @param {string} text
  */
-function schoolReason(text) {
+export function schoolReason(text) {
   const reason = minorContentReason(text);
   if (reason === "school-uniform" && hasAdultAgeMarker(text)) {
-    return minorContentReason(text.replace(/\bseragam\b/g, " "));
+    return minorContentReason(text.replace(/\bseragam\b/gi, " "));
   }
   return reason;
 }
