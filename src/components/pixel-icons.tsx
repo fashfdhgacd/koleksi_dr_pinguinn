@@ -1173,6 +1173,7 @@ const SLUG_ICON: Record<string, string> = {
   terbaru: "calendar",
   jav: "jav",
   "ai-plus": "chip",
+  "ai-gay": "chip",
   jilbab: "hijab",
   tante: "woman",
   amatir: "camera",
