@@ -47,6 +47,13 @@ const OBFUSCATED = [
   /sch[o0*]{2}l[\W_]{0,2}g[i1!*]rl/,
 ];
 
+/** Extra clear school cues the word rules miss (lowercased text). Lock-only: never unlocks anything. */
+const STRICT_SCHOOL = [
+  /\b(?:abg|abege|masih|bocil|dedek|adek)\b[^.]{0,30}\bseragam\b/,
+  /\bseragam\b[^.]{0,20}\b(?:abg|sekolah|smp|sma|smk|putih abu|pramuka)\b/,
+  /\b(?:dalam|di) (?:ruang )?kelas\b/,
+];
+
 /** Adult incest wording that hidden-ids.js files under "incest-child" but is not about a minor. */
 const ADULT_INCEST_ONLY = /\b(?:ibu kandung|anak dan ibu|orang tua dan anak)\b/;
 const CHILD_CUE = /\b(?:ayah|bapak|bapa|papa|daddy)\b|\bponakan\b|\bkeponakan\b|\bbudak\b/;
@@ -78,6 +85,9 @@ export function lockedMinorReason(title = "") {
       return `locked:${reason}`;
     }
   }
+  // Stricter (2026-10-26): school-uniform with a young cue, or sex "in the classroom". Runs before
+  // the JAV exemption on purpose: this only ever hides more, never unlocks.
+  if (STRICT_SCHOOL.some((re) => re.test(unmasked))) return "locked:school-strict";
   // Same JAV exemption as hidden-ids.js: the spelling patterns also match the plain words.
   if (isJavGenreTitle(title)) return "";
   for (const re of OBFUSCATED) {
