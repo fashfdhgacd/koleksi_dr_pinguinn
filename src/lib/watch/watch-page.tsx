@@ -14,6 +14,7 @@ import { cleanDisplayTitle } from "@/lib/seo";
 import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { CatalogBackLink } from "@/components/video/catalog-back-link";
 import { WatchStats } from "@/components/video/watch-stats";
+import { PushButton } from "@/components/video/push-button";
 import { DRP_CATEGORY, DRP_SOURCES, drpKindOfUrl } from "@/lib/catalog/drp-hosts.js";
 
 const routeApi = getRouteApi("/watch/$id");
@@ -347,6 +348,7 @@ export function WatchPage() {
             </p>
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{cleanDisplayTitle(item.title)}</h1>
             <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>
+            <PushButton />
             {item.categories && item.categories.length ? (
               <nav aria-label="Kategori" className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Kategori</p>

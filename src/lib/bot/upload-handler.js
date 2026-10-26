@@ -11,9 +11,11 @@ import {
 import { DRP_CATEGORY } from "@/lib/catalog/drp-hosts.js";
 import { upsertVideosBatch } from "@/lib/bot/github.js";
 import { postNewVideosToChannelReport, channelReportLine } from "@/lib/bot/channel-post";
+import { pushNewVideos, pushReportLine } from "@/lib/web-push";
 import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
 import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
 import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import { reviewPriority as detectorPriority } from "@/lib/catalog/minor-detector.js";
 import { uploadRejectReason, uploadWarnReason } from "@/lib/bot/title-guard.js";
 
 /** Owner's own LuluStream / DoodStream / Byse uploads ("byse-probe" = Byse on a not-yet-listed domain). */
@@ -423,7 +425,12 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
       : recordBase;
     // School/minor-themed titles are stored but flagged hidden (the catalog never shows them).
     const minorText = `${baseTitle} ${String(video.title || parsedMsg.title || "")} ${String(meta.title || "")}`;
-    const hiddenReason = minorContentReason(minorText) || lockedMinorReason(minorText);
+    // minor-detector.js: "block" is already locked via lockedMinorReason; "review" is held hidden
+    // until the owner checks it (Unhide in /pemilik = Tayangkan). Additive to the rules above.
+    const hiddenReason =
+      minorContentReason(minorText) ||
+      lockedMinorReason(minorText) ||
+      (detectorPriority("", minorText) === "review" ? "detector-review" : "");
     const flagged = autoTitled.has(i) ? { ...baseRecord, titleAuto: true } : baseRecord;
     const record = hiddenReason
       ? { ...flagged, hidden: true, hidden_reason: hiddenReason }
@@ -516,7 +523,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
             hidden: Boolean(it.record.hidden),
           });
           lines.push(
-            `✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}${it.record.hidden_reason === DEAD_VIDEY_REASON ? " · disembunyikan: video mati" : it.record.hidden ? " · 🙈 disembunyikan (judul menyiratkan minor/sekolah)" : ""}`,
+            `✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}${it.record.hidden_reason === DEAD_VIDEY_REASON ? " · disembunyikan: video mati" : it.record.hidden_reason === "detector-review" ? " · 🔎 ditahan, perlu dicek di /pemilik (konteks sekolah/keluarga + umur)" : it.record.hidden ? " · 🙈 disembunyikan (judul menyiratkan minor/sekolah)" : ""}`,
           );
           if (it.warn && !it.record.hidden) {
             lines.push(
@@ -564,6 +571,15 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
       if (line) lines.push(line);
     } catch (err) {
       lines.push(`📣 Channel gagal: ${err instanceof Error ? err.message : String(err)}`.slice(0, 220));
+    }
+  }
+
+  // Once per upload batch: web push "video baru" to subscribers (max 2/day WIB, see web-push.ts).
+  if (createdRecords.length) {
+    try {
+      lines.push(pushReportLine(await pushNewVideos(createdRecords)));
+    } catch (err) {
+      lines.push(`🔔 Push gagal: ${err instanceof Error ? err.message : String(err)}`.slice(0, 220));
     }
   }
 
