@@ -9,6 +9,7 @@ import {
   listSearch,
 } from "./local";
 import { fetchCatalog } from "./client";
+import { uploadDateOf } from "./sitemap-entries";
 import { listRanking, withVideyViews } from "./ranking-list";
 import { parseRankingKey } from "./rankings";
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./types";
@@ -157,7 +158,8 @@ export async function queryCatalogServer(query: CatalogQuery, signal?: AbortSign
           listRelated(id, 12, signal).catch(() => ({ items: [] as VideoCard[] })),
         ]);
         const [itemV] = await withVideyViews([item]);
-        return { ok: true, type, item: itemV, related: await withVideyViews(related.items) };
+        const uploadDate = await uploadDateOf(itemV.id).catch(() => undefined);
+        return { ok: true, type, item: uploadDate != null ? { ...itemV, uploadDate } : itemV, related: await withVideyViews(related.items) };
       }
       case "home": {
         // Hero: one video per WIB time slot (hero-pick.ts); old featured list only as a fallback.

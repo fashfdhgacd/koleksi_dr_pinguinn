@@ -333,6 +333,19 @@ function normalizeEmbedUrl(url: string): string {
   }
 }
 
+/** createdAt (detik/ms/ISO) -> ISO 8601 dengan zona WIB; undefined kalau tidak valid. */
+function realUploadDate(raw?: string | number | null): string | undefined {
+  if (raw == null || raw === "") return undefined;
+  let ms: number;
+  if (typeof raw === "number") ms = raw < 1e12 ? raw * 1000 : raw;
+  else if (/^\d+$/.test(raw.trim())) {
+    const n = Number(raw.trim());
+    ms = n < 1e12 ? n * 1000 : n;
+  } else ms = Date.parse(raw);
+  if (!Number.isFinite(ms) || ms < Date.UTC(2015, 0, 1) || ms > Date.now() + 86_400_000) return undefined;
+  return new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
 function uploadDateFromId(id: string): string {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
@@ -351,6 +364,8 @@ export function videoJsonLd(input: {
   embedUrl?: string | null;
   contentUrl?: string | null;
   durationSec?: number | null;
+  /** Tanggal unggah asli (createdAt/date katalog). Bukti originalitas: tanggal kita lebih awal dari situs penyalin. */
+  uploadDate?: string | number | null;
 }) {
   const embed = (input.embedUrl || "").trim();
   const content = (input.contentUrl || "").trim();
@@ -364,10 +379,13 @@ export function videoJsonLd(input: {
     name: String(input.title || "Video").trim(),
     description: (input.description || "").trim().slice(0, 300),
     thumbnailUrl: thumb,
-    uploadDate: uploadDateFromId(input.id),
+    uploadDate: realUploadDate(input.uploadDate) || uploadDateFromId(input.id),
     inLanguage: "id",
+    isPartOf: { "@id": `${HOME_CANONICAL}#website` },
+    copyrightHolder: { "@id": `${HOME_CANONICAL}#organization` },
     publisher: {
       "@type": "Organization",
+      "@id": `${HOME_CANONICAL}#organization`,
       name: BRAND_NAME,
       url: HOME_CANONICAL,
       logo: {
@@ -437,8 +455,37 @@ function organizationNode() {
       width: 512,
       height: 512,
     },
+    email: "dmca@koleksidrpinguin.com",
+    foundingLocation: "Indonesia",
   };
 }
+
+/** BreadcrumbList untuk halaman non-watch (kategori, tentang). */
+export function breadcrumbJsonLd(items: Array<{ name: string; url: string }>) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((it, i) => ({ "@type": "ListItem", position: i + 1, name: it.name, item: it.url })),
+  };
+}
+
+/** CollectionPage untuk halaman kategori, terhubung ke WebSite brand. */
+export function collectionPageJsonLd(input: { name: string; url: string; description: string }) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: input.name,
+    url: input.url,
+    description: input.description,
+    inLanguage: "id",
+    isPartOf: { "@id": `${HOME_CANONICAL}#website` },
+    publisher: { "@id": `${HOME_CANONICAL}#organization` },
+  };
+}
+
+export const ABOUT_TITLE = `Tentang ${SITE_NAME} - Situs Resmi koleksidrpinguin.com`;
+export const ABOUT_DESCRIPTION =
+  "Tentang Koleksi Dr. Pinguin (Dr. Pinguin, M.S.B.): situs resmi koleksidrpinguin.com, katalog video dewasa 18+ yang dikurasi sendiri. Cara mengenali situs asli dan kontak.";
 
 export function websiteJsonLd() {
   return { "@context": "https://schema.org", ...websiteNode() };

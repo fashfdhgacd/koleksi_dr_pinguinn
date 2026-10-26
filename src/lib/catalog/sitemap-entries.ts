@@ -80,3 +80,21 @@ export async function listSitemapWatchEntries(): Promise<SitemapWatchEntry[]> {
   memo.set(items, out);
   return out;
 }
+
+/** id -> tanggal unggah mentah (createdAt ?? date), per build katalog (in-memory, tanpa KV/D1). */
+const dateMemo = new WeakMap<object, Map<string, string | number>>();
+
+export async function uploadDateOf(id: string): Promise<string | number | undefined> {
+  const { items } = await loadItems();
+  let map = dateMemo.get(items);
+  if (!map) {
+    map = new Map();
+    for (const it of items) {
+      if (!it?.id || map.has(it.id)) continue;
+      const raw = it.createdAt ?? it.date;
+      if (typeof raw === "number" || (typeof raw === "string" && raw.trim())) map.set(it.id, raw);
+    }
+    dateMemo.set(items, map);
+  }
+  return map.get(id);
+}

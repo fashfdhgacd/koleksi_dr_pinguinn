@@ -22,7 +22,8 @@ import {
 } from "@/lib/catalog/rankings";
 import { DEFAULT_PAGE_SIZE, type VideoCard } from "@/lib/catalog/types";
 import { useCatalogFeed } from "../hooks/use-catalog";
-import { DEFAULT_OG, SITE_ORIGIN, homeSeo } from "@/lib/seo";
+import { jsonLdString } from "@/lib/json-ld";
+import { DEFAULT_OG, HOME_CANONICAL, SITE_NAME, SITE_ORIGIN, breadcrumbJsonLd, collectionPageJsonLd, homeSeo } from "@/lib/seo";
 
 function parsePage(value: unknown): number | undefined {
   const n = Math.floor(Number(value));
@@ -89,13 +90,19 @@ export const Route = createFileRoute("/kategori/$slug")({
     if (periode && !emptyPeriod) qs.set("periode", periode);
     if (page > 1 && !emptyPeriod) qs.set("page", String(page));
     const url = `${SITE_ORIGIN}/kategori/${params.slug}${qs.toString() ? `?${qs.toString()}` : ""}`;
+    // Halaman 2+: judul & deskripsi unik per halaman (hindari duplikat judul di GSC).
+    const pageTitle = page > 1 && !emptyPeriod ? seo.title.replace(/ \| koleksidrpinguin\.com$/, ` – Halaman ${page} | koleksidrpinguin.com`) : seo.title;
+    const pageDesc = page > 1 && !emptyPeriod ? `Halaman ${page}: ${seo.description}` : seo.description;
+    const crumbName = (cat?.label || rank?.label || params.slug).trim();
+    const indexable = !(emptyPeriod || emptyCategory || page > DEEP_PAGE_NOINDEX);
     return {
       meta: [
-        { title: seo.title },
-        { name: "description", content: seo.description },
-        { property: "og:title", content: seo.title },
-        { property: "og:description", content: seo.description },
+        { title: pageTitle },
+        { name: "description", content: pageDesc },
+        { property: "og:title", content: pageTitle },
+        { property: "og:description", content: pageDesc },
         { property: "og:url", content: url },
+        { property: "og:type", content: "website" },
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
         ...(emptyPeriod || emptyCategory || page > DEEP_PAGE_NOINDEX
@@ -106,6 +113,24 @@ export const Route = createFileRoute("/kategori/$slug")({
           : []),
       ],
       links: [{ rel: "canonical", href: url }],
+      scripts: indexable
+        ? [
+            {
+              type: "application/ld+json",
+              children: jsonLdString(collectionPageJsonLd({ name: pageTitle, url, description: pageDesc })),
+            },
+            {
+              type: "application/ld+json",
+              children: jsonLdString(
+                breadcrumbJsonLd([
+                  { name: SITE_NAME, url: HOME_CANONICAL },
+                  { name: "Kategori", url: `${SITE_ORIGIN}/kategori` },
+                  { name: crumbName, url: `${SITE_ORIGIN}/kategori/${params.slug}` },
+                ]),
+              ),
+            },
+          ]
+        : [],
     };
   },
   component: CategoryPage,
