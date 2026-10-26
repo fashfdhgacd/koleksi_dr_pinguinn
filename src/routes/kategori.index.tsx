@@ -5,13 +5,16 @@ import { RANKINGS } from "@/lib/catalog/rankings";
 import { queryCatalog } from "@/lib/catalog/service";
 import type { CategoryInfo } from "@/lib/catalog/types";
 import { SITE_ORIGIN } from "@/lib/seo";
-import { PixelSparkle } from "@/components/pixel-icons";
+import { PixelIcon, PixelSparkle } from "@/components/pixel-icons";
 import { VideoThumb } from "@/components/video/thumb";
 
 const countFmt = new Intl.NumberFormat("id-ID");
 
+const cardClass =
+  "flex h-full min-h-[132px] flex-col items-center justify-center gap-1.5 rounded-none border border-white/45 bg-black px-2 py-4 text-center text-white transition-colors duration-150 hover:border-white/85 sm:min-h-[150px]";
+
 export const Route = createFileRoute("/kategori/")({
-  loader: async (): Promise<{ categories: CategoryInfo[]; specials: CategoryInfo[]; extra: Record<string, number | undefined> }> => {
+  loader: async (): Promise<{ categories: CategoryInfo[]; extra: Record<string, number | undefined> }> => {
     const totalOf = async (p: Promise<unknown>): Promise<number | undefined> => {
       try {
         const r = (await p) as { ok?: boolean; total?: unknown };
@@ -27,8 +30,8 @@ export const Route = createFileRoute("/kategori/")({
       totalOf(queryCatalog({ type: "category", category: "paling-disukai", page: 1, limit: 1 })),
     ]);
     const extra = { terbaru: latest, "paling-ditonton": views, "paling-disukai": likes };
-    if (res.ok && res.type === "categories" && res.categories.length) return { categories: res.categories, specials: res.specials || [], extra };
-    return { categories: CATEGORY_LIST, specials: [], extra };
+    if (res.ok && res.type === "categories" && res.categories.length) return { categories: res.categories, extra };
+    return { categories: CATEGORY_LIST, extra };
   },
   head: () => {
     const title = "Kategori Bokep Indo, JAV, AI & Videy - Koleksi Dr. Pinguin | koleksidrpinguin.com";
@@ -51,41 +54,58 @@ export const Route = createFileRoute("/kategori/")({
   component: CategoriesPage,
 });
 
-const coverCardClass =
-  "group relative block h-full min-h-[132px] overflow-hidden rounded-none border border-white/45 bg-black text-white transition-colors duration-150 hover:border-white/85 sm:min-h-[150px]";
-
-/** Thumbnail (server-picked, unique on the page; poster when empty) with label + count over a dark gradient. */
-function CoverInner({ label, count, cover, coverId }: { label: string; count?: number; cover?: string; coverId?: string }) {
+function CatCard({
+  to,
+  params,
+  search,
+  slug,
+  label,
+  count,
+}: {
+  to: "/" | "/kategori/$slug";
+  params?: { slug: string };
+  search?: { q?: undefined; category?: undefined };
+  slug: string;
+  label: string;
+  count?: number;
+}) {
   return (
-    <>
-      <VideoThumb src={cover || ""} videoId={coverId || ""} alt={label} className="absolute inset-0" />
-      <span className="absolute inset-x-0 bottom-0 flex flex-col bg-gradient-to-t from-black/90 via-black/60 to-transparent px-2 pb-1.5 pt-6">
+    <li>
+      <Link to={to} params={params} search={search} className={cardClass}>
+        <PixelIcon slug={slug} className="mb-1" />
         <span className="pixel text-[11px] leading-tight sm:text-[13px]">{label}</span>
         {typeof count === "number" ? (
-          <span className="pixel text-[10px] text-white/60 sm:text-xs">{countFmt.format(count)} video</span>
+          <span className="pixel text-[10px] text-white/50 sm:text-xs">{countFmt.format(count)} video</span>
         ) : null}
-      </span>
-    </>
+      </Link>
+    </li>
   );
 }
 
-/** A category or ranking card (/kategori/<slug>). */
-function CoverCard({ slug, label, count, cover, coverId }: CategoryInfo) {
+/** A category card: the cover video's thumbnail (unique per category, server-picked) or the poster. */
+function CoverCard({ cat }: { cat: CategoryInfo }) {
   return (
     <li>
-      <Link to="/kategori/$slug" params={{ slug }} search={{ page: undefined, periode: undefined }} className={coverCardClass}>
-        <CoverInner label={label} count={count} cover={cover} coverId={coverId} />
+      <Link
+        to="/kategori/$slug"
+        params={{ slug: cat.slug }}
+        search={{ page: undefined, periode: undefined }}
+        className="group relative block h-full min-h-[132px] overflow-hidden sm:min-h-[150px] rounded-none border border-white/45 bg-black text-white transition-colors duration-150 hover:border-white/85"
+      >
+        <VideoThumb src={cat.cover || ""} videoId={cat.coverId || ""} alt={cat.label} className="absolute inset-0" />
+        <span className="absolute inset-x-0 bottom-0 flex flex-col bg-gradient-to-t from-black/90 via-black/60 to-transparent px-2 pb-1.5 pt-6">
+          <span className="pixel text-[11px] leading-tight sm:text-[13px]">{cat.label}</span>
+          {typeof cat.count === "number" ? (
+            <span className="pixel text-[10px] text-white/60 sm:text-xs">{countFmt.format(cat.count)} video</span>
+          ) : null}
+        </span>
       </Link>
     </li>
   );
 }
 
 function CategoriesPage() {
-  const { categories, extra, specials } = Route.useLoaderData();
-  const special = (slug: string) => {
-    const s = specials.find((x) => x.slug === slug);
-    return { cover: s?.cover, coverId: s?.coverId };
-  };
+  const { categories, extra } = Route.useLoaderData();
   return (
     <Shell>
       <section className="relative space-y-6">
@@ -97,15 +117,24 @@ function CategoriesPage() {
 
         <ul className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4">
           {RANKINGS.map((r) => (
-            <CoverCard key={r.slug} {...special(r.slug)} slug={r.slug} label={r.label} count={extra?.[r.slug]} />
+            <CatCard
+              key={r.slug}
+              to="/kategori/$slug"
+              params={{ slug: r.slug }}
+              slug={r.slug}
+              label={r.label}
+              count={extra?.[r.slug]}
+            />
           ))}
-          <li>
-            <Link to="/" search={{ q: undefined, category: undefined }} className={coverCardClass}>
-              <CoverInner label="Terbaru" count={extra?.terbaru} {...special("terbaru")} />
-            </Link>
-          </li>
+          <CatCard
+            to="/"
+            search={{ q: undefined, category: undefined }}
+            slug="terbaru"
+            label="Terbaru"
+            count={extra?.terbaru}
+          />
           {categories.map((cat) => (
-            <CoverCard key={cat.slug} {...cat} />
+            <CoverCard key={cat.slug} cat={cat} />
           ))}
         </ul>
       </section>

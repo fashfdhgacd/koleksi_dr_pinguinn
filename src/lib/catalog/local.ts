@@ -1,6 +1,6 @@
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
-import { CATEGORY_LIST, MIN_LISTED_CATEGORY_COUNT, SEO_MIN_COUNT, findCategory } from "./categories";
+import { CATEGORY_LIST, MIN_INDEXED_CATEGORY_COUNT, MIN_LISTED_CATEGORY_COUNT, findCategory } from "./categories";
 import deadSources from "./dead-sources.json";
 import type { CategoryInfo } from "./types";
 import {
@@ -280,8 +280,7 @@ function listedSlugs(cache: CatalogCache): Set<string> {
   for (const c of CATEGORY_LIST) {
     if (!cache.bySlug.get(c.slug)?.length) continue;
     const n = categoryPool(cache, c.slug).length;
-    const seoMin = SEO_MIN_COUNT[c.slug];
-    if (seoMin ? n >= seoMin : n >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && n > 0)) set.add(c.slug);
+    if (n >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && n > 0)) set.add(c.slug);
   }
   listedMemo.set(cache, set);
   return set;
@@ -329,70 +328,44 @@ const DEAD_COVER_IDS = new Set<string>([
   ...Object.keys(((deadSources as { suspect?: Record<string, unknown> }).suspect || {}) as Record<string, unknown>),
 ]);
 
-/** A /kategori card that is not a category: pre-ranked candidates, best first (ranking pages, Terbaru). */
-export type SpecialCoverSource = { slug: string; list: RawItem[] };
-type Cover = { cover: string; coverId: string };
-
 /**
- * /kategori covers: each card gets the thumbnail of its best video and no video is used twice on the
- * page. The 3 special cards (Paling ditonton / Paling disukai / Terbaru) pick first, in order, from
- * their own ranking (same lists as those pages), so they show the true top items. Then categories,
- * fewest candidates first, each take their highest all-time-viewed unused video (same number as
- * "Paling ditonton"; ties: newest first). Dead/suspect and no-thumbnail items are skipped; hidden,
- * locked and frameless Videy items are already out of the pools. Memoized per catalog build and
- * special-list signature: no KV/D1 reads of its own.
+ * /kategori covers: each category gets the thumbnail of its most-viewed video (all-time views, the
+ * same number as "Paling ditonton"), and no video is used twice. Greedy: categories with the fewest
+ * candidates pick first, each takes its highest-viewed unused video with a real thumbnail (hidden,
+ * locked and frameless Videy items are already out of the pools). Ties: newest first (pool order).
+ * Once per catalog build (memo on the cache object), no KV/D1 reads.
  */
-const coverMemo = new WeakMap<object, Map<string, Map<string, Cover>>>();
-const coverOk = (cache: CatalogCache, it: RawItem | undefined): it is RawItem =>
-  Boolean(it?.id && !DEAD_COVER_IDS.has(it.id) && cache.byId.has(it.id) && thumbOf(it, cache.posters));
-function categoryCovers(cache: CatalogCache, slugs: string[], specials: SpecialCoverSource[] = []): Map<string, Cover> {
-  // Enough of each special list to cover every possible collision.
-  const head = slugs.length + specials.length + 1;
-  const sig =
-    slugs.join(",") +
-    "|" +
-    specials.map((s) => s.slug + ":" + s.list.filter((it) => coverOk(cache, it)).slice(0, head).map((it) => it.id).join(",")).join("|");
-  let bySig = coverMemo.get(cache);
-  const hit = bySig?.get(sig);
-  if (hit) return hit;
-  const used = new Set<string>();
-  const memo = new Map<string, Cover>();
-  const take = (slug: string, list: RawItem[]) => {
-    const pick = list.find((it) => coverOk(cache, it) && !used.has(it.id));
-    if (pick) used.add(pick.id);
-    memo.set(slug, pick ? { cover: thumbOf(pick, cache.posters), coverId: pick.id } : { cover: "", coverId: "" });
-  };
-  for (const s of specials) take(s.slug, s.list);
+const coverMemo = new WeakMap<object, Map<string, { cover: string; coverId: string }>>();
+function categoryCovers(cache: CatalogCache, slugs: string[]): Map<string, { cover: string; coverId: string }> {
+  let memo = coverMemo.get(cache);
+  if (memo && slugs.every((s) => memo!.has(s))) return memo;
   const ranked = slugs.map((slug) => {
     const pool = cache.bySlug.get(slug)?.length ? categoryPool(cache, slug) : [];
     const list = pool
       .map((it, i) => ({ it, i, v: typeof it.views === "number" ? it.views : 0 }))
-      .filter(({ it }) => coverOk(cache, it));
+      .filter(({ it }) => it?.id && !DEAD_COVER_IDS.has(it.id) && Boolean(thumbOf(it, cache.posters)));
     list.sort((a, b) => b.v - a.v || a.i - b.i);
-    return { slug, list: list.map((x) => x.it) };
+    return { slug, list };
   });
   ranked.sort((a, b) => a.list.length - b.list.length || slugs.indexOf(a.slug) - slugs.indexOf(b.slug));
-  for (const { slug, list } of ranked) take(slug, list);
-  if (!bySig) coverMemo.set(cache, (bySig = new Map()));
-  if (bySig.size > 8) bySig.clear();
-  bySig.set(sig, memo);
+  const used = new Set<string>();
+  memo = new Map();
+  for (const { slug, list } of ranked) {
+    const pick = list.find(({ it }) => !used.has(it.id));
+    if (pick) used.add(pick.it.id);
+    memo.set(slug, pick ? { cover: thumbOf(pick.it, cache.posters), coverId: pick.it.id } : { cover: "", coverId: "" });
+  }
+  coverMemo.set(cache, memo);
   return memo;
-}
-
-/** Newest-first Terbaru list (same as the Terbaru page), for its /kategori cover. */
-export async function terbaruCoverSource(): Promise<RawItem[]> {
-  return (await loadItems()).terbaruSorted;
 }
 
 /**
  * Public category list with live counts; categories with fewer than
- * MIN_LISTED_CATEGORY_COUNT videos are left out (their pages still work). The 2026-10-26 SEO
- * categories (SEO_MIN_COUNT) are listed and in the sitemap from their own count, AI GAY is always on
- * /kategori but in the sitemap only from its count (below it every such page is noindex). Each entry carries its unique cover (categoryCovers).
+ * MIN_LISTED_CATEGORY_COUNT videos are left out (their pages still work). AI GAY (new 2026-10-26) is
+ * always on /kategori; in the sitemap only from MIN_INDEXED_CATEGORY_COUNT videos (until then its
+ * page is noindex). Each entry carries its unique cover (categoryCovers).
  */
-export async function listListedCategories(
-  opts: { sitemap?: boolean; specials?: SpecialCoverSource[]; specialOut?: CategoryInfo[] } = {},
-): Promise<CategoryInfo[]> {
+export async function listListedCategories(opts: { sitemap?: boolean } = {}): Promise<CategoryInfo[]> {
   const cache = await loadItems();
   const out: CategoryInfo[] = [];
   for (const c of CATEGORY_LIST) {
@@ -400,18 +373,12 @@ export async function listListedCategories(
     // Only known category slugs with videos: no fallback scan for empty ones.
     const count = cache.bySlug.get(c.slug)?.length ? categoryPool(cache, c.slug).length : 0;
     // Videy is listed from its first video; other categories need MIN_LISTED_CATEGORY_COUNT.
-    const seoMin = SEO_MIN_COUNT[c.slug];
-    const listed = seoMin
-      ? count >= seoMin || (c.slug === "ai-gay" && !opts.sitemap)
-      : count >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && count > 0);
-    if (listed) {
+    const aiGay = c.slug === "ai-gay" && (!opts.sitemap || count >= MIN_INDEXED_CATEGORY_COUNT);
+    if (count >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && count > 0) || aiGay) {
       out.push({ slug: c.slug, label: c.label, count });
     }
   }
   if (opts.sitemap) return out;
-  const covers = categoryCovers(cache, out.map((c) => c.slug), opts.specials);
-  for (const sp of opts.specials || []) {
-    opts.specialOut?.push({ slug: sp.slug, label: sp.slug, ...(covers.get(sp.slug) || { cover: "", coverId: "" }) });
-  }
+  const covers = categoryCovers(cache, out.map((c) => c.slug));
   return out.map((c) => ({ ...c, ...(covers.get(c.slug) || { cover: "", coverId: "" }) }));
 }

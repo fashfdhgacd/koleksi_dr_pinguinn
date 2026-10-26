@@ -5,7 +5,7 @@ import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { CatalogPager } from "@/components/video/catalog-pager";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
-import { LEGACY_CATEGORY_SLUGS, UNLISTED_CATEGORY_SLUGS, findCategory, minIndexedCount } from "@/lib/catalog/categories";
+import { LEGACY_CATEGORY_SLUGS, MIN_INDEXED_CATEGORY_COUNT, UNLISTED_CATEGORY_SLUGS, findCategory } from "@/lib/catalog/categories";
 import { SafeBoundary } from "@/components/safe-boundary";
 import { rememberCatalog } from "@/lib/catalog/last-catalog";
 import { queryCatalog } from "@/lib/catalog/service";
@@ -85,8 +85,8 @@ export const Route = createFileRoute("/kategori/$slug")({
     // A plain category without any video yet (e.g. a new one before its first upload): noindex,follow
     // so Google does not index a thin page. Indexable automatically from the first video.
     const ld = loaderData as { ok?: boolean; type?: string; total?: number } | undefined;
-    // AI GAY and the 2026-10-26 SEO categories stay noindex until they reach SEO_MIN_COUNT videos.
-    const minCount = minIndexedCount(cat?.slug);
+    // AI GAY (new, 2026-10-26) also stays noindex until it has MIN_INDEXED_CATEGORY_COUNT videos.
+    const minCount = cat?.slug === "ai-gay" ? MIN_INDEXED_CATEGORY_COUNT : 1;
     const emptyCategory = Boolean(
       !rank && cat && ld && ld.ok && ld.type === "category" && typeof ld.total === "number" && ld.total < minCount,
     );
