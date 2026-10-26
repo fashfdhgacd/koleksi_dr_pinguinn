@@ -59,7 +59,11 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
     const d = await post<{ held?: boolean }>(secret, { action: "detector-review-decide", id, decision });
     setBusy("");
     if (!d.ok) {
-      setErr(d.error === "locked_minor" ? "Judul ini terkunci (minor), tidak bisa ditayangkan." : d.error || "Gagal.");
+      setErr(d.error === "locked_minor"
+          ? "Judul ini terkunci (minor), tidak bisa ditayangkan."
+          : d.error === "title_needs_rename"
+            ? "Judul masih perlu diganti. Tap Edit, ganti judulnya, lalu Tayangkan lagi."
+            : d.error || "Gagal.");
       return;
     }
     setRows((rs) =>
