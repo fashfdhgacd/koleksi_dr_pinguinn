@@ -71,7 +71,9 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
     const owner = minorContentReason(title);
     // Isyarat sekolah tambahan: hanya antre "Perlu dicek", tidak pernah mengunci/menyembunyikan.
     const cue = owner === "review" || owner === "minor" ? "" : schoolReviewCue(title);
-    if (!heldTag && owner !== "review" && !cue) continue;
+    // Aturan pemilik 2026-10-26: video yang sudah tayang tidak pernah ditandai/diantrekan lagi.
+    // Antrean hanya berisi upload baru yang sedang ditahan (hidden_reason "detector-review", belum Tayangkan).
+    if (!heldTag || unhide.ids[it.id]) continue;
     if (owner === "minor" || isLockedMinor(it as never)) continue; // status "locked", bukan untuk dicek
     if (ownerChecked18(title)) continue; // bertanda umur 18: sudah dicek pemilik (kunci di atas tetap menang)
     const ex = explainTitle(title, owner);
