@@ -118,7 +118,7 @@ export const Route = createFileRoute("/watch/$id")({
         { name: "twitter:description", content: description },
         { name: "twitter:image", content: image },
         { name: "twitter:image:alt", content: OG_SITE_NAME },
-        { name: "robots", content: item ? "index,follow,max-video-preview:120" : "noindex,follow" },
+        { name: "robots", content: item && !item.noindex ? "index,follow,max-video-preview:120" : "noindex,follow" },
         { name: "rating", content: "adult" },
       ],
       links: [{ rel: "canonical", href: url }],

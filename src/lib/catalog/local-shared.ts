@@ -340,6 +340,39 @@ export function videyThumb(item: RawItem): string {
   return id ? `/videy-thumbs/${id}.jpg` : "";
 }
 
+/** Videy ids that have public/videy-thumbs/<id>.jpg, listed at build time by vite.config.ts. */
+declare const __VIDEY_THUMB_IDS__: string[] | undefined;
+let videyThumbSet: Set<string> | null | undefined;
+function videyThumbIds(): Set<string> | null {
+  if (videyThumbSet === undefined) {
+    videyThumbSet = typeof __VIDEY_THUMB_IDS__ !== "undefined" && Array.isArray(__VIDEY_THUMB_IDS__) ? new Set(__VIDEY_THUMB_IDS__) : null;
+  }
+  return videyThumbSet;
+}
+
+/** A Videy item whose frame is still missing this long after upload is left out of public lists. */
+export const VIDEY_NO_THUMB_HIDE_HOURS = 6;
+export const VIDEY_NO_THUMB_HIDE_MS = VIDEY_NO_THUMB_HIDE_HOURS * 3_600_000;
+
+/** True when the build has no frame for this Videy item (unknown thumb list = false, never hides). */
+export function videyMissingThumb(item: RawItem): boolean {
+  if (!isVidey(item)) return false;
+  const ids = videyThumbIds();
+  if (!ids) return false;
+  const id = String(item.id || "").replace(/[^A-Za-z0-9_-]/g, "");
+  return Boolean(id) && !ids.has(id);
+}
+
+/**
+ * When a Videy item without a frame drops out of public lists (upload time + 6 h), or 0 when it never
+ * does (has a frame / not Videy). An unknown upload time counts as old. The frame failing to grab
+ * usually means the cdn file is dead, so its player would not play either.
+ */
+export function videyNoThumbHideAt(item: RawItem, uploadedMs: number): number {
+  if (!videyMissingThumb(item)) return 0;
+  return uploadedMs > 0 ? uploadedMs + VIDEY_NO_THUMB_HIDE_MS : 1;
+}
+
 export function thumbOf(item: RawItem, posters: Record<string, string>): string {
   const id = item.id;
   if (isVidey(item)) return videyThumb(item);

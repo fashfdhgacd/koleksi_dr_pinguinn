@@ -21,6 +21,7 @@ import {
   mainCatalog,
   slugOf,
   toCard,
+  videyNoThumbHideAt,
 } from "./local-shared";
 import localCatalog from "./videos.json";
 import streamtapeBatch from "./streamtape.json";
@@ -158,6 +159,10 @@ type BuiltCache = CatalogCache & {
   raw?: RawItem[];
   hiddenIds?: Set<string>;
   unhideKey?: string;
+  /** Videy items without a frame, past VIDEY_NO_THUMB_HIDE_HOURS: off lists, /watch still opens (noindex). */
+  videyNoThumbIds?: Set<string>;
+  /** Next time a frameless Videy item crosses the limit (0 = none pending); loadItemsRaw rebuilds then. */
+  videyNoThumbNextAt?: number;
 };
 
 let lastHiddenIds = new Set<string>();
@@ -477,9 +482,20 @@ export function buildIndexes(
     })
     .map(withStats);
   lastHiddenIds = hiddenIds;
-  const popular = popularIds(items);
+  // Frameless Videy items past the limit leave every list but stay in byId, so /watch still opens.
+  const now = Date.now();
+  const videyNoThumbIds = new Set<string>();
+  let videyNoThumbNextAt = 0;
   for (const it of items) {
     byId.set(it.id, it);
+    const hideAt = videyNoThumbHideAt(it, timeKey(it));
+    if (!hideAt) continue;
+    if (hideAt <= now) videyNoThumbIds.add(it.id);
+    else if (!videyNoThumbNextAt || hideAt < videyNoThumbNextAt) videyNoThumbNextAt = hideAt;
+  }
+  if (videyNoThumbIds.size) items = items.filter((it) => !videyNoThumbIds.has(it.id));
+  const popular = popularIds(items);
+  for (const it of items) {
     // Multi-category (title-tags.ts): the video joins its primary category and every tag category.
     const slugs = titleTags(it.title, slugOf(it), tagOptions(it, popular));
     // Owner-chosen extra categories (/pemilik > Edit): the video also shows up in each of them.
@@ -524,6 +540,8 @@ export function buildIndexes(
     raw,
     hiddenIds,
     unhideKey,
+    videyNoThumbIds,
+    videyNoThumbNextAt,
   };
 }
 
@@ -602,7 +620,9 @@ export async function loadItemsRaw(): Promise<CatalogCache> {
   await syncUnhidden();
   const cache = (await loadItemsInner()) as BuiltCache;
   // A refresh that started before the latest Unhide change: rebuild with the current list.
-  if (cache.raw && cache.unhideKey !== unhideKey) {
+  // Or a frameless Videy item just crossed VIDEY_NO_THUMB_HIDE_HOURS (CPU only, at most once per item).
+  const due = Boolean(cache.videyNoThumbNextAt && Date.now() >= cache.videyNoThumbNextAt);
+  if (cache.raw && (cache.unhideKey !== unhideKey || due)) {
     const next = buildIndexes(cache.raw, cache.posters, cache.videyNo, cache.at);
     if (runtime.cache === cache) runtime.cache = next;
     return next;
@@ -637,6 +657,22 @@ async function loadItemsInner(): Promise<CatalogCache> {
 /** Fitur 'Tidak publish' / hidden review DINONAKTIFKAN â€” selalu return set kosong. */
 export async function getUnpublished(): Promise<Set<string>> {
   return new Set();
+}
+
+/** Videy item left off lists for a missing frame (/watch stays 200 with noindex). */
+export async function isVideyNoThumbHidden(id: string): Promise<boolean> {
+  const key = String(id || "").trim();
+  if (!key) return false;
+  const cache = (await loadItemsRaw()) as BuiltCache;
+  return Boolean(cache.videyNoThumbIds?.has(key));
+}
+
+/** Owner list: frameless Videy items hidden right now, newest first. */
+export async function listVideyNoThumbHidden(): Promise<RawItem[]> {
+  const cache = (await loadItemsRaw()) as BuiltCache;
+  const ids = cache.videyNoThumbIds;
+  if (!ids?.size) return [];
+  return sortByNewest([...ids].map((id) => cache.byId.get(id)).filter((it): it is RawItem => Boolean(it)), false);
 }
 
 /** True for hidden ids (minor/school-themed content); /watch answers 404 + noindex for them. */

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { applyUnhidden, hiddenReasonRaw, loadItemsRaw } from "@/lib/catalog/local-cache";
+import { applyUnhidden, hiddenReasonRaw, listVideyNoThumbHidden, loadItemsRaw } from "@/lib/catalog/local-cache";
 import { isVidey, type RawItem } from "@/lib/catalog/local-shared";
 import { isLockedMinorId, lockedMinorReason, ownerEditBlockReason } from "@/lib/catalog/minor-lock.js";
 import itemOverrides from "@/lib/catalog/overrides.json";
@@ -81,7 +81,13 @@ async function listUntitled() {
     });
   }
   rows.sort((a, b) => b.createdAt - a.createdAt);
-  return json({ ok: true, items: rows });
+  // Videy items with no frame past VIDEY_NO_THUMB_HIDE_HOURS: off public lists (read-time, no writes).
+  const noThumb = (await listVideyNoThumbHidden()).map((it) => ({
+    id: it.id,
+    title: String(it.title || ""),
+    createdAt: createdMs(it),
+  }));
+  return json({ ok: true, items: rows, noThumb });
 }
 
 async function saveTitle(body: { id?: unknown; title?: unknown }) {
