@@ -8,6 +8,7 @@
 import { OwnerHeroCard } from "@/components/owner-hero";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CATEGORY_LIST } from "@/lib/catalog/categories";
+import { EXTRA_CHOICES, MAX_EXTRA } from "@/components/owner-edit-sheet";
 import { fmt, ownerToast, type OwnerStats, type DayRow } from "@/components/owner-dashboard-shared";
 import {
   AlertStrip,
@@ -128,19 +129,19 @@ const PAGE = 10;
 /** Upload list filter: "" = semua, a source label, or "nothumb". */
 type RecentFilter = string;
 
-const card = "min-w-0 rounded-xl border border-white/[0.08] border-t-[#2dd4bf]/40 bg-[#131316] p-4 sm:p-5";
-const h2 = "flex items-center justify-between gap-2 text-[13px] font-semibold uppercase tracking-[0.12em] text-[#2dd4bf]";
+const card = "min-w-0 rounded-2xl border border-white/[0.06] bg-[#111314] p-4 sm:p-5";
+const h2 = "flex items-center justify-between gap-2 text-sm font-medium text-zinc-100";
 const h2note = "text-[13px] font-normal normal-case tracking-normal text-zinc-400";
 const btn =
-  "shrink-0 whitespace-nowrap rounded-md border border-white/[0.12] bg-[#16161a] px-2 py-1 text-[13px] text-zinc-200 hover:bg-white/[0.06] disabled:opacity-50";
+  "shrink-0 whitespace-nowrap rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[13px] text-zinc-200 hover:border-[#2dd4bf]/40 hover:bg-white/[0.06] disabled:opacity-50";
 // Separate classes per state so the active background never competes with the base bg in CSS order.
 function toggleCls(active: boolean): string {
-  const base = "shrink-0 whitespace-nowrap rounded-md border px-2 py-1 text-[13px]";
+  const base = "shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[13px]";
   return active
     ? `${base} border-[#2dd4bf] bg-[#2dd4bf] font-medium text-zinc-950`
     : `${base} border-white/[0.12] bg-transparent text-zinc-400 hover:text-zinc-200`;
 }
-const input = "rounded-md border border-white/[0.12] bg-[#0c0c0e] px-2.5 py-2 text-sm text-zinc-100 placeholder:text-zinc-500";
+const input = "rounded-lg border border-white/[0.08] bg-[#0a0b0c] px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500";
 
 function compact(n: number): string {
   if (n >= 10_000) return `${(n / 1000).toLocaleString("id-ID", { maximumFractionDigits: 1 })}k`;
@@ -230,9 +231,9 @@ async function ownerPost<T extends { ok?: boolean; error?: string }>(
 
 function StatCell({ label, value, sub }: { label: string; value: string; sub?: string | null }) {
   return (
-    <div className="min-w-0 rounded-lg border border-white/[0.05] bg-[#0f0f12] px-3 py-2.5">
-      <p className="text-[13px] font-medium uppercase leading-snug tracking-[0.08em] text-[#5eead4]">{label}</p>
-      <p className="mt-1 truncate text-2xl tabular-nums text-zinc-50">{value}</p>
+    <div className="min-w-0 rounded-xl border border-white/[0.05] bg-[#0c0e0f] px-3.5 py-3">
+      <p className="text-[12px] font-medium leading-snug text-zinc-400">{label}</p>
+      <p className="mt-1 truncate text-[26px] font-semibold leading-tight tabular-nums text-zinc-50">{value}</p>
       {sub ? (
         <p className="mt-0.5 text-[13px] leading-snug text-zinc-400">
           {sub}
@@ -381,7 +382,15 @@ function EditRow({
   const [err, setErr] = useState("");
   const extraChanged = [...extra].sort().join(",") !== [...(row.extra || [])].sort().join(",");
   function toggleExtra(slug: string) {
-    setExtra((cur) => (cur.includes(slug) ? cur.filter((s) => s !== slug) : [...cur, slug]));
+    setErr("");
+    setExtra((cur) => {
+      if (cur.includes(slug)) return cur.filter((s) => s !== slug);
+      if (cur.length >= MAX_EXTRA) {
+        setErr(`Maksimal ${MAX_EXTRA} kategori tambahan.`);
+        return cur;
+      }
+      return [...cur, slug];
+    });
   }
   async function save() {
     setBusy(true);
@@ -426,13 +435,16 @@ function EditRow({
         {busy ? "..." : "Simpan"}
       </button>
       <div className="basis-full">
-        <p className="mb-1 text-[13px] text-zinc-400">Tampil juga di kategori (opsional, maks. 6):</p>
+        <p className="mb-1 text-[13px] text-zinc-400">
+          Tampil juga di kategori (opsional, maks. 6): <span className="tabular-nums">{extra.length}/{MAX_EXTRA}</span>
+        </p>
         <div className="flex flex-wrap gap-1.5">
-          {CATEGORY_LIST.filter((c) => c.slug !== cat).map((c) => (
+          {EXTRA_CHOICES.filter((c) => c.slug !== cat).map((c) => (
             <button
               key={c.slug}
               type="button"
               aria-pressed={extra.includes(c.slug)}
+              disabled={!extra.includes(c.slug) && extra.length >= MAX_EXTRA}
               className={toggleCls(extra.includes(c.slug))}
               onClick={() => toggleExtra(c.slug)}
             >
