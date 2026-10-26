@@ -33,9 +33,9 @@ export const Route = createFileRoute("/kategori/")({
     return { categories: CATEGORY_LIST, extra };
   },
   head: () => {
-    const title = "Kategori | koleksidrpinguin.com";
+    const title = "Kategori Bokep Indo, JAV, AI & Videy - Koleksi Dr. Pinguin | koleksidrpinguin.com";
     const description =
-      "Pilih kategori di Koleksi Dr. Pinguin: Jav, AI+, Jilbab, Tante, Selingkuh, Bule, Mahasiswi, Tobrut, Outdoor, Hotel, dan lainnya.";
+      "Semua kategori Koleksi Dr. Pinguin: bokep indo viral, JAV sub indo, bokep AI indo, videy, Malaysia, jilbab, tante, dan lainnya. Pilih lalu tonton langsung di HP.";
     const url = `${SITE_ORIGIN}/kategori`;
     return {
       meta: [

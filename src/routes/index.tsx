@@ -112,7 +112,8 @@ export const Route = createFileRoute("/")({
     const q = typeof match.search.q === "string" ? match.search.q : undefined;
     const page = typeof match.search.page === "number" ? match.search.page : 1;
     const seo = homeSeo(q);
-    const title = !q && page > 1 ? `${seo.title} – Halaman ${page}` : seo.title;
+    const title = !q && page > 1 ? `Video Terbaru Halaman ${page} - ${BRAND_NAME} | koleksidrpinguin.com` : seo.title;
+    const description = !q && page > 1 ? `Halaman ${page} video terbaru ${BRAND_NAME}: bokep indo viral, videy, JAV dan AI+ terbaru.` : seo.description;
     const url = q
       ? HOME_CANONICAL
       : page > 1
@@ -121,9 +122,9 @@ export const Route = createFileRoute("/")({
     return {
       meta: [
         { title },
-        { name: "description", content: seo.description },
+        { name: "description", content: description },
         { property: "og:title", content: title },
-        { property: "og:description", content: seo.description },
+        { property: "og:description", content: description },
         { property: "og:url", content: url },
         { property: "og:type", content: "website" },
         { property: "og:image", content: DEFAULT_OG },

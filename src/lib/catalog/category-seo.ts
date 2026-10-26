@@ -15,10 +15,10 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     description: `Nonton JAV sub indo terbaru ${YEAR} dan bokep Jepang yang lagi rame. Cari kode JAV favoritmu, langsung putar di HP tanpa download.`,
   },
   "ai-plus": {
-    h1: "Bokep AI+ Terbaru",
-    intro: "Video AI+ terbaru yang lagi banyak dicari, gambar jernih dan streaming lancar. Koleksinya nambah terus tiap minggu.",
-    title: `Bokep AI+ Terbaru ${YEAR} - Video AI Viral | ${TITLE_SUFFIX}`,
-    description: `Bokep AI+ terbaru ${YEAR}: video AI viral yang lagi banyak dicari, jernih dan lancar diputar langsung di HP.`,
+    h1: "Bokep AI Indo Terbaru",
+    intro: "Bokep AI indo dan video AI+ terbaru yang lagi banyak dicari, gambar jernih dan streaming lancar. Koleksinya nambah terus tiap minggu.",
+    title: `Bokep AI Indo Terbaru ${YEAR} - Video AI+ Viral | ${TITLE_SUFFIX}`,
+    description: `Bokep AI indo terbaru ${YEAR} di Koleksi Dr. Pinguin: video AI+ viral yang lagi banyak dicari, jernih dan lancar diputar langsung di HP.`,
   },
   jilbab: {
     h1: "Bokep Jilbab Viral Terbaru",
@@ -197,7 +197,7 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
   videy: {
     h1: "Video Viral Videy Terbaru",
     intro: "Kumpulan link videy viral dan bokep videy indo terbaru, langsung diputar di sini tanpa buka link satu-satu. Selalu nambah tiap ada video videy baru yang lagi rame.",
-    title: `Video Viral Videy Terbaru ${YEAR} - Link Videy Indo | ${TITLE_SUFFIX}`,
+    title: `Bokep Videy Indo Viral Terbaru ${YEAR} - Link Videy | ${TITLE_SUFFIX}`,
     description: `Video viral videy terbaru ${YEAR}: kumpulan link videy dan bokep videy indo yang lagi rame, bisa langsung ditonton di HP tanpa buka link satu-satu.`,
   },
   bokep: {
