@@ -419,6 +419,7 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
         <PopTapLayer
           videoId={item.id}
           host="Videy"
+          mediaRef={videoRef}
           onPass={() => {
             const v = videoRef.current;
             if (v) void (v.paused ? v.play().catch(() => {}) : v.pause());

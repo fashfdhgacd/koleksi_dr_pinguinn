@@ -3,7 +3,7 @@
 // (tap-popunder.tsx) and the Videy player (ts-videy-popunder.tsx).
 // Cap, modelled on the hosts' own players (IndoAV / Lulu: first tap opens an ad tab, next tap plays):
 // at most POP_MAX_PER_VIDEO pops per video id (the count resets when another video is opened) and at
-// least POP_MIN_GAP_MS between any two pops. sessionStorage only; timestamps are compared on tap
+// least POP_MIN_GAP_MS between two pops on the same video. sessionStorage only; timestamps are compared on tap
 // (no server writes, no timers). A blocked window.open counts nothing.
 // Counters: popc_fire / popc_ok / popc_block in player-log (once per video+event per session).
 import { sendPlayerLog, type PlayerLogHost } from "@/lib/player-log-client";
@@ -13,8 +13,8 @@ const HOSTS = new Set(["IndoAV", "UserBokep", "Streamtape", "Putarin", "Videy", 
 
 /** Max popunders per video id. Easy to change. */
 export const POP_MAX_PER_VIDEO = 3;
-/** Minimum time between any two popunders. Easy to change. */
-export const POP_MIN_GAP_MS = 2 * 60_000;
+/** Minimum time between two popunders on the SAME video (a newly opened video may pop at once). */
+export const POP_MIN_GAP_MS = 20_000;
 
 const KEY = "kdp_pop_v1";
 type PopState = { id: string; n: number; at: number };
@@ -46,8 +46,8 @@ function writeState(v: PopState): void {
 export function canPop(videoId: string): boolean {
   if (typeof window === "undefined" || !videoId) return false;
   const st = readState();
-  const n = st.id === videoId ? st.n : 0;
-  return n < POP_MAX_PER_VIDEO && Date.now() - st.at >= POP_MIN_GAP_MS;
+  if (st.id !== videoId) return true; // another video: fresh count, no gap
+  return st.n < POP_MAX_PER_VIDEO && Date.now() - st.at >= POP_MIN_GAP_MS;
 }
 
 /** True when this video can still get a popunder later (count not used up), ignoring the gap. */
