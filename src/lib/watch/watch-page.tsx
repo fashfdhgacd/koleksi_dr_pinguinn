@@ -181,35 +181,26 @@ function uploadDateLabel(raw: string | number | null | undefined): string {
   return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" });
 }
 
-/** Fakta singkat per video (durasi, kategori, tanggal, sumber): teks unik yang terlihat, bukan keyword. */
+/** Fakta singkat per video (durasi, tanggal, sumber). Kategori sudah tampil sebagai chip di atasnya. */
 function VideoFacts({ item }: { item: VideoDetail }) {
-  const slug = isVideyItem(item) ? "videy" : categorySlugFor(item.category);
-  const categoryName = isVideyItem(item) ? VIDEY_LABEL : item.category;
   const date = uploadDateLabel(item.uploadDate);
   const host = isVideyItem(item) || isDrpHostItem(item) ? "" : hostLabel(catalogPlayUrl(item)).replace("Puterin", "Putarin");
   const rows: Array<[string, string]> = [];
   if (item.durationLabel) rows.push(["Durasi", item.durationLabel]);
-  if (categoryName) rows.push(["Kategori", String(categoryName)]);
   if (date) rows.push(["Diunggah", date]);
   if (host) rows.push(["Sumber", host]);
   if (!rows.length) return null;
   return (
     <section aria-label="Info video" className="space-y-2">
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
+      <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Info</p>
+      <dl className="flex flex-wrap gap-2 text-sm">
         {rows.map(([k, v]) => (
-          <div key={k}>
-            <dt className="text-xs uppercase tracking-[0.18em] text-muted">{k}</dt>
-            <dd className="text-foreground">{v}</dd>
+          <div key={k} className="inline-flex h-9 items-center gap-2 rounded-full border border-border px-4">
+            <dt className="text-muted">{k}</dt>
+            <dd className="font-medium text-foreground">{v}</dd>
           </div>
         ))}
       </dl>
-      {slug && categoryName ? (
-        <p className="text-sm">
-          <a href={`/kategori/${slug}`} className="text-muted hover:text-foreground hover:underline">
-            Lihat video {String(categoryName)} lainnya →
-          </a>
-        </p>
-      ) : null}
     </section>
   );
 }
