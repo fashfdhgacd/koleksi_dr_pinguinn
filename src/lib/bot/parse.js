@@ -293,6 +293,8 @@ export function parseMessage(text = "") {
     const cm = line.match(/^(?:category|kategori|cat)\s*[:\-]\s*(.+)$/i);
     if (cm) category = cm[1].trim().toLowerCase();
   }
+  // Tag #aigay (or #ai-gay / #ai_gay) anywhere in the message = category AI GAY (/kategori/ai-gay).
+  if (!category && /(?:^|\s)#ai[-_]?gay\b/i.test(text)) category = "ai-gay";
 
   const urls = extractUrls(text);
   const videos = [];

@@ -272,6 +272,8 @@ function slugOfRaw(item: RawItem): string {
   if (isDrpBokep(item)) return DRP_CATEGORY;
   const raw = (item.category || "").toLowerCase().trim();
   const title = item.title || "";
+  // An explicit AI GAY upload (#aigay / "kategori: ai gay") wins over the host default.
+  if (raw && findCategory(raw)?.slug === "ai-gay") return "ai-gay";
   if (isPutarin(item)) return "jav";
   if (isStreamtape(item)) return "ai-plus";
   // Explicit source/bot category naming one of the newer categories (bule, bumil, tobrut, ...).

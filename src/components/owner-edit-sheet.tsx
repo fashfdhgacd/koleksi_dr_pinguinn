@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 export const EXTRA_CHOICES: { slug: string; label: string }[] = [
   { slug: "jav", label: "Jav" },
   { slug: "hentai", label: "Hentai" },
+  { slug: "ai-gay", label: "AI GAY" },
   { slug: "jilbab", label: "Jilbab" },
   { slug: "tante", label: "Tante" },
   { slug: "amatir", label: "Amatir" },

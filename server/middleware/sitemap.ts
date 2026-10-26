@@ -134,7 +134,7 @@ function errorXml(method: string, message: string): Response {
 }
 
 async function buildPagesXml(): Promise<string> {
-  return wrapUrlset(pageEntries(await listListedCategories()));
+  return wrapUrlset(pageEntries(await listListedCategories({ sitemap: true })));
 }
 
 async function buildWatchXml(chunkIndex?: number): Promise<{ xml: string; total: number; chunks: number }> {

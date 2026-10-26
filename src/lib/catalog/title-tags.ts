@@ -23,6 +23,8 @@ const mahasiswiRule = extra.get("mahasiswi");
 const TAG_RULES: [string, RegExp][] = [
   // Not a bare "ai": JAV actresses are often named Ai (Ai Sayama).
   ["ai-plus", /buatan ai|\bai generated\b|\bdeepfake\b|\bai ?短剧|\bai (?:china|short drama|drama|video)\b/],
+  // AI GAY: the #aigay upload tag or "ai gay" wording. Never a bare "gay" (not AI-made).
+  ["ai-gay", /\bai ?gay\b|\bgay ai\b/],
   ["jilbab", /\b(?:jilbab|jilboob|berjilbab|hijab|hijaber|hijabers|kerudung|tudung|cadar|niqab)\b/],
   ["tante", /\b(?:tante|milf|janda|stw|mature|mamah muda|mama muda|cougar)\b/],
   ["istri", /\b(?:istri|istriku|istrinya|bini|wife|pasutri|suami istri)\b/],

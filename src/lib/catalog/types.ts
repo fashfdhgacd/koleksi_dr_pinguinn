@@ -57,6 +57,10 @@ export type CategoryInfo = {
   label: string;
   /** Jumlah video (hanya diisi oleh daftar kategori /kategori). */
   count?: number;
+  /** /kategori cover: thumbnail of the category's most-viewed video, unique across categories ("" = poster). */
+  cover?: string;
+  /** Id of the cover video (VideoThumb uses it for the cached /thumb/<id> route). */
+  coverId?: string;
 };
 
 export type PagedVideos = {

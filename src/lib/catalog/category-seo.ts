@@ -20,6 +20,12 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     title: `Bokep AI Indo Terbaru ${YEAR} - Video AI+ Viral | ${TITLE_SUFFIX}`,
     description: `Bokep AI indo terbaru ${YEAR} di Koleksi Dr. Pinguin: video AI+ viral yang lagi banyak dicari, jernih dan lancar diputar langsung di HP.`,
   },
+  "ai-gay": {
+    h1: "Video AI Gay Terbaru",
+    intro: "Kumpulan video AI gay buatan AI: adegan sesama pria hasil generate AI, semua pemeran dewasa. Kategori baru, videonya ditambah bertahap.",
+    title: `Video AI Gay Terbaru ${YEAR} - Kategori AI GAY | ${TITLE_SUFFIX}`,
+    description: `Video AI gay terbaru ${YEAR} di Koleksi Dr. Pinguin: adegan sesama pria buatan AI, pemeran dewasa, langsung putar di HP tanpa download.`,
+  },
   jilbab: {
     h1: "Bokep Jilbab Viral Terbaru",
     intro: "Bokep jilbab indo viral yang lagi rame, dari hijab syar'i sampai ukhti yang bikin penasaran. Langsung putar di HP.",
