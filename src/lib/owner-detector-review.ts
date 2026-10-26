@@ -12,7 +12,7 @@ import { readUnhideState, setUnhidden } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState, setOwnerHidden } from "@/lib/catalog/owner-hide-store";
 import { readReviewState, writeReviewState } from "@/lib/owner-review-store";
 import { minorContentReason } from "@/lib/catalog/minor-detector.js";
-import { explainTitle } from "@/lib/catalog/minor-context.js";
+import { explainTitle, ownerChecked18, schoolReviewCue } from "@/lib/catalog/minor-context.js";
 
 export type DetectorReviewRow = {
   id: string;
@@ -69,8 +69,11 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
     const title = String(it.title || "");
     const heldTag = it.hidden === true && it.hidden_reason === "detector-review";
     const owner = minorContentReason(title);
-    if (!heldTag && owner !== "review") continue;
+    // Isyarat sekolah tambahan: hanya antre "Perlu dicek", tidak pernah mengunci/menyembunyikan.
+    const cue = owner === "review" || owner === "minor" ? "" : schoolReviewCue(title);
+    if (!heldTag && owner !== "review" && !cue) continue;
     if (owner === "minor" || isLockedMinor(it as never)) continue; // status "locked", bukan untuk dicek
+    if (ownerChecked18(title)) continue; // bertanda umur 18: sudah dicek pemilik (kunci di atas tetap menang)
     const ex = explainTitle(title, owner);
     const ownerHidden = Boolean(ownerHide.ids[it.id]);
     const held = ownerHidden || (heldTag && !unhide.ids[it.id]);
@@ -80,7 +83,7 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
       translation: translateZh(title),
       moderation: "review_pending",
       assessment: ex.assessment,
-      reason: owner === "review" ? ex.reason : `Ditahan saat upload (judul sudah berubah, cek ulang). ${ex.reason}`,
+      reason: owner === "review" ? ex.reason : cue ? `Isyarat sekolah (${cue}), tidak dikunci. Pastikan tokohnya dewasa. ${ex.reason}` : `Ditahan saat upload (judul sudah berubah, cek ulang). ${ex.reason}`,
       signals: ex.signals,
       held,
       status: ownerHidden ? "Disembunyiin pemilik" : held ? "Ditahan (upload baru), belum tayang" : "Masih tayang",

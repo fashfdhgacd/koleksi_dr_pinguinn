@@ -293,7 +293,7 @@ export function OwnerDashboard() {
               type="button"
               onClick={() => goTab(t.id)}
               aria-current={tab === t.id ? "page" : undefined}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition ${
+              className={`flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition ${focusRing} ${
                 tab === t.id ? "bg-[#2dd4bf]/12 font-medium text-[#5eead4]" : "text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100"
               }`}
             >
@@ -317,7 +317,7 @@ export function OwnerDashboard() {
       <div className="lg:pl-60">
         {/* Top bar */}
         <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#08090a]/75 backdrop-blur-xl">
-          <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-2 px-4 py-3">
+          <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
             <div className="min-w-0 leading-tight">
               <h1 className="truncate text-lg font-semibold text-zinc-50">{tabs.find((t) => t.id === tab)?.label}</h1>
               <p className="text-[12px] text-zinc-500">
@@ -333,17 +333,17 @@ export function OwnerDashboard() {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-4 lg:pb-10">
+        <main className="mx-auto w-full max-w-5xl px-3 pb-28 pt-4 sm:px-4 lg:pb-10">
           {/* RINGKASAN */}
-          <section className={`${show("ringkasan")} flex-col gap-4`}>
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <section className={`${show("ringkasan")} flex-col gap-3 sm:gap-4`}>
+            <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
               {kpis.map((k) => (
                 <div key={k.label} className={glass + " relative overflow-hidden p-4"}>
-                  <p className="text-[12px] text-zinc-400">{k.label}</p>
-                  <p className="mt-1 text-[30px] font-semibold leading-none tabular-nums tracking-tight text-zinc-50 sm:text-[36px]">
+                  <p className="truncate text-[11px] font-medium uppercase tracking-wide text-zinc-500">{k.label}</p>
+                  <p className="mt-1.5 text-[26px] font-semibold leading-none tabular-nums tracking-tight text-zinc-50 sm:text-[30px]">
                     {fmt(k.value)}
                   </p>
-                  <p className="mt-1.5 text-[12px] text-zinc-500">{k.sub}</p>
+                  <p className="mt-1 truncate text-[12px] text-zinc-500">{k.sub}</p>
                   {k.series && k.series.length > 1 ? <Sparkline values={k.series} /> : null}
                 </div>
               ))}
@@ -352,7 +352,7 @@ export function OwnerDashboard() {
               <button
                 type="button"
                 onClick={() => goTab("cek")}
-                className="flex items-center justify-between gap-3 rounded-2xl border border-amber-400/25 bg-amber-400/[0.07] px-4 py-3 text-left"
+                className={`flex items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] px-4 py-3 text-left ${focusRing}`}
               >
                 <span className="text-sm text-amber-100">
                   <span className="font-semibold">{fmt(reviewCount)} judul</span> perlu kamu cek (detector minor)
@@ -432,10 +432,10 @@ export function OwnerDashboard() {
                 </Collapse>
               </Group>
               <Group title="Akun">
-                <Link to="/" className="flex items-center justify-between px-4 py-3.5 text-sm text-zinc-200 hover:bg-white/[0.02]">
+                <Link to="/" className={`flex items-center justify-between px-4 py-3 text-sm text-zinc-200 hover:bg-white/[0.03] ${focusRing}`}>
                   Buka katalog <span className="text-zinc-500">›</span>
                 </Link>
-                <button type="button" onClick={logout} className="flex w-full items-center justify-between px-4 py-3.5 text-left text-sm text-red-300 hover:bg-white/[0.02]">
+                <button type="button" onClick={logout} className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm text-red-300 hover:bg-white/[0.03] ${focusRing}`}>
                   Keluar <span className="text-zinc-500">›</span>
                 </button>
               </Group>
@@ -456,7 +456,7 @@ export function OwnerDashboard() {
               type="button"
               onClick={() => goTab(t.id)}
               aria-current={tab === t.id ? "page" : undefined}
-              className={`relative flex flex-col items-center gap-0.5 py-2.5 text-[11px] ${tab === t.id ? "text-[#5eead4]" : "text-zinc-500"}`}
+              className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] ${focusRing} ${tab === t.id ? "text-[#5eead4]" : "text-zinc-500"}`}
             >
               <span className="text-lg leading-none" aria-hidden="true">{t.icon}</span>
               {t.label}
@@ -483,7 +483,9 @@ const shellStyle: React.CSSProperties = {
   backgroundAttachment: "fixed",
   fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
 };
-const glass = "rounded-2xl border border-white/[0.07] bg-white/[0.03] shadow-[0_1px_0_rgba(255,255,255,0.04)_inset] backdrop-blur-xl";
+// Tanpa backdrop-blur: lebih ringan di HP dan tidak menjebak elemen `fixed` di dalam kartu.
+const glass = "rounded-xl border border-white/[0.07] bg-[#101214] shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]";
+const focusRing = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2dd4bf]";
 
 function Badge({ n }: { n?: number | null }) {
   if (!n) return null;
@@ -512,7 +514,7 @@ function Sparkline({ values }: { values: number[] }) {
 function Group({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="mb-2 px-1 text-[12px] font-medium text-zinc-500">{title}</p>
+      <h2 className="mb-1.5 px-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">{title}</h2>
       <div className={glass + " divide-y divide-white/[0.06] overflow-hidden"}>{children}</div>
     </div>
   );
@@ -520,7 +522,7 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
 
 function StatusRow({ label, ok, text }: { label: string; ok: boolean | null; text: string }) {
   return (
-    <div className="flex items-center justify-between gap-3 px-4 py-3.5 text-sm">
+    <div className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
       <span className="text-zinc-300">{label}</span>
       <span className="flex items-center gap-2 text-zinc-400">
         <span className={`size-2 rounded-full ${ok == null ? "bg-zinc-600" : ok ? "bg-[#2dd4bf]" : "bg-amber-400"}`} />
@@ -530,7 +532,7 @@ function StatusRow({ label, ok, text }: { label: string; ok: boolean | null; tex
   );
 }
 const headBtnPrimary =
-  "whitespace-nowrap rounded-lg border border-[#2dd4bf] bg-[#2dd4bf] px-3 py-1.5 text-[13px] font-medium text-zinc-950 transition hover:bg-[#5eead4] disabled:opacity-50";
+  "whitespace-nowrap rounded-lg border border-[#2dd4bf] bg-[#2dd4bf] px-3 py-1.5 text-[13px] font-medium text-zinc-950 transition hover:bg-[#5eead4] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2dd4bf] disabled:opacity-50";
 
 function Pill({ ok, label }: { ok: boolean | null; label: string }) {
   return (
@@ -570,7 +572,7 @@ function Collapse({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left text-sm font-medium text-zinc-100 transition hover:bg-white/[0.02]"
+        className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium text-zinc-100 transition hover:bg-white/[0.03] ${focusRing}`}
       >
         <span className="flex items-center gap-2.5">
           <span className={`size-2 rounded-full ${accent === "amber" ? "bg-amber-400" : "bg-[#2dd4bf]"}`} aria-hidden="true" />
@@ -690,7 +692,7 @@ function PlayerErrorsSection({
   const ownerHidden = data?.ownerHidden || [];
 
   return (
-    <section id="player-error" className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+    <section id="player-error" className="rounded-xl border border-white/[0.08] bg-[#141416] p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Player error</h2>
         <Button type="button" size="sm" variant="outline" disabled={busy || !secret} onClick={() => void load()}>
