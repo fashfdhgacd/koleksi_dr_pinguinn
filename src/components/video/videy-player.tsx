@@ -10,7 +10,7 @@ import { loadVast, ping, prerollDue, VAST_TIMEOUT_MS, type VastAd } from "@/comp
  *
  * Pre-roll (videy-preroll.ts, TrafficStars VAST spot 5210886): on about every 2nd Videy play the
  * play tap first fetches the VAST (3.5 s budget) and plays the ad mp4 in the same <video>, with our
- * own Skip button after 5 s (or the VAST skipoffset if shorter); only the "Kunjungi iklan" button opens ClickThrough (a tap on the video does nothing).
+ * own Skip button after 5 s (or the VAST skipoffset if shorter); only the small corner "Info" button opens ClickThrough (a tap on the video does nothing).
  * No fill, error, timeout or an ad that does not start within 4 s goes straight to the film.
  * Counters (player-log, once per video per session): pre_req / pre_fill / pre_done (played to the end)
  * / pre_skip (Skip tapped).
@@ -442,16 +442,17 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
               >
                 Suara
               </button>
-              {adRef.current.ad.clickThrough ? (
-                <button
-                  type="button"
-                  onClick={adClick}
-                  className="rounded-md border border-white/30 bg-black/75 px-3 py-1.5 text-xs text-white"
-                >
-                  Kunjungi iklan ↗
-                </button>
-              ) : null}
             </div>
+          ) : null}
+          {adRef.current?.ad.clickThrough ? (
+            <button
+              type="button"
+              onClick={adClick}
+              aria-label="Info iklan"
+              className="absolute bottom-3 left-2 rounded bg-black/40 px-1.5 py-0.5 text-[10px] leading-tight text-white/70"
+            >
+              Info
+            </button>
           ) : null}
           {skipIn !== null ? (
             <button
