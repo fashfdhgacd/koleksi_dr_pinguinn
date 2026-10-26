@@ -1,3 +1,4 @@
+import { chunkFileName, feedBase, indexFileName } from "../catalog/chunk-contract.js";
 const Y = 85e4,
   X = {
     "videos.json": "videos-latest.json",
@@ -35,16 +36,15 @@ function H(t) {
 function L(t, e) {
   return `${t}/${e}`.replace(/\/+/g, "/");
 }
+// Chunk naming is shared with the site loader and build guard (src/lib/catalog/chunk-contract.js).
 function O(t) {
-  return String(t)
-    .replace(/\.json$/i, "")
-    .replace(/-p\d+$/i, "");
+  return feedBase(t);
 }
 function I(t) {
-  return `${O(t)}-index.json`;
+  return indexFileName(t);
 }
 function j(t, e) {
-  return e <= 1 ? `${t}.json` : `${t}-p${String(e).padStart(2, "0")}.json`;
+  return chunkFileName(t, e);
 }
 function V(t) {
   return X[t] || t;
@@ -119,7 +119,8 @@ async function S(t, e) {
     const l = JSON.parse(i || "[]");
     c = Array.isArray(l) ? l : [];
   } catch {
-    c = [];
+    // A corrupt chunk must not read as empty: the caller would rewrite it and lose videos.
+    return { ok: !1, items: [], sha: null, reason: `invalid_json ${e}` };
   }
   return { ok: !0, items: c, sha: s.body?.sha || null, missing: !1 };
 }
@@ -189,6 +190,14 @@ async function T(t, e, n, s, blind409 = !1) {
     throw new Error(`GitHub PUT ${e} ${b.status}: ${d.slice(0, 250)}`);
   }
   return { skipped: !1, path: r, bytes: Buffer.byteLength(g, "utf8") };
+}
+// Never commit an index that points at a chunk which is not on GitHub (site would miss it).
+async function writeIndex(t, e, parts, sha) {
+  for (const part of parts) {
+    const r = await S(t, part);
+    if (!r.ok || r.missing) throw new Error(`index_part_missing ${part}: ${r.reason || "404"}`);
+  }
+  return T(t, I(e), parts, sha);
 }
 async function M(t, e) {
   const n = I(e),
@@ -344,10 +353,10 @@ async function upsertVideosBatchOnce(t, e, n) {
         (J = JSON.stringify(m, null, 2) + "\n"),
         await T(t, p, m, k.sha));
       const C = [p, o, ...r.slice(1).filter((E) => E !== o && E !== p)];
-      (await T(t, I(e), C, u.missing ? null : u.sha), (R = o));
+      (await writeIndex(t, e, C, u.missing ? null : u.sha), (R = o));
     } else if ((await T(t, p, m, k.sha), u.missing || u.parts[0] !== p)) {
       const a = [p, ...r.filter((o) => o !== p)];
-      await T(t, I(e), a, u.missing ? null : u.sha);
+      await writeIndex(t, e, a, u.missing ? null : u.sha);
     }
   } catch (a) {
     if (a && a.conflict) throw a;
