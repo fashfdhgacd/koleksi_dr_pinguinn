@@ -17,7 +17,7 @@ interface SitemapEvent {
 /** Small child sitemaps (≤1000 URLs) so Google fetches/processes each quickly. */
 const WATCH_CHUNK = 1_000;
 
-const LEGAL_PATHS = ["/syarat", "/privasi", "/2257", "/dmca", "/kontak"] as const;
+const LEGAL_PATHS = ["/tentang", "/syarat", "/privasi", "/2257", "/dmca", "/kontak"] as const;
 
 function escapeXml(s: string): string {
   return s
