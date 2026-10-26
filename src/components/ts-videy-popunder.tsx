@@ -1,30 +1,61 @@
-// Videy player popunder: the Videy player (videy-player.tsx, our own HTML5 player) calls popTap()
-// synchronously in a tap handler (poster tap, or the re-armed tap layer during playback). The cap
-// (POP_MAX_PER_VIDEO per video, POP_MIN_GAP_MS between pops) lives in card-popunder.ts and is shared
-// with the catalog cards and the watch-page tap layer. Opened -> the tap does nothing else (next tap
-// plays); blocked -> the next tap retries, and after 2 blocked tries per video the tap plays so
-// ad-blocker visitors are never stuck.
+// TrafficStars popunder (spot 5210859) for Videy watch pages only; used by videy-player.tsx, which
+// only renders for Videy items (never IndoAV / UserBokep / Putarin or catalog pages).
+// The Videy player's own tap-catcher overlay (our page, not an iframe) calls popTap() synchronously
+// in its click handler: window.open(direct link) in that user gesture. Opened (non-null) -> video
+// marked done for this session (and the site-wide one-per-session flag is set), the tap does nothing else (video stays paused, our tab stays);
+// blocked -> the overlay stays and the next tap retries; after 2 blocked tries the tap plays.
 // Counters (player-log, once per video per session): pop_fire / pop_ok / pop_block.
 import { sendPlayerLog } from "@/lib/player-log-client";
-import { canPop, firePop } from "@/components/card-popunder";
+import { markPopDoneThisSession, popDoneThisSession } from "@/components/card-popunder";
 
+const DIRECT_LINK = "https://fozekikikiminu.com/api/v1/direct/587547ff73c844b39ab9f02d1285154b";
+const KEY = "kdp_ts_pop_ids";
 const MAX_FAILS = 2;
+let memory: string[] = [];
 const failures = new Map<string, number>();
 
-/** True while a tap on this video should go to the ad first. */
+function firedIds(): string[] {
+  try {
+    const raw = sessionStorage.getItem(KEY);
+    return raw ? (JSON.parse(raw) as string[]) : memory;
+  } catch {
+    return memory;
+  }
+}
+
+function saveIds(ids: string[]): void {
+  memory = ids;
+  try {
+    sessionStorage.setItem(KEY, JSON.stringify(ids.slice(-200)));
+  } catch {
+    /* storage blocked: in-memory only */
+  }
+}
+
+/** True while this video still owes its ad (the tap-catcher stays in charge of the first tap). */
 export function owesAd(videoId: string): boolean {
-  return canPop(videoId) && (failures.get(videoId) || 0) < MAX_FAILS;
+  if (typeof window === "undefined" || !videoId) return false;
+  if (popDoneThisSession()) return false; // one popunder per session site-wide
+  return !firedIds().includes(videoId) && (failures.get(videoId) || 0) < MAX_FAILS;
 }
 
 /**
- * Call synchronously from the tap handler. Returns true when this tap was used for the ad (the
- * caller must NOT play), false when it should play.
+ * Call synchronously from the overlay's click handler. Returns true when this tap was used for the
+ * ad (the caller must NOT play), false when it should play.
  */
 export function popTap(videoId: string): boolean {
   if (!owesAd(videoId)) return false;
   sendPlayerLog(videoId, "Videy", "pop_fire");
-  const r = firePop(videoId);
-  if (r === "ok") {
+  let w: Window | null = null;
+  try {
+    w = window.open(DIRECT_LINK, "_blank");
+    if (w) w.opener = null; // the ad tab cannot reach back into this page
+  } catch {
+    w = null;
+  }
+  if (w) {
+    saveIds(firedIds().concat(videoId));
+    markPopDoneThisSession();
     sendPlayerLog(videoId, "Videy", "pop_ok");
     return true;
   }
