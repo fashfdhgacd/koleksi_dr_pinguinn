@@ -295,6 +295,11 @@ export function parseMessage(text = "") {
   }
   // Tag #aigay (or #ai-gay / #ai_gay) anywhere in the message = category AI GAY (/kategori/ai-gay).
   if (!category && /(?:^|\s)#ai[-_]?gay\b/i.test(text)) category = "ai-gay";
+  // Same for the 2026-10-26 SEO categories: #blunder, #kelasbintang, #tiktok, ... (first one wins).
+  if (!category) {
+    const m = /(?:^|\s)#(blunder|kelas[-_]?bintang|tiktok|mantan|vcs|kompilasi|tetangga|kacamata|kantor|anal|cantik)\b/i.exec(text);
+    if (m) category = m[1].toLowerCase().replace(/^kelas[-_]?bintang$/, "kelas-bintang");
+  }
 
   const urls = extractUrls(text);
   const videos = [];

@@ -1,6 +1,6 @@
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
-import { CATEGORY_LIST, MIN_INDEXED_CATEGORY_COUNT, MIN_LISTED_CATEGORY_COUNT, findCategory } from "./categories";
+import { CATEGORY_LIST, MIN_LISTED_CATEGORY_COUNT, SEO_MIN_COUNT, findCategory } from "./categories";
 import deadSources from "./dead-sources.json";
 import type { CategoryInfo } from "./types";
 import {
@@ -280,7 +280,8 @@ function listedSlugs(cache: CatalogCache): Set<string> {
   for (const c of CATEGORY_LIST) {
     if (!cache.bySlug.get(c.slug)?.length) continue;
     const n = categoryPool(cache, c.slug).length;
-    if (n >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && n > 0)) set.add(c.slug);
+    const seoMin = SEO_MIN_COUNT[c.slug];
+    if (seoMin ? n >= seoMin : n >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && n > 0)) set.add(c.slug);
   }
   listedMemo.set(cache, set);
   return set;
@@ -385,9 +386,9 @@ export async function terbaruCoverSource(): Promise<RawItem[]> {
 
 /**
  * Public category list with live counts; categories with fewer than
- * MIN_LISTED_CATEGORY_COUNT videos are left out (their pages still work). AI GAY (new 2026-10-26) is
- * always on /kategori; in the sitemap only from MIN_INDEXED_CATEGORY_COUNT videos (until then its
- * page is noindex). Each entry carries its unique cover (categoryCovers).
+ * MIN_LISTED_CATEGORY_COUNT videos are left out (their pages still work). The 2026-10-26 SEO
+ * categories (SEO_MIN_COUNT) are listed and in the sitemap from their own count, AI GAY is always on
+ * /kategori but in the sitemap only from its count (below it every such page is noindex). Each entry carries its unique cover (categoryCovers).
  */
 export async function listListedCategories(
   opts: { sitemap?: boolean; specials?: SpecialCoverSource[]; specialOut?: CategoryInfo[] } = {},
@@ -399,8 +400,11 @@ export async function listListedCategories(
     // Only known category slugs with videos: no fallback scan for empty ones.
     const count = cache.bySlug.get(c.slug)?.length ? categoryPool(cache, c.slug).length : 0;
     // Videy is listed from its first video; other categories need MIN_LISTED_CATEGORY_COUNT.
-    const aiGay = c.slug === "ai-gay" && (!opts.sitemap || count >= MIN_INDEXED_CATEGORY_COUNT);
-    if (count >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && count > 0) || aiGay) {
+    const seoMin = SEO_MIN_COUNT[c.slug];
+    const listed = seoMin
+      ? count >= seoMin || (c.slug === "ai-gay" && !opts.sitemap)
+      : count >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && count > 0);
+    if (listed) {
       out.push({ slug: c.slug, label: c.label, count });
     }
   }
