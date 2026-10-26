@@ -32,7 +32,7 @@ function writeConsent() {
 
 function registerPosterSw() {
   if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
-  void navigator.serviceWorker.register("/sw-posters.js", { scope: "/" }).catch(() => {});
+  void navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
 }
 
 export function AgeGate({ children }: { children: ReactNode }) {
