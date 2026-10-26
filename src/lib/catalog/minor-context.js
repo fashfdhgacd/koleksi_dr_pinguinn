@@ -166,3 +166,40 @@ export function explainTitle(title = "", ownerVerdict = "") {
         : d.reason;
   return { status, assessment, contextVerdict: d.verdict, reason, signals: d.signals, score: d.score };
 }
+
+/**
+ * Isyarat sekolah tambahan (2026-10-26, keputusan pemilik): TIDAK mengunci, hanya memasukkan judul ke
+ * kotak "Perlu dicek" (review_pending). Judul dengan penanda dewasa eksplisit tidak pernah ditandai.
+ */
+const SCHOOL_REVIEW_CUES = /** @type {Array<[RegExp, string]>} */ ([
+  [/\b(?:abg|abege|masih|bocil|dedek|adek)\b[^.]{0,30}\bseragam\b/, "kata muda + seragam"],
+  [/\bseragam\b[^.]{0,20}\b(?:abg|sekolah|smp|sma|smk|putih abu|pramuka)\b/, "seragam + sekolah"],
+  [/\b(?:dalam|di) (?:ruang )?kelas\b/, "di/dalam kelas"],
+]);
+const ADULT_MARKERS =
+  /\b(?:1[89]|[2-9]\d)\s*(?:yo|y o|thn|tahun|th)\b|\b(?:1[89]|[2-9]\d)\s*\+|\b[2-9]0\s*an\b|\b(?:dewasa|mahasiswi|mahasiswa|kuliah|kampus|college|university|universitas)\b/;
+
+/**
+ * @param {string} title
+ * @returns {string} label isyarat ("" kalau tidak ada / ada penanda dewasa)
+ */
+export function schoolReviewCue(title = "") {
+  const t = String(title || "").toLowerCase().replace(/\*{2,}/g, " ");
+  if (!t.trim() || ADULT_MARKERS.test(t)) return "";
+  for (const [re, label] of SCHOOL_REVIEW_CUES) if (re.test(t)) return label;
+  return "";
+}
+
+/**
+ * Pemilik (2026-10-26): judul bertanda umur 18 ("18+", "18yo", atau "18" berdiri sendiri sebagai umur)
+ * sudah dicek pemilik, jadi tidak masuk antrean "Perlu dicek" dan tidak ditahan saat upload.
+ * TIDAK membuka kunci: verdict "minor" / kunci minor-lock.js / HIDDEN_IDS tetap berlaku.
+ * Tidak cocok dengan 1080/180/18:30/18.5/18cm/18 menit dll.
+ */
+const AGE18 =
+  /(?:^|[^\p{L}\p{N}.,:\-])18(?:\s*\+|\s*(?:yo|y\.o\.?|thn|tahun|th)\b|(?![\p{L}\p{N}.,:]|\s*(?:cm|mm|menit|min|jam|detik|ribu|rb|juta|k|p|fps|gb|mb)\b))/iu;
+
+/** @param {string} title */
+export function ownerChecked18(title = "") {
+  return AGE18.test(String(title || ""));
+}

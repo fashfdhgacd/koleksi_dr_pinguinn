@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 /** Kategori tambahan yang boleh dipilih di /pemilik (urutan dari pemilik). Slug = src/lib/catalog/categories.ts. */
 export const EXTRA_CHOICES: { slug: string; label: string }[] = [
@@ -123,7 +124,7 @@ export function OwnerEditSheet({
     setErr("");
     setExtra((cur) => {
       if (cur.includes(slug)) return cur.filter((s) => s !== slug);
-      if (cur.length >= MAX_EXTRA) {
+      if (cur.filter((x) => x !== mainCat).length >= MAX_EXTRA) {
         setErr(`Maksimal ${MAX_EXTRA} kategori tambahan.`);
         return cur;
       }
@@ -155,89 +156,99 @@ export function OwnerEditSheet({
     onSaved({ title: d.title || t || initialTitle, extra: d.extra || extra, verdict: v });
   }
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center" onClick={onClose}>
+  const nExtra = extra.filter((x) => x !== mainCat).length;
+  const node = (
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:p-4" onClick={onClose}>
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Edit video"
-        className="max-h-[88dvh] w-full max-w-lg overflow-y-auto rounded-t-3xl border border-white/[0.08] bg-[#121416]/95 p-5 shadow-2xl shadow-black/60 sm:rounded-3xl"
+        className="max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-white/[0.08] bg-[#121416] p-4 shadow-2xl shadow-black/60 sm:rounded-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden="true" />
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-white/15 sm:hidden" aria-hidden="true" />
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-base font-semibold text-zinc-50">Edit video</h3>
+          <h3 className="text-sm font-semibold text-zinc-50">
+            Edit video <span className="ml-1 text-[11px] font-normal text-zinc-500">ID {id}</span>
+          </h3>
           <button type="button" onClick={onClose} className="rounded-full px-2 text-zinc-400 hover:text-zinc-100" aria-label="Tutup">
             ✕
           </button>
         </div>
-        <p className="mt-0.5 text-[12px] text-zinc-500">ID {id}</p>
 
-        <label className="mt-4 block text-[13px] font-medium text-zinc-300" htmlFor="edit-title">
+        <label className="mt-3 block text-[12px] font-medium text-zinc-400" htmlFor="edit-title">
           Judul
         </label>
-        <textarea
+        <input
           id="edit-title"
-          rows={2}
+          type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="mt-1.5 w-full resize-none rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2.5 text-sm text-zinc-100 focus:border-[#2dd4bf]/60 focus:outline-none"
+          className="mt-1 w-full rounded-lg border border-white/[0.08] bg-black/30 px-2.5 py-1.5 text-sm text-zinc-100 focus:border-[#2dd4bf]/60 focus:outline-none"
         />
 
-        <div className="mt-4 flex items-baseline justify-between gap-2">
-          <p className="text-[13px] font-medium text-zinc-300">Tampil juga di kategori (opsional, maks. 6)</p>
-          <span className={`text-[12px] tabular-nums ${extra.length >= MAX_EXTRA ? "text-amber-300" : "text-zinc-500"}`}>
-            {extra.length}/{MAX_EXTRA}
+        <div className="mt-3 flex items-baseline justify-between gap-2">
+          <p className="text-[12px] font-medium text-zinc-400">Tampil juga di kategori (maks. {MAX_EXTRA})</p>
+          <span className={`text-[11px] tabular-nums ${nExtra >= MAX_EXTRA ? "text-amber-300" : "text-zinc-500"}`}>
+            {nExtra}/{MAX_EXTRA}
           </span>
         </div>
-        {orig == null ? <p className="mt-2 text-[12px] text-zinc-500">Memuat kategori tersimpan…</p> : null}
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        {orig == null ? <p className="mt-1 text-[11px] text-zinc-500">Memuat kategori tersimpan…</p> : null}
+        <div className="mt-1.5 flex flex-wrap gap-1">
           {EXTRA_CHOICES.map((c) => {
-            const on = extra.includes(c.slug);
-            const full = !on && extra.length >= MAX_EXTRA;
+            const main = c.slug === mainCat;
+            const on = main || extra.includes(c.slug);
+            const full = !on && nExtra >= MAX_EXTRA;
             return (
               <button
                 key={c.slug}
                 type="button"
                 aria-pressed={on}
-                disabled={orig == null || full || c.slug === mainCat}
-                onClick={() => toggle(c.slug)}
-                className={`rounded-full border px-3 py-1.5 text-[13px] transition disabled:opacity-35 ${
-                  on
+                title={main ? "Kategori utama" : undefined}
+                disabled={orig == null || full}
+                onClick={() => {
+                  if (!main) toggle(c.slug);
+                }}
+                className={`rounded-full border px-2.5 py-1 text-[12px] leading-tight transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#2dd4bf] disabled:opacity-35 ${
+                  main
+                    ? "cursor-default border-[#2dd4bf]/60 bg-[#2dd4bf]/15 font-medium text-[#5eead4]"
+                    : on
                     ? "border-[#2dd4bf] bg-[#2dd4bf] font-medium text-zinc-950"
                     : "border-white/[0.1] bg-white/[0.03] text-zinc-300 hover:border-[#2dd4bf]/50"
                 }`}
               >
-                {c.label}
+                {main ? `${c.label} · utama` : c.label}
               </button>
             );
           })}
         </div>
 
-        {err ? <p className="mt-3 text-[13px] text-red-400">{err}</p> : null}
+        {err ? <p className="mt-2 text-[12px] text-red-400">{err}</p> : null}
         {verdict ? (
-          <p className="mt-3 rounded-xl border border-white/[0.08] bg-black/30 px-3 py-2 text-[13px] text-zinc-200">
+          <p className="mt-2 rounded-lg border border-white/[0.08] bg-black/30 px-2.5 py-1.5 text-[12px] text-zinc-200">
             Tersimpan. Detector sekarang: <span className="font-medium text-amber-200">{verdictText(verdict)}</span>
           </p>
         ) : null}
-        <p className="mt-3 text-[12px] text-zinc-500">
+        <p className="mt-2 text-[11px] leading-snug text-zinc-500">
           Edit judul tidak pernah membuka video yang terkunci. Perubahan tampil di situs dalam ±1 menit.
         </p>
 
-        <div className="mt-4 flex gap-2">
+        <div className="mt-3 flex gap-2">
           <button
             type="button"
             disabled={busy}
             onClick={() => void save()}
-            className="flex-1 rounded-xl bg-[#2dd4bf] px-4 py-2.5 text-sm font-semibold text-zinc-950 disabled:opacity-50"
+            className="flex-1 rounded-lg bg-[#2dd4bf] px-3 py-2 text-sm font-semibold text-zinc-950 disabled:opacity-50"
           >
             {busy ? "Menyimpan…" : "Simpan"}
           </button>
-          <button type="button" onClick={onClose} className="rounded-xl border border-white/[0.1] px-4 py-2.5 text-sm text-zinc-200">
+          <button type="button" onClick={onClose} className="rounded-lg border border-white/[0.1] px-3 py-2 text-sm text-zinc-200">
             Tutup
           </button>
         </div>
       </div>
     </div>
   );
+  // Portal ke <body>: kartu induk memakai backdrop-blur, sehingga `fixed` menempel ke kartu, bukan ke layar.
+  return typeof document === "undefined" ? node : createPortal(node, document.body);
 }
