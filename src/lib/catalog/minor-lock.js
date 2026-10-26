@@ -17,6 +17,7 @@
  * "sama"), loose "kecil"/"muda"/"abege" phrases, and adult incest wording (mother/aunt).
  */
 import { isJavGenreTitle, minorContentReason, reviewPriority } from "./hidden-ids.js";
+import { isMinorContentTitle } from "./minor-detector.js";
 
 /** Reasons from hidden-ids.js that count as a clear school/minor theme. */
 const CLEAR_REASONS = new Set([
@@ -66,6 +67,8 @@ function joinSpelled(t) {
 export function lockedMinorReason(title = "") {
   const raw = lower(title);
   if (!raw.trim()) return "";
+  // Owner-supplied detector (minor-detector.js): "minor" = block. Additive: rules below still run.
+  if (isMinorContentTitle(title)) return "locked:minor-detector";
   // Strip the "***" censor so the explicit words decide (not the weak masked-term rule).
   const unmasked = raw.replace(/\*{2,}/g, " ");
   for (const text of [unmasked, joinSpelled(unmasked)]) {
