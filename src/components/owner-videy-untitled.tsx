@@ -77,7 +77,7 @@ export function OwnerVideyUntitled({ secret }: { secret: string }) {
       setRows(d.items || []);
       setNoThumb(Array.isArray(d.noThumb) ? d.noThumb : []);
     } catch {
-      setLoadError("Jaringan error.");
+      setLoadError("Koneksi bermasalah, coba lagi.");
     }
   }, [secret]);
 
@@ -106,7 +106,7 @@ export function OwnerVideyUntitled({ secret }: { secret: string }) {
       }
       setDone((s) => ({ ...s, [id]: d.title || title }));
     } catch {
-      setErrors((e) => ({ ...e, [id]: "Jaringan error." }));
+      setErrors((e) => ({ ...e, [id]: "Koneksi bermasalah, coba lagi." }));
     } finally {
       setBusy(null);
     }
@@ -153,7 +153,7 @@ export function OwnerVideyUntitled({ secret }: { secret: string }) {
       {expanded ? (
       <div className="border-t border-white/[0.06] p-2 sm:p-3">
       {loadError ? <p className="mt-1 text-sm text-amber-400">{loadError}</p> : null}
-      {rows == null && !loadError ? <p className="mt-3 text-sm text-zinc-500">...</p> : null}
+      {rows == null && !loadError ? <p className="mt-3 text-sm text-zinc-500">Memuat…</p> : null}
       <div className="mt-3">
         {(rows || []).map((r) => (
           <div

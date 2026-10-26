@@ -44,7 +44,7 @@ export function OwnerTools({ secret, part = "main" }: { secret: string; part?: "
       setShareText(data.text || "");
       setShareNote(`${data.count || 0} link${data.reset ? " · pool hari ini habis, mulai ulang" : ""}`);
     } catch {
-      setShareNote("Jaringan error.");
+      setShareNote("Koneksi bermasalah.");
     } finally {
       setShareBusy(false);
     }
@@ -82,7 +82,7 @@ export function OwnerTools({ secret, part = "main" }: { secret: string; part?: "
       setUploadNote(data.text || "Selesai.");
       setUploadText("");
     } catch {
-      setUploadNote("Jaringan error.");
+      setUploadNote("Koneksi bermasalah.");
     } finally {
       setUploadBusy(false);
     }
@@ -115,7 +115,7 @@ export function OwnerTools({ secret, part = "main" }: { secret: string; part?: "
       setPosterNote(data.text || "Tersimpan.");
       setPosterUrl("");
     } catch {
-      setPosterNote("Jaringan error.");
+      setPosterNote("Koneksi bermasalah.");
     } finally {
       setPosterBusy(false);
     }
@@ -143,7 +143,7 @@ export function OwnerTools({ secret, part = "main" }: { secret: string; part?: "
       }
       setPosterNote(data.text || `Selesai. ${data.filled || 0}/${data.checked || 0} terisi.`);
     } catch {
-      setPosterNote("Jaringan error.");
+      setPosterNote("Koneksi bermasalah.");
     } finally {
       setPosterBusy(false);
     }
