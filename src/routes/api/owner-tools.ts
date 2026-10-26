@@ -24,8 +24,7 @@ import rankMeta from "@/lib/catalog/rank-periods-meta.json";
 import latestPosters from "../../../data/latest-posters.json";
 import thumbsDeploy from "../../../data/.thumbs-deploy.json";
 import { findCategory } from "@/lib/catalog/categories";
-import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
-import { isLockedMinorId, lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import { isLockedMinorId, lockedMinorReason, ownerEditBlockReason } from "@/lib/catalog/minor-lock.js";
 import { reviewPriority as detectorPriority, minorContentReason as ownerDetectorReason } from "@/lib/catalog/minor-detector.js";
 import { explainTitle } from "@/lib/catalog/minor-context.js";
 import itemOverrides from "@/lib/catalog/overrides.json";
@@ -583,7 +582,7 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
   // Locked/hidden items may be edited (metadata correction), but an edit never unhides: local-cache.ts
   // checks the stored title as well as the edit, so the item stays hidden. A new title must not carry
   // a school/minor theme.
-  if (title && (lockedMinorReason(title) || minorContentReason(title) || detectorPriority("", title) === "block")) {
+  if (title && ownerEditBlockReason(title)) {
     return json({ ok: false, error: "Judul ditolak: bertema sekolah/di bawah umur." }, 403);
   }
 

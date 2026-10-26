@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { applyUnhidden, hiddenReasonRaw, loadItemsRaw } from "@/lib/catalog/local-cache";
 import { isVidey, type RawItem } from "@/lib/catalog/local-shared";
-import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
-import { isLockedMinorId, lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import { isLockedMinorId, lockedMinorReason, ownerEditBlockReason } from "@/lib/catalog/minor-lock.js";
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
@@ -100,7 +99,7 @@ async function saveTitle(body: { id?: unknown; title?: unknown }) {
   // Minor-lock, same rules as owner-tools.ts handleEditVideo.
   if (isLockedItem(item)) return json({ ok: false, error: "Video ini terkunci (minor-lock), tidak bisa diedit." }, 403);
   if (hiddenReasonRaw(item)) return json({ ok: false, error: "Video ini ditandai/tersembunyi, tidak bisa diedit." }, 403);
-  if (lockedMinorReason(typed) || minorContentReason(typed) || lockedMinorReason(title) || minorContentReason(title)) {
+  if (ownerEditBlockReason(typed) || ownerEditBlockReason(title)) {
     return json({ ok: false, error: "Judul ditolak: bertema sekolah/di bawah umur." }, 403);
   }
 

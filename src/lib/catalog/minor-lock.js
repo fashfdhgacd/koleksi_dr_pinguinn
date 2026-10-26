@@ -17,7 +17,48 @@
  * "sama"), loose "kecil"/"muda"/"abege" phrases, and adult incest wording (mother/aunt).
  */
 import { isJavGenreTitle, minorContentReason, reviewPriority } from "./hidden-ids.js";
-import { isMinorContentTitle } from "./minor-detector.js";
+import { isMinorContentTitle, reviewPriority as detectorPriority } from "./minor-detector.js";
+
+/**
+ * Adult age marker (owner exception 2026-10-26): "18yo", "18 yo", "18+", "19yo", "19+", "20 tahun"...
+ * A bare number after Eps/Episode/Part/Vol/Ep/Chapter is NOT an age.
+ */
+const ADULT_AGE = /(?<!\b(?:eps?|episode|part|pt|vol|volume|chapter|ch|no|bagian|seri)\.?\s?)\b(?:1[89]|[2-9]\d)\s?(?:yo|y\.o|years?\s?old|tahun|thn|th)\b|(?<!\b(?:eps?|episode|part|pt|vol|volume|chapter|ch|no|bagian|seri)\.?\s?)\b(?:1[89]|[2-9]\d)\s?\+/;
+
+/** @param {string} title */
+export function hasAdultAgeMarker(title = "") {
+  return ADULT_AGE.test(String(title || "").toLowerCase());
+}
+
+/**
+ * hidden-ids.js reason, except a "school-uniform" hit on a title with an adult age marker is
+ * re-checked without the uniform word: any other rule still decides; otherwise "" (review only).
+ * @param {string} text
+ */
+function schoolReason(text) {
+  const reason = minorContentReason(text);
+  if (reason === "school-uniform" && hasAdultAgeMarker(text)) {
+    return minorContentReason(text.replace(/\bseragam\b/g, " "));
+  }
+  return reason;
+}
+
+/**
+ * Single check for owner title edits (owner-tools.ts edit-video, owner-videy.ts): rejected when the
+ * hard lock, the hidden-ids school/minor rules (with the adult-age uniform exception) or the owner
+ * detector "block" fires.
+ * @param {string} title
+ * @returns {string} "" when allowed, otherwise the reason
+ */
+export function ownerEditBlockReason(title = "") {
+  if (!String(title || "").trim()) return "";
+  const locked = lockedMinorReason(title);
+  if (locked) return locked;
+  const r = schoolReason(lower(title));
+  if (r) return r;
+  if (detectorPriority("", title) === "block") return "detector-block";
+  return "";
+}
 
 /** Reasons from hidden-ids.js that count as a clear school/minor theme. */
 const CLEAR_REASONS = new Set([
@@ -72,7 +113,7 @@ export function lockedMinorReason(title = "") {
   // Strip the "***" censor so the explicit words decide (not the weak masked-term rule).
   const unmasked = raw.replace(/\*{2,}/g, " ");
   for (const text of [unmasked, joinSpelled(unmasked)]) {
-    const reason = minorContentReason(text);
+    const reason = schoolReason(text);
     if (reason && CLEAR_REASONS.has(reason) && reviewPriority(reason, text) === "clear") {
       if (reason === "incest-child" && ADULT_INCEST_ONLY.test(text) && !CHILD_CUE.test(text)) continue;
       return `locked:${reason}`;
