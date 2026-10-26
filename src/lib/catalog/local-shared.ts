@@ -1,6 +1,6 @@
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
-import { LEGACY_CATEGORY_SLUGS, findCategory } from "./categories";
+import { LEGACY_CATEGORY_SLUGS, SEO_MIN_COUNT, findCategory } from "./categories";
 import {
   EXTRA_CATEGORY_RULES,
   GENERIC_CATEGORY_SLUGS,
@@ -273,7 +273,10 @@ function slugOfRaw(item: RawItem): string {
   const raw = (item.category || "").toLowerCase().trim();
   const title = item.title || "";
   // An explicit AI GAY upload (#aigay / "kategori: ai gay") wins over the host default.
-  if (raw && findCategory(raw)?.slug === "ai-gay") return "ai-gay";
+  // Same for the 2026-10-26 SEO categories (#blunder, "kategori: kelas bintang", ...). No stored
+  // category of a live video names one of them, so no live video moves.
+  const seo = raw ? findCategory(raw)?.slug : undefined;
+  if (seo && seo in SEO_MIN_COUNT) return seo;
   if (isPutarin(item)) return "jav";
   if (isStreamtape(item)) return "ai-plus";
   // Explicit source/bot category naming one of the newer categories (bule, bumil, tobrut, ...).

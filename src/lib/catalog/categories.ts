@@ -38,6 +38,17 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "crot-dalam", label: "Crot Dalam", query: "crot-dalam" },
   { slug: "hamil", label: "Hamil", query: "hamil" },
   { slug: "ojol", label: "Ojol", query: "ojol" },
+  { slug: "blunder", label: "Blunder", query: "blunder" },
+  { slug: "kelas-bintang", label: "Kelas Bintang", query: "kelas-bintang" },
+  { slug: "tiktok", label: "TikTok", query: "tiktok" },
+  { slug: "mantan", label: "Mantan", query: "mantan" },
+  { slug: "vcs", label: "VCS", query: "vcs" },
+  { slug: "kompilasi", label: "Kompilasi", query: "kompilasi" },
+  { slug: "tetangga", label: "Tetangga", query: "tetangga" },
+  { slug: "kacamata", label: "Kacamata", query: "kacamata" },
+  { slug: "kantor", label: "Kantor", query: "kantor" },
+  { slug: "anal", label: "Anal", query: "anal" },
+  { slug: "cantik", label: "Cewek Cantik", query: "cantik" },
   { slug: "lainnya", label: "Lainnya", query: "lainnya" },
   { slug: "videy", label: "drpinguin videy", query: "videy" },
   // Owner's own LuluStream / DoodStream / Byse uploads (src/lib/catalog/drp-hosts.js).
@@ -63,6 +74,48 @@ export const MIN_LISTED_CATEGORY_COUNT = 20;
 
 /** A category page with fewer videos than this is noindex,follow (thin page), indexable automatically after. */
 export const MIN_INDEXED_CATEGORY_COUNT = 5;
+
+/**
+ * SEO categories added 2026-10-26 (from Search Console queries + title word counts). Each is listed
+ * on /kategori, in the sitemap and on watch chips only from its count (AI GAY: always on /kategori);
+ * below it the page is noindex,follow. Members come from title rules (additive, title-tags.ts) or
+ * an explicit upload category; a live video's main category never changes.
+ */
+export const SEO_MIN_COUNT: Record<string, number> = {
+  "ai-gay": MIN_INDEXED_CATEGORY_COUNT,
+  "blunder": 8,
+  "kelas-bintang": 8,
+  "tiktok": 8,
+  "mantan": 8,
+  "vcs": 8,
+  "kompilasi": 8,
+  "tetangga": 8,
+  "kacamata": 8,
+  "kantor": 8,
+  "anal": 8,
+  "cantik": 8,
+};
+
+/** Fewest videos for a category page to be indexable (1 = any non-empty page). */
+export function minIndexedCount(slug: string | null | undefined): number {
+  return (slug && SEO_MIN_COUNT[slug]) || 1;
+}
+
+/** Upload hashtags (#aigay, #kelasbintang, ...) per category slug; see src/lib/bot/parse.js. */
+export const HASHTAG_CATEGORY: Record<string, string> = {
+  aigay: "ai-gay",
+  "blunder": "blunder",
+  "kelasbintang": "kelas-bintang",
+  "tiktok": "tiktok",
+  "mantan": "mantan",
+  "vcs": "vcs",
+  "kompilasi": "kompilasi",
+  "tetangga": "tetangga",
+  "kacamata": "kacamata",
+  "kantor": "kantor",
+  "anal": "anal",
+  "cantik": "cantik",
+};
 
 /** Chip utama di header; sisanya di menu "Lainnya". */
 export const PRIMARY_CATEGORY_SLUGS = [
@@ -104,6 +157,8 @@ export function findCategory(slug: string | null | undefined): CategoryDef | und
   if (key === "streamtape" || key === "streampie") {
     return CATEGORIES.find((c) => c.slug === "ai-plus");
   }
+  const tag = HASHTAG_CATEGORY[key.replace(/^#/, "").replace(/[-_ ]/g, "")];
+  if (tag) return CATEGORIES.find((c) => c.slug === tag);
   const legacy = LEGACY_CATEGORY_SLUGS[key];
   if (legacy) return CATEGORIES.find((c) => c.slug === legacy);
   return CATEGORIES.find((c) => c.slug === key);
