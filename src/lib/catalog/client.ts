@@ -10,6 +10,15 @@ export type ClientQuery = {
   id?: string;
 };
 
+/**
+ * Response-shape version, sent as `v` on every /api/data request (the route ignores it). Browsers keep
+ * /api/data responses for up to an hour (categories), across deploys, so a client that cached the
+ * /kategori list before covers existed (2026-10-26, #69/#71) kept drawing the penguin poster on every
+ * card after a client-side navigation. Bump this whenever a response gains fields the UI relies on:
+ * the new URL skips every copy cached under the old one, in the browser and at the edge.
+ */
+export const CATALOG_SHAPE_VERSION = "2";
+
 export function catalogPath(query: ClientQuery): string {
   const params = new URLSearchParams();
   params.set("type", query.type);
@@ -18,6 +27,7 @@ export function catalogPath(query: ClientQuery): string {
   if (query.category) params.set("category", query.category);
   if (query.q) params.set("q", query.q);
   if (query.id) params.set("id", query.id);
+  params.set("v", CATALOG_SHAPE_VERSION);
   return `/api/data?${params.toString()}`;
 }
 

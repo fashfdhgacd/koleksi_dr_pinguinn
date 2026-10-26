@@ -19,7 +19,9 @@ function cacheControl(ok: boolean, type: string | null): string {
     return "public, max-age=120, s-maxage=600, stale-while-revalidate=86400";
   }
   if (type === "categories") {
-    return "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800";
+    // Browser 5 min (was 1 h): the browser copy outlives a deploy, and a stale list drew /kategori
+    // without covers after client navigation. The edge copy is per deploy, so 1 day there is safe.
+    return "public, max-age=300, s-maxage=86400, stale-while-revalidate=604800";
   }
   // home / latest / featured / category — browser 2 menit, edge 10 menit
   return "public, max-age=120, s-maxage=600, stale-while-revalidate=3600";
