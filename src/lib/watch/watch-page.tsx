@@ -173,6 +173,47 @@ function ShareSheet({
   );
 }
 
+/** Tanggal unggah yang bisa dibaca (id-ID, WIB). Kosong kalau tidak valid. */
+function uploadDateLabel(raw: string | number | null | undefined): string {
+  if (raw == null || raw === "") return "";
+  const d = new Date(typeof raw === "number" && raw < 1e12 ? raw * 1000 : raw);
+  if (Number.isNaN(d.getTime()) || d.getFullYear() < 2015) return "";
+  return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" });
+}
+
+/** Fakta singkat per video (durasi, kategori, tanggal, sumber): teks unik yang terlihat, bukan keyword. */
+function VideoFacts({ item }: { item: VideoDetail }) {
+  const slug = isVideyItem(item) ? "videy" : categorySlugFor(item.category);
+  const categoryName = isVideyItem(item) ? VIDEY_LABEL : item.category;
+  const date = uploadDateLabel(item.uploadDate);
+  const host = isVideyItem(item) || isDrpHostItem(item) ? "" : hostLabel(catalogPlayUrl(item)).replace("Puterin", "Putarin");
+  const rows: Array<[string, string]> = [];
+  if (item.durationLabel) rows.push(["Durasi", item.durationLabel]);
+  if (categoryName) rows.push(["Kategori", String(categoryName)]);
+  if (date) rows.push(["Diunggah", date]);
+  if (host) rows.push(["Sumber", host]);
+  if (!rows.length) return null;
+  return (
+    <section aria-label="Info video" className="space-y-2">
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-4">
+        {rows.map(([k, v]) => (
+          <div key={k}>
+            <dt className="text-xs uppercase tracking-[0.18em] text-muted">{k}</dt>
+            <dd className="text-foreground">{v}</dd>
+          </div>
+        ))}
+      </dl>
+      {slug && categoryName ? (
+        <p className="text-sm">
+          <a href={`/kategori/${slug}`} className="text-muted hover:text-foreground hover:underline">
+            Lihat video {String(categoryName)} lainnya →
+          </a>
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 export function WatchPage() {
   const { id } = routeApi.useParams();
   const loaderData = routeApi.useLoaderData();
@@ -371,6 +412,7 @@ export function WatchPage() {
                 </ul>
               </nav>
             ) : null}
+            <VideoFacts item={item} />
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
