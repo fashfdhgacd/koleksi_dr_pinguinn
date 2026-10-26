@@ -1,7 +1,7 @@
 // Catalog card-click popunder (TrafficStars spot 5210859 direct link): on home, kategori and search
 // grids (and the home hero), a click on a VIDEO card at most once per browser session (shared with the Videy tap popunder) opens the ad in a new tab
 // synchronously in that click; the normal navigation to the watch page then proceeds unchanged
-// (nothing is prevented or delayed). The 30-minute timestamp is stored only when window.open returned a
+// (nothing is prevented or delayed). The session flag is set only when window.open returned a
 // window; a blocked open retries on a later card click. Ad cards ([data-kdp-ad]) never trigger it.
 // Counters: popc_fire / popc_ok / popc_block in player-log (once per video+event per session).
 import { sendPlayerLog, type PlayerLogHost } from "@/lib/player-log-client";
