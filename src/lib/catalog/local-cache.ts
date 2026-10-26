@@ -31,7 +31,7 @@ import videoStats from "./video-stats.json";
 import itemOverrides from "./overrides.json";
 import { softenMinorTerms } from "./minor-title-guard";
 import { HIDDEN_IDS as HIDDEN_ID_REASONS, RESTORED_TITLES, minorContentReason } from "./hidden-ids.js";
-import { isLockedMinorId, lockedMinorReason } from "./minor-lock.js";
+import { isLockedMinorId, lockedMinorReason, schoolReason } from "./minor-lock.js";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
 import latestVideos from "../../../data/videos-latest.json";
@@ -135,7 +135,7 @@ const MEMO_MAX = 50_000;
 function minorReasonMemo(title: string): string {
   let r = minorMemo.get(title);
   if (r === undefined) {
-    r = minorContentReason(title);
+    r = schoolReason(title); // hidden-ids rules + owner 18yo uniform exception (minor-lock.js)
     if (minorMemo.size > MEMO_MAX) minorMemo.clear();
     minorMemo.set(title, r);
   }
