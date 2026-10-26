@@ -6,6 +6,7 @@ import { queryCatalog } from "@/lib/catalog/service";
 import type { CategoryInfo } from "@/lib/catalog/types";
 import { SITE_ORIGIN } from "@/lib/seo";
 import { PixelIcon, PixelSparkle } from "@/components/pixel-icons";
+import { VideoThumb } from "@/components/video/thumb";
 
 const countFmt = new Intl.NumberFormat("id-ID");
 
@@ -81,6 +82,28 @@ function CatCard({
   );
 }
 
+/** A category card: the cover video's thumbnail (unique per category, server-picked) or the poster. */
+function CoverCard({ cat }: { cat: CategoryInfo }) {
+  return (
+    <li>
+      <Link
+        to="/kategori/$slug"
+        params={{ slug: cat.slug }}
+        search={{ page: undefined, periode: undefined }}
+        className="group relative block h-full min-h-[132px] overflow-hidden sm:min-h-[150px] rounded-none border border-white/45 bg-black text-white transition-colors duration-150 hover:border-white/85"
+      >
+        <VideoThumb src={cat.cover || ""} videoId={cat.coverId || ""} alt={cat.label} className="absolute inset-0" />
+        <span className="absolute inset-x-0 bottom-0 flex flex-col bg-gradient-to-t from-black/90 via-black/60 to-transparent px-2 pb-1.5 pt-6">
+          <span className="pixel text-[11px] leading-tight sm:text-[13px]">{cat.label}</span>
+          {typeof cat.count === "number" ? (
+            <span className="pixel text-[10px] text-white/60 sm:text-xs">{countFmt.format(cat.count)} video</span>
+          ) : null}
+        </span>
+      </Link>
+    </li>
+  );
+}
+
 function CategoriesPage() {
   const { categories, extra } = Route.useLoaderData();
   return (
@@ -111,14 +134,7 @@ function CategoriesPage() {
             count={extra?.terbaru}
           />
           {categories.map((cat) => (
-            <CatCard
-              key={cat.slug}
-              to="/kategori/$slug"
-              params={{ slug: cat.slug }}
-              slug={cat.slug}
-              label={cat.label}
-              count={cat.count}
-            />
+            <CoverCard key={cat.slug} cat={cat} />
           ))}
         </ul>
       </section>
