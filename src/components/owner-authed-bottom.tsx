@@ -23,20 +23,20 @@ export function OwnerAuthedBottom(props: {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <div className="rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/35 bg-[#121215]">
+      <div className="overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111314]">
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          className="flex w-full items-center justify-between px-4 py-3 text-left text-[13px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]"
+          className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left text-sm font-medium text-zinc-100 hover:bg-white/[0.02]"
         >
           Statistik 14 hari · perangkat · halaman · sumber
-          <span className="text-zinc-500">{open ? "-" : "+"}</span>
+          <span className={`text-zinc-500 transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true">›</span>
         </button>
         {open ? (
           <div className="flex flex-col gap-3 border-t border-white/[0.06] p-2 sm:p-3">
       {days.length ? (
-              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+              <section className="rounded-xl border border-white/[0.05] bg-[#0c0e0f] p-4">
                 <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Kunjungan halaman 14 hari (WIB)</h2>
                 <div className="mt-3">
                   <OwnerChart days={days} />
@@ -45,7 +45,7 @@ export function OwnerAuthedBottom(props: {
             ) : null}
 
             {days.length ? (
-              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+              <section className="rounded-xl border border-white/[0.05] bg-[#0c0e0f] p-4">
                 <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Riwayat 14 hari</h2>
                 <div className="mt-3 overflow-x-auto">
                   <table className="w-full text-left text-sm">
@@ -76,7 +76,7 @@ export function OwnerAuthedBottom(props: {
             ) : null}
 
             {devices.length ? (
-              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+              <section className="rounded-xl border border-white/[0.05] bg-[#0c0e0f] p-4">
                 <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Perangkat hari ini (WIB)</h2>
                 <ul className="mt-3 space-y-2">
                   {devices.map((d) => (
@@ -95,7 +95,7 @@ export function OwnerAuthedBottom(props: {
             ) : null}
 
             {stats?.topPaths?.length ? (
-              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+              <section className="rounded-xl border border-white/[0.05] bg-[#0c0e0f] p-4">
                 <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Halaman hari ini (WIB)</h2>
                 <ul className="mt-3 space-y-2 text-sm">
                   {stats.topPaths.slice(0, 8).map((row) => (
@@ -109,7 +109,7 @@ export function OwnerAuthedBottom(props: {
             ) : null}
 
             {stats?.topRefs?.length ? (
-              <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
+              <section className="rounded-xl border border-white/[0.05] bg-[#0c0e0f] p-4">
                 <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Sumber hari ini (WIB)</h2>
                 <ul className="mt-3 space-y-2 text-sm">
                   {stats.topRefs.slice(0, 6).map((row) => (

@@ -7,7 +7,6 @@ import {
   saveSecret,
   ownerToast,
   OwnerToaster,
-  REFRESH_MIN_GAP_MS,
   wibHourMinute,
   type OwnerStats,
 } from "@/components/owner-dashboard-shared";
@@ -25,8 +24,7 @@ import { Button } from "@/components/ui/button";
 
 /**
  * /pemilik. Cloudflare cost: NO interval polling. Everything loads once when the panel opens (after
- * the key), on the Refresh button, and when the tab becomes visible again, at most once per
- * REFRESH_MIN_GAP_MS. The owner key stays in this tab's sessionStorage only (gone when the tab
+ * the key) and on the Refresh button. No visibility or timer reloads. The owner key stays in this tab's sessionStorage only (gone when the tab
  * closes) and is sent as a header, never in a URL.
  */
 export function OwnerDashboard() {
@@ -133,17 +131,7 @@ export function OwnerDashboard() {
     refreshAll(secret, false, false);
   }, [authed, secret, refreshAll]);
 
-  // Tab visible again: reload, at most once per REFRESH_MIN_GAP_MS.
-  useEffect(() => {
-    if (!authed || !secret) return;
-    const onVisible = () => {
-      if (document.visibilityState !== "visible") return;
-      if (Date.now() - lastLoadRef.current < REFRESH_MIN_GAP_MS) return;
-      refreshAll(secret, true);
-    };
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [authed, secret, refreshAll]);
+  // No visibilitychange/interval reload: data loads on open and on the Refresh button only.
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -196,6 +184,21 @@ export function OwnerDashboard() {
     };
   }, [authed, secret]);
 
+  const [pushOk, setPushOk] = useState<boolean | null>(null);
+  useEffect(() => {
+    if (!authed || !secret) return;
+    let alive = true;
+    void fetch("/api/push", { cache: "no-store" })
+      .then((r) => r.json().catch(() => null))
+      .then((d: { ok?: boolean; publicKey?: string } | null) => {
+        if (alive) setPushOk(Boolean(d?.ok && d.publicKey));
+      })
+      .catch(() => alive && setPushOk(false));
+    return () => {
+      alive = false;
+    };
+  }, [authed, secret, reloadKey]);
+
   const online = Math.max(0, stats?.online ?? stats?.count ?? 0);
   const devices = useMemo(() => {
     const rows = (stats?.devices || []).filter((d) => d.device !== "bot");
@@ -209,6 +212,14 @@ export function OwnerDashboard() {
   const days = stats?.days || [];
   const lastText = wibHourMinute(tickAt);
 
+  function jumpTo(id: string) {
+    if (id !== "top") window.dispatchEvent(new CustomEvent("drp-owner-open", { detail: id }));
+    window.setTimeout(() => {
+      const el = id === "top" ? document.body : document.getElementById(`collapse-${id}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
   function showGone() {
     window.dispatchEvent(new CustomEvent("drp-owner-open", { detail: "player-error" }));
     window.setTimeout(() => {
@@ -217,20 +228,28 @@ export function OwnerDashboard() {
   }
 
   return (
-    <div className="min-h-dvh text-zinc-100" style={{ backgroundColor: "#0c0c0e" }}>
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-6 sm:py-8">
-        <header className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-[13px] font-semibold uppercase tracking-[0.2em] text-zinc-400">Dr. Pinguin</p>
-            <h1 className="mt-1 flex items-center gap-2 text-2xl font-semibold tracking-tight text-zinc-50">
-              Pemilik
-              <span className="size-2 bg-[#2dd4bf]" aria-hidden="true" />
-            </h1>
+    <div
+      className="min-h-dvh text-zinc-100 antialiased"
+      style={{ backgroundColor: "#0a0b0c", fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif' }}
+    >
+      <header className="sticky top-0 z-40 border-b border-white/[0.06] bg-[#0a0b0c]/90 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+          <div className="flex items-center gap-2.5">
+            <span className="grid size-8 place-items-center rounded-lg bg-[#2dd4bf]/15 text-sm font-bold text-[#2dd4bf]" aria-hidden="true">
+              P
+            </span>
+            <div className="leading-tight">
+              <h1 className="text-base font-semibold text-zinc-50">Panel Pemilik</h1>
+              <p className="text-[12px] text-zinc-500">
+                {authed ? (lastText ? `Update ${lastText} WIB` : loading ? "Memuat…" : "Belum dimuat") : "Dr. Pinguin"}
+              </p>
+            </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-1.5">
             {authed ? (
               <>
                 <Pill ok={botOk} label={botOk == null ? "Bot ..." : botOk ? "Bot aktif" : "Bot perlu dicek"} />
+                <Pill ok={pushOk} label={pushOk == null ? "Push ..." : pushOk ? "Push siap" : "Push mati"} />
                 <Pill ok label={`Live ${online}`} />
               </>
             ) : null}
@@ -239,9 +258,6 @@ export function OwnerDashboard() {
             </Link>
             {authed ? (
               <>
-                <span className="whitespace-nowrap text-[13px] text-zinc-400">
-                  {lastText ? `Terakhir diperbarui ${lastText} WIB` : loading ? "Memuat…" : ""}
-                </span>
                 <button
                   type="button"
                   className={headBtnPrimary}
@@ -256,8 +272,18 @@ export function OwnerDashboard() {
               </>
             ) : null}
           </div>
-        </header>
-
+        </div>
+        {authed ? (
+          <nav className="mx-auto flex w-full max-w-6xl gap-1.5 overflow-x-auto px-4 pb-2.5 [scrollbar-width:none]" aria-label="Lompat ke bagian">
+            {NAV.map(([id, label]) => (
+              <button key={id} type="button" className={navChip} onClick={() => jumpTo(id)}>
+                {label}
+              </button>
+            ))}
+          </nav>
+        ) : null}
+      </header>
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-5 sm:py-6">
         {!authed ? (
           <OwnerLoginForm
             draft={draft}
@@ -268,6 +294,9 @@ export function OwnerDashboard() {
           />
         ) : (
           <>
+            <Collapse id="detector-review" title="Perlu dicek (detector minor)" accent="amber">
+              <DetectorReviewSection secret={secret} />
+            </Collapse>
             <OwnerOverview
               secret={secret}
               online={online}
@@ -300,9 +329,6 @@ export function OwnerDashboard() {
                       reload={() => loadPlayerLog(secret)}
                     />
                   </Collapse>
-                  <Collapse id="detector-review" title="Perlu dicek (detector minor)">
-                    <DetectorReviewSection secret={secret} />
-                  </Collapse>
                   <Collapse id="hidden" title="Video disembunyikan">
                     <HiddenListSection secret={secret} />
                   </Collapse>
@@ -329,16 +355,28 @@ export function OwnerDashboard() {
   );
 }
 
+const NAV: [string, string][] = [
+  ["top", "Ringkasan"],
+  ["detector-review", "Perlu dicek"],
+  ["player-error", "Player error"],
+  ["hidden", "Disembunyikan"],
+  ["tools", "Tambah video"],
+  ["poster", "Poster"],
+  ["bot", "Bot"],
+];
+const navChip =
+  "shrink-0 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1 text-[12px] text-zinc-300 transition hover:border-[#2dd4bf]/50 hover:text-[#5eead4]";
+
 const headBtn =
-  "whitespace-nowrap rounded-md border border-white/[0.1] bg-[#16161a] px-2.5 py-1 text-[13px] text-zinc-300 transition hover:text-zinc-50 disabled:opacity-50";
+  "whitespace-nowrap rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-[13px] text-zinc-300 transition hover:text-zinc-50 disabled:opacity-50";
 // Own class list (not headBtn + overrides) so the teal background never loses to bg-[#16161a] in CSS order.
 const headBtnPrimary =
-  "whitespace-nowrap rounded-md border border-[#2dd4bf] bg-[#2dd4bf] px-2.5 py-1 text-[13px] font-medium text-zinc-950 transition hover:bg-[#5eead4] disabled:opacity-50";
+  "whitespace-nowrap rounded-lg border border-[#2dd4bf] bg-[#2dd4bf] px-3 py-1.5 text-[13px] font-medium text-zinc-950 transition hover:bg-[#5eead4] disabled:opacity-50";
 
 function Pill({ ok, label }: { ok: boolean | null; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border border-white/[0.08] px-2 py-1 text-[13px] uppercase tracking-[0.12em] text-zinc-400">
-      <span className={`size-1.5 ${ok == null ? "bg-zinc-600" : ok ? "bg-[#2dd4bf]" : "bg-amber-400"}`} />
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-white/[0.08] bg-white/[0.02] px-2.5 py-1 text-[12px] text-zinc-300">
+      <span className={`size-1.5 rounded-full ${ok == null ? "bg-zinc-600" : ok ? "bg-[#2dd4bf]" : "bg-amber-400"}`} />
       {label}
     </span>
   );
@@ -348,7 +386,17 @@ function Pill({ ok, label }: { ok: boolean | null; label: string }) {
  * Collapsed-by-default block for less used owner sections. Content mounts only when opened.
  * Another part of the panel can open it with a "drp-owner-open" event naming its id.
  */
-function Collapse({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+function Collapse({
+  id,
+  title,
+  children,
+  accent = "teal",
+}: {
+  id: string;
+  title: string;
+  children: React.ReactNode;
+  accent?: "teal" | "amber";
+}) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const onOpen = (e: Event) => {
@@ -358,15 +406,20 @@ function Collapse({ id, title, children }: { id: string; title: string; children
     return () => window.removeEventListener("drp-owner-open", onOpen);
   }, [id]);
   return (
-    <div id={`collapse-${id}`} className="scroll-mt-4 rounded-xl border border-white/[0.07] border-t-[#2dd4bf]/35 bg-[#121215]">
+    <div id={`collapse-${id}`} className="scroll-mt-28 overflow-hidden rounded-2xl border border-white/[0.06] bg-[#111314]">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between px-4 py-3 text-left text-[13px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]"
+        className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left text-sm font-medium text-zinc-100 transition hover:bg-white/[0.02]"
       >
-        {title}
-        <span className="text-zinc-500">{open ? "-" : "+"}</span>
+        <span className="flex items-center gap-2.5">
+          <span className={`size-2 rounded-full ${accent === "amber" ? "bg-amber-400" : "bg-[#2dd4bf]"}`} aria-hidden="true" />
+          {title}
+        </span>
+        <span className={`text-zinc-500 transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true">
+          ›
+        </span>
       </button>
       {open ? <div className="border-t border-white/[0.06] p-2 sm:p-3">{children}</div> : null}
     </div>

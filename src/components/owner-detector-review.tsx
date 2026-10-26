@@ -80,8 +80,8 @@ export function DetectorReviewSection({ secret }: { secret: string }) {
         <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} /> Tampilkan yang sudah diputuskan
       </label>
       {list.map((r) => (
-        <div key={r.id} className="flex gap-3 rounded-xl border border-white/[0.08] bg-[#141416] p-3">
-          <img src={r.thumbUrl} alt="" loading="lazy" className="h-20 w-32 shrink-0 rounded-md bg-black object-cover" />
+        <div key={r.id} className="flex flex-col gap-3 rounded-xl border border-amber-400/15 bg-[#0c0e0f] p-3 sm:flex-row">
+          <img src={r.thumbUrl} alt="" loading="lazy" className="aspect-video w-full shrink-0 rounded-lg bg-black object-cover sm:h-20 sm:w-32" />
           <div className="min-w-0 flex-1 text-sm">
             <p className="font-medium text-zinc-100 break-words">{r.title}</p>
             {r.translation ? <p className="text-[13px] text-zinc-400">🇮🇩 {r.translation}</p> : null}
@@ -95,10 +95,10 @@ export function DetectorReviewSection({ secret }: { secret: string }) {
               </a>
             </p>
             <div className="mt-2 flex gap-2">
-              <button type="button" disabled={busy === r.id} onClick={() => decide(r.id, "show")} className="rounded-md bg-emerald-600 px-3 py-1 text-[13px] text-white disabled:opacity-50">
+              <button type="button" disabled={busy === r.id} onClick={() => decide(r.id, "show")} className="rounded-lg bg-[#2dd4bf] px-3.5 py-1.5 text-[13px] font-medium text-zinc-950 disabled:opacity-50">
                 Tayangkan
               </button>
-              <button type="button" disabled={busy === r.id} onClick={() => decide(r.id, "hide")} className="rounded-md bg-zinc-700 px-3 py-1 text-[13px] text-white disabled:opacity-50">
+              <button type="button" disabled={busy === r.id} onClick={() => decide(r.id, "hide")} className="rounded-lg border border-white/[0.1] bg-white/[0.04] px-3.5 py-1.5 text-[13px] text-zinc-200 disabled:opacity-50">
                 Sembunyiin
               </button>
             </div>
