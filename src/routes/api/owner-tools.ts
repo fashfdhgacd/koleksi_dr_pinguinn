@@ -10,6 +10,7 @@ import {
 } from "@/lib/bot/posters.js";
 
 import { listHiddenForReview, setReviewMark } from "@/lib/owner-hidden-review";
+import { decideDetectorReview, listDetectorReview } from "@/lib/owner-detector-review";
 import {
   listHiddenCandidates,
   applyUnhidden,
@@ -25,7 +26,8 @@ import thumbsDeploy from "../../../data/.thumbs-deploy.json";
 import { findCategory } from "@/lib/catalog/categories";
 import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
 import { isLockedMinorId, lockedMinorReason } from "@/lib/catalog/minor-lock.js";
-import { reviewPriority as detectorPriority } from "@/lib/catalog/minor-detector.js";
+import { reviewPriority as detectorPriority, minorContentReason as ownerDetectorReason } from "@/lib/catalog/minor-detector.js";
+import { explainTitle } from "@/lib/catalog/minor-context.js";
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
@@ -73,7 +75,7 @@ const HIDE_REASON_LABELS: Record<string, string> = {
   "incest-child": "Inses dengan anak",
   "bot-flag": "Ditandai bot saat upload",
   "locked:minor-detector": "Detector minor: judul jelas di bawah umur (diblokir)",
-  "detector-review": "Perlu dicek: konteks sekolah/keluarga + kata umur (detector minor)",
+  "detector-review": "Perlu dicek: sinyal sekolah/umur dari detector minor (lihat kotak Perlu dicek)",
   "source-gone": "Dihapus di sumber",
 };
 
@@ -623,6 +625,8 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
     category: saved?.category || null,
     // minor-detector.js verdict for the new title ("review" = owner should double-check it).
     detector: title ? detectorPriority("", title) : null,
+    // Status moderasi (locked / review_pending / clear) + penjelasan konteks untuk pemilik.
+    moderation: title ? explainTitle(title, ownerDetectorReason(title)) : null,
     ...(extra ? { extra: saved?.extra || [] } : {}),
   });
 }
@@ -708,6 +712,14 @@ export const Route = createFileRoute("/api/owner-tools")({
         }
         if (body.action === "unhide-bulk") {
           const r = await setHiddenOverrideBulk(body);
+          return json(r, r.status || 200);
+        }
+        if (body.action === "detector-review-list") {
+          const items = await listDetectorReview();
+          return json({ ok: true, count: items.length, pending: items.filter((r) => !r.decidedAt).length, items });
+        }
+        if (body.action === "detector-review-decide") {
+          const r = await decideDetectorReview(body as never);
           return json(r, r.status || 200);
         }
         if (body.action === "review-mark") {

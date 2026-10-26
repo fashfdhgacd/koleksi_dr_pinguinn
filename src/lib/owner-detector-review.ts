@@ -1,0 +1,125 @@
+/**
+ * Kotak "Perlu dicek" (detector minor, verdict "review") di /pemilik.
+ * - Upload baru yang "review" ditahan (hidden_reason "detector-review") tapi tampil di sini
+ *   dengan link pratinjau khusus pemilik (embed sumber, karena /watch masih 404).
+ * - Katalog lama yang "review" tetap tayang sampai pemilik memutuskan.
+ * - "minor" dan judul yang terkunci minor-lock tidak masuk sini (terkunci, tanpa link tonton).
+ * Tayangkan = Unhide (+ hapus owner-hide); Sembunyiin = owner-hide. Kunci minor-lock tetap
+ * menang di local-cache (isHiddenRaw), jadi Tayangkan tidak pernah membuka judul terkunci.
+ */
+import { applyUnhidden, isLockedMinor, loadItemsRaw } from "@/lib/catalog/local-cache";
+import { readUnhideState, setUnhidden } from "@/lib/catalog/unhide-store";
+import { readOwnerHideState, setOwnerHidden } from "@/lib/catalog/owner-hide-store";
+import { readReviewState, writeReviewState } from "@/lib/owner-review-store";
+import { minorContentReason } from "@/lib/catalog/minor-detector.js";
+import { explainTitle } from "@/lib/catalog/minor-context.js";
+
+export type DetectorReviewRow = {
+  id: string;
+  title: string;
+  translation: string | null;
+  /** Selalu dari detector pemilik: "review_pending" di kotak ini. */
+  moderation: "review_pending";
+  assessment: string;
+  reason: string;
+  signals: string[];
+  held: boolean;
+  status: string;
+  thumbUrl: string;
+  watchUrl: string;
+  decidedAt: number | null;
+};
+
+/** Glosarium kata Mandarin yang sering muncul di judul (terjemahan kata kunci, bukan mesin). */
+const ZH: [string, string][] = [
+  ["高考", "ujian masuk kuliah"], ["高三", "kelas 3 SMA"], ["高中", "SMA"], ["初中", "SMP"], ["中学", "sekolah menengah"],
+  ["小学", "SD"], ["学生妹", "cewek pelajar"], ["学生", "pelajar"], ["校服", "seragam sekolah"], ["老师", "guru"],
+  ["萝莉", "loli"], ["幼", "anak kecil"], ["儿子", "anak laki-laki"], ["女儿", "anak perempuan"], ["妈妈", "ibu"],
+  ["母亲", "ibu"], ["继母", "ibu tiri"], ["后妈", "ibu tiri"], ["爸爸", "ayah"], ["父亲", "ayah"], ["姐姐", "kakak perempuan"],
+  ["妹妹", "adik perempuan"], ["弟弟", "adik laki-laki"], ["哥哥", "kakak laki-laki"], ["老婆", "istri"], ["妻子", "istri"],
+  ["人妻", "istri orang"], ["丈夫", "suami"], ["阿姨", "tante"], ["大学生", "mahasiswa"], ["大学", "kampus"], ["奖励", "hadiah"],
+  ["考试", "ujian"], ["前", "sebelum"], ["后", "sesudah"], ["偷情", "selingkuh"], ["强奸", "pemerkosaan"], ["迷奸", "dibius"],
+  ["性爱", "seks"], ["做爱", "bercinta"], ["中出", "keluar di dalam"], ["巨乳", "payudara besar"], ["美女", "cewek cantik"],
+  ["少妇", "wanita muda (menikah)"], ["熟女", "wanita matang"], ["自慰", "masturbasi"], ["国产", "lokal China"], ["视频", "video"],
+];
+
+export function translateZh(title: string): string | null {
+  if (!/[\u4e00-\u9fff]/.test(title)) return null;
+  let s = title;
+  for (const [zh, id] of [...ZH].sort((a, b) => b[0].length - a[0].length)) s = s.split(zh).join(` ${id} `);
+  s = s.replace(/[\u4e00-\u9fff]+/g, "…").replace(/\s+/g, " ").trim();
+  return `${s} (terjemahan kata kunci)`;
+}
+
+type AnyItem = { id: string; title?: unknown; embed?: unknown; direct?: unknown; hidden?: unknown; hidden_reason?: unknown };
+
+function http(v: unknown): string | null {
+  const s = String(v || "").trim();
+  return /^https?:\/\//i.test(s) ? s : null;
+}
+
+export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
+  const cache = (await loadItemsRaw()) as unknown as { raw?: AnyItem[]; items: AnyItem[] };
+  const [unhide, ownerHide, state] = await Promise.all([readUnhideState(), readOwnerHideState(), readReviewState(true)]);
+  const out: DetectorReviewRow[] = [];
+  const seen = new Set<string>();
+  for (const it of cache.raw || cache.items) {
+    if (!it?.id || seen.has(it.id)) continue;
+    seen.add(it.id);
+    const title = String(it.title || "");
+    const heldTag = it.hidden === true && it.hidden_reason === "detector-review";
+    const owner = minorContentReason(title);
+    if (!heldTag && owner !== "review") continue;
+    if (owner === "minor" || isLockedMinor(it as never)) continue; // status "locked", bukan untuk dicek
+    const ex = explainTitle(title, owner);
+    const ownerHidden = Boolean(ownerHide.ids[it.id]);
+    const held = ownerHidden || (heldTag && !unhide.ids[it.id]);
+    out.push({
+      id: it.id,
+      title,
+      translation: translateZh(title),
+      moderation: "review_pending",
+      assessment: ex.assessment,
+      reason: owner === "review" ? ex.reason : `Ditahan saat upload (judul sudah berubah, cek ulang). ${ex.reason}`,
+      signals: ex.signals,
+      held,
+      status: ownerHidden ? "Disembunyiin pemilik" : held ? "Ditahan (upload baru), belum tayang" : "Masih tayang",
+      thumbUrl: `/thumb/${it.id}`,
+      // /watch 404 untuk item tertahan; pakai embed sumber sebagai pratinjau khusus pemilik.
+      watchUrl: held ? http(it.embed) || http(it.direct) || `/watch/${it.id}` : `/watch/${it.id}`,
+      decidedAt: state.checked[`det:${it.id}`] || null,
+    });
+  }
+  // Belum diputuskan dulu, yang ditahan paling atas.
+  return out.sort((a, b) => Number(!!a.decidedAt) - Number(!!b.decidedAt) || Number(b.held) - Number(a.held));
+}
+
+export async function decideDetectorReview(body: { id?: unknown; decision?: unknown }): Promise<{ ok: boolean; error?: string; status?: number; held?: boolean }> {
+  const id = String(body.id || "").trim();
+  if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return { ok: false, error: "bad_id", status: 400 };
+  if (body.decision !== "show" && body.decision !== "hide") return { ok: false, error: "bad_decision", status: 400 };
+  const cache = (await loadItemsRaw()) as unknown as { raw?: AnyItem[]; items: AnyItem[] };
+  const it = (cache.raw || cache.items).find((x) => x?.id === id);
+  if (!it) return { ok: false, error: "not_found", status: 404 };
+  const title = String(it.title || "");
+  // status "locked": tidak bisa ditayangkan lewat tombol Tayangkan.
+  if (minorContentReason(title) === "minor" || isLockedMinor(it as never)) return { ok: false, error: "locked_minor", status: 403 };
+  try {
+    let unhideIds: string[];
+    let hideIds: string[];
+    if (body.decision === "show") {
+      hideIds = Object.keys((await setOwnerHidden(id, false)).ids);
+      unhideIds = it.hidden === true ? Object.keys((await setUnhidden(id, true)).ids) : Object.keys((await readUnhideState()).ids);
+    } else {
+      hideIds = Object.keys((await setOwnerHidden(id, true)).ids);
+      unhideIds = Object.keys((await readUnhideState()).ids);
+    }
+    applyUnhidden(unhideIds, hideIds);
+    const state = await readReviewState(true);
+    state.checked[`det:${id}`] = Date.now();
+    await writeReviewState(state);
+    return { ok: true, held: body.decision === "hide" };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "kv_error", status: 503 };
+  }
+}
