@@ -6,6 +6,8 @@
 // already loads).
 import { useCallback, useEffect, useState } from "react";
 import cost from "@/lib/owner-cost.json";
+import tsStats from "../../public/data/trafficstars.json";
+import { AD_ZONES } from "@/components/ad-slot";
 import { fmt, ownerToast, wibDateTime } from "@/components/owner-dashboard-shared";
 
 export type PlayerLogHost = {
@@ -85,6 +87,45 @@ type CostFile = {
 
 const COST = cost as CostFile;
 
+/* TrafficStars daily stats: written by the "Sinkron TrafficStars" routine into public/data/trafficstars.json
+ * (same file the TrafficStars card fetches). Imported at build time: every sync commit redeploys, so no
+ * extra request or KV read per panel open. */
+type TsDay = { date: string; impressions: number; earnings: number };
+const TS_DAYS = (((tsStats as { days?: TsDay[] }).days || []) as TsDay[]).slice().sort((a, b) => a.date.localeCompare(b.date));
+const TS_UPDATED = (tsStats as { updatedAt?: string }).updatedAt || null;
+function tsEarnings() {
+  const last = TS_DAYS[TS_DAYS.length - 1] || null;
+  const week = TS_DAYS.slice(-7);
+  return {
+    last,
+    weekUsd: week.length ? week.reduce((a, d) => a + (d.earnings || 0), 0) : null,
+    weekImp: week.reduce((a, d) => a + (d.impressions || 0), 0),
+    weekFrom: week[0]?.date || null,
+  };
+}
+
+/** Ad networks as actually wired in code: ExoClick is live whenever ad-slot.tsx has a grid zone. */
+function adsLive(): AdRow[] {
+  return COST.ads.map((a) =>
+    a.name === "ExoClick" && AD_ZONES.length
+      ? { ...a, status: "aktif", note: `banner grid ${AD_ZONES.join(", ")}` }
+      : a,
+  );
+}
+
+/** Billing cycle that contains today (WIB), rolling the monthly start day of cycleFrom forward. */
+function currentCycle(now = Date.now()): { from: string; to: string } {
+  const startDay = Number(String(COST.cloudflare.cycleFrom).slice(8, 10)) || 1;
+  const w = new Date(now + 7 * 3600_000);
+  const y = w.getUTCFullYear();
+  let m = w.getUTCMonth();
+  if (w.getUTCDate() < startDay) m -= 1;
+  const from = new Date(Date.UTC(y, m, startDay));
+  const to = new Date(Date.UTC(y, m + 1, startDay - 1));
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return { from: iso(from), to: iso(to) };
+}
+
 const card = "min-w-0 rounded-xl border border-white/[0.08] border-t-[#2dd4bf]/40 bg-[#131316] p-4 sm:p-5";
 const h2 = "flex items-center justify-between gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]";
 const btn =
@@ -92,6 +133,11 @@ const btn =
 const btnPrimary =
   "shrink-0 whitespace-nowrap rounded-md border border-[#2dd4bf] bg-[#2dd4bf] px-2 py-1 text-[13px] font-medium text-zinc-950 hover:bg-[#5eead4] disabled:opacity-50";
 const input = "min-w-0 rounded-md border border-white/[0.1] bg-[#0c0c0e] px-2 py-1.5 text-[13px] text-zinc-200";
+
+/* Label/value rows: label never breaks per word; long values wrap under the label on narrow cards. */
+const rowCls = "flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 border-t border-white/[0.06] py-2 text-sm";
+const label = "min-w-[9rem] shrink-0 text-zinc-300";
+const value = "min-w-0 flex-1 basis-48 text-right text-[13px] leading-snug text-zinc-300 tabular-nums";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
@@ -188,14 +234,18 @@ export function MoneyCard() {
   const cf = COST.cloudflare;
   const spentPct = Math.min(100, (cf.spentUsd / cf.ceilingUsd) * 100);
   const projPct = Math.min(100, (cf.projectedTotalUsd / cf.ceilingUsd) * 100);
-  const row = "flex items-baseline justify-between gap-3 border-t border-white/[0.06] py-2 text-sm";
-  const adsSummary = COST.ads.map((a) => `${a.name} ${a.status}`).join(" · ");
+  const row = rowCls;
+  const ads = adsLive();
+  const adsSummary = ads.map((a) => `${a.name} ${a.status}`).join(", ");
+  const cyc = currentCycle();
+  const stale = cf.cycleTo < cyc.from;
+  const ts = tsEarnings();
   return (
     <section className={`${card} h-full`}>
       <div className={h2}>
         <span>Uang &amp; biaya</span>
         <span className="text-[13px] font-normal normal-case tracking-normal text-zinc-400">
-          siklus {dayText(cf.cycleFrom)} – {dayText(cf.cycleTo)}
+          {dayText(cyc.from)} – {dayText(cyc.to)}
         </span>
       </div>
       <div className="mt-3 flex items-baseline justify-between gap-3 text-sm">
@@ -208,25 +258,32 @@ export function MoneyCard() {
         <span className="absolute inset-y-0 left-0 rounded bg-[#2dd4bf]/35" style={{ width: `${projPct}%` }} />
         <span className="absolute inset-y-0 left-0 rounded bg-[#2dd4bf]" style={{ width: `${spentPct}%` }} />
       </div>
-      <p className="mt-1 text-[13px] text-zinc-400">{usd(cf.spentUsd)} sudah terpakai · termasuk dasar {usd(cf.baseUsd)}</p>
+      <p className="mt-1 text-[13px] text-zinc-400">
+        {stale
+          ? `Angka siklus ${dayText(cf.cycleFrom)} – ${dayText(cf.cycleTo)}, belum diperbarui untuk siklus ini.`
+          : `${usd(cf.spentUsd)} sudah terpakai (termasuk biaya dasar ${usd(cf.baseUsd)}), dicek ${dayText(COST.updated)}.`}
+      </p>
       <div className={`${row} mt-2`}>
-        <span className="text-zinc-300">Pendapatan minggu ini</span>
-        <span className="text-zinc-400">{usd(COST.earnings.weekUsd)}</span>
+        <span className={label}>Pendapatan 7 hari</span>
+        <span className={value}>
+          <b className="font-semibold text-zinc-100">{usd(ts.weekUsd)}</b>
+          {ts.weekFrom ? <span className="block text-[13px] text-zinc-400">sejak {dayText(ts.weekFrom)}, {fmt(ts.weekImp)} impresi</span> : null}
+        </span>
       </div>
-      {COST.earnings.lastDay ? (
+      {ts.last ? (
         <div className={row}>
-          <span className="text-zinc-300">Pendapatan {dayText(COST.earnings.lastDay.date)}</span>
-          <span className="tabular-nums text-zinc-100">
-            {usd(COST.earnings.lastDay.usd)}{" "}
-            <span className="text-[13px] text-zinc-400">
-              {COST.earnings.lastDay.source} · {COST.earnings.lastDay.impressions.toLocaleString("id-ID")} impresi
+          <span className={label}>Pendapatan {dayText(ts.last.date)}</span>
+          <span className={value}>
+            <b className="font-semibold text-zinc-100">{usd(ts.last.earnings)}</b>
+            <span className="block text-[13px] text-zinc-400">
+              {fmt(ts.last.impressions)} impresi{TS_UPDATED ? `, sinkron ${wibDateTime(TS_UPDATED)}` : ""}
             </span>
           </span>
         </div>
       ) : null}
       <div className={row}>
-        <span className="shrink-0 text-zinc-300">Iklan</span>
-        <span className="min-w-0 text-right text-[13px] leading-snug text-zinc-300">{adsSummary}</span>
+        <span className={label}>Iklan</span>
+        <span className={value}>{adsSummary}</span>
       </div>
       <button
         type="button"
@@ -247,19 +304,24 @@ export function MoneyCard() {
               </span>
             </li>
           ))}
-          {COST.ads.map((a) => (
+          {ads.map((a) => (
             <li key={a.name} className={row}>
               <span className="shrink-0 text-zinc-300">{a.name}</span>
               <span className="min-w-0 text-right text-zinc-200">
                 {a.status}
                 <span className="block text-[13px] text-zinc-400">
-                  {a.note ? `${a.note} · ` : ""}pendapatan {usd(a.earningsUsd)}
+                  {a.note ? `${a.note}. ` : ""}
+                  {a.name === "TrafficStars"
+                    ? `Pendapatan 7 hari ${usd(ts.weekUsd)}`
+                    : a.earningsUsd != null
+                      ? `Pendapatan terakhir tercatat ${usd(a.earningsUsd)}`
+                      : ""}
                 </span>
               </span>
             </li>
           ))}
           <li className="pt-2 text-[13px] text-zinc-400">
-            Data manual, diperbarui {dayText(COST.updated)} (tidak ditarik langsung dari Cloudflare / TrafficStars).
+            Biaya Cloudflare dicatat manual ({dayText(COST.updated)}). Pendapatan dari sinkron TrafficStars otomatis.
           </li>
         </ul>
       ) : null}
@@ -299,7 +361,7 @@ export function ThumbMissingCard({ secret, reloadKey }: { secret: string; reload
       setRows(d.items || []);
       setTotal(d.total ?? 0);
     } catch {
-      ownerToast("Gagal memuat Thumbnail kosong: jaringan error.", "error", { label: "Coba lagi", run: () => void load() });
+      ownerToast("Gagal memuat Thumbnail kosong: koneksi bermasalah.", "error", { label: "Coba lagi", run: () => void load() });
     } finally {
       setBusy(false);
     }
@@ -330,7 +392,7 @@ export function ThumbMissingCard({ secret, reloadKey }: { secret: string; reload
       setNote(`${d.text || "Tersimpan."}${d.rejected?.length ? ` ${d.rejected.length} link ditolak.` : ""}`);
       ownerToast(d.text || "Poster tersimpan.", "ok");
     } catch {
-      ownerToast("Poster gagal disimpan: jaringan error.");
+      ownerToast("Poster gagal disimpan: koneksi bermasalah.");
     } finally {
       setBusy(false);
     }
@@ -404,8 +466,9 @@ export function StatusCard(props: {
   statsHint?: string | null;
 }) {
   const { botOk, status, playerLog } = props;
-  const rows: { name: string; tone: "ok" | "warn" | "bad" | "idle"; value: string }[] = [
-    { name: "Bot Telegram", tone: botOk == null ? "idle" : botOk ? "ok" : "warn", value: botOk == null ? "…" : botOk ? "webhook OK" : "perlu dicek" },
+  const pop = playerLog?.popunder;
+  const rows: { name: string; tone: "ok" | "warn" | "bad" | "idle"; value: string; sub?: string }[] = [
+    { name: "Bot Telegram", tone: botOk == null ? "idle" : botOk ? "ok" : "warn", value: botOk == null ? "…" : botOk ? "tersambung" : "perlu dicek" },
     {
       name: "Katalog dimuat",
       tone: status?.catalogAt ? "ok" : "idle",
@@ -423,32 +486,40 @@ export function StatusCard(props: {
     },
     {
       name: "Popunder Videy hari ini",
-      tone: !playerLog?.popunder ? "idle" : playerLog.popunder.today.ok > 0 ? "ok" : playerLog.popunder.today.fire > 0 ? "warn" : "idle",
-      value: playerLog?.popunder
-        ? `tap ${playerLog.popunder.today.fire} · buka ${playerLog.popunder.today.ok} · diblok ${playerLog.popunder.today.block} (kemarin buka ${playerLog.popunder.yesterday.ok})`
-        : "…",
+      tone: !pop ? "idle" : pop.today.ok > 0 ? "ok" : pop.today.fire > 0 ? "warn" : "idle",
+      value: pop ? `${fmt(pop.today.ok)} terbuka dari ${fmt(pop.today.fire)} tap, ${fmt(pop.today.block)} diblok` : "…",
+      sub: pop ? `kemarin ${fmt(pop.yesterday.ok)} terbuka` : undefined,
     },
     {
       name: "Popunder kartu hari ini",
-      tone: !playerLog?.popunder ? "idle" : (playerLog.popunder.today.cardOk || 0) > 0 ? "ok" : (playerLog.popunder.today.cardFire || 0) > 0 ? "warn" : "idle",
-      value: playerLog?.popunder
-        ? `klik ${playerLog.popunder.today.cardFire || 0} · buka ${playerLog.popunder.today.cardOk || 0} · diblok ${playerLog.popunder.today.cardBlock || 0} (kemarin buka ${playerLog.popunder.yesterday.cardOk || 0})`
-        : "…",
+      tone: !pop ? "idle" : (pop.today.cardOk || 0) > 0 ? "ok" : (pop.today.cardFire || 0) > 0 ? "warn" : "idle",
+      value: pop ? `${fmt(pop.today.cardOk || 0)} terbuka dari ${fmt(pop.today.cardFire || 0)} klik, ${fmt(pop.today.cardBlock || 0)} diblok` : "…",
+      sub: pop ? `kemarin ${fmt(pop.yesterday.cardOk || 0)} terbuka` : undefined,
     },
     {
-      name: "Pre-roll Videy hari ini",
-      tone: !playerLog?.popunder ? "idle" : (playerLog.popunder.today.preDone || 0) + (playerLog.popunder.today.preSkip || 0) > 0 ? "ok" : (playerLog.popunder.today.preReq || 0) > 0 ? "warn" : "idle",
-      value: playerLog?.popunder
-        ? `minta ${playerLog.popunder.today.preReq || 0} · ada iklan ${playerLog.popunder.today.preFill || 0} · selesai ${playerLog.popunder.today.preDone || 0} · dilewati ${playerLog.popunder.today.preSkip || 0} (kemarin selesai ${playerLog.popunder.yesterday.preDone || 0} · dilewati ${playerLog.popunder.yesterday.preSkip || 0})`
+      name: "Iklan pembuka Videy hari ini",
+      tone: !pop ? "idle" : (pop.today.preDone || 0) + (pop.today.preSkip || 0) > 0 ? "ok" : (pop.today.preReq || 0) > 0 ? "warn" : "idle",
+      value: pop
+        ? `${fmt(pop.today.preFill || 0)} ada iklan dari ${fmt(pop.today.preReq || 0)} putar, ${fmt(pop.today.preDone || 0)} selesai, ${fmt(pop.today.preSkip || 0)} dilewati`
         : "…",
+      sub: pop ? `kemarin ${fmt(pop.yesterday.preDone || 0)} selesai, ${fmt(pop.yesterday.preSkip || 0)} dilewati` : undefined,
     },
-    { name: "Thumbnail R2", tone: status?.thumbsAt ? "ok" : "idle", value: status ? wibDateTime(status.thumbsAt || null) : "…" },
+    {
+      // The stamp is written only when the 2-hourly Videy job produced NEW frames, so this is
+      // "last new thumbnails", not "last run" (the job keeps running when nothing is missing).
+      name: "Thumbnail Videy baru",
+      tone: status?.thumbsAt ? "ok" : "idle",
+      value: status ? (status.thumbsAt ? wibDateTime(status.thumbsAt) : "belum ada data") : "…",
+      sub: status ? "dicek otomatis tiap 2 jam" : undefined,
+    },
     {
       name: "Penyimpanan",
       tone: !playerLog ? "idle" : playerLog.storage === "d1" && playerLog.hideReadable !== false ? "ok" : "bad",
       value: !playerLog
         ? "…"
-        : `D1 ${playerLog.storage === "d1" ? "OK" : "tidak terbaca"} · KV ${playerLog.hideReadable === false ? "tidak terbaca" : "OK"}`,
+        : playerLog.storage === "d1" && playerLog.hideReadable !== false
+          ? "normal"
+          : `${playerLog.storage === "d1" ? "" : "database tidak terbaca"}${playerLog.storage !== "d1" && playerLog.hideReadable === false ? ", " : ""}${playerLog.hideReadable === false ? "daftar sembunyi tidak terbaca" : ""}`,
     },
   ];
   return (
@@ -456,10 +527,15 @@ export function StatusCard(props: {
       <div className={h2}>Status sistem</div>
       <ul className="mt-2">
         {rows.map((r) => (
-          <li key={r.name} className="flex items-center gap-2 border-t border-white/[0.06] py-2 text-sm">
-            <Dot tone={r.tone} />
-            <span className="min-w-0 flex-1 text-zinc-200">{r.name}</span>
-            <span className="shrink-0 text-right text-[13px] text-zinc-300">{r.value}</span>
+          <li key={r.name} className={rowCls}>
+            <span className={`${label} flex items-center gap-2 text-zinc-200`}>
+              <Dot tone={r.tone} />
+              {r.name}
+            </span>
+            <span className={value}>
+              {r.value}
+              {r.sub ? <span className="block text-zinc-500">{r.sub}</span> : null}
+            </span>
           </li>
         ))}
       </ul>

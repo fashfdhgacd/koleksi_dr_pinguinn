@@ -85,7 +85,7 @@ export function OwnerTrafficStars({ reloadKey }: { reloadKey?: number }) {
       {data && days.length ? (
         <>
           <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <Stat label="Hari ini (UTC)" earn={today?.earnings} imp={today?.impressions} />
+            <Stat label="Hari ini" earn={today?.earnings} imp={today?.impressions} />
             <Stat label="Kemarin" earn={yesterday?.earnings} imp={yesterday?.impressions} />
             <Stat label={`${last7.length} hari terakhir`} earn={sumEarn} imp={sumImp} />
           </div>

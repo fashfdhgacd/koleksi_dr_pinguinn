@@ -88,7 +88,7 @@ export function deviceLabel(d: DeviceKind): string {
 
 export function presenceLabel(p?: OwnerStats["presence"]): string {
   if (p === "hybrid" || p === "postgres") return "Sesi nyata (server)";
-  if (p === "kv") return "Sesi nyata (KV)";
+  if (p === "kv") return "Sesi nyata (server)";
   return "Sesi isolate ini";
 }
 
