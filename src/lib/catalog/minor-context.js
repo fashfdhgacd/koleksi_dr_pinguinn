@@ -32,6 +32,8 @@ function norm(t = "") {
     .trim();
 }
 
+import { hasAdultAgeMarker } from "./minor-lock.js";
+
 const EXPLICIT_MINOR_PATTERNS = [
   /\b(?:anak\s+di\s+bawah\s+umur|di\s+bawah\s+umur|underage|minor(?:\s+content)?)\b/,
   /\b(?:balita|anak\s+kecil)\b/,
@@ -143,6 +145,18 @@ export function detectMinor(title = "") {
   return { verdict: "clear", reason: why, signals, score };
 }
 
+/**
+ * Label penilaian untuk judul bersinyal lemah, sesuai sinyal yang benar-benar ada (bukan label umum).
+ * @param {string} title
+ */
+export function weakAssessment(title = "") {
+  const t = norm(String(title || ""));
+  if (ownerChecked18(title)) return "ada tanda dewasa (18yo/18+)";
+  if (/\b(?:anak|ayah|ibu|mama|papa|keluarga|istri|suami|adik|adek|kakak|tiri)\b/.test(t)) return "kata keluarga (bukan tanda umur), kemungkinan salah tulis judul";
+  if (/\bseragam\b/.test(t)) return "cuma kata seragam (bisa seragam kerja/cosplay)";
+  return "sinyal lemah, kemungkinan salah tulis judul";
+}
+
 /** Status proyek dari verdict detector pemilik. */
 export function statusOf(ownerVerdict = "") {
   return ownerVerdict === "minor" ? "locked" : ownerVerdict === "review" ? "review_pending" : "clear";
@@ -156,8 +170,7 @@ export function statusOf(ownerVerdict = "") {
 export function explainTitle(title = "", ownerVerdict = "") {
   const d = detectMinor(title);
   const status = statusOf(ownerVerdict);
-  const assessment =
-    d.verdict === "minor" ? "terlarang" : d.verdict === "review" ? "sinyal merah, cek videonya" : "kemungkinan cuma kata keluarga / salah tulis judul";
+  const assessment = d.verdict === "minor" ? "terlarang" : d.verdict === "review" ? "sinyal merah, cek videonya" : weakAssessment(title);
   const reason =
     status === "locked"
       ? `Terkunci oleh detector pemilik. ${d.verdict === "minor" ? d.reason : "Pola eksplisit di bawah umur."}`
@@ -201,5 +214,6 @@ const AGE18 =
 
 /** @param {string} title */
 export function ownerChecked18(title = "") {
-  return AGE18.test(String(title || ""));
+  // Sama dengan minor-lock.js hasAdultAgeMarker (18yo/18 yo/18+/19+/20 tahun, bukan Eps/Part 18) + "18" berdiri sendiri.
+  return AGE18.test(String(title || "")) || hasAdultAgeMarker(title);
 }

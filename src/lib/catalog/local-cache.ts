@@ -32,6 +32,7 @@ import itemOverrides from "./overrides.json";
 import { softenMinorTerms } from "./minor-title-guard";
 import { HIDDEN_IDS as HIDDEN_ID_REASONS, RESTORED_TITLES, minorContentReason } from "./hidden-ids.js";
 import { isLockedMinorId, lockedMinorReason, schoolReason } from "./minor-lock.js";
+import { ownerChecked18 } from "./minor-context.js";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
 import latestVideos from "../../../data/videos-latest.json";
@@ -174,17 +175,29 @@ function hasCleanEdit(id: string): boolean {
   return Boolean(t) && !minorReasonMemo(String(t)) && !lockedReasonMemo(String(t));
 }
 
+/**
+ * Owner rule 2026-10-26: an item held ONLY by the review layer (bot flag "detector-review") whose
+ * title carries an adult age marker (18yo/18+, ownerChecked18) is published. Locks, HIDDEN_IDS and
+ * every other hidden reason still apply (checked after this by the normal path).
+ */
+function adultReviewOnly(it: RawItem): boolean {
+  const rec = it as { hidden?: unknown; hidden_reason?: unknown };
+  if (rec.hidden !== true || rec.hidden_reason !== "detector-review") return false;
+  const title = String(overrideTitle(it.id) || RESTORED[it.id] || it.title || "");
+  return ownerChecked18(title) && !lockedReasonMemo(title) && !minorReasonMemo(title);
+}
+
 /** Why an item is hidden by default ("" = not hidden). Ignores owner Unhide overrides. */
 export function hiddenReasonRaw(it: RawItem): string {
   if (hasCleanEdit(it.id)) {
     const rec = it as { hidden?: unknown; hidden_reason?: unknown };
-    if (rec.hidden === true) return String(rec.hidden_reason || "bot-flag");
+    if (rec.hidden === true && !adultReviewOnly(it)) return String(rec.hidden_reason || "bot-flag");
     return String(OVERRIDES[it.id]?.hidden || "");
   }
   const listed = HIDDEN_REASONS[it.id];
   if (listed) return listed;
   const rec = it as { hidden?: unknown; hidden_reason?: unknown };
-  if (rec.hidden === true) return String(rec.hidden_reason || "bot-flag");
+  if (rec.hidden === true && !adultReviewOnly(it)) return String(rec.hidden_reason || "bot-flag");
   const ovHidden = OVERRIDES[it.id]?.hidden;
   if (ovHidden) return String(ovHidden);
   // Reviewed real title (owner edit, overrides.json, or "***" restored to "Tocil ..." via

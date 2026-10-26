@@ -64,3 +64,15 @@ test("locked tidak bisa ditayangkan lewat Tayangkan (guard di server)", () => {
   // dan item locked tidak masuk kotak Perlu dicek
   assert.match(src, /if \(owner === "minor" \|\| isLockedMinor\(it as never\)\) continue;/);
 });
+
+test("label penilaian sesuai sinyal + konsisten dengan penanda dewasa", async () => {
+  const { weakAssessment, ownerChecked18 } = await import("../src/lib/catalog/minor-context.js");
+  const { hasAdultAgeMarker } = await import("../src/lib/catalog/minor-lock.js");
+  assert.equal(weakAssessment("Indo Ngentot Masih Pake Seragam 18yo"), "ada tanda dewasa (18yo/18+)");
+  assert.equal(weakAssessment("Seragam kantor nakal"), "cuma kata seragam (bisa seragam kerja/cosplay)");
+  assert.match(weakAssessment("Ibu Anak Tiriku"), /^kata keluarga/);
+  assert.equal(weakAssessment("Cewek viral hotel"), "sinyal lemah, kemungkinan salah tulis judul");
+  for (const t of ["masih pake seragam 18yo", "Indo Ngentot Masih Pake Seragam 18yo", "abg 18 yo", "cewek 19+", "seragam 20 tahun"]) {
+    assert.ok(hasAdultAgeMarker(t) && ownerChecked18(t), t);
+  }
+});
