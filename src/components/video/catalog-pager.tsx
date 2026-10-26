@@ -22,6 +22,8 @@ export function CatalogPager({
   total: number;
   limit: number;
   loading?: boolean;
+  /** Diteruskan pemanggil; pager memakai total. */
+  hasMore?: boolean;
   onPage: (page: number) => void;
   /** Path for SSR-rendered crawlable page links, e.g. "/kategori/jilbab". */
   basePath?: string;

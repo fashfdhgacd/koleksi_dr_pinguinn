@@ -16,6 +16,7 @@ import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
 import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
 import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
 import { reviewPriority as detectorPriority } from "@/lib/catalog/minor-detector.js";
+import { ownerChecked18 } from "@/lib/catalog/minor-context.js";
 import { uploadRejectReason, uploadWarnReason } from "@/lib/bot/title-guard.js";
 
 /** Owner's own LuluStream / DoodStream / Byse uploads ("byse-probe" = Byse on a not-yet-listed domain). */
@@ -430,7 +431,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const hiddenReason =
       minorContentReason(minorText) ||
       lockedMinorReason(minorText) ||
-      (detectorPriority("", minorText) === "review" ? "detector-review" : "");
+      (detectorPriority("", minorText) === "review" && !ownerChecked18(minorText) ? "detector-review" : "");
     const flagged = autoTitled.has(i) ? { ...baseRecord, titleAuto: true } : baseRecord;
     const record = hiddenReason
       ? { ...flagged, hidden: true, hidden_reason: hiddenReason }
