@@ -5,6 +5,8 @@ import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { VideoPlayer } from "@/components/video/player";
 import { VideyPlayer } from "@/components/video/videy-player";
+import { PopTapLayer } from "@/components/tap-popunder";
+import { hostLabel } from "@/lib/catalog/embed";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
@@ -301,7 +303,10 @@ export function WatchPage() {
             {isVideyItem(item) ? (
               <VideyPlayer key={item.id} item={item} />
             ) : (
-              <VideoPlayer key={item.id} item={item} />
+              <div className="relative">
+                <VideoPlayer key={item.id} item={item} />
+                <PopTapLayer key={`pop-${item.id}`} videoId={item.id} host={hostLabel(catalogPlayUrl(item)).replace("Puterin", "Putarin")} />
+              </div>
             )}
             {(() => {
               const src = catalogPlayUrl(item);
