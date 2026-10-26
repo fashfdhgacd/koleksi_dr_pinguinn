@@ -8,6 +8,7 @@
 import { OwnerHeroCard } from "@/components/owner-hero";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CATEGORY_LIST } from "@/lib/catalog/categories";
+import { EXTRA_CHOICES, MAX_EXTRA } from "@/components/owner-edit-sheet";
 import { fmt, ownerToast, type OwnerStats, type DayRow } from "@/components/owner-dashboard-shared";
 import {
   AlertStrip,
@@ -381,7 +382,15 @@ function EditRow({
   const [err, setErr] = useState("");
   const extraChanged = [...extra].sort().join(",") !== [...(row.extra || [])].sort().join(",");
   function toggleExtra(slug: string) {
-    setExtra((cur) => (cur.includes(slug) ? cur.filter((s) => s !== slug) : [...cur, slug]));
+    setErr("");
+    setExtra((cur) => {
+      if (cur.includes(slug)) return cur.filter((s) => s !== slug);
+      if (cur.length >= MAX_EXTRA) {
+        setErr(`Maksimal ${MAX_EXTRA} kategori tambahan.`);
+        return cur;
+      }
+      return [...cur, slug];
+    });
   }
   async function save() {
     setBusy(true);
@@ -426,13 +435,16 @@ function EditRow({
         {busy ? "..." : "Simpan"}
       </button>
       <div className="basis-full">
-        <p className="mb-1 text-[13px] text-zinc-400">Tampil juga di kategori (opsional, maks. 6):</p>
+        <p className="mb-1 text-[13px] text-zinc-400">
+          Tampil juga di kategori (opsional, maks. 6): <span className="tabular-nums">{extra.length}/{MAX_EXTRA}</span>
+        </p>
         <div className="flex flex-wrap gap-1.5">
-          {CATEGORY_LIST.filter((c) => c.slug !== cat).map((c) => (
+          {EXTRA_CHOICES.filter((c) => c.slug !== cat).map((c) => (
             <button
               key={c.slug}
               type="button"
               aria-pressed={extra.includes(c.slug)}
+              disabled={!extra.includes(c.slug) && extra.length >= MAX_EXTRA}
               className={toggleCls(extra.includes(c.slug))}
               onClick={() => toggleExtra(c.slug)}
             >

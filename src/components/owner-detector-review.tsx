@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { OwnerEditSheet, verdictText, type EditVerdict } from "@/components/owner-edit-sheet";
 
 type Row = {
   id: string;
@@ -31,11 +32,13 @@ async function post<T>(secret: string, body: Record<string, unknown>): Promise<T
 }
 
 /** Kotak "Perlu dicek": judul verdict "review" dari detector minor, satu tap Tayangkan/Sembunyiin. */
-export function DetectorReviewSection({ secret }: { secret: string }) {
+export function DetectorReviewSection({ secret, onCount }: { secret: string; onCount?: (n: number) => void }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState("");
   const [showDone, setShowDone] = useState(false);
+  const [editing, setEditing] = useState<Row | null>(null);
+  const [verdicts, setVerdicts] = useState<Record<string, EditVerdict>>({});
 
   const load = useCallback(async () => {
     setErr("");
@@ -64,6 +67,11 @@ export function DetectorReviewSection({ secret }: { secret: string }) {
       ),
     );
   };
+
+  const pendingCount = rows ? rows.filter((r) => !r.decidedAt).length : null;
+  useEffect(() => {
+    if (pendingCount != null) onCount?.(pendingCount);
+  }, [pendingCount, onCount]);
 
   if (err && !rows) return <p className="text-sm text-red-400">{err}</p>;
   if (!rows) return <p className="text-sm text-zinc-500">Memuat…</p>;
@@ -101,11 +109,31 @@ export function DetectorReviewSection({ secret }: { secret: string }) {
               <button type="button" disabled={busy === r.id} onClick={() => decide(r.id, "hide")} className="rounded-lg border border-white/[0.1] bg-white/[0.04] px-3.5 py-1.5 text-[13px] text-zinc-200 disabled:opacity-50">
                 Sembunyiin
               </button>
+              <button type="button" onClick={() => setEditing(r)} className="rounded-lg border border-[#2dd4bf]/40 px-3.5 py-1.5 text-[13px] text-[#5eead4]">
+                Edit
+              </button>
             </div>
+            {verdicts[r.id] ? (
+              <p className="mt-2 rounded-lg bg-black/30 px-2.5 py-1.5 text-[12px] text-zinc-200">
+                Setelah edit: <span className="font-medium text-amber-200">{verdictText(verdicts[r.id])}</span>
+              </p>
+            ) : null}
           </div>
         </div>
       ))}
       {!list.length ? <p className="text-sm text-zinc-500">Tidak ada yang perlu dicek.</p> : null}
+      {editing ? (
+        <OwnerEditSheet
+          secret={secret}
+          id={editing.id}
+          title={editing.title}
+          onClose={() => setEditing(null)}
+          onSaved={({ title, verdict }) => {
+            setRows((rs) => (rs || []).map((x) => (x.id === editing.id ? { ...x, title } : x)));
+            if (verdict) setVerdicts((v) => ({ ...v, [editing.id]: verdict }));
+          }}
+        />
+      ) : null}
     </div>
   );
 }
