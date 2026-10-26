@@ -225,7 +225,7 @@ async function ownerPost<T extends { ok?: boolean; error?: string }>(
     if (data) return data;
     return { ok: false, error: `HTTP ${res.status}` } as T;
   } catch {
-    return { ok: false, error: "Jaringan error." } as T;
+    return { ok: false, error: "Koneksi bermasalah." } as T;
   }
 }
 
@@ -283,7 +283,7 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
   return (
     <>
       <div className={h2}>
-        <span>{showHours ? "Kunjungan halaman · 24 jam terakhir" : "Kunjungan halaman · 14 hari"}</span>
+        <span>{showHours ? "Kunjungan halaman, 24 jam terakhir" : "Kunjungan halaman, 14 hari"}</span>
         <span className="flex gap-1">
           {hasHours ? (
             <button type="button" className={toggleCls(showHours)} aria-pressed={showHours} onClick={() => setMode("hours")}>
@@ -490,7 +490,7 @@ function VideoRows({
       if (!d?.ok) ownerToast(`Gagal menyembunyikan: ${d?.error || res.status}`);
       if (d?.ok) onChanged();
     } catch {
-      ownerToast("Gagal menyembunyikan: jaringan error.");
+      ownerToast("Gagal menyembunyikan: koneksi bermasalah.");
     } finally {
       setBusy("");
     }
@@ -512,7 +512,7 @@ function VideoRows({
                 className="h-9 w-16 shrink-0 rounded bg-zinc-900 object-cover"
               />
               <a href={`/watch/${r.id}`} target="_blank" rel="noopener" className="min-w-0 flex-1">
-                <span className="line-clamp-2 text-sm leading-snug text-zinc-100">{r.title || r.id}</span>
+                <span className="block truncate text-sm leading-snug text-zinc-100">{r.title || r.id}</span>
                 <span className={`mt-0.5 block text-[13px] leading-snug ${r.noThumb ? "text-amber-300" : "text-zinc-400"}`}>
                   {r.categoryLabel}
                   {r.extra?.length
@@ -822,7 +822,7 @@ export function OwnerOverview(props: {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 3)
     .map(([k, n]) => `${shortSource(k)} ${fmt(n)}`)
-    .join(" · ");
+    .join(", ");
   const sourceChips = Object.entries(ov?.bySource || {})
     .sort((a, b) => b[1] - a[1])
     .slice(0, 8);

@@ -27,7 +27,7 @@ async function post<T>(secret: string, body: Record<string, unknown>): Promise<T
     });
     return ((await res.json().catch(() => null)) || { ok: false, error: `HTTP ${res.status}` }) as never;
   } catch {
-    return { ok: false, error: "Jaringan error." } as never;
+    return { ok: false, error: "Koneksi bermasalah." } as never;
   }
 }
 

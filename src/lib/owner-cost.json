@@ -1,28 +1,54 @@
 {
-  "updated": "2026-10-20",
-  "note": "Data manual, diperbarui 20 Okt 2026 dari tagihan Cloudflare dan dashboard TrafficStars. Tidak ditarik langsung dari Cloudflare / TrafficStars.",
+  "updated": "2026-10-26",
+  "note": "Biaya Cloudflare dicatat manual 26 Okt 2026 dari analitik Cloudflare (22–26 Okt), diproyeksikan ke 31 hari. Pendapatan dibaca dari public/data/trafficstars.json.",
   "cloudflare": {
-    "cycleFrom": "2026-09-22",
-    "cycleTo": "2026-10-21",
-    "spentUsd": 8.64,
-    "projectedUsageUsd": 3.94,
+    "cycleFrom": "2026-10-22",
+    "cycleTo": "2026-11-21",
+    "spentUsd": 6.03,
+    "projectedUsageUsd": 10.5,
     "baseUsd": 5,
-    "projectedTotalUsd": 8.94,
+    "projectedTotalUsd": 15.5,
     "ceilingUsd": 20,
     "items": [
-      { "label": "KV writes", "usd": 5.0, "note": "1,51 jt write (dr-pinguin-analytics 1,31 jt); hampir 0 sejak 19 Okt" },
-      { "label": "Workers CPU", "usd": 3.04, "note": "181 jt ms" },
-      { "label": "Requests", "usd": 0.6, "note": "11,94 jt request" }
+      {
+        "label": "Workers CPU",
+        "usd": 10.5,
+        "note": "81,7 jt ms dalam 4,6 hari, perkiraan 555 jt ms sesiklus (gratis 30 jt)"
+      },
+      {
+        "label": "Request",
+        "usd": 0,
+        "note": "1,08 jt dalam 4,6 hari, perkiraan 7,3 jt (gratis 10 jt)"
+      },
+      {
+        "label": "Tulis KV",
+        "usd": 0,
+        "note": "1.602 tulis (gratis 1 jt)"
+      }
     ]
   },
   "earnings": {
     "weekUsd": null,
-    "monthUsd": null,
-    "lastDay": { "date": "2026-10-19", "usd": 0.25, "impressions": 23785, "source": "TrafficStars" }
+    "monthUsd": null
   },
   "ads": [
-    { "name": "TrafficStars", "status": "aktif", "note": "situs 91976 · MasterSpot grid, popunder 5210859 (Videy + klik kartu/hero), pre-roll video 5210886 (Videy) · 19 Okt: 23.785 impresi", "earningsUsd": 0.25 },
-    { "name": "ExoClick", "status": "dicopot", "note": "dicopot 19 Okt ($1,79 dalam seminggu sebelumnya)", "earningsUsd": 1.79 },
-    { "name": "Monetag", "status": "dihapus", "note": "direct link dihapus", "earningsUsd": null }
+    {
+      "name": "TrafficStars",
+      "status": "aktif",
+      "note": "popunder 5210859 (Videy, kartu, hero), iklan pembuka 5210886 (Videy)",
+      "earningsUsd": null
+    },
+    {
+      "name": "ExoClick",
+      "status": "aktif",
+      "note": "banner grid 6053864",
+      "earningsUsd": null
+    },
+    {
+      "name": "Monetag",
+      "status": "dihapus",
+      "note": "direct link dihapus",
+      "earningsUsd": null
+    }
   ]
 }

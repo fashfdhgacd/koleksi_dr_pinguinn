@@ -72,7 +72,7 @@ export function OwnerDashboard() {
       saveSecret(key);
       setSecret(key);
     } catch {
-      ownerToast("Gagal memuat statistik: jaringan error.", "error", { label: "Coba lagi", run: () => void fetchOnline(key) });
+      ownerToast("Gagal memuat statistik: koneksi bermasalah.", "error", { label: "Coba lagi", run: () => void fetchOnline(key) });
     } finally {
       setLoading(false);
     }
@@ -96,7 +96,7 @@ export function OwnerDashboard() {
       }
       setPlayerLog(d);
     } catch {
-      ownerToast("Gagal memuat Kesehatan player: jaringan error.", "error", { label: "Coba lagi", run: () => void loadPlayerLog(key) });
+      ownerToast("Gagal memuat Kesehatan player: koneksi bermasalah.", "error", { label: "Coba lagi", run: () => void loadPlayerLog(key) });
       setPlayerLog((cur) => cur || { hosts: [] });
     } finally {
       setPlayerBusy(false);
@@ -321,13 +321,13 @@ export function OwnerDashboard() {
             <div className="min-w-0 leading-tight">
               <h1 className="truncate text-lg font-semibold text-zinc-50">{tabs.find((t) => t.id === tab)?.label}</h1>
               <p className="text-[12px] text-zinc-500">
-                {lastText ? `Update ${lastText} WIB` : loading ? "Memuat…" : "Belum dimuat"} ·{" "}
-                <span className="text-[#5eead4]">● {fmt(online)} online</span>
+                {lastText ? `Diperbarui ${lastText} WIB` : loading ? "Memuat…" : "Belum dimuat"},{" "}
+                <span className="text-[#5eead4]">● {fmt(online)} sedang online</span>
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               <button type="button" className={headBtnPrimary} onClick={() => refreshAll(secret)} disabled={loading}>
-                {loading ? "Memuat…" : "↻ Refresh"}
+                {loading ? "Memuat…" : "↻ Muat ulang"}
               </button>
             </div>
           </div>
@@ -396,7 +396,7 @@ export function OwnerDashboard() {
           {seen.video ? (
             <section className={`${show("video")} flex-col gap-4`}>
               <Group title="Kelola video">
-                <Collapse id="tools" title="Tambah video · Ambil link">
+                <Collapse id="tools" title="Tambah video dan ambil link">
                   <OwnerTools secret={secret} />
                 </Collapse>
                 <Collapse id="player-error" title="Player error (detail + sembunyikan)">
@@ -414,7 +414,7 @@ export function OwnerDashboard() {
                   <OwnerTools secret={secret} part="poster" />
                 </Collapse>
               </Group>
-              <p className="px-1 text-[12px] text-zinc-500">Cari & edit video ada di tab Ringkasan (Upload terbaru · Cari video).</p>
+              <p className="px-1 text-[12px] text-zinc-500">Cari dan edit video ada di tab Ringkasan, bagian Upload terbaru.</p>
             </section>
           ) : null}
 
@@ -427,7 +427,7 @@ export function OwnerDashboard() {
                 <StatusRow label="Pengunjung online" ok text={fmt(online)} />
               </Group>
               <Group title="Bot">
-                <Collapse id="bot" title="Bot Telegram (webhook, detail)">
+                <Collapse id="bot" title="Bot Telegram (detail)">
                   <OwnerTelegramStatus secret={secret} />
                 </Collapse>
               </Group>
@@ -645,7 +645,7 @@ function PlayerErrorsSection({
         await load();
       }
     } catch {
-      ownerToast("Jaringan error.");
+      ownerToast("Koneksi bermasalah.");
     } finally {
       setBusyId("");
     }
@@ -700,7 +700,7 @@ function PlayerErrorsSection({
         </Button>
       </div>
       {note ? <p className="mt-2 text-[13px] text-zinc-400">{note}</p> : null}
-      {data?.storage === "none" ? <p className="mt-2 text-[13px] text-amber-400">Database D1 tidak terbaca.</p> : null}
+      {data?.storage === "none" ? <p className="mt-2 text-[13px] text-amber-400">Database tidak terbaca.</p> : null}
 
       {data ? (
         <>
@@ -752,9 +752,9 @@ function PlayerErrorsSection({
                     <span className="mr-1.5 text-zinc-400">{hostLabel(r.host)}</span>
                     {title(r)}
                     <span className="ml-1.5 tabular-nums text-zinc-400">
-                      {r.fails} gagal{r.reports ? ` · ${r.reports} lapor` : ""}
-                      {r.gone ? " · dihapus oleh sumber" : ""}
-                      {r.hidden ? " · disembunyikan" : ""}
+                      {fmt(r.fails)} gagal{r.reports ? `, ${fmt(r.reports)} laporan` : ""}
+                      {r.gone ? ", dihapus oleh sumber" : ""}
+                      {r.hidden ? ", disembunyikan" : ""}
                     </span>
                   </span>
                   {actions(r)}
@@ -789,7 +789,7 @@ function PlayerErrorsSection({
 
           <h3 className="mt-4 text-[13px] font-medium text-zinc-300">Disembunyikan dari sini ({ownerHidden.length})</h3>
           {data.hideReadable === false ? (
-            <p className="mt-1 text-[13px] text-amber-400">KV tidak terbaca, daftar belum bisa dimuat.</p>
+            <p className="mt-1 text-[13px] text-amber-400">Penyimpanan tidak terbaca, daftar belum bisa dimuat.</p>
           ) : ownerHidden.length ? (
             <ul className="mt-1 divide-y divide-white/[0.06]">
               {ownerHidden.map((r) => (

@@ -66,7 +66,7 @@ function RecentUploads({ secret }: { secret: string }) {
         setFlush(null);
       }
     } catch {
-      setNote("Jaringan error.");
+      setNote("Koneksi bermasalah.");
     } finally {
       setBusy(false);
     }
@@ -135,7 +135,7 @@ export function OwnerTelegramStatus({ secret }: { secret: string }) {
 
   async function call(action: "telegram-webhook-info" | "telegram-webhook-setup") {
     setBusy(true);
-    setNote(action === "telegram-webhook-setup" ? "Memasang pengaman webhook…" : "Mengecek status bot…");
+    setNote(action === "telegram-webhook-setup" ? "Memasang ulang pengaman bot…" : "Mengecek status bot…");
     try {
       const res = await fetch("/api/owner-tools", {
         method: "POST",
@@ -153,10 +153,10 @@ export function OwnerTelegramStatus({ secret }: { secret: string }) {
       }
       setData(d);
       if (!d.ok) setNote(`Gagal: ${d.error || "tidak diketahui"}`);
-      else if (action === "telegram-webhook-setup") setNote("Pengaman webhook terpasang.");
+      else if (action === "telegram-webhook-setup") setNote("Pengaman bot terpasang.");
       else setNote("");
     } catch {
-      setNote("Jaringan error.");
+      setNote("Koneksi bermasalah.");
     } finally {
       setBusy(false);
     }
@@ -181,13 +181,13 @@ export function OwnerTelegramStatus({ secret }: { secret: string }) {
         <dl className="mt-3 grid grid-cols-[auto,1fr] gap-x-3 gap-y-1 text-xs text-zinc-300">
           <dt className="text-zinc-500">Status</dt>
           <dd className={healthy ? "text-emerald-400" : "text-amber-400"}>{healthy ? "Aman & aktif" : "Perlu dicek"}</dd>
-          <dt className="text-zinc-500">URL webhook</dt>
+          <dt className="text-zinc-500">Alamat bot</dt>
           <dd className="break-all">
             {info?.url || "—"} {data.urlOk ? "(ok)" : `(harusnya ${data.expectedUrl || "/api/telegram"})`}
           </dd>
           <dt className="text-zinc-500">Antrian</dt>
           <dd>{info ? info.pendingUpdateCount : "—"}</dd>
-          <dt className="text-zinc-500">Error terakhir</dt>
+          <dt className="text-zinc-500">Gangguan terakhir</dt>
           <dd className="break-all">
             {info?.lastErrorMessage ? `${info.lastErrorMessage} (${wib(info.lastErrorDate)})` : "Tidak ada"}
           </dd>
