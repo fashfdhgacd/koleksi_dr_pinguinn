@@ -17,6 +17,23 @@ import { lockedMinorReason, schoolReason } from "@/lib/catalog/minor-lock.js";
 import { reviewPriority as detectorPriority } from "@/lib/catalog/minor-detector.js";
 import { ownerChecked18 } from "@/lib/catalog/minor-context.js";
 import { uploadRejectReason, uploadWarnReason } from "@/lib/bot/title-guard.js";
+import { HOLD_REASON, explainTerm, holdReplyLines, titleHold, uploadAction } from "@/lib/bot/title-hold.js";
+
+/** Title is clean for the hard checks too (reject list + minor-lock). Used for hold suggestions. */
+function hardOk(t) {
+  return !uploadRejectReason(t) && !lockedMinorReason(t);
+}
+
+/** Raw catalog items (hidden ones included) to find held drafts on a resend; [] when unavailable. */
+async function rawCatalogItems() {
+  try {
+    const { loadItemsRaw } = await import("@/lib/catalog/local-cache");
+    const cache = await loadItemsRaw();
+    return cache.raw || cache.items || [];
+  } catch {
+    return [];
+  }
+}
 
 /** Owner's own LuluStream / DoodStream / Byse uploads ("byse-probe" = Byse on a not-yet-listed domain). */
 const DRP_HOSTS = new Set(["lulu", "dood", "byse", "byse-probe"]);
@@ -262,6 +279,8 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   let skippedTotal = 0;
   let failedTotal = 0;
   let rejectedTotal = 0;
+  let heldTotal = 0;
+  let catalogRaw = null;
   const posterBatch = {};
   const createdRecords = [];
 
@@ -388,7 +407,9 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const rejectReason = uploadRejectReason(guardText);
     if (rejectReason) {
       rejectedTotal += 1;
-      lines.push(`⛔ ${video.id}: Ditolak: judul nyebut "${rejectReason}". Video nggak dimasukin ke web.`);
+      const meaning = explainTerm(rejectReason);
+      lines.push(`⛔ ${video.id}: Ditolak: judul nyebut "${rejectReason}"${meaning ? ` = ${meaning}` : ""}. Video nggak dimasukin ke web.`);
+      lines.push("✏️ Kalau isinya jelas orang dewasa, kirim ulang link-nya pakai judul baru. Kalau isinya memang anak sekolah/di bawah umur, jangan diupload.");
       continue;
     }
     // Judul dasar (branding situs lain + pinguin lama sudah dibuang) untuk kategori & filter minor;
@@ -432,11 +453,43 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
       lockedMinorReason(minorText) ||
       (detectorPriority("", minorText) === "review" && !ownerChecked18(minorText) ? "detector-review" : "");
     const flagged = autoTitled.has(i) ? { ...baseRecord, titleAuto: true } : baseRecord;
-    const record = hiddenReason
+    let record = hiddenReason
       ? { ...flagged, hidden: true, hidden_reason: hiddenReason }
       : deadVidey.has(i)
         ? { ...flagged, hidden: true, hidden_reason: DEAD_VIDEY_REASON }
         : flagged;
+    // Upload-time title check (title-hold.js, NEW uploads only): school/minor-implying words hold the
+    // upload as an editable hidden draft; a resend of a held draft with a clean title publishes it.
+    const typedTitle = String(video.title || parsedMsg.title || "");
+    const hold = titleHold(baseTitle, hardOk) || titleHold(typedTitle, hardOk) || titleHold(String(meta.title || ""), hardOk);
+    if (catalogRaw === null) catalogRaw = await rawCatalogItems();
+    const act = uploadAction(catalogRaw, record, title, (t) => !hold && hardOk(t));
+    if (act.action === "hold-again") {
+      heldTotal += 1;
+      for (const l of holdReplyLines(act.draft.id, hold || { term: "", meaning: "", suggestions: [] })) lines.push(l);
+      continue;
+    }
+    if (act.action === "publish") {
+      try {
+        const { publishHeldDraft } = await import("@/lib/owner-detector-review");
+        const res = await publishHeldDraft(String(act.draft.id), title, record.category);
+        if (res.ok) {
+          createdTotal += 1;
+          createdRecords.push({ id: String(act.draft.id), title, poster: "", hidden: false });
+          lines.push(`✅ ${act.draft.id} — ${title} · judul baru, video yang tadinya ditahan sekarang tayang`);
+        } else {
+          failedTotal += 1;
+          lines.push(`⚠️ ${act.draft.id}: gagal nayangin draft (${res.error || "unknown"}). Coba Tayangkan di /pemilik.`);
+        }
+      } catch (err) {
+        failedTotal += 1;
+        lines.push(`⚠️ ${act.draft.id}: gagal nayangin draft (${err instanceof Error ? err.message : String(err)})`.slice(0, 220));
+      }
+      continue;
+    }
+    if (act.action === "hold") {
+      record = { ...record, hidden: true, hidden_reason: HOLD_REASON, title_hold: hold };
+    }
     const warn = uploadWarnReason(`${guardText} ${baseTitle}`, record.category);
     const fileName = video.file || "videos.json";
     const list = byFile.get(fileName) || [];
@@ -457,7 +510,8 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
       for (const [fileName, items] of byFile) {
         const keep = [];
         for (const it of items) {
-          if (String(it.record?.category || "") !== "videy") {
+          // Held drafts take the direct path so the owner gets the hold reply right away.
+          if (String(it.record?.category || "") !== "videy" || it.record?.hidden_reason === HOLD_REASON) {
             keep.push(it);
             continue;
           }
@@ -515,6 +569,12 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
         const idKey = String(it.record.id || "").toLowerCase();
         const poster = String(it.record.poster || it.record.thumbnail || "").trim();
         if (isHttpPoster(poster)) posterBatch[it.record.id] = poster;
+        if (createdIds.has(idKey) && it.record.hidden_reason === HOLD_REASON) {
+          createdTotal -= 1;
+          heldTotal += 1;
+          for (const l of holdReplyLines(it.record.id, it.record.title_hold || { term: "", meaning: "", suggestions: [] })) lines.push(l);
+          continue;
+        }
         if (createdIds.has(idKey)) {
           createdRecords.push({
             id: String(it.record.id),
@@ -583,7 +643,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     }
   }
 
-  const summary = `✅ ${createdTotal} dibuat · ⏭️ ${skippedTotal} skip · ⚠️ ${failedTotal} gagal${queuedTotal ? ` · 🕒 ${queuedTotal} antre` : ""}${rejectedTotal ? ` · ⛔ ${rejectedTotal} ditolak` : ""}`;
+  const summary = `✅ ${createdTotal} dibuat · ⏭️ ${skippedTotal} skip · ⚠️ ${failedTotal} gagal${queuedTotal ? ` · 🕒 ${queuedTotal} antre` : ""}${heldTotal ? ` · ⛔ ${heldTotal} ditahan (judul perlu diganti)` : ""}${rejectedTotal ? ` · ⛔ ${rejectedTotal} ditolak` : ""}`;
   await tgSendChunks(
     token,
     chatId,

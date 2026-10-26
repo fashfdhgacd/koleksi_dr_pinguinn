@@ -13,6 +13,35 @@ import { readOwnerHideState, setOwnerHidden } from "@/lib/catalog/owner-hide-sto
 import { readReviewState, writeReviewState } from "@/lib/owner-review-store";
 import { minorContentReason } from "@/lib/catalog/minor-detector.js";
 import { explainTitle, ownerChecked18, schoolReviewCue } from "@/lib/catalog/minor-context.js";
+import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import { readOwnerEditState, setOwnerEdit } from "@/lib/catalog/owner-edit-store";
+import { uploadRejectReason } from "@/lib/bot/title-guard.js";
+import { HOLD_REASON, canPublishTitle, titleHold } from "@/lib/bot/title-hold.js";
+
+/** Hard checks a held draft's new title must also pass (reject list + minor lock + detector "minor"). */
+function hardOk(t: string): boolean {
+  return !uploadRejectReason(t) && !lockedMinorReason(t) && minorContentReason(t) !== "minor";
+}
+
+/**
+ * Publishes a held upload draft (hidden_reason "title-rename") under a clean title: owner edit
+ * title (+ category) and Unhide, same stores as /pemilik Edit + Tayangkan. Used by a bot resend.
+ */
+export async function publishHeldDraft(id: string, title: string, category?: string): Promise<{ ok: boolean; error?: string }> {
+  if (!canPublishTitle(title, hardOk)) return { ok: false, error: "title_needs_rename" };
+  try {
+    await setOwnerEdit(id, { title, ...(category ? { category } : {}) });
+    const hideIds = Object.keys((await setOwnerHidden(id, false)).ids);
+    const unhideIds = Object.keys((await setUnhidden(id, true)).ids);
+    applyUnhidden(unhideIds, hideIds, (await readOwnerEditState()).ids);
+    const state = await readReviewState(true);
+    state.checked[`det:${id}`] = Date.now();
+    await writeReviewState(state);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "kv_error" };
+  }
+}
 
 export type DetectorReviewRow = {
   id: string;
@@ -60,13 +89,44 @@ function http(v: unknown): string | null {
 
 export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
   const cache = (await loadItemsRaw()) as unknown as { raw?: AnyItem[]; items: AnyItem[] };
-  const [unhide, ownerHide, state] = await Promise.all([readUnhideState(), readOwnerHideState(), readReviewState(true)]);
+  const [unhide, ownerHide, state, edits] = await Promise.all([
+    readUnhideState(),
+    readOwnerHideState(),
+    readReviewState(true),
+    readOwnerEditState().catch(() => ({ ids: {} as Record<string, { title?: string }> })),
+  ]);
   const out: DetectorReviewRow[] = [];
   const seen = new Set<string>();
   for (const it of cache.raw || cache.items) {
     if (!it?.id || seen.has(it.id)) continue;
     seen.add(it.id);
-    const title = String(it.title || "");
+    // Upload held because the title needs renaming (title-hold.js): editable draft, never locked here.
+    const renameTag = it.hidden === true && it.hidden_reason === HOLD_REASON;
+    const title = String((renameTag && edits.ids[it.id]?.title) || it.title || "");
+    if (renameTag) {
+      if (unhide.ids[it.id]) continue;
+      const hold = titleHold(title);
+      const clean = canPublishTitle(title, hardOk);
+      out.push({
+        id: it.id,
+        title,
+        translation: translateZh(title),
+        moderation: "review_pending",
+        assessment: clean ? "Judul sudah aman, tinggal Tayangkan" : "Judul perlu diganti",
+        reason: clean
+          ? "Judul sudah diganti dan lolos cek. Tap Tayangkan buat nayangin."
+          : hold
+            ? `Judul perlu diganti: kata "${hold.term}" = ${hold.meaning}. Tap Edit, ganti judulnya${hold.suggestions.length ? ` (saran: ${hold.suggestions.join(" / ")})` : ""}, lalu Tayangkan.`
+            : "Judul perlu diganti: masih kena cek judul. Tap Edit, ganti judulnya, lalu Tayangkan.",
+        signals: hold ? [hold.term] : [],
+        held: true,
+        status: ownerHide.ids[it.id] ? "Disembunyiin pemilik" : "Ditahan (judul perlu diganti), belum tayang",
+        thumbUrl: `/thumb/${it.id}`,
+        watchUrl: http(it.embed) || http(it.direct) || `/watch/${it.id}`,
+        decidedAt: null,
+      });
+      continue;
+    }
     const heldTag = it.hidden === true && it.hidden_reason === "detector-review";
     const owner = minorContentReason(title);
     // Isyarat sekolah tambahan: hanya antre "Perlu dicek", tidak pernah mengunci/menyembunyikan.
@@ -106,6 +166,14 @@ export async function decideDetectorReview(body: { id?: unknown; decision?: unkn
   const cache = (await loadItemsRaw()) as unknown as { raw?: AnyItem[]; items: AnyItem[] };
   const it = (cache.raw || cache.items).find((x) => x?.id === id);
   if (!it) return { ok: false, error: "not_found", status: 404 };
+  if (it.hidden === true && it.hidden_reason === HOLD_REASON && body.decision === "show") {
+    // Held for its title: publish only once the (edited) title passes the same upload check.
+    const edits = await readOwnerEditState().catch(() => ({ ids: {} as Record<string, { title?: string }> }));
+    const current = String(edits.ids[id]?.title || it.title || "");
+    if (!canPublishTitle(current, hardOk)) return { ok: false, error: "title_needs_rename", status: 409 };
+    const r = await publishHeldDraft(id, current);
+    return r.ok ? { ok: true, held: false } : { ok: false, error: r.error, status: 503 };
+  }
   const title = String(it.title || "");
   // status "locked": tidak bisa ditayangkan lewat tombol Tayangkan.
   if (minorContentReason(title) === "minor" || isLockedMinor(it as never)) return { ok: false, error: "locked_minor", status: 403 };

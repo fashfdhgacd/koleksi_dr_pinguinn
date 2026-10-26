@@ -75,6 +75,7 @@ const HIDE_REASON_LABELS: Record<string, string> = {
   "bot-flag": "Ditandai bot saat upload",
   "locked:minor-detector": "Detector minor: judul jelas di bawah umur (diblokir)",
   "detector-review": "Perlu dicek: sinyal sekolah/umur dari detector minor (lihat kotak Perlu dicek)",
+  "title-rename": "Judul perlu diganti: ditahan saat upload (lihat kotak Perlu dicek, Edit lalu Tayangkan)",
   "source-gone": "Dihapus di sumber",
 };
 
