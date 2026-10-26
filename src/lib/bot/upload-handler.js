@@ -13,8 +13,7 @@ import { upsertVideosBatch } from "@/lib/bot/github.js";
 import { postNewVideosToChannelReport, channelReportLine } from "@/lib/bot/channel-post";
 import { pushNewVideos, pushReportLine } from "@/lib/web-push";
 import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
-import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
-import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import { lockedMinorReason, schoolReason } from "@/lib/catalog/minor-lock.js";
 import { reviewPriority as detectorPriority } from "@/lib/catalog/minor-detector.js";
 import { ownerChecked18 } from "@/lib/catalog/minor-context.js";
 import { uploadRejectReason, uploadWarnReason } from "@/lib/bot/title-guard.js";
@@ -429,7 +428,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     // minor-detector.js: "block" is already locked via lockedMinorReason; "review" is held hidden
     // until the owner checks it (Unhide in /pemilik = Tayangkan). Additive to the rules above.
     const hiddenReason =
-      minorContentReason(minorText) ||
+      schoolReason(minorText) ||
       lockedMinorReason(minorText) ||
       (detectorPriority("", minorText) === "review" && !ownerChecked18(minorText) ? "detector-review" : "");
     const flagged = autoTitled.has(i) ? { ...baseRecord, titleAuto: true } : baseRecord;
