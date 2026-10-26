@@ -180,7 +180,7 @@ export function HiddenListSection({ secret }: { secret: string }) {
       );
       setSelected(new Set());
       const rej = (d.rejected || []).length;
-      setBulkMsg(`${unhide ? "Ditampilkan" : "Disembunyikan"}: ${applied.size} video${rej ? ` · ${rej} id ditolak (bukan video yang ditandai)` : ""}.`);
+      setBulkMsg(`${unhide ? "Ditampilkan" : "Disembunyikan"}: ${applied.size} video${rej ? `, ${rej} ditolak karena bukan video yang ditandai` : ""}.`);
     } catch {
       setErr("gagal");
     } finally {
@@ -302,7 +302,7 @@ export function HiddenListSection({ secret }: { secret: string }) {
       </p>
       {err ? (
         <p className="mt-3 text-xs text-red-400">
-          Error: {err}{" "}
+          Gagal: {err}{" "}
           <button type="button" className="underline" onClick={() => void load()}>
             coba lagi
           </button>
@@ -466,7 +466,7 @@ export function HiddenListSection({ secret }: { secret: string }) {
                             <>
                               {" · "}
                               <a href={r.embedUrl} target="_blank" rel="noreferrer noopener" className="text-sky-400/70 hover:underline">
-                                embed
+                                link pemutar
                               </a>
                             </>
                           ) : null}
