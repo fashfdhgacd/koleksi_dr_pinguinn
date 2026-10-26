@@ -25,6 +25,7 @@ import thumbsDeploy from "../../../data/.thumbs-deploy.json";
 import { findCategory } from "@/lib/catalog/categories";
 import { minorContentReason } from "@/lib/catalog/hidden-ids.js";
 import { isLockedMinorId, lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import { reviewPriority as detectorPriority } from "@/lib/catalog/minor-detector.js";
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
@@ -71,6 +72,8 @@ const HIDE_REASON_LABELS: Record<string, string> = {
   classroom: "Ruang kelas",
   "incest-child": "Inses dengan anak",
   "bot-flag": "Ditandai bot saat upload",
+  "locked:minor-detector": "Detector minor: judul jelas di bawah umur (diblokir)",
+  "detector-review": "Perlu dicek: konteks sekolah/keluarga + kata umur (detector minor)",
   "source-gone": "Dihapus di sumber",
 };
 
@@ -578,7 +581,7 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
   // Locked/hidden items may be edited (metadata correction), but an edit never unhides: local-cache.ts
   // checks the stored title as well as the edit, so the item stays hidden. A new title must not carry
   // a school/minor theme.
-  if (title && (lockedMinorReason(title) || minorContentReason(title))) {
+  if (title && (lockedMinorReason(title) || minorContentReason(title) || detectorPriority("", title) === "block")) {
     return json({ ok: false, error: "Judul ditolak: bertema sekolah/di bawah umur." }, 403);
   }
 
@@ -618,6 +621,8 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
     id,
     title: saved?.title || null,
     category: saved?.category || null,
+    // minor-detector.js verdict for the new title ("review" = owner should double-check it).
+    detector: title ? detectorPriority("", title) : null,
     ...(extra ? { extra: saved?.extra || [] } : {}),
   });
 }
