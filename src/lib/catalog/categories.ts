@@ -8,6 +8,8 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "jav", label: "Jav", query: "jav" },
   { slug: "hentai", label: "Hentai", query: "hentai" },
   { slug: "ai-plus", label: "AI+", query: "ai-plus" },
+  // Gay AI videos; tagged on upload with #aigay or "kategori: ai gay" (src/lib/bot/parse.js).
+  { slug: "ai-gay", label: "AI GAY", query: "ai-gay" },
   { slug: "jilbab", label: "Jilbab", query: "jilbab" },
   { slug: "tante", label: "Tante", query: "tante" },
   { slug: "amatir", label: "Amatir", query: "amatir" },
@@ -59,6 +61,9 @@ export const CATEGORY_LIST: CategoryInfo[] = CATEGORIES.filter((c) => !UNLISTED_
 /** Kategori dengan video lebih sedikit dari ini tidak tampil di /kategori dan sitemap (halaman tetap bisa dibuka). */
 export const MIN_LISTED_CATEGORY_COUNT = 20;
 
+/** A category page with fewer videos than this is noindex,follow (thin page), indexable automatically after. */
+export const MIN_INDEXED_CATEGORY_COUNT = 5;
+
 /** Chip utama di header; sisanya di menu "Lainnya". */
 export const PRIMARY_CATEGORY_SLUGS = [
   "jav",
@@ -80,9 +85,13 @@ export const MORE_CATEGORIES: CategoryInfo[] = CATEGORY_LIST.filter(
   (c) => !(PRIMARY_CATEGORY_SLUGS as readonly string[]).includes(c.slug),
 );
 
+/** Every spelling that names AI GAY (upload "kategori:" line, #aigay tag, bot menu). */
+export const AI_GAY_KEYS = new Set(["ai-gay", "ai gay", "aigay", "#aigay", "#ai-gay", "ai_gay"]);
+
 export function findCategory(slug: string | null | undefined): CategoryDef | undefined {
   if (!slug) return undefined;
   const key = slug.trim().toLowerCase();
+  if (AI_GAY_KEYS.has(key)) return CATEGORIES.find((c) => c.slug === "ai-gay");
   if (key === "ai" || key === "ai+") {
     return CATEGORIES.find((c) => c.slug === "ai-plus");
   }
