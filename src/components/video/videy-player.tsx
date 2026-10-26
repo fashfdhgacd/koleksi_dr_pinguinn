@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { VideoDetail } from "@/lib/catalog/types";
 import { sendPlayerLog } from "@/lib/player-log-client";
 import { popTap } from "@/components/ts-videy-popunder";
+import { PopTapLayer } from "@/components/tap-popunder";
 import { loadVast, ping, prerollDue, VAST_TIMEOUT_MS, type VastAd } from "@/components/videy-preroll";
 
 /**
@@ -19,7 +20,8 @@ import { loadVast, ping, prerollDue, VAST_TIMEOUT_MS, type VastAd } from "@/comp
  * browser allows it, and unlocks on exit.
  *
  * TrafficStars popunder (ts-videy-popunder.tsx): the poster overlay is our tap-catcher; its first tap
- * per video per session opens the direct link in a new tab (our tab stays, paused); the next tap plays.
+ * (within the shared per-video cap, card-popunder.ts) opens the direct link in a new tab; the next tap
+ * plays. During playback a one-shot PopTapLayer re-arms when the cap allows a later pop.
  *
  * Kesehatan player (/pemilik): the same /api/player-log beacons as the other hosts, once per video
  * per session (src/lib/player-log-client.ts), host "Videy":
@@ -412,6 +414,17 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
         poster={poster}
         controls={phase === "main"}
       />
+      {phase === "main" ? (
+        // Re-armed popunder tap during playback (shared per-video cap); removes itself after firing.
+        <PopTapLayer
+          videoId={item.id}
+          host="Videy"
+          onPass={() => {
+            const v = videoRef.current;
+            if (v) void (v.paused ? v.play().catch(() => {}) : v.pause());
+          }}
+        />
+      ) : null}
       {phase === "idle" ? (
         <button
           type="button"
