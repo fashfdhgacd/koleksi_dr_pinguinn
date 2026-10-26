@@ -1,3 +1,4 @@
+import { curatedDescription } from "@/lib/catalog/video-descriptions";
 import { createFileRoute, notFound } from "@tanstack/react-router";
 import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { queryCatalog } from "@/lib/catalog/service";
@@ -63,7 +64,10 @@ export const Route = createFileRoute("/watch/$id")({
         ? videoSeoTitle(item.title, item.category)
         : "Video tidak ditemukan | koleksidrpinguin.com";
     const ogTitle = gen ? gen.ogTitle : item ? cleanDisplayTitle(item.title) : title;
-    const description = gen
+    const curated = item ? curatedDescription(item.id) : "";
+    const description = curated
+      ? curated
+      : gen
       ? gen.description
       : item
         ? resolveVideoSeoDescription(item)
