@@ -44,6 +44,8 @@ export type VideoDetail = VideoCard & {
   qualities: VideoQuality[];
   subjects: string[];
   playable: boolean;
+  /** Videy item off lists for a missing frame: the page still opens but asks search engines not to index it. */
+  noindex?: boolean;
   /** Every listed /kategori category this video is in (same pools as the category pages), max 10. */
   categories?: CategoryInfo[];
   /** Tanggal unggah asli dari katalog (createdAt ?? date); dipakai VideoObject.uploadDate. */

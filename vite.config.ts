@@ -120,7 +120,21 @@ function authPopupPlugin(): Plugin {
 // `0.0.0.0:8080` is the live-preview contract — don't change host/port.
 // The dev server starts once `src/router.tsx` and `src/routes/` exist — see
 // AGENTS.md § "First scaffold".
+/** Videy ids that already have a frame (public/videy-thumbs/<id>.jpg); see videyMissingThumb. */
+function videyThumbIds(): string[] | null {
+  try {
+    return readdirSync(join(__dirname, "public", "videy-thumbs"))
+      .filter((f) => f.endsWith(".jpg"))
+      .map((f) => f.slice(0, -4));
+  } catch {
+    return null;
+  }
+}
+
 export default defineConfig(({ command, isPreview }) => ({
+  define: {
+    __VIDEY_THUMB_IDS__: JSON.stringify(videyThumbIds()),
+  },
   server: {
     host: "0.0.0.0",
     port: 8080,
