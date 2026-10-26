@@ -2,21 +2,21 @@ import { createFileRoute } from "@tanstack/react-router";
 import { isOwnerKey, ownerKeyFrom, ownerSecret } from "@/lib/owner-auth";
 import { hiddenReasonRaw, loadItemsRaw } from "@/lib/catalog/local-cache";
 import type { RawItem } from "@/lib/catalog/local-shared";
-import latestPutarin from "../../../data/putarin-latest.json";
-// The Telegram bot splits this feed into chunks once it grows (videos-latest.json, -p02.json, ...;
-// see chunk naming in src/lib/bot/github.js). Bundle every chunk so no upload drops off the site.
-const latestVideoChunks = import.meta.glob<unknown>("../../../data/videos-latest*.json", {
-  eager: true,
-  import: "default",
-});
-const chunkNo = (path: string) => Number(/-p(\d+)\.json$/i.exec(path)?.[1] ?? 1);
-const latestVideos: unknown[] = Object.keys(latestVideoChunks)
-  .filter((path) => !/-index\.json$/i.test(path))
-  .sort((a, b) => chunkNo(a) - chunkNo(b))
-  .flatMap((path) => {
-    const chunk = latestVideoChunks[path];
-    return Array.isArray(chunk) ? chunk : [];
-  });
+import { mergeChunks } from "@/lib/catalog/chunk-contract.js";
+import latestVideosIndex from "../../../data/videos-latest-index.json";
+import latestPutarinIndex from "../../../data/putarin-latest-index.json";
+// Chunked bot feeds (contract: src/lib/catalog/chunk-contract.js). Every chunk is bundled and
+// ordered by its -index.json; scripts/check-catalog.mjs fails the build if one goes missing.
+const latestVideos: unknown[] = mergeChunks(
+  import.meta.glob<unknown>("../../../data/videos-latest*.json", { eager: true, import: "default" }),
+  latestVideosIndex,
+  "videos-latest",
+);
+const latestPutarin: unknown[] = mergeChunks(
+  import.meta.glob<unknown>("../../../data/putarin-latest*.json", { eager: true, import: "default" }),
+  latestPutarinIndex,
+  "putarin-latest",
+);
 
 /**
  * Owner-only "Baru masuk": newest Telegram uploads from the bundled bot files

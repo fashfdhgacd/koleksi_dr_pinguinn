@@ -36,22 +36,22 @@ import { isLockedMinorId, lockedMinorReason, schoolReason } from "./minor-lock.j
 import { ownerChecked18 } from "./minor-context.js";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
-// The Telegram bot splits this feed into chunks once it grows (videos-latest.json, -p02.json, ...;
-// see chunk naming in src/lib/bot/github.js). Bundle every chunk so no upload drops off the site.
-const latestVideoChunks = import.meta.glob<unknown>("../../../data/videos-latest*.json", {
-  eager: true,
-  import: "default",
-});
-const chunkNo = (path: string) => Number(/-p(\d+)\.json$/i.exec(path)?.[1] ?? 1);
-const latestVideos: unknown[] = Object.keys(latestVideoChunks)
-  .filter((path) => !/-index\.json$/i.test(path))
-  .sort((a, b) => chunkNo(a) - chunkNo(b))
-  .flatMap((path) => {
-    const chunk = latestVideoChunks[path];
-    return Array.isArray(chunk) ? chunk : [];
-  });
-// Putarin uploads from the Telegram bot land here (bot appends, dedupes by id); bundle so every batch stays live.
-import latestPutarin from "../../../data/putarin-latest.json";
+// Telegram bot uploads (IndoAV/Streamtape/Putarin) land in these feeds; bundle so every batch stays live.
+// Chunked bot feeds (contract: src/lib/catalog/chunk-contract.js). Every chunk is bundled and
+// ordered by its -index.json; scripts/check-catalog.mjs fails the build if one goes missing.
+const latestVideos: unknown[] = mergeChunks(
+  import.meta.glob<unknown>("../../../data/videos-latest*.json", { eager: true, import: "default" }),
+  latestVideosIndex,
+  "videos-latest",
+);
+const latestPutarin: unknown[] = mergeChunks(
+  import.meta.glob<unknown>("../../../data/putarin-latest*.json", { eager: true, import: "default" }),
+  latestPutarinIndex,
+  "putarin-latest",
+);
+import { mergeChunks } from "@/lib/catalog/chunk-contract.js";
+import latestVideosIndex from "../../../data/videos-latest-index.json";
+import latestPutarinIndex from "../../../data/putarin-latest-index.json";
 import latestPosters from "../../../data/latest-posters.json";
 // Owner's Byse / DoodStream / LuluStream library (/kategori/bokep), one-off import 2026-10-19.
 import drpBokepBatch from "../../../data/drp-bokep.json";
