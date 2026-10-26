@@ -16,7 +16,7 @@ import {
 import { runtime } from "./local-shared";
 import { popularIds, tagOptions, titleTags } from "./title-tags";
 import { normalizeSearchText, parseSearchQuery, scoreSearch } from "./search-rank";
-import { isPublicHidden, loadItems, pageOf, sortByNewest } from "./local-cache";
+import { isPublicHidden, isVideyNoThumbHidden, loadItems, pageOf, sortByNewest } from "./local-cache";
 import type { CatalogCache } from "./local-shared";
 
 export { loadItems } from "./local-cache";
@@ -263,6 +263,7 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
     subjects: [],
     playable: Boolean(embed),
     categories: videoCategories(bag, item),
+    ...((await isVideyNoThumbHidden(item.id)) ? { noindex: true } : {}),
   };
 }
 

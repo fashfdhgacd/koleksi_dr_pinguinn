@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 type Row = { id: string; title: string; thumb: string; createdAt: number };
+type NoThumbRow = { id: string; title: string; createdAt: number };
 type AdCounts = Record<string, { today: number; week: number }>;
 
 const AD_LABELS: [string, string][] = [
@@ -39,6 +40,8 @@ export function OwnerVideyUntitled({ secret }: { secret: string }) {
   const [ads, setAds] = useState<AdCounts | null>(null);
   // Collapsed by default, same header as the panel's other Collapse sections (owner-panel.tsx).
   const [expanded, setExpanded] = useState(false);
+  const [noThumb, setNoThumb] = useState<NoThumbRow[]>([]);
+  const [noThumbOpen, setNoThumbOpen] = useState(false);
 
   useEffect(() => {
     if (!secret) return;
@@ -65,13 +68,14 @@ export function OwnerVideyUntitled({ secret }: { secret: string }) {
         body: JSON.stringify({ action: "list" }),
         cache: "no-store",
       });
-      const d = (await res.json().catch(() => null)) as { ok?: boolean; items?: Row[] } | null;
+      const d = (await res.json().catch(() => null)) as { ok?: boolean; items?: Row[]; noThumb?: NoThumbRow[] } | null;
       if (!res.ok || !d?.ok) {
         setLoadError("Gagal ambil daftar.");
         return;
       }
       setLoadError(null);
       setRows(d.items || []);
+      setNoThumb(Array.isArray(d.noThumb) ? d.noThumb : []);
     } catch {
       setLoadError("Jaringan error.");
     }
@@ -203,6 +207,39 @@ export function OwnerVideyUntitled({ secret }: { secret: string }) {
       </div>
       ) : null}
     </section>
+      ) : null}
+      {noThumb.length ? (
+        <section id="videy-tanpa-thumb" className="rounded-xl border border-white/[0.07] bg-[#121215]">
+          <button
+            type="button"
+            onClick={() => setNoThumbOpen((v) => !v)}
+            aria-expanded={noThumbOpen}
+            className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-400"
+          >
+            <span>
+              Videy tanpa thumbnail, disembunyikan otomatis
+              <span className="ml-2 font-normal normal-case tracking-normal text-zinc-500">{noThumb.length} video</span>
+            </span>
+            <span className="text-zinc-600">{noThumbOpen ? "-" : "+"}</span>
+          </button>
+          {noThumbOpen ? (
+            <div className="border-t border-white/[0.06] px-4 py-3">
+              <p className="mb-2 text-xs text-zinc-500">
+                Tidak ada frame 6 jam setelah upload (player kemungkinan mati). Muncul lagi otomatis kalau thumbnail ada.
+              </p>
+              <ul className="space-y-1.5 text-[13px]">
+                {noThumb.map((r) => (
+                  <li key={r.id} className="truncate text-zinc-400">
+                    <a href={`/watch/${r.id}`} target="_blank" rel="noreferrer" className="text-zinc-200 hover:underline">
+                      {r.title || r.id}
+                    </a>
+                    {r.createdAt ? ` · ${wib(r.createdAt)}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </section>
       ) : null}
     </>
   );
