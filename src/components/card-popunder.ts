@@ -1,5 +1,5 @@
 // Catalog card-click popunder (TrafficStars spot 5210859 direct link): on home, kategori and search
-// grids (and the home hero), a click on a VIDEO card at most once per 30 minutes per visitor opens the ad in a new tab
+// grids (and the home hero), a click on a VIDEO card at most once per browser session (shared with the Videy tap popunder) opens the ad in a new tab
 // synchronously in that click; the normal navigation to the watch page then proceeds unchanged
 // (nothing is prevented or delayed). The 30-minute timestamp is stored only when window.open returned a
 // window; a blocked open retries on a later card click. Ad cards ([data-kdp-ad]) never trigger it.
@@ -7,31 +7,34 @@
 import { sendPlayerLog, type PlayerLogHost } from "@/lib/player-log-client";
 
 const DIRECT_LINK = "https://fozekikikiminu.com/api/v1/direct/587547ff73c844b39ab9f02d1285154b";
-const KEY = "kdp_ts_card_pop_at";
-/** At most one card/hero popunder per visitor per 30 minutes (timestamp in localStorage). */
-const GAP_MS = 30 * 60_000;
+const KEY = "kdp_pop_session";
 const HOSTS = new Set(["IndoAV", "UserBokep", "Streamtape", "Putarin", "Videy", "Arsip"]);
-let lastMem = 0;
+let doneMem = false;
 
-function done(): boolean {
-  let last = lastMem;
+/**
+ * One popunder per browser session for the whole site (card click, hero and Videy tap share it).
+ * sessionStorage only: no server writes, no timers.
+ */
+export function popDoneThisSession(): boolean {
+  if (doneMem) return true;
   try {
-    last = Number(localStorage.getItem(KEY)) || 0;
+    return sessionStorage.getItem(KEY) === "1";
   } catch {
-    /* storage blocked: in-memory only */
+    return false;
   }
-  const now = Date.now();
-  return last > 0 && last <= now && now - last < GAP_MS;
 }
 
-function markDone(): void {
-  lastMem = Date.now();
+export function markPopDoneThisSession(): void {
+  doneMem = true;
   try {
-    localStorage.setItem(KEY, String(lastMem));
+    sessionStorage.setItem(KEY, "1");
   } catch {
     /* in-memory only */
   }
 }
+
+const done = popDoneThisSession;
+const markDone = markPopDoneThisSession;
 
 /** Click handler for a catalog grid container (capture phase). Never prevents navigation. */
 export function onCatalogCardClick(event: { target: EventTarget | null }, hostOf: (id: string) => string): void {
