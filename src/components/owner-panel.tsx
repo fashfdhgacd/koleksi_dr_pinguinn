@@ -17,6 +17,7 @@ import { OwnerTools } from "@/components/owner-tools";
 import { OwnerVideyUntitled } from "@/components/owner-videy-untitled";
 import { OwnerAuthedBottom } from "@/components/owner-authed-bottom";
 import { HiddenListSection } from "@/components/owner-hidden-list";
+import { DetectorReviewSection } from "@/components/owner-detector-review";
 import { OwnerTelegramStatus } from "@/components/owner-telegram-status";
 import { OwnerTrafficStars } from "@/components/owner-trafficstars";
 import type { PlayerLogData } from "@/components/owner-health";
@@ -298,6 +299,9 @@ export function OwnerDashboard() {
                       busy={playerBusy}
                       reload={() => loadPlayerLog(secret)}
                     />
+                  </Collapse>
+                  <Collapse id="detector-review" title="Perlu dicek (detector minor)">
+                    <DetectorReviewSection secret={secret} />
                   </Collapse>
                   <Collapse id="hidden" title="Video disembunyikan">
                     <HiddenListSection secret={secret} />
