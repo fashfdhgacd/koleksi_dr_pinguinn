@@ -61,6 +61,25 @@ const TAG_RULES: [string, RegExp][] = [
   ["amatir", /\b(?:mesum|rekaman|direkam|ngewe|ngentot|ngentotin|dientot|skandal|video pribadi)\b/],
 ];
 
+/**
+ * SEO categories added 2026-10-26 (categories.ts SEO_MIN_COUNT): additive title rules only, checked
+ * after the rules above, and never on a title with child/school wording. "prank" (consent unclear),
+ * "gilir" (same) and person or other-site names are deliberately not here.
+ */
+const SEO_TAG_RULES: [string, RegExp][] = [
+  ["blunder", /\bblunder\b/],
+  ["kelas-bintang", /\bkelas ?bintang\b/],
+  ["tiktok", /\b(?:tiktok|tiktoker|tiktokers|tik tok)\b/],
+  ["mantan", /\b(?:mantan|mantanku|mantannya)\b/],
+  ["vcs", /\b(?:vcs|video call sex|video call)\b/],
+  ["kompilasi", /\b(?:kompilasi|compilation)\b/],
+  ["tetangga", /\b(?:tetangga|tetanggaku)\b/],
+  ["kacamata", /\b(?:kacamata|kaca mata|berkacamata|glasses)\b/],
+  ["kantor", /\b(?:kantor|office|karyawan|karyawati|sekretaris|rekan kerja)\b/],
+  ["anal", /\b(?:anal|lubang pantat)\b/],
+  ["cantik", /\b(?:cantik|cakep|geulis)\b/],
+];
+
 /** Fraction of the catalog (by real view stats) tagged Viral. */
 const POPULAR_SHARE = 0.1;
 const popularMemo = new WeakMap<object, Set<string>>();
@@ -118,6 +137,12 @@ export function titleTags(title: string | undefined, primary: string, opts: TagO
   for (const [slug, re] of TAG_RULES) {
     if (out.length >= MAX_TAGS) break;
     if (!out.includes(slug) && re.test(t)) out.push(slug);
+  }
+  if (!minor) {
+    for (const [slug, re] of SEO_TAG_RULES) {
+      if (out.length >= MAX_TAGS) break;
+      if (!out.includes(slug) && re.test(t)) out.push(slug);
+    }
   }
   // Source-true: IndoAV / UserBokep / Putarin videos titled "Indo ..." are Indonesian amateur clips.
   if (opts.indoSource && out.length < MAX_TAGS && !out.includes("amatir") && /\b(?:indo|indonesia|bokep indo)\b/.test(t)) {

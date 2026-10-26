@@ -386,6 +386,11 @@ async function rankedList(kind: RankKind, period: RankPeriod): Promise<Ranked[]>
 }
 
 /** One page of a ranking. Unavailable periods return an empty page (never estimated numbers). */
+/** All-time ranking items, best first (same memoized list as the ranking page): /kategori covers. */
+export async function rankedAllTime(kind: RankKind): Promise<RawItem[]> {
+  return (await rankedList(kind, "all")).map((r) => r.item);
+}
+
 export async function listRanking(
   kind: RankKind,
   period: RankPeriod,
