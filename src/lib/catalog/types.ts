@@ -77,7 +77,7 @@ export type CatalogSuccess =
     })
   | ({ ok: true; type: "latest" | "featured" | "category" | "search" | "related" } & PagedVideos)
   | { ok: true; type: "detail"; item: VideoDetail; related: VideoCard[] }
-  | { ok: true; type: "categories"; categories: CategoryInfo[] };
+  | { ok: true; type: "categories"; categories: CategoryInfo[]; specials?: CategoryInfo[] };
 
 export type CatalogError = {
   ok: false;

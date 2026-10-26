@@ -5,15 +5,16 @@ import {
   listFeatured,
   listLatest,
   listListedCategories,
+  terbaruCoverSource,
   listRelated,
   listSearch,
 } from "./local";
 import { fetchCatalog } from "./client";
 import { uploadDateOf } from "./sitemap-entries";
-import { listRanking, withVideyViews } from "./ranking-list";
+import { listRanking, rankedAllTime, withVideyViews } from "./ranking-list";
 import { parseRankingKey } from "./rankings";
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./types";
-import type { CatalogError, CatalogResponse, CatalogType, VideoCard } from "./types";
+import type { CatalogError, CatalogResponse, CatalogType, CategoryInfo, VideoCard } from "./types";
 
 /** Featured/hero: only keep thumbs that are known real art (not brand / speculative *-thumb). */
 function isRealFeaturedThumb(url: string | null | undefined): boolean {
@@ -111,8 +112,25 @@ export async function queryCatalogServer(query: CatalogQuery, signal?: AbortSign
     }
 
     switch (type) {
-      case "categories":
-        return { ok: true, type, categories: await listListedCategories() };
+      case "categories": {
+        // Special-card covers need the likes ranking (server only): in the browser ask /api/data.
+        if (typeof window !== "undefined") return fetchCatalog({ type: "categories" }, signal);
+        const [views, likes, newest] = await Promise.all([
+          rankedAllTime("views"),
+          rankedAllTime("likes"),
+          terbaruCoverSource(),
+        ]);
+        const specials: CategoryInfo[] = [];
+        const categories = await listListedCategories({
+          specials: [
+            { slug: "paling-ditonton", list: views },
+            { slug: "paling-disukai", list: likes },
+            { slug: "terbaru", list: newest },
+          ],
+          specialOut: specials,
+        });
+        return { ok: true, type, categories, specials };
+      }
       case "latest": {
         const data = await listLatest(page, limit, signal);
         return { ok: true, type, ...data, items: await withVideyViews(data.items) };
