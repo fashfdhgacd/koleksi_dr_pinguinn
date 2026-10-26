@@ -36,7 +36,20 @@ import { isLockedMinorId, lockedMinorReason, schoolReason } from "./minor-lock.j
 import { ownerChecked18 } from "./minor-context.js";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
-import latestVideos from "../../../data/videos-latest.json";
+// The Telegram bot splits this feed into chunks once it grows (videos-latest.json, -p02.json, ...;
+// see chunk naming in src/lib/bot/github.js). Bundle every chunk so no upload drops off the site.
+const latestVideoChunks = import.meta.glob<unknown>("../../../data/videos-latest*.json", {
+  eager: true,
+  import: "default",
+});
+const chunkNo = (path: string) => Number(/-p(\d+)\.json$/i.exec(path)?.[1] ?? 1);
+const latestVideos: unknown[] = Object.keys(latestVideoChunks)
+  .filter((path) => !/-index\.json$/i.test(path))
+  .sort((a, b) => chunkNo(a) - chunkNo(b))
+  .flatMap((path) => {
+    const chunk = latestVideoChunks[path];
+    return Array.isArray(chunk) ? chunk : [];
+  });
 // Putarin uploads from the Telegram bot land here (bot appends, dedupes by id); bundle so every batch stays live.
 import latestPutarin from "../../../data/putarin-latest.json";
 import latestPosters from "../../../data/latest-posters.json";

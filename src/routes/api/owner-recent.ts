@@ -3,7 +3,20 @@ import { isOwnerKey, ownerKeyFrom, ownerSecret } from "@/lib/owner-auth";
 import { hiddenReasonRaw, loadItemsRaw } from "@/lib/catalog/local-cache";
 import type { RawItem } from "@/lib/catalog/local-shared";
 import latestPutarin from "../../../data/putarin-latest.json";
-import latestVideos from "../../../data/videos-latest.json";
+// The Telegram bot splits this feed into chunks once it grows (videos-latest.json, -p02.json, ...;
+// see chunk naming in src/lib/bot/github.js). Bundle every chunk so no upload drops off the site.
+const latestVideoChunks = import.meta.glob<unknown>("../../../data/videos-latest*.json", {
+  eager: true,
+  import: "default",
+});
+const chunkNo = (path: string) => Number(/-p(\d+)\.json$/i.exec(path)?.[1] ?? 1);
+const latestVideos: unknown[] = Object.keys(latestVideoChunks)
+  .filter((path) => !/-index\.json$/i.test(path))
+  .sort((a, b) => chunkNo(a) - chunkNo(b))
+  .flatMap((path) => {
+    const chunk = latestVideoChunks[path];
+    return Array.isArray(chunk) ? chunk : [];
+  });
 
 /**
  * Owner-only "Baru masuk": newest Telegram uploads from the bundled bot files
