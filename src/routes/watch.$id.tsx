@@ -89,6 +89,7 @@ export const Route = createFileRoute("/watch/$id")({
           embedUrl: contentUrl ? null : embedUrl,
           contentUrl,
           durationSec: item.duration,
+          uploadDate: item.uploadDate,
         })
       : null;
 
