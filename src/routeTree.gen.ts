@@ -20,7 +20,9 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PrivasiRouteImport } from './routes/privasi'
 import { Route as PutarinRouteImport } from './routes/putarin'
 import { Route as SyaratRouteImport } from './routes/syarat'
+import { Route as TentangRouteImport } from './routes/tentang'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as ApiAdLogRouteImport } from './routes/api/ad-log'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiEmbedThumbRouteImport } from './routes/api/embed-thumb'
 import { Route as ApiFrameRouteImport } from './routes/api/frame'
@@ -29,7 +31,12 @@ import { Route as ApiImgProxyRouteImport } from './routes/api/img-proxy'
 import { Route as ApiLikeRouteImport } from './routes/api/like'
 import { Route as ApiOgRouteImport } from './routes/api/og'
 import { Route as ApiOnlineRouteImport } from './routes/api/online'
+import { Route as ApiOwnerHeroRouteImport } from './routes/api/owner-hero'
+import { Route as ApiOwnerRecentRouteImport } from './routes/api/owner-recent'
 import { Route as ApiOwnerToolsRouteImport } from './routes/api/owner-tools'
+import { Route as ApiOwnerVideyRouteImport } from './routes/api/owner-videy'
+import { Route as ApiPlayerLogRouteImport } from './routes/api/player-log'
+import { Route as ApiPushRouteImport } from './routes/api/push'
 import { Route as ApiPuterinThumbRouteImport } from './routes/api/puterin-thumb'
 import { Route as ApiTapeThumbRouteImport } from './routes/api/tape-thumb'
 import { Route as ApiTelegramRouteImport } from './routes/api/telegram'
@@ -98,9 +105,19 @@ const SyaratRoute = SyaratRouteImport.update({
   path: '/syarat',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TentangRoute = TentangRouteImport.update({
+  id: '/tentang',
+  path: '/tentang',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TermsRoute = TermsRouteImport.update({
   id: '/terms',
   path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAdLogRoute = ApiAdLogRouteImport.update({
+  id: '/api/ad-log',
+  path: '/api/ad-log',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDataRoute = ApiDataRouteImport.update({
@@ -143,9 +160,34 @@ const ApiOnlineRoute = ApiOnlineRouteImport.update({
   path: '/api/online',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOwnerHeroRoute = ApiOwnerHeroRouteImport.update({
+  id: '/api/owner-hero',
+  path: '/api/owner-hero',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOwnerRecentRoute = ApiOwnerRecentRouteImport.update({
+  id: '/api/owner-recent',
+  path: '/api/owner-recent',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOwnerToolsRoute = ApiOwnerToolsRouteImport.update({
   id: '/api/owner-tools',
   path: '/api/owner-tools',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOwnerVideyRoute = ApiOwnerVideyRouteImport.update({
+  id: '/api/owner-videy',
+  path: '/api/owner-videy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPlayerLogRoute = ApiPlayerLogRouteImport.update({
+  id: '/api/player-log',
+  path: '/api/player-log',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPushRoute = ApiPushRouteImport.update({
+  id: '/api/push',
+  path: '/api/push',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiPuterinThumbRoute = ApiPuterinThumbRouteImport.update({
@@ -221,7 +263,9 @@ export interface FileRoutesByFullPath {
   '/privasi': typeof PrivasiRoute
   '/putarin': typeof PutarinRoute
   '/syarat': typeof SyaratRoute
+  '/tentang': typeof TentangRoute
   '/terms': typeof TermsRoute
+  '/api/ad-log': typeof ApiAdLogRoute
   '/api/data': typeof ApiDataRoute
   '/api/embed-thumb': typeof ApiEmbedThumbRoute
   '/api/frame': typeof ApiFrameRoute
@@ -230,7 +274,12 @@ export interface FileRoutesByFullPath {
   '/api/like': typeof ApiLikeRoute
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
+  '/api/owner-hero': typeof ApiOwnerHeroRoute
+  '/api/owner-recent': typeof ApiOwnerRecentRoute
   '/api/owner-tools': typeof ApiOwnerToolsRoute
+  '/api/owner-videy': typeof ApiOwnerVideyRoute
+  '/api/player-log': typeof ApiPlayerLogRoute
+  '/api/push': typeof ApiPushRoute
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
@@ -255,7 +304,9 @@ export interface FileRoutesByTo {
   '/privasi': typeof PrivasiRoute
   '/putarin': typeof PutarinRoute
   '/syarat': typeof SyaratRoute
+  '/tentang': typeof TentangRoute
   '/terms': typeof TermsRoute
+  '/api/ad-log': typeof ApiAdLogRoute
   '/api/data': typeof ApiDataRoute
   '/api/embed-thumb': typeof ApiEmbedThumbRoute
   '/api/frame': typeof ApiFrameRoute
@@ -264,7 +315,12 @@ export interface FileRoutesByTo {
   '/api/like': typeof ApiLikeRoute
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
+  '/api/owner-hero': typeof ApiOwnerHeroRoute
+  '/api/owner-recent': typeof ApiOwnerRecentRoute
   '/api/owner-tools': typeof ApiOwnerToolsRoute
+  '/api/owner-videy': typeof ApiOwnerVideyRoute
+  '/api/player-log': typeof ApiPlayerLogRoute
+  '/api/push': typeof ApiPushRoute
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
@@ -291,7 +347,9 @@ export interface FileRoutesById {
   '/privasi': typeof PrivasiRoute
   '/putarin': typeof PutarinRoute
   '/syarat': typeof SyaratRoute
+  '/tentang': typeof TentangRoute
   '/terms': typeof TermsRoute
+  '/api/ad-log': typeof ApiAdLogRoute
   '/api/data': typeof ApiDataRoute
   '/api/embed-thumb': typeof ApiEmbedThumbRoute
   '/api/frame': typeof ApiFrameRoute
@@ -300,7 +358,12 @@ export interface FileRoutesById {
   '/api/like': typeof ApiLikeRoute
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
+  '/api/owner-hero': typeof ApiOwnerHeroRoute
+  '/api/owner-recent': typeof ApiOwnerRecentRoute
   '/api/owner-tools': typeof ApiOwnerToolsRoute
+  '/api/owner-videy': typeof ApiOwnerVideyRoute
+  '/api/player-log': typeof ApiPlayerLogRoute
+  '/api/push': typeof ApiPushRoute
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
@@ -328,7 +391,9 @@ export interface FileRouteTypes {
     | '/privasi'
     | '/putarin'
     | '/syarat'
+    | '/tentang'
     | '/terms'
+    | '/api/ad-log'
     | '/api/data'
     | '/api/embed-thumb'
     | '/api/frame'
@@ -337,7 +402,12 @@ export interface FileRouteTypes {
     | '/api/like'
     | '/api/og'
     | '/api/online'
+    | '/api/owner-hero'
+    | '/api/owner-recent'
     | '/api/owner-tools'
+    | '/api/owner-videy'
+    | '/api/player-log'
+    | '/api/push'
     | '/api/puterin-thumb'
     | '/api/tape-thumb'
     | '/api/telegram'
@@ -362,7 +432,9 @@ export interface FileRouteTypes {
     | '/privasi'
     | '/putarin'
     | '/syarat'
+    | '/tentang'
     | '/terms'
+    | '/api/ad-log'
     | '/api/data'
     | '/api/embed-thumb'
     | '/api/frame'
@@ -371,7 +443,12 @@ export interface FileRouteTypes {
     | '/api/like'
     | '/api/og'
     | '/api/online'
+    | '/api/owner-hero'
+    | '/api/owner-recent'
     | '/api/owner-tools'
+    | '/api/owner-videy'
+    | '/api/player-log'
+    | '/api/push'
     | '/api/puterin-thumb'
     | '/api/tape-thumb'
     | '/api/telegram'
@@ -397,7 +474,9 @@ export interface FileRouteTypes {
     | '/privasi'
     | '/putarin'
     | '/syarat'
+    | '/tentang'
     | '/terms'
+    | '/api/ad-log'
     | '/api/data'
     | '/api/embed-thumb'
     | '/api/frame'
@@ -406,7 +485,12 @@ export interface FileRouteTypes {
     | '/api/like'
     | '/api/og'
     | '/api/online'
+    | '/api/owner-hero'
+    | '/api/owner-recent'
     | '/api/owner-tools'
+    | '/api/owner-videy'
+    | '/api/player-log'
+    | '/api/push'
     | '/api/puterin-thumb'
     | '/api/tape-thumb'
     | '/api/telegram'
@@ -433,7 +517,9 @@ export interface RootRouteChildren {
   PrivasiRoute: typeof PrivasiRoute
   PutarinRoute: typeof PutarinRoute
   SyaratRoute: typeof SyaratRoute
+  TentangRoute: typeof TentangRoute
   TermsRoute: typeof TermsRoute
+  ApiAdLogRoute: typeof ApiAdLogRoute
   ApiDataRoute: typeof ApiDataRoute
   ApiEmbedThumbRoute: typeof ApiEmbedThumbRoute
   ApiFrameRoute: typeof ApiFrameRoute
@@ -442,7 +528,12 @@ export interface RootRouteChildren {
   ApiLikeRoute: typeof ApiLikeRoute
   ApiOgRoute: typeof ApiOgRoute
   ApiOnlineRoute: typeof ApiOnlineRoute
+  ApiOwnerHeroRoute: typeof ApiOwnerHeroRoute
+  ApiOwnerRecentRoute: typeof ApiOwnerRecentRoute
   ApiOwnerToolsRoute: typeof ApiOwnerToolsRoute
+  ApiOwnerVideyRoute: typeof ApiOwnerVideyRoute
+  ApiPlayerLogRoute: typeof ApiPlayerLogRoute
+  ApiPushRoute: typeof ApiPushRoute
   ApiPuterinThumbRoute: typeof ApiPuterinThumbRoute
   ApiTapeThumbRoute: typeof ApiTapeThumbRoute
   ApiTelegramRoute: typeof ApiTelegramRoute
@@ -534,11 +625,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SyaratRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tentang': {
+      id: '/tentang'
+      path: '/tentang'
+      fullPath: '/tentang'
+      preLoaderRoute: typeof TentangRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/terms': {
       id: '/terms'
       path: '/terms'
       fullPath: '/terms'
       preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/ad-log': {
+      id: '/api/ad-log'
+      path: '/api/ad-log'
+      fullPath: '/api/ad-log'
+      preLoaderRoute: typeof ApiAdLogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/data': {
@@ -597,11 +702,46 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOnlineRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/owner-hero': {
+      id: '/api/owner-hero'
+      path: '/api/owner-hero'
+      fullPath: '/api/owner-hero'
+      preLoaderRoute: typeof ApiOwnerHeroRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/owner-recent': {
+      id: '/api/owner-recent'
+      path: '/api/owner-recent'
+      fullPath: '/api/owner-recent'
+      preLoaderRoute: typeof ApiOwnerRecentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/owner-tools': {
       id: '/api/owner-tools'
       path: '/api/owner-tools'
       fullPath: '/api/owner-tools'
       preLoaderRoute: typeof ApiOwnerToolsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/owner-videy': {
+      id: '/api/owner-videy'
+      path: '/api/owner-videy'
+      fullPath: '/api/owner-videy'
+      preLoaderRoute: typeof ApiOwnerVideyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/player-log': {
+      id: '/api/player-log'
+      path: '/api/player-log'
+      fullPath: '/api/player-log'
+      preLoaderRoute: typeof ApiPlayerLogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/push': {
+      id: '/api/push'
+      path: '/api/push'
+      fullPath: '/api/push'
+      preLoaderRoute: typeof ApiPushRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/puterin-thumb': {
@@ -717,7 +857,9 @@ const rootRouteChildren: RootRouteChildren = {
   PrivasiRoute: PrivasiRoute,
   PutarinRoute: PutarinRoute,
   SyaratRoute: SyaratRoute,
+  TentangRoute: TentangRoute,
   TermsRoute: TermsRoute,
+  ApiAdLogRoute: ApiAdLogRoute,
   ApiDataRoute: ApiDataRoute,
   ApiEmbedThumbRoute: ApiEmbedThumbRoute,
   ApiFrameRoute: ApiFrameRoute,
@@ -726,7 +868,12 @@ const rootRouteChildren: RootRouteChildren = {
   ApiLikeRoute: ApiLikeRoute,
   ApiOgRoute: ApiOgRoute,
   ApiOnlineRoute: ApiOnlineRoute,
+  ApiOwnerHeroRoute: ApiOwnerHeroRoute,
+  ApiOwnerRecentRoute: ApiOwnerRecentRoute,
   ApiOwnerToolsRoute: ApiOwnerToolsRoute,
+  ApiOwnerVideyRoute: ApiOwnerVideyRoute,
+  ApiPlayerLogRoute: ApiPlayerLogRoute,
+  ApiPushRoute: ApiPushRoute,
   ApiPuterinThumbRoute: ApiPuterinThumbRoute,
   ApiTapeThumbRoute: ApiTapeThumbRoute,
   ApiTelegramRoute: ApiTelegramRoute,

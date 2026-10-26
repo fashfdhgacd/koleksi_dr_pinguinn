@@ -39,6 +39,9 @@ export function Shell({
             </div>
             <div className="flex items-center justify-between gap-6 sm:justify-end sm:gap-8">
               <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm" aria-label="Legal">
+                <Link to="/tentang" className="hover:text-white hover:underline">
+                  Tentang
+                </Link>
                 <Link to="/2257" className="hover:text-white hover:underline">
                   2257
                 </Link>
