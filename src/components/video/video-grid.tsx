@@ -1,16 +1,15 @@
 // Grid: 2 / 3 / 4 kolom (mobile / tablet / desktop) for the watch page; catalog grids 1 / 3 / 4.
 // Catalog grids (home, kategori; `ads` prop): 1 / 3 / 4 columns (cards sized for a 300x250 ad),
-// card thumbs 300:250, and a TrafficStars MasterSpot card (ts-grid-ad.tsx) as every 8th card
-// (cells 8, 16, 24, 32; max 4), each one card footprint, lazy-loaded, collapsing on its own if
-// unfilled. Pages hold 36 videos; trailing videos are trimmed so rows stay full at 3 and 4 columns.
+// card thumbs 300:250, and an ExoClick 300x250 card (ad-slot.tsx, zone 6053864) as every 8th card
+// (cells 8, 16, 24, 32; max 4), each one card footprint, lazy-loaded. Pages hold 36 videos; trailing videos are trimmed so rows stay full at 3 and 4 columns.
 // The watch page ("Tonton juga") keeps the default grid, no ads.
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { isRealMinor } from "@/lib/minor-terms";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TsGridAd } from "@/components/ts-grid-ad";
+import { AdSlot } from "@/components/ad-slot";
 import { onCatalogCardClick } from "@/components/card-popunder";
 import { VideoCard } from "./video-card";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect } from "react";
 import { restoreCatalogScroll } from "@/lib/catalog/last-catalog";
 
 const DEFAULT_GRID =
@@ -54,12 +53,9 @@ export function VideoGrid({
   ads?: boolean;
 }) {
   const shown = visibleCards(items);
-  const [empty, setEmpty] = useState<Record<number, true>>({});
-  const onEmpty = useCallback((slot: number) => setEmpty((e) => ({ ...e, [slot]: true })), []);
-  // Up to 4 slots, every 8th card; each lazy-loads and collapses
-  // on its own if unfilled (a trimmed trailing video then returns).
+  // Up to 4 slots, every 8th card; each lazy-loads (an unfilled slot stays a blank card footprint).
   const slots = ads
-    ? AD_POSITIONS.map((at, slot) => ({ at, slot })).filter((x) => x.at < shown.length && !empty[x.slot])
+    ? AD_POSITIONS.map((at, slot) => ({ at, slot })).filter((x) => x.at < shown.length)
     : [];
   const cells = shown.length + slots.length;
   // "Kembali ke katalog" with a full load: scroll back to where the card was clicked.
@@ -78,7 +74,7 @@ export function VideoGrid({
         return (
           <Cell
             key={video.id}
-            ad={s ? <TsGridAd key={`ts-ad-${s.slot}`} onEmpty={() => onEmpty(s.slot)} /> : null}
+            ad={s ? <AdSlot key={`exo-ad-${s.slot}`} /> : null}
           >
             <VideoCard video={video} eager={index < eagerCount} />
           </Cell>

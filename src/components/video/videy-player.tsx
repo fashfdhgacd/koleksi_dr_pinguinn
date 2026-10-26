@@ -10,7 +10,7 @@ import { loadVast, ping, prerollDue, VAST_TIMEOUT_MS, type VastAd } from "@/comp
  *
  * Pre-roll (videy-preroll.ts, TrafficStars VAST spot 5210886): on about every 2nd Videy play the
  * play tap first fetches the VAST (3.5 s budget) and plays the ad mp4 in the same <video>, with our
- * own Skip button after 5 s (or the VAST skipoffset if shorter); tapping the ad opens ClickThrough.
+ * own Skip button after 5 s (or the VAST skipoffset if shorter); only the "Kunjungi iklan" button opens ClickThrough (a tap on the video does nothing).
  * No fill, error, timeout or an ad that does not start within 4 s goes straight to the film.
  * Counters (player-log, once per video per session): pre_req / pre_fill / pre_done (played to the end)
  * / pre_skip (Skip tapped).
@@ -394,6 +394,11 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     if (v && v.muted) v.muted = false;
   }, []);
 
+  const unmuteAd = useCallback(() => {
+    const v = videoRef.current;
+    if (v) v.muted = !v.muted;
+  }, []);
+
   return (
     <div
       ref={wrapRef}
@@ -423,10 +428,31 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
       ) : null}
       {phase === "ad" ? (
         <>
-          <button type="button" onClick={adClick} aria-label="Iklan" className="absolute inset-0 bg-transparent" />
+          {/* No full-area click-catcher: a tap on the ad video never opens the advertiser (accidental
+              clicks, e.g. tapping to unmute, inflated CTR). Only the labelled buttons below act. */}
           <span className="pointer-events-none absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-xs text-white">
             {adRef.current ? "Iklan" : "Memuat…"}
           </span>
+          {adRef.current ? (
+            <div className="absolute right-2 top-2 flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                onClick={unmuteAd}
+                className="rounded-md border border-white/30 bg-black/75 px-3 py-1.5 text-xs text-white"
+              >
+                Suara
+              </button>
+              {adRef.current.ad.clickThrough ? (
+                <button
+                  type="button"
+                  onClick={adClick}
+                  className="rounded-md border border-white/30 bg-black/75 px-3 py-1.5 text-xs text-white"
+                >
+                  Kunjungi iklan ↗
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           {skipIn !== null ? (
             <button
               type="button"

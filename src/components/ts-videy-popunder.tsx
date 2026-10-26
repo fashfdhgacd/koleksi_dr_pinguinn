@@ -2,10 +2,11 @@
 // only renders for Videy items (never IndoAV / UserBokep / Putarin or catalog pages).
 // The Videy player's own tap-catcher overlay (our page, not an iframe) calls popTap() synchronously
 // in its click handler: window.open(direct link) in that user gesture. Opened (non-null) -> video
-// marked done for this session, the tap does nothing else (video stays paused, our tab stays);
+// marked done for this session (and the site-wide one-per-session flag is set), the tap does nothing else (video stays paused, our tab stays);
 // blocked -> the overlay stays and the next tap retries; after 2 blocked tries the tap plays.
 // Counters (player-log, once per video per session): pop_fire / pop_ok / pop_block.
 import { sendPlayerLog } from "@/lib/player-log-client";
+import { markPopDoneThisSession, popDoneThisSession } from "@/components/card-popunder";
 
 const DIRECT_LINK = "https://fozekikikiminu.com/api/v1/direct/587547ff73c844b39ab9f02d1285154b";
 const KEY = "kdp_ts_pop_ids";
@@ -34,6 +35,7 @@ function saveIds(ids: string[]): void {
 /** True while this video still owes its ad (the tap-catcher stays in charge of the first tap). */
 export function owesAd(videoId: string): boolean {
   if (typeof window === "undefined" || !videoId) return false;
+  if (popDoneThisSession()) return false; // one popunder per session site-wide
   return !firedIds().includes(videoId) && (failures.get(videoId) || 0) < MAX_FAILS;
 }
 
@@ -53,6 +55,7 @@ export function popTap(videoId: string): boolean {
   }
   if (w) {
     saveIds(firedIds().concat(videoId));
+    markPopDoneThisSession();
     sendPlayerLog(videoId, "Videy", "pop_ok");
     return true;
   }
