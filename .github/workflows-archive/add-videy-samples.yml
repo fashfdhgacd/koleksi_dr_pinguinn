@@ -1,0 +1,75 @@
+name: add-videy-samples
+# One-off: adds three Videy videos to data/videos-latest.json in the same record format the
+# Telegram bot writes (lib/bot/store.js toRecord + titleAuto), then grabs their thumbnails.
+# Ids already in the file are skipped, so running it again changes nothing.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/add-videy-samples.yml"
+permissions:
+  contents: write
+concurrency:
+  group: videy-thumbs
+  cancel-in-progress: false
+jobs:
+  add:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ffmpeg
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+      - name: Add records
+        run: |
+          python3 - <<'PY'
+          import json, datetime
+          path = "data/videos-latest.json"
+          items = json.load(open(path, encoding="utf-8"))
+          have = {str(it.get("id", "")).lower() for it in items if isinstance(it, dict)}
+          queue = [
+              ("721gV1K11", "Video Viral Videy Indo Terbaru 1 - koleksidrpinguin.com"),
+              ("IJ57HH4Q1", "Link Videy Viral Hari Ini 2 - koleksidrpinguin.com"),
+              ("2oNeBvXq1", "Bokep Videy Indo Viral 3 - koleksidrpinguin.com"),
+          ]
+          now = datetime.datetime.now(datetime.timezone.utc)
+          new = []
+          for vid, title in queue:
+              if vid.lower() in have:
+                  continue
+              new.append({
+                  "id": vid,
+                  "title": title,
+                  "embed": f"https://videy.co/v/?id={vid}",
+                  "direct": f"https://cdn.videy.co/{vid}.mp4",
+                  "source": "Videy",
+                  "category": "videy",
+                  "tags": ["videy", "videy", "telegram"],
+                  "date": now.strftime("%Y-%m-%d"),
+                  "updated_at": now.isoformat(timespec="milliseconds").replace("+00:00", "Z"),
+                  "titleAuto": True,
+              })
+          # Same order as upsertVideosBatch: the batch reversed, in front of the existing items.
+          items = list(reversed(new)) + items
+          with open(path, "w", encoding="utf-8") as f:
+              f.write(json.dumps(items, indent=2, ensure_ascii=False) + "\n")
+          print(f"added {len(new)}")
+          PY
+      - name: Grab missing Videy frames
+        run: python3 scripts/videy_thumbs.py
+      - name: Commit
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/videos-latest.json public/videy-thumbs || true
+          if git diff --cached --quiet; then
+            echo "Nothing new"
+            exit 0
+          fi
+          git commit -m "bot: add 3 Videy videos + thumbnails"
+          for i in 1 2 3; do
+            git pull --rebase --quiet && git push && exit 0
+            sleep 5
+          done
+          exit 1
