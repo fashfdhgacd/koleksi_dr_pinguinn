@@ -1,4 +1,4 @@
-import { CATEGORY_LIST, findCategory } from "./categories";
+import { PUBLIC_CATEGORY_LIST, findCategory } from "./categories";
 import {
   getDetail,
   listCategory,
@@ -190,7 +190,7 @@ export async function queryCatalogServer(query: CatalogQuery, signal?: AbortSign
           type,
           featured: featured.items,
           latest: { ...latest, items: await withVideyViews(latest.items) },
-          categories: CATEGORY_LIST,
+          categories: PUBLIC_CATEGORY_LIST,
         };
       }
     }

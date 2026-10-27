@@ -65,9 +65,19 @@ export const UNLISTED_CATEGORY_SLUGS = new Set<string>([]);
  */
 export const LEGACY_CATEGORY_SLUGS: Record<string, string> = { abg: "teen-18", mahasiswi: "college-18" };
 
+/**
+ * Categories kept out of search and public navigation (owner decision 2026-10-27): no sitemap entry,
+ * noindex,follow, no /kategori tile, no watch chip, not in menus. The page still opens and every video
+ * stays in the catalog and in its other categories; owner tools still list them.
+ */
+export const NOINDEX_CATEGORY_SLUGS = new Set<string>(["teen-18", "college-18"]);
+
 export const CATEGORY_LIST: CategoryInfo[] = CATEGORIES.filter((c) => !UNLISTED_CATEGORY_SLUGS.has(c.slug)).map(
   ({ slug, label }) => ({ slug, label }),
 );
+
+/** CATEGORY_LIST without NOINDEX_CATEGORY_SLUGS: what visitors and crawlers see. */
+export const PUBLIC_CATEGORY_LIST: CategoryInfo[] = CATEGORY_LIST.filter((c) => !NOINDEX_CATEGORY_SLUGS.has(c.slug));
 
 /** Kategori dengan video lebih sedikit dari ini tidak tampil di /kategori dan sitemap (halaman tetap bisa dibuka). */
 export const MIN_LISTED_CATEGORY_COUNT = 20;
@@ -134,7 +144,7 @@ export const PRIMARY_CATEGORIES: CategoryInfo[] = PRIMARY_CATEGORY_SLUGS.map(
   (slug) => CATEGORY_LIST.find((c) => c.slug === slug)!,
 ).filter(Boolean);
 
-export const MORE_CATEGORIES: CategoryInfo[] = CATEGORY_LIST.filter(
+export const MORE_CATEGORIES: CategoryInfo[] = PUBLIC_CATEGORY_LIST.filter(
   (c) => !(PRIMARY_CATEGORY_SLUGS as readonly string[]).includes(c.slug),
 );
 
