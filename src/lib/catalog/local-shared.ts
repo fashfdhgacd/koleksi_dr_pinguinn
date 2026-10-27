@@ -63,10 +63,16 @@ export type CatalogCache = {
   haystack: { item: RawItem; hay: string }[];
 };
 
-export const runtime: {
-  cache: CatalogCache | null;
-  inflight: Promise<CatalogCache> | null;
-} = { cache: null, inflight: null };
+/**
+ * One catalog per isolate. The build emits this module twice (Nitro server chunk for middleware/API
+ * and the SSR router bundle), so a module-local object meant every cold isolate built the ~10k-item
+ * indexes twice (e.g. /watch: watch-placeholder middleware, then the page). globalThis lets both
+ * copies share the same built cache. Data is identical (same bundled JSON); no KV writes, no timers.
+ */
+type CatalogRuntime = { cache: CatalogCache | null; inflight: Promise<CatalogCache> | null };
+const RUNTIME_KEY = "__kdpCatalogRuntimeV1";
+const runtimeHost = globalThis as unknown as Record<string, CatalogRuntime | undefined>;
+export const runtime: CatalogRuntime = (runtimeHost[RUNTIME_KEY] ??= { cache: null, inflight: null });
 
 /** Safe startsWith that never throws if value is not a string. */
 export function safeStartsWith(value: unknown, prefix: string): boolean {
