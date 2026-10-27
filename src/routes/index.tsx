@@ -106,7 +106,22 @@ export const Route = createFileRoute("/")({
     if (isSchemaPlaceholder(search.q)) {
       throw redirect({ href: HOME_CANONICAL, statusCode: 301 });
     }
-    return loadHome({ search });
+    const res = await loadHome({ search });
+    // Past the last page (e.g. ?page=9999): redirect to the real last page instead of an empty grid.
+    const page = search.page || 1;
+    if (page > 1 && res && res.ok) {
+      const total = res.type === "home" ? res.latest.total : res.type === "search" ? res.total : 0;
+      const limit = (res.type === "home" ? res.latest.limit : res.type === "search" ? res.limit : 0) || DEFAULT_PAGE_SIZE;
+      const last = Math.max(1, Math.ceil(total / limit));
+      if (total > 0 && page > last) {
+        throw redirect({
+          to: "/",
+          search: { q: search.q, page: last > 1 ? last : undefined },
+          statusCode: 302,
+        });
+      }
+    }
+    return res;
   },
   head: ({ match }) => {
     const q = typeof match.search.q === "string" ? match.search.q : undefined;
