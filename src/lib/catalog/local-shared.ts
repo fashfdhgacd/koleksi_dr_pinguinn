@@ -335,7 +335,18 @@ export function directPoster(url: unknown): string {
   if (PLACEHOLDER_IMAGE_RE.test(u)) return "";
   if (/cdnhlsplayer\.lat/i.test(u)) return "";
   if (/\/api\/(img-proxy|tape-thumb|embed-thumb|puterin-thumb)/i.test(u)) return "";
-  return u;
+  return fixDmmCover(u);
+}
+
+/**
+ * Stored poster maps (jav-posters.json etc.) hold DMM URLs built from the short id
+ * (.../digital/video/sone011/sone011pl.jpg), which redirect to "NOW PRINTING". Rewrite them to
+ * the real content id; "" (brand poster) when DMM has no cover for that code.
+ */
+export function fixDmmCover(url: string): string {
+  const m = url.match(/^https?:\/\/pics\.dmm\.co\.jp\/digital\/video\/([a-z]{2,8})(\d{3,4})\/\1\2pl\.jpg$/i);
+  if (!m) return url;
+  return javCoverFromTitle(`${m[1]}-${m[2]}`);
 }
 
 /**
