@@ -1,8 +1,19 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { titleTags } from "../catalog/title-tags";
 
 function today() {
   return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * Ingest-time auto tags: same engine as the site (title-tags.ts + tag-dictionary.js), so a new video
+ * carries its category, host, "telegram" and up to 12 theme tags. The site re-derives them at build.
+ */
+function autoTags(cat, parsed, title) {
+  const sourceText = `${parsed.embed || ""} ${parsed.source || ""} ${parsed.direct || ""} ${parsed.host || ""}`;
+  const themes = titleTags(title, cat, { indoSource: /indoav|userbokep|putarin|puterin/i.test(sourceText), sourceText });
+  return [...new Set([cat, parsed.host, "telegram", ...themes].filter(Boolean))];
 }
 
 export function toRecord({ parsed, title, category }) {
@@ -15,7 +26,8 @@ export function toRecord({ parsed, title, category }) {
     direct: parsed.direct,
     source: parsed.source,
     category: cat,
-    tags: [cat, parsed.host, "telegram"],
+    // Ingest-time auto tags (shared dictionary, tag-dictionary.js); the site re-derives the same at build.
+    tags: autoTags(cat, parsed, title),
     date: today(),
     updated_at: new Date().toISOString(),
     ...(poster.startsWith("http") ? { poster, thumbnail: poster } : {}),
