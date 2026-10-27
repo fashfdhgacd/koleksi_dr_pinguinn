@@ -15,6 +15,12 @@ const HOSTS = new Set(["IndoAV", "UserBokep", "Streamtape", "Putarin", "Videy", 
 export const POP_MAX_PER_VIDEO = 3;
 /** Minimum time between two popunders on the SAME video (a newly opened video may pop at once). */
 export const POP_MIN_GAP_MS = 20_000;
+/** Videy has its own pre-roll as well, so its popunder stops at 2 per video. */
+export const POP_MAX_VIDEY = 2;
+/** Per-video cap for a host label. */
+export function popMaxFor(host: string): number {
+  return host === "Videy" ? POP_MAX_VIDEY : POP_MAX_PER_VIDEO;
+}
 
 const KEY = "kdp_pop_v1";
 type PopState = { id: string; n: number; at: number };
@@ -43,26 +49,26 @@ function writeState(v: PopState): void {
 }
 
 /** True when a popunder for this video is allowed right now (per-video count + global gap). */
-export function canPop(videoId: string): boolean {
+export function canPop(videoId: string, max: number = POP_MAX_PER_VIDEO): boolean {
   if (typeof window === "undefined" || !videoId) return false;
   const st = readState();
   if (st.id !== videoId) return true; // another video: fresh count, no gap
-  return st.n < POP_MAX_PER_VIDEO && Date.now() - st.at >= POP_MIN_GAP_MS;
+  return st.n < max && Date.now() - st.at >= POP_MIN_GAP_MS;
 }
 
 /** True when this video can still get a popunder later (count not used up), ignoring the gap. */
-export function popsLeft(videoId: string): boolean {
+export function popsLeft(videoId: string, max: number = POP_MAX_PER_VIDEO): boolean {
   if (typeof window === "undefined" || !videoId) return false;
   const st = readState();
-  return (st.id === videoId ? st.n : 0) < POP_MAX_PER_VIDEO;
+  return (st.id === videoId ? st.n : 0) < max;
 }
 
 /**
  * Opens the direct link synchronously (call inside the click handler). Returns "ok" when a tab
  * opened (counted), "block" when the browser blocked it (not counted), "skip" when the cap says no.
  */
-export function firePop(videoId: string): "ok" | "block" | "skip" {
-  if (!canPop(videoId)) return "skip";
+export function firePop(videoId: string, max: number = POP_MAX_PER_VIDEO): "ok" | "block" | "skip" {
+  if (!canPop(videoId, max)) return "skip";
   let w: Window | null = null;
   try {
     w = window.open(DIRECT_LINK, "_blank");

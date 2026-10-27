@@ -7,7 +7,7 @@
 // focus/blur, scroll, or our own <video>'s play/pause/timeupdate events) when canPop() says the gap has passed and this video has pops left.
 // Not used for ads: it never covers an ad unit, only the video player.
 import { useEffect, useState, type RefObject } from "react";
-import { canPop, firePop, popHost } from "@/components/card-popunder";
+import { canPop, firePop, popHost, popMaxFor } from "@/components/card-popunder";
 import { sendPlayerLog } from "@/lib/player-log-client";
 
 const MAX_FAILS = 2;
@@ -27,10 +27,11 @@ export function PopTapLayer({
 }) {
   const [armed, setArmed] = useState(false);
   const [fails, setFails] = useState(0);
+  const max = popMaxFor(host);
 
   useEffect(() => {
     const check = () => {
-      if (canPop(videoId)) setArmed(true);
+      if (canPop(videoId, max)) setArmed(true);
     };
     check();
     const vis = () => {
@@ -50,7 +51,7 @@ export function PopTapLayer({
       window.removeEventListener("blur", check);
       window.removeEventListener("scroll", check);
     };
-  }, [videoId, mediaRef]);
+  }, [videoId, mediaRef, max]);
 
   if (!armed || fails >= MAX_FAILS) return null;
   const lh = popHost(host);
@@ -60,13 +61,13 @@ export function PopTapLayer({
       aria-label="Putar video"
       className="absolute inset-0 z-10 cursor-pointer bg-transparent"
       onClick={() => {
-        if (!canPop(videoId)) {
+        if (!canPop(videoId, max)) {
           setArmed(false);
           onPass?.();
           return;
         }
         sendPlayerLog(videoId, lh, "pop_fire");
-        const r = firePop(videoId);
+        const r = firePop(videoId, max);
         if (r === "ok") {
           sendPlayerLog(videoId, lh, "pop_ok");
           setArmed(false);
