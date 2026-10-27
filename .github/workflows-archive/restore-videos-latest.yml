@@ -1,0 +1,101 @@
+name: Restore videos-latest
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 40
+
+      - name: Restore data/videos-latest.json from last known good commit
+        run: |
+          set -e
+          # Prefer commits that still had a full videos-latest
+          for sha in 660316786b95ac7ddc32225d86526c1b234bdfc1 c0df3f42f161c935057c3408ec469445c0b117a6 8419b8a; do
+            if git cat-file -e "${sha}:data/videos-latest.json" 2>/dev/null; then
+              git show "${sha}:data/videos-latest.json" > data/videos-latest.json
+              BYTES=$(wc -c < data/videos-latest.json)
+              echo "Restored from $sha ($BYTES bytes)"
+              if [ "$BYTES" -gt 5000 ]; then
+                break
+              fi
+            fi
+          done
+          python3 - <<'PY'
+          import json, urllib.request, time
+          path = "data/videos-latest.json"
+          data = json.load(open(path))
+          assert isinstance(data, list) and len(data) > 10, f"bad restore: {type(data)} len={len(data) if isinstance(data, list) else None}"
+          print("items", len(data))
+
+          # Enrich Streamtape titles/thumbs via public file/info
+          def info(fid):
+              url = f"https://api.streamtape.com/file/info?file={fid}"
+              try:
+                  with urllib.request.urlopen(url, timeout=10) as r:
+                      j = json.loads(r.read().decode())
+                  if j.get("status") != 200:
+                      return None
+                  res = j.get("result") or {}
+                  row = res.get(fid) if isinstance(res, dict) and fid in res else res
+                  if not isinstance(row, dict):
+                      return None
+                  name = str(row.get("name") or "").rsplit(".", 1)[0].strip()
+                  thumb = str(row.get("thumb") or "").strip()
+                  return {"title": name, "thumb": thumb}
+              except Exception as e:
+                  print("info fail", fid, e)
+                  return None
+
+          ok = 0
+          for item in data:
+              if not isinstance(item, dict):
+                  continue
+              blob = f"{item.get('embed','')} {item.get('source','')} {item.get('direct','')}".lower()
+              if "streamtape" not in blob:
+                  continue
+              fid = str(item.get("id") or "")
+              if not fid:
+                  continue
+              title = str(item.get("title") or "")
+              need = (not title) or title.startswith("Video ") or "Batch 25 Sep" in title
+              if not need and item.get("poster"):
+                  continue
+              meta = info(fid)
+              if not meta:
+                  continue
+              if meta.get("title"):
+                  item["title"] = meta["title"]
+              if meta.get("thumb"):
+                  item["poster"] = meta["thumb"]
+                  item["thumbnail"] = meta["thumb"]
+              ok += 1
+              time.sleep(0.15)
+          print("enriched", ok)
+          open(path, "w").write(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+          PY
+
+      - name: Commit
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/videos-latest.json
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          COUNT=$(python3 -c "import json; print(len(json.load(open('data/videos-latest.json'))))")
+          git commit -m "fix: restore videos-latest.json ($COUNT items) — AI+ catalog recovery"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main || true
+            git push origin HEAD:main && exit 0
+            sleep 2
+          done
+          exit 1
