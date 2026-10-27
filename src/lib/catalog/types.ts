@@ -50,6 +50,8 @@ export type VideoDetail = VideoCard & {
   categories?: CategoryInfo[];
   /** Tanggal unggah asli dari katalog (createdAt ?? date); dipakai VideoObject.uploadDate. */
   uploadDate?: string | number | null;
+  /** Up to 6 other videos of the same main category (id + raw title), for plain internal links. */
+  sameCategory?: Array<{ id: string; title: string }>;
 };
 
 export type CategoryInfo = {

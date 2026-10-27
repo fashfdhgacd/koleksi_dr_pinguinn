@@ -412,6 +412,22 @@ export function WatchPage() {
                 </ul>
               </nav>
             ) : null}
+            {item.sameCategory && item.sameCategory.length ? (
+              <nav aria-label="Video lain di kategori ini" className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
+                  Lainnya di {item.category || "kategori ini"}
+                </p>
+                <ul className="space-y-1 text-sm">
+                  {item.sameCategory.map((v) => (
+                    <li key={v.id}>
+                      <a href={`/watch/${v.id}`} className="text-foreground/80 underline-offset-2 hover:text-primary hover:underline">
+                        {cleanDisplayTitle(v.title)}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            ) : null}
             <VideoFacts item={item} />
             <div className="flex flex-wrap gap-3">
               <button
