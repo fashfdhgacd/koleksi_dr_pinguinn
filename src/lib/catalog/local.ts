@@ -1,6 +1,6 @@
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
-import { CATEGORY_LIST, MIN_LISTED_CATEGORY_COUNT, SEO_MIN_COUNT, findCategory } from "./categories";
+import { CATEGORY_LIST, MIN_LISTED_CATEGORY_COUNT, NOINDEX_CATEGORY_SLUGS, SEO_MIN_COUNT, findCategory } from "./categories";
 import deadSources from "./dead-sources.json";
 import type { CategoryInfo } from "./types";
 import {
@@ -272,8 +272,34 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
     subjects: [],
     playable: Boolean(embed),
     categories: videoCategories(bag, item),
+    sameCategory: await sameCategoryLinks(bag, item),
     ...((await isVideyNoThumbHidden(item.id)) ? { noindex: true } : {}),
   };
+}
+
+/** Text links on a watch page to other videos of its main category (internal linking for crawlers). */
+const SAME_CATEGORY_LINKS = 6;
+
+/**
+ * Up to SAME_CATEGORY_LINKS videos next to this one in its category list (the pool is built once per
+ * catalog build, so this is an in-memory slice: no KV/D1 read). Hidden videos are skipped.
+ */
+async function sameCategoryLinks(cache: CatalogCache, item: RawItem): Promise<Array<{ id: string; title: string }>> {
+  const slug = slugOf(item);
+  if (!slug || NOINDEX_CATEGORY_SLUGS.has(slug)) return [];
+  const pool = categoryPool(cache, slug);
+  if (pool.length < 2) return [];
+  const at = Math.max(0, pool.findIndex((x) => x?.id === item.id));
+  const out: Array<{ id: string; title: string }> = [];
+  for (let step = 1; step < pool.length && step <= SAME_CATEGORY_LINKS * 4 && out.length < SAME_CATEGORY_LINKS; step++) {
+    const next = pool[(at + step) % pool.length];
+    const id = String(next?.id || "");
+    const title = String(next?.title || "").trim();
+    if (!id || !title || id === item.id || out.some((o) => o.id === id)) continue;
+    if (await isPublicHidden(id)) continue;
+    out.push({ id, title });
+  }
+  return out;
 }
 
 /** Max category chips on a watch page. */
@@ -286,6 +312,7 @@ function listedSlugs(cache: CatalogCache): Set<string> {
   if (set) return set;
   set = new Set();
   for (const c of CATEGORY_LIST) {
+    if (NOINDEX_CATEGORY_SLUGS.has(c.slug)) continue;
     if (!cache.bySlug.get(c.slug)?.length) continue;
     const n = categoryPool(cache, c.slug).length;
     const seoMin = SEO_MIN_COUNT[c.slug];
@@ -404,6 +431,7 @@ export async function listListedCategories(
   const cache = await loadItems();
   const out: CategoryInfo[] = [];
   for (const c of CATEGORY_LIST) {
+    if (NOINDEX_CATEGORY_SLUGS.has(c.slug)) continue;
     // Same pool as the category page (bokep counts its inserted IndoAV videos, like its page total).
     // Only known category slugs with videos: no fallback scan for empty ones.
     const count = cache.bySlug.get(c.slug)?.length ? categoryPool(cache, c.slug).length : 0;

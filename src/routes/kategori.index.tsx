@@ -1,6 +1,6 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
-import { CATEGORY_LIST } from "@/lib/catalog/categories";
+import { PUBLIC_CATEGORY_LIST } from "@/lib/catalog/categories";
 import { RANKINGS } from "@/lib/catalog/rankings";
 import { queryCatalog } from "@/lib/catalog/service";
 import type { CategoryInfo } from "@/lib/catalog/types";
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/kategori/")({
     ]);
     const extra = { terbaru: latest, "paling-ditonton": views, "paling-disukai": likes };
     if (res.ok && res.type === "categories" && res.categories.length) return { categories: res.categories, specials: res.specials || [], extra };
-    return { categories: CATEGORY_LIST, specials: [], extra };
+    return { categories: PUBLIC_CATEGORY_LIST, specials: [], extra };
   },
   head: () => {
     const title = "Kategori Bokep Indo, JAV, AI & Videy - Koleksi Dr. Pinguin | koleksidrpinguin.com";

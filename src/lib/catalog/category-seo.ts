@@ -10,15 +10,15 @@ const TITLE_SUFFIX = "koleksidrpinguin.com";
 const COPY: Record<string, { h1: string; intro: string; title?: string; description?: string }> = {
   jav: {
     h1: "JAV Sub Indo Terbaru",
-    intro: "Nonton JAV sub indo terbaru dan bokep Jepang yang lagi rame, dari artis JAV favorit sampai kode yang paling dicari. Langsung putar di HP tanpa download.",
-    title: `JAV Sub Indo Terbaru ${YEAR} - Nonton Bokep Jepang | ${TITLE_SUFFIX}`,
-    description: `Nonton JAV sub indo terbaru ${YEAR} dan bokep Jepang yang lagi rame. Cari kode JAV favoritmu, langsung putar di HP tanpa download.`,
+    intro: "Kumpulan JAV sub indo dan bokep Jepang terbaru, diurutkan dari yang baru masuk. Cari pakai kode atau nama artis lewat kolom pencarian, lalu putar langsung di HP tanpa aplikasi tambahan.",
+    title: `JAV Sub Indo Terbaru ${YEAR} - Bokep Jepang Kode Lengkap | ${TITLE_SUFFIX}`,
+    description: `Nonton JAV sub indo terbaru ${YEAR}: bokep Jepang dengan kode dan nama artis, bisa dicari dan diputar langsung di HP tanpa download.`,
   },
   "ai-plus": {
-    h1: "Bokep AI Indo Terbaru",
-    intro: "Bokep AI indo dan video AI+ terbaru yang lagi banyak dicari, gambar jernih dan streaming lancar. Koleksinya nambah terus tiap minggu.",
-    title: `Bokep AI Indo Terbaru ${YEAR} - Video AI+ Viral | ${TITLE_SUFFIX}`,
-    description: `Bokep AI indo terbaru ${YEAR} di Koleksi Dr. Pinguin: video AI+ viral yang lagi banyak dicari, jernih dan lancar diputar langsung di HP.`,
+    h1: "Bokep AI Indo Terbaru (AI+)",
+    intro: "AI+ adalah koleksi video buatan AI dengan wajah dan suasana ala Indonesia dan Asia: gambar tajam, durasi pendek, dan diputar lancar di HP. Video baru masuk hampir tiap hari, jadi halaman ini selalu berubah. Kalau mau yang rekaman asli, cek juga kategori Viral, Amatir atau Videy di bawah.",
+    title: `Bokep AI Indo Terbaru ${YEAR} - Video AI+ Jernih | ${TITLE_SUFFIX}`,
+    description: `Video AI+ terbaru ${YEAR}: bokep AI indo dan Asia buatan AI, gambar tajam dan lancar diputar di HP. Video baru masuk hampir tiap hari.`,
   },
   "ai-gay": {
     h1: "Video AI Gay Terbaru",
@@ -27,10 +27,10 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     description: `Video AI gay terbaru ${YEAR} di Koleksi Dr. Pinguin: adegan sesama pria buatan AI, pemeran dewasa, langsung putar di HP tanpa download.`,
   },
   jilbab: {
-    h1: "Bokep Jilbab Viral Terbaru",
-    intro: "Bokep jilbab indo viral yang lagi rame, dari hijab syar'i sampai ukhti yang bikin penasaran. Langsung putar di HP.",
-    title: `Bokep Jilbab Viral Terbaru ${YEAR} - Hijab Indo | ${TITLE_SUFFIX}`,
-    description: `Bokep jilbab viral terbaru ${YEAR}: video hijab indo yang lagi rame dan paling dicari, langsung tonton di HP tanpa ribet.`,
+    h1: "Bokep Jilbab Indo Viral",
+    intro: "Video jilbab dan hijab indo yang lagi banyak dicari, dari rekaman pasangan sampai yang sempat viral di media sosial. Semua pemeran dewasa, langsung putar di HP.",
+    title: `Bokep Jilbab Indo Viral ${YEAR} - Video Hijab Terbaru | ${TITLE_SUFFIX}`,
+    description: `Bokep jilbab indo viral ${YEAR}: video hijab terbaru yang lagi banyak dicari, pemeran dewasa, tonton langsung di HP tanpa download.`,
   },
   tante: {
     h1: "Bokep Tante Indo Viral",
@@ -45,16 +45,16 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     description: `Bokep indo amatir terbaru ${YEAR}: rekaman pribadi dan pasutri asli yang lagi viral, langsung putar di HP.`,
   },
   viral: {
-    h1: "Bokep Indo Viral Terbaru",
-    intro: "Video indo viral yang lagi rame di Twitter, Telegram dan TikTok, dikumpulin di satu tempat. Update tiap ada yang baru.",
-    title: `Bokep Indo Viral Terbaru ${YEAR} - Video Viral Hari Ini | ${TITLE_SUFFIX}`,
-    description: `Bokep indo viral terbaru ${YEAR}: video viral Twitter, Telegram dan TikTok yang lagi rame hari ini, langsung tonton di HP.`,
+    h1: "Bokep Indo Viral Hari Ini",
+    intro: "Video indo yang lagi ramai dibagikan di X, Telegram dan TikTok, dikumpulkan di satu halaman supaya tidak perlu buka link satu per satu. Yang paling baru selalu tampil paling atas.",
+    title: `Bokep Indo Viral Hari Ini ${YEAR} - Video Ramai X & Telegram | ${TITLE_SUFFIX}`,
+    description: `Bokep indo viral hari ini: video yang lagi ramai di X, Telegram dan TikTok ${YEAR}, terkumpul di satu halaman dan langsung bisa diputar.`,
   },
   percakapan: {
-    h1: "Bokep Indo Percakapan Jelas",
-    intro: "Bokep indo dengan obrolan dan suara jelas, dari VCS sampai telpon mesum yang lagi viral.",
-    title: `Bokep Indo Percakapan Jelas Terbaru ${YEAR} - VCS Viral | ${TITLE_SUFFIX}`,
-    description: `Bokep indo percakapan jelas terbaru ${YEAR}: VCS, video call dan obrolan mesum yang lagi viral, suara jernih.`,
+    h1: "Bokep Indo Ada Percakapannya",
+    intro: "Video indo yang suaranya jelas dan ada obrolannya, mulai dari video call sampai rekaman pasangan yang ngobrol santai. Cocok kalau kamu suka yang terasa lebih nyata.",
+    title: `Bokep Indo Percakapan Jelas ${YEAR} - Suara Jernih | ${TITLE_SUFFIX}`,
+    description: `Bokep indo dengan percakapan jelas ${YEAR}: video call dan rekaman pasangan dengan obrolan dan suara jernih, langsung putar di HP.`,
   },
   kosan: {
     h1: "Bokep Kosan Indo Viral",
@@ -63,10 +63,10 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     description: `Bokep kosan indo viral terbaru ${YEAR}: rekaman asli anak kos dan pasangan yang lagi rame, tonton langsung di HP.`,
   },
   colmek: {
-    h1: "Video Colmek Indo Viral",
-    intro: "Video colmek indo yang lagi rame, dari VCS sampai rekaman pribadi. Update terus.",
-    title: `Video Colmek Indo Viral Terbaru ${YEAR} | ${TITLE_SUFFIX}`,
-    description: `Video colmek indo viral terbaru ${YEAR}: VCS dan rekaman pribadi yang lagi rame, langsung putar tanpa download.`,
+    h1: "Video Colmek Indo Terbaru",
+    intro: "Rekaman colmek indo dari VCS, live dan video pribadi yang sempat beredar. Isinya diperbarui setiap ada unggahan baru, diputar langsung tanpa pindah aplikasi.",
+    title: `Video Colmek Indo Terbaru ${YEAR} - VCS & Rekaman Pribadi | ${TITLE_SUFFIX}`,
+    description: `Video colmek indo terbaru ${YEAR}: rekaman VCS, live dan video pribadi yang sempat beredar, langsung tonton di HP tanpa download.`,
   },
   "teen-18": {
     h1: "Video Teen (18+) Terbaru",
@@ -87,10 +87,10 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     description: `Bokep live indo terbaru ${YEAR}: rekaman live streaming yang lagi viral, langsung putar di HP.`,
   },
   doggy: {
-    h1: "Bokep Doggy Indo Viral",
-    intro: "Video gaya doggy indo dan asia yang paling dicari, langsung putar tanpa ribet.",
-    title: `Bokep Doggy Indo Viral Terbaru ${YEAR} | ${TITLE_SUFFIX}`,
-    description: `Bokep doggy indo viral terbaru ${YEAR}: gaya nungging yang paling dicari, tonton langsung di HP.`,
+    h1: "Bokep Doggy Style Indo",
+    intro: "Pilihan video gaya doggy dari indo dan Asia, dari rekaman amatir sampai yang lebih rapi. Diurutkan dari yang terbaru, tinggal pilih lalu putar.",
+    title: `Bokep Doggy Style Indo Terbaru ${YEAR} - Indo & Asia | ${TITLE_SUFFIX}`,
+    description: `Bokep doggy style indo terbaru ${YEAR}: video gaya nungging dari indo dan Asia, amatir sampai rapi, langsung putar di HP.`,
   },
   "open-bo": {
     h1: "Bokep Open BO Indo Viral",
@@ -99,10 +99,10 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     description: `Bokep open BO indo viral terbaru ${YEAR}: rekaman michat dan BO asli yang lagi rame, langsung tonton di HP.`,
   },
   malaysia: {
-    h1: "Bokep Malaysia Viral Terbaru",
-    intro: "Video Malaysia dan melayu yang lagi viral, dari tudung sampai amatir.",
-    title: `Bokep Malaysia Viral Terbaru ${YEAR} - Video Melayu | ${TITLE_SUFFIX}`,
-    description: `Bokep Malaysia viral terbaru ${YEAR}: video melayu dan tudung yang lagi rame, langsung putar di HP.`,
+    h1: "Bokep Malaysia & Melayu Viral",
+    intro: "Video Malaysia dan melayu yang lagi viral, termasuk rekaman bertudung dan amatir dari negeri jiran. Bahasanya dekat dengan bahasa kita, jadi tetap enak ditonton.",
+    title: `Bokep Malaysia Viral Terbaru ${YEAR} - Video Melayu & Tudung | ${TITLE_SUFFIX}`,
+    description: `Bokep Malaysia viral terbaru ${YEAR}: video melayu, bertudung dan amatir dari negeri jiran yang lagi ramai, langsung putar di HP.`,
   },
   chindo: {
     h1: "Bokep Chindo Viral Terbaru",
@@ -279,6 +279,31 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     description: `Koleksi Dr. Pinguin Bokep terbaru ${YEAR}: bokep indo pilihan yang diunggah sendiri, langsung tonton di HP tanpa download.`,
   },
 };
+
+/** Related category links shown under the intro of the busiest landing pages (internal linking). */
+const RELATED: Record<string, string[]> = {
+  "ai-plus": ["viral", "jav", "hentai", "amatir", "jilbab", "videy"],
+  jav: ["ai-plus", "hentai", "barat", "chindo", "videy"],
+  jilbab: ["viral", "amatir", "istri", "malaysia", "videy"],
+  viral: ["amatir", "jilbab", "colmek", "percakapan", "videy"],
+  percakapan: ["vcs", "colmek", "viral", "amatir", "videy"],
+  colmek: ["vcs", "percakapan", "viral", "live", "videy"],
+  doggy: ["amatir", "viral", "istri", "crot-dalam", "videy"],
+  malaysia: ["jilbab", "viral", "chindo", "amatir", "videy"],
+};
+/** Top category pages that always show a link to /kategori/videy, even without a RELATED list. */
+const VIDEY_LINK_PAGES = new Set(["ai-plus", "jav", "hentai", "jilbab", "tante", "amatir", "viral", "istri", "live", "malaysia", "colmek", "doggy", "percakapan"]);
+
+/** Related categories (slug + label) for a category page; always includes Videy on top pages. */
+export function categoryRelated(slug: string): Array<{ slug: string; label: string }> {
+  const list = [...(RELATED[slug] || [])];
+  if (VIDEY_LINK_PAGES.has(slug) && !list.includes("videy")) list.push("videy");
+  return list
+    .filter((s) => s !== slug)
+    .map((s) => CATEGORIES.find((c) => c.slug === s))
+    .filter((c): c is (typeof CATEGORIES)[number] => Boolean(c))
+    .map((c) => ({ slug: c.slug, label: c.slug === "videy" ? "Videy" : c.label }));
+}
 
 export function categorySeo(slug: string): CategorySeo {
   const cat = CATEGORIES.find((c) => c.slug === slug);

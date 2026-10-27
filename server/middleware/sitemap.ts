@@ -3,7 +3,7 @@
  * Nitro middleware (Cloudflare) — do not keep static public/sitemap*.xml or they shadow this.
  * Includes Google video sitemap extension (video:video) for /watch entries.
  */
-import type { CategoryInfo } from "../../src/lib/catalog/types";
+import { DEFAULT_PAGE_SIZE, type CategoryInfo } from "../../src/lib/catalog/types";
 import { listListedCategories } from "../../src/lib/catalog/local";
 import { listSitemapWatchEntries } from "../../src/lib/catalog/sitemap-entries";
 import { RANKINGS, RANK_PERIODS, rankPeriodAvailable } from "../../src/lib/catalog/rankings";
@@ -60,6 +60,13 @@ function pageEntries(categories: CategoryInfo[]): string[] {
         priority: c.slug === "jav" || c.slug === "ai-plus" ? "0.8" : "0.7",
       }),
     );
+  }
+  // AI+ is the top landing page: its pagination pages 2..5 are indexable (same cap as
+  // DEEP_PAGE_NOINDEX on the category route), so list them while they exist.
+  const aiPlus = categories.find((c) => c.slug === "ai-plus");
+  const aiPages = aiPlus && typeof aiPlus.count === "number" ? Math.min(5, Math.ceil(aiPlus.count / DEFAULT_PAGE_SIZE)) : 1;
+  for (let n = 2; n <= aiPages; n++) {
+    out.push(urlEntry(`${SITE_ORIGIN}/kategori/ai-plus?page=${n}`, { changefreq: "daily", priority: "0.5" }));
   }
   for (const path of LEGAL_PATHS) {
     out.push(urlEntry(`${SITE_ORIGIN}${path}`, { changefreq: "monthly", priority: "0.3" }));
