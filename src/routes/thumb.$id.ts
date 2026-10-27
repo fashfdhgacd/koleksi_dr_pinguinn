@@ -46,6 +46,19 @@ async function byseSource(id: string): Promise<string> {
   }
 }
 
+/** TEMP preview probe: what Byse details answers from the Worker (removed before merge). */
+export async function byseProbe(code: string): Promise<string> {
+  try {
+    const r = await fetch(`https://bysejikuar.com/api/videos/${code}/embed/details`, {
+      headers: { accept: "application/json", "user-agent": "Mozilla/5.0", referer: `https://bysejikuar.com/e/${code}` },
+      signal: AbortSignal.timeout(4000),
+    });
+    return `${r.status} ${(await r.text()).slice(0, 300)}`;
+  } catch (e) {
+    return `err ${String(e).slice(0, 100)}`;
+  }
+}
+
 function keyFor(id: string): string {
   return `posters/typed/${id.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80)}`;
 }
@@ -125,6 +138,8 @@ export const Route = createFileRoute("/thumb/$id")({
         try {
           const id = String(params.id || "").replace(/\.(jpg|jpeg|webp|png)$/i, "");
           if (!id) return new Response(null, { status: 404 });
+          const probe = new URL(request.url).searchParams.get("byseprobe");
+          if (probe && /^[A-Za-z0-9]{4,40}$/.test(probe)) return new Response(await byseProbe(probe), { headers: { "cache-control": "no-store" } });
           let hit: Response | null = null;
           try {
             hit = (await caches.default.match(request)) || null;
