@@ -1,11 +1,11 @@
-import { categorySeo } from "@/lib/catalog/category-seo";
+import { categoryRelated, categorySeo } from "@/lib/catalog/category-seo";
 import { useEffect } from "react";
 import { Link, createFileRoute, notFound, redirect, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { CatalogPager } from "@/components/video/catalog-pager";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
-import { LEGACY_CATEGORY_SLUGS, UNLISTED_CATEGORY_SLUGS, findCategory, minIndexedCount } from "@/lib/catalog/categories";
+import { LEGACY_CATEGORY_SLUGS, NOINDEX_CATEGORY_SLUGS, UNLISTED_CATEGORY_SLUGS, findCategory, minIndexedCount } from "@/lib/catalog/categories";
 import { SafeBoundary } from "@/components/safe-boundary";
 import { rememberCatalog } from "@/lib/catalog/last-catalog";
 import { queryCatalog } from "@/lib/catalog/service";
@@ -116,6 +116,8 @@ export const Route = createFileRoute("/kategori/$slug")({
     const emptyCategory = Boolean(
       !rank && cat && ld && ld.ok && ld.type === "category" && typeof ld.total === "number" && ld.total < minCount,
     );
+    // Owner decision 2026-10-27: these stay reachable but out of search (no sitemap, noindex,follow).
+    const hiddenFromSearch = Boolean(cat && NOINDEX_CATEGORY_SLUGS.has(cat.slug));
     const qs = new URLSearchParams();
     if (periode && !emptyPeriod) qs.set("periode", periode);
     if (page > 1 && !emptyPeriod) qs.set("page", String(page));
@@ -124,7 +126,19 @@ export const Route = createFileRoute("/kategori/$slug")({
     const pageTitle = page > 1 && !emptyPeriod ? seo.title.replace(/ \| koleksidrpinguin\.com$/, ` – Halaman ${page} | koleksidrpinguin.com`) : seo.title;
     const pageDesc = page > 1 && !emptyPeriod ? `Halaman ${page}: ${seo.description}` : seo.description;
     const crumbName = (cat?.label || rank?.label || params.slug).trim();
-    const indexable = !(emptyPeriod || emptyCategory || page > DEEP_PAGE_NOINDEX);
+    const indexable = !(emptyPeriod || emptyCategory || hiddenFromSearch || page > DEEP_PAGE_NOINDEX);
+    // rel prev/next between pagination pages of a plain category (each page keeps its own canonical).
+    const pageUrl = (n: number) => `${SITE_ORIGIN}/kategori/${params.slug}${n > 1 ? `?page=${n}` : ""}`;
+    const lastPage =
+      !rank && ld && ld.ok && ld.type === "category" && typeof ld.total === "number"
+        ? Math.max(1, Math.ceil(ld.total / ((ld as { limit?: number }).limit || DEFAULT_PAGE_SIZE)))
+        : 1;
+    const pageLinks = rank
+      ? []
+      : [
+          ...(page > 1 ? [{ rel: "prev", href: pageUrl(page - 1) }] : []),
+          ...(page < lastPage ? [{ rel: "next", href: pageUrl(page + 1) }] : []),
+        ];
     return {
       meta: [
         { title: pageTitle },
@@ -135,14 +149,14 @@ export const Route = createFileRoute("/kategori/$slug")({
         { property: "og:type", content: "website" },
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
-        ...(emptyPeriod || emptyCategory || page > DEEP_PAGE_NOINDEX
+        ...(!indexable
           ? [
               { name: "robots", content: "noindex,follow" },
               { name: "googlebot", content: "noindex,follow" },
             ]
           : []),
       ],
-      links: [{ rel: "canonical", href: url }],
+      links: [{ rel: "canonical", href: url }, ...pageLinks],
       scripts: indexable
         ? [
             {
@@ -367,6 +381,19 @@ function PlainCategoryPage({ slug }: { slug: string }) {
           ) : null}
           {typeof feed.total === "number" ? (
             <p className="mt-1 text-sm text-zinc-500">{feed.total.toLocaleString("id-ID")} video</p>
+          ) : null}
+          {categoryRelated(cat.slug).length ? (
+            <nav className="mt-3 flex flex-wrap gap-2" aria-label="Kategori terkait">
+              {categoryRelated(cat.slug).map((c) => (
+                <a
+                  key={c.slug}
+                  href={`/kategori/${c.slug}`}
+                  className="inline-flex h-8 items-center rounded-full border border-white/10 px-3 text-sm text-zinc-300 hover:border-white/40 hover:text-white"
+                >
+                  {c.label}
+                </a>
+              ))}
+            </nav>
           ) : null}
         </div>
 

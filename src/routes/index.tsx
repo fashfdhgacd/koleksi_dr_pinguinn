@@ -236,6 +236,13 @@ function HomePage() {
             <h1 className="text-xl font-semibold tracking-tight text-zinc-100">{title}</h1>
             <p className="mt-1 text-sm text-zinc-500">{subtitle}</p>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">{intro}</p>
+            {q ? null : (
+              <p className="mt-2 text-sm">
+                <a href="/kategori/videy" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
+                  Video viral Videy terbaru →
+                </a>
+              </p>
+            )}
           </div>
 
           {feed.loading && !feed.items.length ? (
