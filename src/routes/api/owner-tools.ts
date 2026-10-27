@@ -659,7 +659,8 @@ async function handleTelegramWebhook(install: boolean) {
     lastSetupAt(),
   ]);
   const info = result.info;
-  const urlOk = Boolean(info && info.url === WEBHOOK_URL);
+  // Any of our own hosts (www, .site, workers.dev) delivers to this same Worker, so it counts as ok.
+  const urlOk = Boolean(info && (info.url === WEBHOOK_URL || info.isOurs));
   return json(
     {
       ok: result.ok,

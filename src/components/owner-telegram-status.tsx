@@ -163,7 +163,10 @@ export function OwnerTelegramStatus({ secret }: { secret: string }) {
   }
 
   const info = data?.info || null;
-  const healthy = Boolean(data?.ok && data.urlOk && info && !info.lastErrorMessage);
+  // Telegram keeps the last delivery error forever; only an error from the last hour is a live problem.
+  const errAt = Date.parse(String(info?.lastErrorDate || ""));
+  const freshError = Boolean(info?.lastErrorMessage) && (!Number.isFinite(errAt) || Date.now() - errAt < 3600_000);
+  const healthy = Boolean(data?.ok && data.urlOk && info && !freshError);
 
   return (
     <section className="rounded-2xl border border-white/[0.08] bg-[#141416] p-5">
