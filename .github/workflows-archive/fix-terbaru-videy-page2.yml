@@ -1,0 +1,40 @@
+name: fix-terbaru-videy-page2
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/fix-terbaru-videy-page2.yml"
+permissions:
+  contents: write
+jobs:
+  patch:
+    # Disabled 2026-10-14: one-shot patch already applied (ea86d61).
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Terbaru page 1 = IndoAV only (Videy mixed in from page 2)
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          p = "src/lib/catalog/local-cache.ts"
+          s = open(p, encoding="utf-8").read()
+          old_c = "  // Videy (newest first) mixed in from the 2nd card on: one in every 4 cards.\n"
+          new_c = "  // Videy (newest first) mixed in from page 2 on (page 1 stays IndoAV only): one in every 4 cards.\n"
+          old = "    const at = 1 + k * 4;\n"
+          new = "    const at = TERBARU_FIRST_PAGE + 1 + k * 4;\n"
+          if new in s:
+              print("already patched"); raise SystemExit(0)
+          assert s.count(old) == 1 and s.count(old_c) == 1, "pattern not found exactly once"
+          s = s.replace(old, new).replace(old_c, new_c)
+          open(p, "w", encoding="utf-8").write(s)
+          PY
+      - name: Commit if changed
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/catalog/local-cache.ts
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "fix(terbaru): page 1 IndoAV only, Videy from page 2"
+          git push
