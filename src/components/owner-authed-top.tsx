@@ -2,6 +2,7 @@
 
 import type { OwnerStats, DayRow } from "@/components/owner-dashboard-shared";
 import { OwnerOverview } from "@/components/owner-overview";
+import { OwnerPosterFill } from "@/components/owner-poster-fill";
 import { OwnerTools } from "@/components/owner-tools";
 import { OwnerVideyUntitled } from "@/components/owner-videy-untitled";
 
@@ -31,6 +32,7 @@ export function OwnerAuthedTop(props: {
         vsUniq={vsUniq}
         vsViews={vsViews}
       />
+      <OwnerPosterFill secret={secret} />
       <OwnerVideyUntitled secret={secret} />
       <OwnerTools secret={secret} />
     </>
