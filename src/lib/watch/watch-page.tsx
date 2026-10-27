@@ -478,35 +478,64 @@ export function WatchPage() {
 }
 
 /** Compact episode buttons under the title (series only): plain links, no thumbnails, no requests. */
+const EP_ACCENT = "#2dd4bf"; // site teal accent (bg-primary is gray in this theme)
+const EP_WINDOW = 24;
+
+function EpisodeLink({ id, ep, current }: { id: string; ep: number; current: boolean }) {
+  return (
+    <a
+      href={`/watch/${id}`}
+      aria-current={current ? "page" : undefined}
+      style={current ? { backgroundColor: EP_ACCENT, borderColor: EP_ACCENT, color: "#09090b" } : undefined}
+      className={
+        "inline-flex h-10 w-[112px] shrink-0 items-center justify-center whitespace-nowrap rounded-md border px-2 text-center text-sm tabular-nums sm:w-auto " +
+        (current
+          ? "font-semibold"
+          : "border-white/20 bg-white/5 font-medium text-white/90 hover:border-[#2dd4bf] hover:text-[#2dd4bf]")
+      }
+    >
+      Episode {ep}
+    </a>
+  );
+}
+
+const EP_GRID =
+  "-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:max-w-3xl sm:grid-cols-[repeat(auto-fill,minmax(112px,1fr))] sm:overflow-visible sm:px-0";
+
 function EpisodeStrip({ episodes, currentId }: { episodes: Array<{ id: string; ep: number }>; currentId: string }) {
   const at = episodes.findIndex((e) => e.id === currentId);
   const next = at >= 0 && at + 1 < episodes.length ? episodes[at + 1] : null;
+  const many = episodes.length > EP_WINDOW;
+  let shown = episodes;
+  if (many) {
+    const half = Math.floor(EP_WINDOW / 2);
+    const start = Math.max(0, Math.min((at < 0 ? 0 : at) - half, episodes.length - EP_WINDOW));
+    shown = episodes.slice(start, start + EP_WINDOW);
+  }
   return (
     <nav aria-label="Episode" className="space-y-2">
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible">
-        {episodes.map((e) => {
-          const current = e.id === currentId;
-          return (
-            <a
-              key={e.id}
-              href={`/watch/${e.id}`}
-              aria-current={current ? "page" : undefined}
-              className={
-                "inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-md border px-4 text-sm font-medium " +
-                (current
-                  ? "border-primary bg-primary text-white"
-                  : "border-white/25 bg-transparent text-foreground/85 hover:border-primary hover:text-primary")
-              }
-            >
-              Episode {e.ep}
-            </a>
-          );
-        })}
+      <div className={EP_GRID}>
+        {shown.map((e) => (
+          <EpisodeLink key={e.id} id={e.id} ep={e.ep} current={e.id === currentId} />
+        ))}
       </div>
+      {many ? (
+        <details className="sm:max-w-3xl">
+          <summary className="cursor-pointer select-none text-sm font-medium text-[#2dd4bf]">
+            Semua episode ({episodes.length})
+          </summary>
+          <div className={EP_GRID + " mt-2"}>
+            {episodes.map((e) => (
+              <EpisodeLink key={e.id} id={e.id} ep={e.ep} current={e.id === currentId} />
+            ))}
+          </div>
+        </details>
+      ) : null}
       {next ? (
         <a
           href={`/watch/${next.id}`}
-          className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white sm:w-auto"
+          style={{ backgroundColor: EP_ACCENT, color: "#09090b" }}
+          className="inline-flex h-10 w-full items-center justify-center rounded-md px-4 text-sm font-semibold hover:opacity-90 active:scale-[0.98] sm:w-auto"
         >
           Episode selanjutnya (Episode {next.ep}) →
         </a>
