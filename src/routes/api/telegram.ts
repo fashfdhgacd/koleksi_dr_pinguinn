@@ -214,9 +214,10 @@ function parseCat(text: string): string {
 
 function parseSource(text: string): string {
   const t = text.toLowerCase().trim();
+  // Lulu first: "lulustream" also contains "stream" and used to fall into Streamtape.
+  if (/lulu|lulustream/.test(t)) return "lulu";
   if (/streamtape|strcloud|sterampie|stream/.test(t)) return "streamtape";
   if (/putarin/.test(t)) return "putarin";
-  if (/lulu|lulustream/.test(t)) return "lulu";
   return "";
 }
 
