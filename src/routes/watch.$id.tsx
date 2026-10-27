@@ -74,11 +74,9 @@ export const Route = createFileRoute("/watch/$id")({
         : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
     const image = item ? shareCardImage(item.thumbnail) : DEFAULT_OG;
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
-    const embedUrl = item
-      ? (item.video_url || item.qualities?.[0]?.url || "").trim() || null
-      : null;
-    const contentUrl =
-      embedUrl && /\.(mp4|webm|mov)($|\?)/i.test(embedUrl) ? embedUrl : null;
+    // Anti-theft: the provider embed/mp4 URL is no longer published in the VideoObject JSON-LD,
+    // so crawlers/scrapers cannot harvest every player link from page metadata in bulk. Google
+    // still gets name/description/thumbnail/uploadDate and our own watch URL. Playback is unchanged.
     const jsonLd = item
       ? videoJsonLd({
           id: item.id,
@@ -86,8 +84,8 @@ export const Route = createFileRoute("/watch/$id")({
           description,
           thumbnail: item.thumbnail,
           category: item.category,
-          embedUrl: contentUrl ? null : embedUrl,
-          contentUrl,
+          embedUrl: null,
+          contentUrl: null,
           durationSec: item.duration,
           uploadDate: item.uploadDate,
         })

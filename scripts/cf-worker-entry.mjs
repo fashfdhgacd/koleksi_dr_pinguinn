@@ -627,6 +627,23 @@ async function cronStatus(env) {
   });
 }
 
+/**
+ * Anti-scrape guard for the catalog API (/api/data): obvious HTTP libraries and download tools
+ * (curl, wget, python-requests, scrapy, yt-dlp, Go, Java, axios, ...) or an empty user agent get a
+ * 403 before the edge cache, so they cannot page through the catalog or harvest player links via
+ * type=detail. Browsers (our own pages) and search crawlers are untouched. No KV/D1, no cost.
+ * Requests with the owner key pass (owner tools).
+ */
+const SCRAPER_UA =
+  /\b(?:curl|wget|python-requests|python-urllib|aiohttp|httpx|scrapy|yt-dlp|youtube-dl|go-http-client|java\/|okhttp|axios|node-fetch|undici|libwww-perl|httrack|httpclient|guzzle|colly|ahrefsbot|semrushbot|mj12bot|dotbot|petalbot|bytespider|gptbot|ccbot|claudebot|dataforseobot|serpstatbot)\b/i;
+
+function scraperBlocked(request, url) {
+  if (url.pathname !== "/api/data") return false;
+  if (request.headers.has("x-online-key")) return false;
+  const ua = (request.headers.get("user-agent") || "").trim();
+  return !ua || SCRAPER_UA.test(ua);
+}
+
 export default {
   ...nitroHandler,
   async scheduled(event, env, context) {
@@ -680,6 +697,9 @@ export default {
       url = new URL(request.url);
     } catch {
       return nitroHandler.fetch(request, env, context);
+    }
+    if (scraperBlocked(request, url)) {
+      return new Response("forbidden", { status: 403, headers: { "cache-control": "private, no-store" } });
     }
     if (url.pathname === "/api/cron-status" && request.method === "GET") return cronStatus(env);
     if (request.method === "POST" && (url.pathname === "/api/owner-videy" || url.pathname === "/api/owner-tools")) {
