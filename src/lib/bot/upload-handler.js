@@ -282,6 +282,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   let heldTotal = 0;
   let catalogRaw = null;
   const posterBatch = {};
+  const postersCommitted = { added: 0, updated: 0, total: 0, any: false };
   const createdRecords = [];
 
   const queue = [];
@@ -551,7 +552,19 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
 
   for (const [fileName, items] of byFile) {
     try {
-      const result = await upsertVideosBatch(env, fileName, items.map((it) => it.record));
+      // Posters ride in the same commit as the videos (one commit per upload).
+      const filePosters = {};
+      for (const it of items) {
+        const poster = String(it.record.poster || it.record.thumbnail || "").trim();
+        if (isHttpPoster(poster)) filePosters[it.record.id] = poster;
+      }
+      const result = await upsertVideosBatch(env, fileName, items.map((it) => it.record), { posters: filePosters });
+      if (result.ok && result.posters) {
+        postersCommitted.added += result.posters.added;
+        postersCommitted.updated += result.posters.updated;
+        postersCommitted.total = result.posters.total;
+        postersCommitted.any = true;
+      }
       if (!result.ok) {
         failedTotal += items.length;
         const errMsg = (result.errors || []).join("; ") || "unknown";
@@ -568,7 +581,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
       for (const it of items) {
         const idKey = String(it.record.id || "").toLowerCase();
         const poster = String(it.record.poster || it.record.thumbnail || "").trim();
-        if (isHttpPoster(poster)) posterBatch[it.record.id] = poster;
+        if (isHttpPoster(poster) && !(result.ok && result.posters)) posterBatch[it.record.id] = poster;
         if (createdIds.has(idKey) && it.record.hidden_reason === HOLD_REASON) {
           createdTotal -= 1;
           heldTotal += 1;
@@ -608,6 +621,9 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     }
   }
 
+  if (postersCommitted.any && (postersCommitted.added || postersCommitted.updated)) {
+    lines.push(`🖼️ Poster map: +${postersCommitted.added} baru · ${postersCommitted.updated} update · total ${postersCommitted.total}`);
+  }
   if (Object.keys(posterBatch).length) {
     try {
       const merged = await mergeLatestPosters(env, posterBatch);
