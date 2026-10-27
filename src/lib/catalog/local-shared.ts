@@ -335,14 +335,50 @@ export function directPoster(url: unknown): string {
   if (PLACEHOLDER_IMAGE_RE.test(u)) return "";
   if (/cdnhlsplayer\.lat/i.test(u)) return "";
   if (/\/api\/(img-proxy|tape-thumb|embed-thumb|puterin-thumb)/i.test(u)) return "";
-  return u;
+  return fixDmmCover(u);
 }
+
+/**
+ * Stored poster maps (jav-posters.json etc.) hold DMM URLs built from the short id
+ * (.../digital/video/sone011/sone011pl.jpg), which redirect to "NOW PRINTING". Rewrite them to
+ * the real content id; "" (brand poster) when DMM has no cover for that code.
+ */
+export function fixDmmCover(url: string): string {
+  const m = url.match(/^https?:\/\/pics\.dmm\.co\.jp\/digital\/video\/([a-z]{2,8})(\d{3,4})\/\1\2pl\.jpg$/i);
+  if (!m) return url;
+  return javCoverFromTitle(`${m[1]}-${m[2]}`);
+}
+
+/**
+ * DMM digital covers live under the 5-digit content id (sone011 -> sone00011). The short id
+ * (sone011) 302-redirects to DMM's "NOW PRINTING" placeholder, which is why most Jav cards showed it.
+ * SOD/Faleno labels carry a "1" prefix on DMM (star716 -> 1star00716).
+ */
+const JAV_DMM_ONE_PREFIX = new Set(["star", "stars", "start", "sdmu", "sdnm", "fsdss", "dldss", "msfh", "iene", "fns"]);
+/** Codes checked by hand: a different DMM content id, or "" when DMM has no cover (brand poster). */
+const JAV_DMM_OVERRIDES: Record<string, string> = {
+  abp901: "118abp00901",
+  abp906: "118abp00906",
+  vrtm168: "h_910vrtm00168",
+  abw177: "",
+  ekdv592: "",
+  hez882: "",
+  hez894: "",
+  heyzo2054: "",
+  onez229: "",
+};
 
 export function javCoverFromTitle(title = ""): string {
   const m = String(title).match(/\b([A-Z]{2,8})[-_ ]?(\d{3,4})\b/i);
   if (!m) return "";
-  const code = (m[1] + m[2]).toLowerCase();
-  return `https://pics.dmm.co.jp/digital/video/${code}/${code}pl.jpg`;
+  const label = m[1].toLowerCase();
+  const key = label + m[2];
+  let cid: string;
+  if (Object.prototype.hasOwnProperty.call(JAV_DMM_OVERRIDES, key)) cid = JAV_DMM_OVERRIDES[key];
+  else if (label === "heyzo") cid = "";
+  else cid = `${JAV_DMM_ONE_PREFIX.has(label) ? "1" : ""}${label}${String(Number(m[2])).padStart(5, "0")}`;
+  if (!cid) return "";
+  return `https://pics.dmm.co.jp/digital/video/${cid}/${cid}pl.jpg`;
 }
 
 /** Videy frame grabbed once by .github/workflows/videy-thumbs.yml, served as a static asset. */

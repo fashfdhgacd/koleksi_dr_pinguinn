@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { resolvePostersBucket } from "@/lib/poster-r2";
+import { fixDmmCover } from "@/lib/catalog/local-shared";
 
 // Poster maps are large: load them lazily (only on an edge-cache + R2 miss) instead of parsing
 // them in every isolate at boot.
@@ -15,7 +16,7 @@ async function sourceFor(id: string): Promise<string> {
   const maps = [posters, javPosters, latestPosters] as Array<Record<string, string>>;
   for (const map of maps) {
     const url = map?.[id];
-    if (typeof url === "string" && url.startsWith("http")) return url;
+    if (typeof url === "string" && url.startsWith("http")) return fixDmmCover(url);
   }
   const ov = (itemOverrides as Record<string, { poster?: string }>)[id];
   if (ov && typeof ov.poster === "string" && ov.poster.startsWith("http")) return ov.poster;
@@ -146,7 +147,8 @@ export const Route = createFileRoute("/thumb/$id")({
             headers: { "user-agent": "kdp-poster/1" },
             signal: AbortSignal.timeout(8000),
           }).catch(() => null);
-          if (!remote?.ok) return await cachedFallback(request);
+          // DMM answers a missing cover with a redirect to its "NOW PRINTING" image: never save that.
+          if (!remote?.ok || /now_printing/i.test(remote.url || "")) return await cachedFallback(request);
           const buf = await remote.arrayBuffer().catch(() => null);
           const type = buf ? sniffType(buf) : "";
           if (!buf || !type || buf.byteLength < 800) return await cachedFallback(request);
