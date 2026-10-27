@@ -459,13 +459,14 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
             </div>
           ) : null}
           {adRef.current?.ad.clickThrough ? (
+            // The only way to the advertiser: a small labelled button (a tap elsewhere does nothing).
             <button
               type="button"
               onClick={adClick}
-              aria-label="Info iklan"
-              className="absolute bottom-3 left-2 rounded bg-black/40 px-1.5 py-0.5 text-[10px] leading-tight text-white/70"
+              aria-label="Kunjungi pengiklan"
+              className="absolute bottom-3 left-2 rounded-md border border-white/30 bg-black/75 px-3 py-1.5 text-xs text-white"
             >
-              Info
+              Kunjungi
             </button>
           ) : null}
           {skipIn !== null ? (
