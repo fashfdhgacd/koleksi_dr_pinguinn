@@ -68,6 +68,8 @@ export const Route = createRootRoute({
       { rel: "icon", type: "image/png", sizes: "192x192", href: "/icon-192.png?v=3" },
       { rel: "image_src", href: DEFAULT_OG },
       { rel: "alternate", type: "application/rss+xml", title: "Koleksi Dr. Pinguin - Video Terbaru", href: "https://koleksidrpinguin.com/rss.xml" },
+      // Poster/thumbnail host (cards + preloaded hero images): open the connection with the HTML.
+      { rel: "preconnect", href: "https://img.koleksidrpinguin.com" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "preconnect", href: "https://tv1.indoav.app" },
