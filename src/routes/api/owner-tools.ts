@@ -18,7 +18,7 @@ import {
   loadItemsRaw,
   type HiddenCandidate,
 } from "@/lib/catalog/local-cache";
-import { isDrpBokep, PLACEHOLDER_IMAGE_RE, slugOf, sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
+import { isDrpBokep, isPutarin, javCoverFromTitle, PLACEHOLDER_IMAGE_RE, slugOf, sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
 import deadSources from "@/lib/catalog/dead-sources.json";
 import rankMeta from "@/lib/catalog/rank-periods-meta.json";
 import latestPosters from "../../../data/latest-posters.json";
@@ -378,6 +378,13 @@ function realPoster(v: unknown): boolean {
  * carry their own thumbnail. Pure in-memory check, no storage read.
  */
 function lacksThumb(it: RawItem, posters?: Record<string, string>): boolean {
+  // Putarin: the bot resolves the embed's image at upload (providers.fetchPutarinMeta) and writes it to
+  // latest-posters.json; one without a stored poster or a JAV-code cover is "Gambar belum ketemu".
+  // Derived from the catalog on the owner request only: no extra writes, video stays public.
+  if (isPutarin(it)) {
+    if (realPoster(it.poster) || realPoster(posters?.[it.id]) || realPoster((latestPosters as Record<string, string>)[it.id])) return false;
+    return !javCoverFromTitle(String(it.title || ""));
+  }
   if (!isDrpBokep(it)) return false;
   if (realPoster(it.poster) || realPoster(it.thumbnail)) return false;
   if (realPoster(posters?.[it.id]) || realPoster((latestPosters as Record<string, string>)[it.id])) return false;

@@ -571,7 +571,7 @@ function VideoRows({
                     ? ` + ${r.extra.map((s) => CATEGORY_LIST.find((c) => c.slug === s)?.label || s).join(", ")}`
                     : ""}{" "}
                   · {r.source}
-                  {r.noThumb ? " · tanpa thumbnail" : showTime && r.createdAt ? ` · ${timeWib(r.createdAt)}` : ""}
+                  {r.noThumb ? " · Gambar belum ketemu" : showTime && r.createdAt ? ` · ${timeWib(r.createdAt)}` : ""}
                   {r.locked ? " · terkunci" : r.hidden ? " · tersembunyi" : ""}
                 </span>
               </a>
