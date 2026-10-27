@@ -58,22 +58,49 @@ export async function readOwnerEditState(): Promise<OwnerEditState> {
   }
 }
 
-/** Merges one edit (title and/or category) for `id`. Returns the stored edit. */
+/**
+ * Write-path read: same key, shortest edge cache KV allows (30 s instead of the 60 s default), so a
+ * save right after another save sees it more often. Only owner saves use this (never per visit).
+ * KV stays eventually consistent; this narrows the window, it does not close it.
+ */
+async function readForWrite(kv: { get: (k: string, o?: { cacheTtl?: number }) => Promise<string | null> }): Promise<OwnerEditState> {
+  const raw = await kv.get(KEY, { cacheTtl: 30 });
+  if (!raw) return { ids: {} };
+  try {
+    return clean(JSON.parse(raw));
+  } catch {
+    return { ids: {} };
+  }
+}
+
+/**
+ * Merges one edit for `id` into the state read right before the write; only this id's entry
+ * changes, so edits of other ids stored meanwhile are kept.
+ * Extra categories: `extraAdd` / `extraRemove` (a delta, preferred) are applied to what is stored
+ * now, so two saves close together both keep their changes. `extra` (full list, older clients)
+ * replaces the list; undefined leaves it alone. Returns the stored edit (null = nothing left).
+ */
 export async function setOwnerEdit(
   id: string,
-  edit: { title?: string; category?: string; extra?: string[] },
+  edit: { title?: string; category?: string; extra?: string[]; extraAdd?: string[]; extraRemove?: string[] },
 ): Promise<OwnerEdit | null> {
   if (!ID_RE.test(id)) throw new Error("bad_id");
   const r = await resolveAnalyticsKV();
   if (!r) throw new Error("kv_unavailable");
-  const state = await readOwnerEditState();
+  const state = await readForWrite(r.kv as never);
   const prev = state.ids[id] || { at: 0 };
+  let extra = edit.extra;
+  if (!extra && (edit.extraAdd?.length || edit.extraRemove?.length)) {
+    const remove = new Set(edit.extraRemove || []);
+    extra = [...(prev.extra || []).filter((s) => !remove.has(s))];
+    for (const s of edit.extraAdd || []) if (!extra.includes(s) && extra.length < MAX_EXTRA_CATEGORIES) extra.push(s);
+  }
   state.ids[id] = {
     ...prev,
     ...(edit.title ? { title: edit.title } : {}),
     ...(edit.category ? { category: edit.category } : {}),
     // An array (even empty) replaces the stored extra categories; undefined leaves them alone.
-    ...(edit.extra ? { extra: edit.extra } : {}),
+    ...(extra ? { extra } : {}),
     at: Date.now(),
   };
   const next = clean(state);
@@ -95,7 +122,8 @@ export async function bulkEditOwnerExtra(
 ): Promise<{ changed: string[]; unchanged: string[]; full: string[]; extra: Record<string, string[]> }> {
   const r = await resolveAnalyticsKV();
   if (!r) throw new Error("kv_unavailable");
-  const state = await readOwnerEditState();
+  // Delta (add/remove) applied per id to the state read right before the write.
+  const state = await readForWrite(r.kv as never);
   const changed: string[] = [];
   const unchanged: string[] = [];
   const full: string[] = [];

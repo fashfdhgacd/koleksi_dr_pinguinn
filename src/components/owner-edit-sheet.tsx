@@ -87,8 +87,10 @@ export function verdictText(v: EditVerdict): string {
 /**
  * Lembar edit (judul + "Tampil juga di kategori", maks. 6). Simpan lewat aksi owner-tools "edit-video"
  * yang sudah ada: server menolak judul terlarang dan tidak pernah membuka kunci. Kategori tambahan yang
- * tersimpan dibaca sekali saat lembar dibuka (catalog-search by id), supaya simpan judul saja tidak
- * menghapus pilihan lama.
+ * tersimpan dibaca saat lembar dibuka (aksi "edit-get", lookup persis per ID), supaya simpan judul saja
+ * tidak menghapus pilihan lama. Kalau gagal dimuat, pilihan kategori dikunci dan muncul pesan + tombol
+ * "Coba lagi"; perubahan kategori tidak pernah dibuang diam-diam. Yang dikirim hanya selisihnya
+ * (extraAdd / extraRemove), jadi dua simpan yang berdekatan tidak saling menimpa.
  */
 export function OwnerEditSheet({
   secret,
@@ -110,21 +112,28 @@ export function OwnerEditSheet({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [verdict, setVerdict] = useState<EditVerdict | null>(null);
+  const [loadErr, setLoadErr] = useState("");
+  const [loadTry, setLoadTry] = useState(0);
 
   useEffect(() => {
     let alive = true;
-    void post<{ ok?: boolean; items?: SearchRow[] }>(secret, { action: "catalog-search", q: id }).then((d) => {
+    setLoadErr("");
+    void post<{ ok?: boolean; error?: string; item?: SearchRow }>(secret, { action: "edit-get", id }).then((d) => {
       if (!alive) return;
-      const row = d.items?.find((r) => r.id === id);
-      const cur = row?.extra || [];
-      setMainCat(row?.category || "");
+      if (!d.ok || !d.item || d.item.id !== id) {
+        // Never fall back to "no categories": saving that would wipe the stored ones.
+        setLoadErr(`Kategori tersimpan gagal dimuat${d.error ? `: ${d.error}` : "."} Pilihan kategori dikunci sampai berhasil dimuat.`);
+        return;
+      }
+      const cur = d.item.extra || [];
+      setMainCat(d.item.category || "");
       setExtra(cur);
       setOrig(cur);
     });
     return () => {
       alive = false;
     };
-  }, [secret, id]);
+  }, [secret, id, loadTry]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -148,9 +157,13 @@ export function OwnerEditSheet({
     const body: Record<string, unknown> = { action: "edit-video", id };
     const t = title.replace(/\s+/g, " ").trim();
     if (t && t !== initialTitle) body.title = t;
-    const changed = orig != null && [...extra].sort().join(",") !== [...orig].sort().join(",");
-    if (changed) body.extra = extra.filter((s) => s !== mainCat).slice(0, MAX_EXTRA);
-    if (!body.title && !body.extra) {
+    if (orig != null) {
+      const add = extra.filter((s) => s !== mainCat && !orig.includes(s));
+      const remove = orig.filter((s) => !extra.includes(s));
+      if (add.length) body.extraAdd = add;
+      if (remove.length) body.extraRemove = remove;
+    }
+    if (!body.title && !body.extraAdd && !body.extraRemove) {
       setErr("Tidak ada perubahan.");
       return;
     }
@@ -164,7 +177,10 @@ export function OwnerEditSheet({
     }
     const v = d.detector || d.moderation ? { detector: d.detector ?? null, moderation: d.moderation ?? null } : null;
     setVerdict(v);
-    if (d.extra) setOrig(d.extra);
+    if (d.extra) {
+      setOrig(d.extra);
+      setExtra(d.extra);
+    }
     onSaved({ title: d.title || t || initialTitle, extra: d.extra || extra, verdict: v });
   }
 
@@ -205,7 +221,15 @@ export function OwnerEditSheet({
             {nExtra}/{MAX_EXTRA}
           </span>
         </div>
-        {orig == null ? <p className="mt-1 text-[11px] text-zinc-500">Memuat kategori tersimpan…</p> : null}
+        {orig == null && !loadErr ? <p className="mt-1 text-[11px] text-zinc-500">Memuat kategori tersimpan…</p> : null}
+        {orig == null && loadErr ? (
+          <p role="alert" className="mt-1 text-[11px] text-red-400">
+            {loadErr}{" "}
+            <button type="button" onClick={() => setLoadTry((n) => n + 1)} className="underline hover:text-red-300">
+              Coba lagi
+            </button>
+          </p>
+        ) : null}
         <div className="mt-1.5 flex flex-wrap gap-1">
           {EXTRA_CHOICES.map((c) => {
             const main = c.slug === mainCat;

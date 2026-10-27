@@ -573,7 +573,43 @@ async function handleCatalogSearch(body: { q?: unknown; limit?: unknown; offset?
   });
 }
 
-async function handleEditVideo(body: { id?: unknown; title?: unknown; category?: unknown; extra?: unknown }) {
+/**
+ * Exact lookup of one video for the edit sheet: current title, main category and the extra
+ * categories stored in KV (owner:edit:v1), falling back to the catalog view. Unlike catalog-search
+ * it never misses an id because of a result limit.
+ */
+async function handleEditGet(body: { id?: unknown }) {
+  const id = String(body.id || "").trim();
+  if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return json({ ok: false, error: "ID video tidak valid." }, 400);
+  const { raw, cache, hidden } = await catalogBase();
+  const it = raw.find((x) => x?.id === id);
+  if (!it) return json({ ok: false, error: "Video tidak ditemukan di katalog." }, 404);
+  const row = toCatalogRow(it, cache.byId?.get(id), hidden.has(id), cache.posters);
+  let stored: { extra?: string[]; category?: string } | undefined;
+  try {
+    stored = (await readOwnerEditState()).ids[id];
+  } catch {
+    return json({ ok: false, error: "Penyimpanan KV tidak tersedia, kategori tersimpan tidak bisa dibaca." }, 503);
+  }
+  return json({
+    ok: true,
+    item: { ...row, category: stored?.category || row.category, extra: stored ? stored.extra || [] : row.extra || [] },
+  });
+}
+
+function slugList(v: unknown): string[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  return [...new Set(v.map((s) => String(s).trim()).filter(Boolean))];
+}
+
+async function handleEditVideo(body: {
+  id?: unknown;
+  title?: unknown;
+  category?: unknown;
+  extra?: unknown;
+  extraAdd?: unknown;
+  extraRemove?: unknown;
+}) {
   const id = String(body.id || "").trim();
   if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return json({ ok: false, error: "ID video tidak valid." }, 400);
   const title = typeof body.title === "string" ? body.title.replace(/\s+/g, " ").trim() : "";
@@ -587,7 +623,15 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
       return json({ ok: false, error: `Maksimal ${MAX_EXTRA_CATEGORIES} kategori tambahan.` }, 400);
     }
   }
-  if (!title && !category && !extra) return json({ ok: false, error: "Tidak ada perubahan." }, 400);
+  const extraAdd = slugList(body.extraAdd);
+  const extraRemove = slugList(body.extraRemove);
+  const badDelta = [...(extraAdd || []), ...(extraRemove || [])].find((s) => !findCategory(s));
+  if (badDelta) return json({ ok: false, error: `Kategori tidak dikenal: ${badDelta}` }, 400);
+  if ((extraAdd?.length || 0) > MAX_EXTRA_CATEGORIES) {
+    return json({ ok: false, error: `Maksimal ${MAX_EXTRA_CATEGORIES} kategori tambahan.` }, 400);
+  }
+  const hasDelta = Boolean(extraAdd?.length || extraRemove?.length);
+  if (!title && !category && !extra && !hasDelta) return json({ ok: false, error: "Tidak ada perubahan." }, 400);
   // Chinese/Japanese/Korean titles are dense: 2 characters ("龍女") is already a real title.
   const minTitle = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(title) ? 2 : 4;
   if (title && (title.length < minTitle || title.length > 200)) {
@@ -617,7 +661,11 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
   // no GitHub token needed in the Worker.
   let saved;
   try {
-    saved = await setOwnerEdit(id, { title, category, ...(extra ? { extra } : {}) });
+    saved = await setOwnerEdit(id, {
+      title,
+      category,
+      ...(extra ? { extra } : hasDelta ? { extraAdd: extraAdd || [], extraRemove: extraRemove || [] } : {}),
+    });
   } catch (err) {
     const msg = String((err as Error)?.message || err);
     return json(
@@ -645,7 +693,7 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
     detector: title ? detectorPriority("", title) : null,
     // Status moderasi (locked / review_pending / clear) + penjelasan konteks untuk pemilik.
     moderation: title ? explainTitle(title, ownerDetectorReason(title)) : null,
-    ...(extra ? { extra: saved?.extra || [] } : {}),
+    ...(extra || hasDelta ? { extra: saved?.extra || [] } : {}),
   });
 }
 
@@ -826,6 +874,14 @@ export const Route = createFileRoute("/api/owner-tools")({
           } catch (err) {
             console.error("[owner-tools] catalog", err);
             return json({ ok: false, error: `catalog_failed: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
+          }
+        }
+        if (body.action === "edit-get") {
+          try {
+            return await handleEditGet(body);
+          } catch (err) {
+            console.error("[owner-tools] edit-get", err);
+            return json({ ok: false, error: `Gagal memuat video: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
           }
         }
         if (body.action === "edit-video") {
