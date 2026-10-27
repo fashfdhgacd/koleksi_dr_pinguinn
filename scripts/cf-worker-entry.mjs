@@ -144,9 +144,15 @@ function cacheKey(url, env) {
   return new Request(k.toString(), { method: "GET" });
 }
 
-/** Pages that may fall back to the previous deploy's copy: HTML routes only (no api, files, data). */
+/**
+ * Pages that may fall back to the previous deploy's copy: HTML routes only (no api, files, data).
+ * Watch pages (/watch/, /v/) never do: a deploy can hide a video (hidden flag, hidden-ids list,
+ * minor-guard) without any owner request to purge it, and the old copy would show that video once
+ * more before the refresh finds the 404. They always render fresh, so visibility is checked first.
+ */
 function lastDeployKey(url, env) {
   if (!deployVersion(env) || VERSION_FREE.test(url.pathname)) return null;
+  if (url.pathname.startsWith("/watch/") || url.pathname.startsWith("/v/")) return null;
   if (url.pathname.startsWith("/api/") || /\.[a-z0-9]{2,5}$/i.test(url.pathname)) return null;
   const k = new URL(url.toString());
   k.searchParams.set("__edge_v", "last");
