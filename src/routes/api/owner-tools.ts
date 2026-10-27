@@ -30,7 +30,7 @@ import { explainTitle } from "@/lib/catalog/minor-context.js";
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
-import { MAX_EXTRA_CATEGORIES, readOwnerEditState, setOwnerEdit } from "@/lib/catalog/owner-edit-store";
+import { MAX_EXTRA_CATEGORIES, bulkEditOwnerExtra, readOwnerEditState, setOwnerEdit } from "@/lib/catalog/owner-edit-store";
 import { isOwnerRequest, ownerSecret } from "@/lib/owner-auth";
 import {
   getWebhookInfo,
@@ -631,6 +631,79 @@ async function handleEditVideo(body: { id?: unknown; title?: unknown; category?:
   });
 }
 
+// Slugs that imply school/minors are never added in bulk (silently dropped).
+const BULK_TAG_BLOCK_RE = /(^|-)(teen|college|sma|smp|sd|sekolah|pelajar|siswa|siswi|abg|bocil|anak|kid|kids|loli|schoolgirl|school|student|minor|underage)(-|$)/i;
+const BULK_MAX_IDS = 300;
+
+function cleanSlugList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return [...new Set(v.map((s) => String(s).trim().toLowerCase()).filter(Boolean))].slice(0, 20);
+}
+
+/** One request, one KV write: add/remove extra category slugs on many videos. Never title/main category/hide. */
+async function handleBulkTags(body: { ids?: unknown; add?: unknown; remove?: unknown }) {
+  const ids = Array.isArray(body.ids)
+    ? [...new Set(body.ids.map((s) => String(s).trim()).filter((s) => /^[A-Za-z0-9_-]{3,64}$/.test(s)))]
+    : [];
+  if (!ids.length) return json({ ok: false, error: "Belum ada video yang dipilih." }, 400);
+  if (ids.length > BULK_MAX_IDS) return json({ ok: false, error: `Maksimal ${BULK_MAX_IDS} video sekali simpan.` }, 400);
+  const addIn = cleanSlugList(body.add);
+  const remove = cleanSlugList(body.remove).filter((s) => findCategory(s));
+  const unknown = addIn.find((s) => !findCategory(s));
+  if (unknown) return json({ ok: false, error: `Tag tidak dikenal: ${unknown}` }, 400);
+  const add = addIn.filter((s) => {
+    const label = findCategory(s)?.label || "";
+    return !BULK_TAG_BLOCK_RE.test(s) && !ownerEditBlockReason(`${s} ${label}`);
+  });
+  if (!add.length && !remove.length) return json({ ok: false, error: "Pilih tag yang mau ditambah atau dihapus." }, 400);
+
+  const { raw, cache } = await catalogBase();
+  const byId = new Map<string, RawItem>();
+  for (const it of raw) if (it?.id && !byId.has(it.id)) byId.set(it.id, it);
+  const known = ids.filter((id) => byId.has(id));
+  // Locked (minor-flagged) videos never get new tags; removing tags from them is fine.
+  const locked = new Set(known.filter((id) => isLockedItem(byId.get(id)!)));
+  const missing = ids.length - known.length;
+  const mainOf = (id: string) => slugOf(cache.byId?.get(id) || byId.get(id)!);
+
+  let res;
+  try {
+    const addTargets = known.filter((id) => !locked.has(id));
+    if (add.length && remove.length) {
+      // Two ops on one state would need two writes; keep it one action = one write.
+      return json({ ok: false, error: "Pilih tambah atau hapus, jangan dua-duanya sekaligus." }, 400);
+    }
+    res = await bulkEditOwnerExtra(add.length ? addTargets : known, { add, remove }, mainOf);
+  } catch (err) {
+    const msg = String((err as Error)?.message || err);
+    return json(
+      { ok: false, error: msg === "kv_unavailable" ? "Penyimpanan KV tidak tersedia." : `Gagal menyimpan: ${msg.slice(0, 120)}` },
+      503,
+    );
+  }
+  if (res.changed.length) {
+    try {
+      const [unhide, hiddenState, edits] = await Promise.all([
+        readUnhideState(),
+        readOwnerHideState().catch(() => null),
+        readOwnerEditState(),
+      ]);
+      applyUnhidden(Object.keys(unhide.ids), hiddenState ? Object.keys(hiddenState.ids) : null, edits.ids);
+    } catch {
+      /* the regular 30 s sync applies it */
+    }
+  }
+  return json({
+    ok: true,
+    changed: res.changed.length,
+    unchanged: res.unchanged.length,
+    full: res.full.length,
+    skipped: missing + (add.length ? locked.size : 0),
+    dropped: addIn.length - add.length,
+    extra: res.extra,
+  });
+}
+
 type OwnerBody = {
   action?: string;
   count?: number;
@@ -743,6 +816,14 @@ export const Route = createFileRoute("/api/owner-tools")({
           } catch (err) {
             console.error("[owner-tools] edit-video", err);
             return json({ ok: false, error: `Edit gagal: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
+          }
+        }
+        if (body.action === "bulk-tags") {
+          try {
+            return await handleBulkTags(body as never);
+          } catch (err) {
+            console.error("[owner-tools] bulk-tags", err);
+            return json({ ok: false, error: `Edit massal gagal: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
           }
         }
         if (body.action === "share") return handleShare(body);

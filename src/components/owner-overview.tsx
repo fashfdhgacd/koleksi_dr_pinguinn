@@ -9,6 +9,7 @@ import { OwnerHeroCard } from "@/components/owner-hero";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CATEGORY_LIST } from "@/lib/catalog/categories";
 import { EXTRA_CHOICES, MAX_EXTRA } from "@/components/owner-edit-sheet";
+import { BulkTagBar } from "@/components/owner-bulk-tags";
 import { fmt, ownerToast, type OwnerStats, type DayRow } from "@/components/owner-dashboard-shared";
 import {
   AlertStrip,
@@ -473,6 +474,17 @@ function VideoRows({
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
   const [menu, setMenu] = useState("");
+  // Pilihan untuk edit tag massal (hanya di daftar ini; hilang kalau halaman di-refresh).
+  const [sel, setSel] = useState<Set<string>>(() => new Set());
+  const allOnPage = rows.length > 0 && rows.every((r) => sel.has(r.id));
+  function toggleSel(id: string) {
+    setSel((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
   // Saved edits shown right away (the server list catches up after its next catalog sync).
   const [patched, setPatched] = useState<
     Record<string, { title?: string; categoryLabel?: string; category?: string; extra?: string[] }>
@@ -498,12 +510,52 @@ function VideoRows({
   return (
     <>
       {note ? <p className="mt-2 text-[13px] text-zinc-400">{note}</p> : null}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <label className="flex cursor-pointer items-center gap-2 text-[13px] text-zinc-300">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-[#2dd4bf]"
+            checked={allOnPage}
+            onChange={() =>
+              setSel((cur) => {
+                const next = new Set(cur);
+                for (const r of rows) {
+                  if (allOnPage) next.delete(r.id);
+                  else next.add(r.id);
+                }
+                return next;
+              })
+            }
+          />
+          Pilih semua di halaman ini ({fmt(rows.length)})
+        </label>
+      </div>
+      <BulkTagBar
+        secret={secret}
+        ids={[...sel]}
+        onClear={() => setSel(new Set())}
+        onApplied={(extra) => {
+          setPatched((p) => {
+            const next = { ...p };
+            for (const [id, ex] of Object.entries(extra)) next[id] = { ...(next[id] || {}), extra: ex };
+            return next;
+          });
+          setSel(new Set());
+        }}
+      />
       <ul className="mt-2">
         {rows.map((r0) => {
           const r = { ...r0, ...(patched[r0.id] || {}) };
           return (
           <li key={r.id} className="border-t border-white/[0.05] py-2">
             <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                className="h-4 w-4 shrink-0 accent-[#2dd4bf]"
+                aria-label={`Pilih ${r.title || r.id}`}
+                checked={sel.has(r.id)}
+                onChange={() => toggleSel(r.id)}
+              />
               <img
                 src={`/thumb/${r.id}`}
                 alt=""

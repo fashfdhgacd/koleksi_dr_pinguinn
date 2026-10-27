@@ -81,3 +81,51 @@ export async function setOwnerEdit(
   // null = the edit only cleared the last extra category, nothing is stored for this id any more.
   return next.ids[id] || null;
 }
+
+/**
+ * Bulk add/remove of extra category slugs for many ids in ONE KV read + ONE KV write
+ * (/pemilik "Edit tag massal"). Never touches title or main category: `mainOf(id)` is the
+ * current main slug, which is never added as an extra and never removed. An id that would go
+ * over MAX_EXTRA_CATEGORIES keeps what fits and is reported in `full`.
+ */
+export async function bulkEditOwnerExtra(
+  ids: string[],
+  op: { add: string[]; remove: string[] },
+  mainOf: (id: string) => string,
+): Promise<{ changed: string[]; unchanged: string[]; full: string[]; extra: Record<string, string[]> }> {
+  const r = await resolveAnalyticsKV();
+  if (!r) throw new Error("kv_unavailable");
+  const state = await readOwnerEditState();
+  const changed: string[] = [];
+  const unchanged: string[] = [];
+  const full: string[] = [];
+  const now = Date.now();
+  for (const id of ids) {
+    if (!ID_RE.test(id)) continue;
+    const prev = state.ids[id] || { at: 0 };
+    const main = prev.category || mainOf(id);
+    const before = (prev.extra || []).filter((s) => s !== main);
+    let next = before.filter((s) => !op.remove.includes(s));
+    let overflow = false;
+    for (const s of op.add) {
+      if (s === main || next.includes(s)) continue;
+      if (next.length >= MAX_EXTRA_CATEGORIES) {
+        overflow = true;
+        continue;
+      }
+      next = [...next, s];
+    }
+    if (overflow) full.push(id);
+    if (next.join(",") === before.join(",")) {
+      unchanged.push(id);
+      continue;
+    }
+    state.ids[id] = { ...prev, extra: next, at: now };
+    changed.push(id);
+  }
+  const cleaned = clean(state);
+  if (changed.length) await r.kv.put(KEY, JSON.stringify(cleaned));
+  const extra: Record<string, string[]> = {};
+  for (const id of changed) extra[id] = cleaned.ids[id]?.extra || [];
+  return { changed, unchanged, full, extra };
+}
