@@ -144,6 +144,18 @@ function cacheKey(url, env) {
   return new Request(k.toString(), { method: "GET" });
 }
 
+/** Pages that may fall back to the previous deploy's copy: HTML routes only (no api, files, data). */
+function lastDeployKey(url, env) {
+  if (!deployVersion(env) || VERSION_FREE.test(url.pathname)) return null;
+  if (url.pathname.startsWith("/api/") || /\.[a-z0-9]{2,5}$/i.test(url.pathname)) return null;
+  const k = new URL(url.toString());
+  k.searchParams.set("__edge_v", "last");
+  return new Request(k.toString(), { method: "GET" });
+}
+
+/** The page's client entry script (hashed name; it changes only when the client code changes). */
+const ENTRY_ASSET_RE = /\/assets\/index-[A-Za-z0-9_-]+\.js/;
+
 function directive(cc, name) {
   const m = cc.match(new RegExp(`(?:^|,)\\s*${name}\\s*=\\s*(\\d+)`, "i"));
   return m ? Number(m[1]) : null;
@@ -171,15 +183,33 @@ function cachePolicy(response, path = "") {
 }
 
 /** Stores a copy of `response` under `key`; the client copy keeps the app's own headers. */
-function store(cache, key, response, policy, context) {
+function store(cache, key, response, policy, context, lastKey = null) {
   const headers = new Headers(response.headers);
   headers.set("x-edge-cc", response.headers.get("cache-control") || "");
   headers.set("x-edge-at", String(Date.now()));
   headers.set("x-edge-fresh", String(policy.fresh));
   headers.set("cache-control", `public, max-age=${policy.fresh + policy.stale}`);
   headers.delete("cdn-cache-control");
-  const copy = new Response(response.clone().body, { status: 200, headers });
-  const put = cache.put(key, copy).catch(() => undefined);
+  const body = response.clone().body;
+  if (!lastKey) {
+    const put = cache.put(key, new Response(body, { status: 200, headers })).catch(() => undefined);
+    if (context?.waitUntil) context.waitUntil(put);
+    return;
+  }
+  // HTML page: the same bytes also go under the deploy-free key (see lastDeployKey), tagged with
+  // the page's client entry script so a later deploy only reuses it while that script still exists.
+  const put = new Response(body)
+    .text()
+    .then((text) => {
+      const asset = text.match(ENTRY_ASSET_RE)?.[0] || "";
+      const lastHeaders = new Headers(headers);
+      if (asset) lastHeaders.set("x-edge-asset", asset);
+      return Promise.all([
+        cache.put(key, new Response(text, { status: 200, headers })),
+        asset ? cache.put(lastKey, new Response(text, { status: 200, headers: lastHeaders })) : null,
+      ]);
+    })
+    .catch(() => undefined);
   if (context?.waitUntil) context.waitUntil(put);
 }
 
@@ -191,17 +221,71 @@ function fromCache(hit, state) {
   headers.delete("x-edge-cc");
   headers.delete("x-edge-at");
   headers.delete("x-edge-fresh");
+  headers.delete("x-edge-asset");
   headers.set("x-edge-cache", state);
   return new Response(hit.body, { status: hit.status, headers });
 }
 
 async function renderAndStore(request, env, context, cache, key) {
   const response = await nitroHandler.fetch(request, env, context);
-  const policy = cachePolicy(response, new URL(request.url).pathname);
-  if (policy) store(cache, key, response, policy, context);
+  const url = new URL(request.url);
+  const policy = cachePolicy(response, url.pathname);
+  const last = lastDeployKey(url, env);
+  const html = (response.headers.get("content-type") || "").includes("text/html");
+  if (policy) store(cache, key, response, policy, context, html ? last : null);
   // No longer cacheable (e.g. a video was hidden and now 404s): drop the old copy right away.
-  else if (context?.waitUntil) context.waitUntil(cache.delete(key).catch(() => undefined));
+  else if (context?.waitUntil) {
+    context.waitUntil(
+      Promise.all([cache.delete(key), last ? cache.delete(last) : null]).catch(() => undefined),
+    );
+  }
   return response;
+}
+
+/** Background render that refreshes `key`, at most one per URL per isolate. */
+function refreshInBackground(request, env, context, cache, key) {
+  const href = key.url;
+  if (refreshing.has(href) || !context?.waitUntil) return;
+  refreshing.add(href);
+  context.waitUntil(
+    // One-shot yield so the cached copy is written to the visitor before the render (the catalog
+    // build on a fresh isolate is ~0.7 s of synchronous CPU) takes the isolate's thread.
+    new Promise((resolve) => setTimeout(resolve, 50))
+      .then(() => renderAndStore(new Request(request), env, context, cache, key))
+      .then((r) => r.body?.cancel?.())
+      .catch(() => undefined)
+      .finally(() => refreshing.delete(href)),
+  );
+}
+
+/**
+ * First visit to a page after a deploy (Oct 2026, cold load): the new deploy's cache key is empty,
+ * so without this every page in every data centre waited for a full render (2–6 s on a fresh isolate,
+ * the bundled catalog is built once per isolate) after each of the ~10 deploys an hour on busy upload
+ * days. Instead the previous deploy's copy is served at once as STALE while one background render
+ * stores the new deploy's page, so the next visitor sees the new uploads. Only reused while its
+ * client entry script still exists in this deploy's static assets (a code deploy that changes the
+ * JS renders fresh as before) and within its own stale window (the cache drops it after that).
+ */
+async function previousDeployCopy(cache, url, env) {
+  const last = lastDeployKey(url, env);
+  if (!last || !env?.ASSETS?.fetch) return null;
+  let hit = null;
+  try {
+    hit = (await cache.match(last)) || null;
+  } catch {
+    return null;
+  }
+  if (!hit) return null;
+  const asset = hit.headers.get("x-edge-asset") || "";
+  if (!asset.startsWith("/assets/")) return null;
+  try {
+    const res = await env.ASSETS.fetch(new Request(new URL(asset, url.origin).toString(), { method: "HEAD" }));
+    if (res.status !== 200) return null;
+  } catch {
+    return null;
+  }
+  return hit;
 }
 
 async function cachedFetch(request, env, context, url) {
@@ -227,17 +311,14 @@ async function cachedFetch(request, env, context, url) {
     // Entries written by a route itself (e.g. /thumb) carry no x-edge-at: their own max-age governs.
     if (!at || Date.now() - at < fresh * 1000) return fromCache(hit, "HIT");
     // Stale but within its stale window (the cache drops it after that): serve it, refresh once.
-    const href = key.url;
-    if (!refreshing.has(href) && context?.waitUntil) {
-      refreshing.add(href);
-      context.waitUntil(
-        renderAndStore(new Request(request), env, context, cache, key)
-          .then((r) => r.body?.cancel?.())
-          .catch(() => undefined)
-          .finally(() => refreshing.delete(href)),
-      );
-    }
+    refreshInBackground(request, env, context, cache, key);
     return fromCache(hit, "STALE");
+  }
+
+  const previous = await previousDeployCopy(cache, url, env);
+  if (previous) {
+    refreshInBackground(request, env, context, cache, key);
+    return fromCache(previous, "STALE");
   }
 
   const response = await renderAndStore(request, env, context, cache, key);
@@ -306,7 +387,14 @@ function purgeKeys(env, id, category) {
   const paths = [`/watch/${id}`, "/", "/kategori/videy"];
   if (category && /^[A-Za-z0-9_-]{1,60}$/.test(category)) paths.push(`/kategori/${category}`);
   const keys = [];
-  for (const origin of PURGE_HOSTS) for (const p of paths) keys.push(cacheKey(new URL(p, origin), env));
+  for (const origin of PURGE_HOSTS) {
+    for (const p of paths) {
+      const u = new URL(p, origin);
+      keys.push(cacheKey(u, env));
+      const last = lastDeployKey(u, env);
+      if (last) keys.push(last);
+    }
+  }
   return keys;
 }
 
