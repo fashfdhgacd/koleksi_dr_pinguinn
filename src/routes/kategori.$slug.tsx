@@ -71,11 +71,35 @@ export const Route = createFileRoute("/kategori/$slug")({
     if (!cat) return { ok: false as const, error: "not found", code: "not_found" as const };
     const raw = location.search as Record<string, unknown>;
     const page = parsePage(raw.page) || 1;
-    return queryCatalog({ type: "category", category: cat.slug, page, limit: DEFAULT_PAGE_SIZE });
+    const res = await queryCatalog({ type: "category", category: cat.slug, page, limit: DEFAULT_PAGE_SIZE });
+    // Past the last page (e.g. ?page=999): redirect to the real last page instead of an empty grid.
+    if (page > 1 && res && res.ok && res.type === "category" && res.total > 0) {
+      const last = Math.max(1, Math.ceil(res.total / (res.limit || DEFAULT_PAGE_SIZE)));
+      if (page > last) {
+        throw redirect({
+          to: "/kategori/$slug",
+          params: { slug: cat.slug },
+          search: { page: last > 1 ? last : undefined, periode: undefined },
+          statusCode: 302,
+        });
+      }
+    }
+    return res;
   },
   head: ({ params, match, loaderData }) => {
     const rank = findRanking(params.slug);
     const cat = rank ? undefined : findCategory(params.slug);
+    if (!rank && !cat) {
+      // Unknown category (404): never indexable, no self canonical, explicit title.
+      return {
+        meta: [
+          { title: "Kategori Tidak Ditemukan | koleksidrpinguin.com" },
+          { name: "robots", content: "noindex,follow" },
+          { name: "googlebot", content: "noindex,follow" },
+        ],
+        links: [],
+      };
+    }
     const page = typeof match.search.page === "number" ? match.search.page : 1;
     const periode = rank ? parsePeriode(match.search.periode) : undefined;
     const seo = rank ? rankingSeo(rank, periodFromKey(periode).period) : cat ? categorySeo(cat.slug) : homeSeo(undefined, undefined);
