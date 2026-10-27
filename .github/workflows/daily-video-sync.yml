@@ -41,6 +41,9 @@ jobs:
         run: |
           node --input-type=module <<'SCRIPT'
           import fs from "node:fs";
+          import { createRequire } from "node:module";
+          // Chunk-aware catalog IO (contract: src/lib/catalog/chunk-contract.js).
+          const latestChunks = createRequire(process.cwd() + "/")("./scripts/lib/latest-chunks.cjs");
 
           const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -166,8 +169,10 @@ jobs:
           const latestPostersPath = "data/latest-posters.json";
           const batchPath = "src/lib/catalog/streamtape-batch-20260925.json";
 
-          let latest = loadJson(latestPath, []);
-          if (!Array.isArray(latest)) latest = [];
+          // Every chunk (videos-latest.json + videos-latest-pNN.json), not just the first one.
+          const latestLoaded = latestChunks.loadChunks("videos-latest");
+          const latest = latestLoaded.items;
+          console.log("videos-latest chunks:", latestLoaded.chunks.map((c) => `${c.file}=${c.items.length}`).join(" "), "total", latest.length);
 
           // Guard: if wiped, try restore from git history via empty skip (workflow separate)
           if (latest.length === 0) {
@@ -215,7 +220,8 @@ jobs:
           console.log("Titles enriched:", titleOk);
 
           // write back latest + batch
-          if (latest.length) saveJson(latestPath, latest, true);
+          // Each video goes back to the chunk it came from; unchanged chunks are not rewritten.
+          if (latest.length) console.log("videos-latest chunks changed:", latestChunks.saveChunks(latestLoaded).join(" ") || "none");
           const batch = loadJson(batchPath, []);
           if (Array.isArray(batch) && batch.length) {
             const byId = new Map(enrichTargets.map((x) => [x.id, x]));
@@ -348,8 +354,9 @@ jobs:
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Every catalog chunk the sync touched (videos-latest.json + videos-latest-pNN.json).
+          git add -- data/videos-latest.json data/videos-latest-p*.json 2>/dev/null || true
           git add \
-            data/videos-latest.json \
             data/latest-posters.json \
             src/lib/catalog/posters.json \
             src/lib/catalog/streamtape-batch-20260925.json \

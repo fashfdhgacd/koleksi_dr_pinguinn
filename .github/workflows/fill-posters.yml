@@ -95,8 +95,8 @@ jobs:
             let javMap = loadJson(javPath, {});
             if (typeof javMap !== "object" || Array.isArray(javMap)) javMap = {};
             const videos = [
-              ...loadJson("data/videos-latest.json", []),
-              ...loadJson("data/putarin-latest.json", []),
+              ...require(process.cwd() + "/scripts/lib/latest-chunks.cjs").loadAll("videos-latest"),
+              ...require(process.cwd() + "/scripts/lib/latest-chunks.cjs").loadAll("putarin-latest"),
               ...loadJson("src/lib/catalog/videos.json", []),
               ...loadJson("src/lib/catalog/streamtape.json", []),
               ...loadJson("src/lib/catalog/putarin.json", []),
@@ -145,7 +145,7 @@ jobs:
             fs.writeFileSync(javPath, JSON.stringify(javMap, null, 2) + "\n");
             let latest = loadJson(latestPath, {});
             if (typeof latest !== "object" || Array.isArray(latest)) latest = {};
-            for (const v of loadJson("data/videos-latest.json", [])) {
+            for (const v of require(process.cwd() + "/scripts/lib/latest-chunks.cjs").loadAll("videos-latest")) {
               if (!v?.id) continue;
               const url = posters[v.id];
               if (isLivePoster(url)) latest[v.id] = url;
@@ -203,7 +203,7 @@ jobs:
           (async () => {
             const seen = new Set();
             const need = [];
-            for (const v of [...asList(load("data/drp-bokep.json", [])), ...asList(load("data/videos-latest.json", []))]) {
+            for (const v of [...asList(load("data/drp-bokep.json", [])), ...asList(require(process.cwd() + "/scripts/lib/latest-chunks.cjs").loadAll("videos-latest"))]) {
               const id = String(v?.id || "");
               const kind = (id.match(/^(by|lu|dd)-/) || [])[1];
               if (!kind || seen.has(id)) continue;
@@ -251,7 +251,7 @@ jobs:
           };
           const need = new Map();
           const seen = new Set();
-          for (const v of [...asList(load("data/putarin-latest.json", [])), ...asList(load("src/lib/catalog/putarin.json", [])), ...asList(load("data/videos-latest.json", []))]) {
+          for (const v of [...asList(require(process.cwd() + "/scripts/lib/latest-chunks.cjs").loadAll("putarin-latest")), ...asList(load("src/lib/catalog/putarin.json", [])), ...asList(require(process.cwd() + "/scripts/lib/latest-chunks.cjs").loadAll("videos-latest"))]) {
             const id = String(v?.id || "");
             if (!id || seen.has(id)) continue;
             seen.add(id);
@@ -342,7 +342,7 @@ jobs:
           (async () => {
             const seen = new Set();
             const need = [];
-            for (const v of [...asList(load("data/putarin-latest.json", [])), ...asList(load("data/videos-latest.json", []))]) {
+            for (const v of [...asList(require(process.cwd() + "/scripts/lib/latest-chunks.cjs").loadAll("putarin-latest")), ...asList(require(process.cwd() + "/scripts/lib/latest-chunks.cjs").loadAll("videos-latest"))]) {
               const id = String(v?.id || "");
               if (!id || seen.has(id)) continue;
               seen.add(id);
