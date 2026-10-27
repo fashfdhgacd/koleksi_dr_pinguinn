@@ -29,6 +29,23 @@ async function sourceFor(id: string): Promise<string> {
   return "";
 }
 
+/**
+ * Byse uploads whose img-place thumbnail never appeared (_xt/_t 404) have no poster anywhere in the
+ * catalog. Ask Byse's public player details (poster_url) from the Worker, once per edge-cache miss;
+ * a real image is then saved in R2 like any other poster, so it is fetched only once per id.
+ */
+async function byseSource(id: string): Promise<string> {
+  const m = id.match(/^by-([A-Za-z0-9]{4,40})$/);
+  if (!m) return "";
+  try {
+    const { fetchByseMeta } = await import("@/lib/bot/providers.js");
+    const meta = await fetchByseMeta("https://bysejikuar.com", m[1]);
+    return typeof meta?.thumb === "string" && meta.thumb.startsWith("http") ? meta.thumb : "";
+  } catch {
+    return "";
+  }
+}
+
 function keyFor(id: string): string {
   return `posters/typed/${id.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80)}`;
 }
@@ -131,7 +148,7 @@ export const Route = createFileRoute("/thumb/$id")({
             }
           }
 
-          const source = await sourceFor(id);
+          const source = (await sourceFor(id)) || (await byseSource(id));
           if (!source) {
             const vy = await videyStatic(id, request);
             if (!vy) return await cachedFallback(request);
