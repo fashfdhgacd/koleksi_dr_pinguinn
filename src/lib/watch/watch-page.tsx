@@ -6,6 +6,7 @@ import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { VideoPlayer } from "@/components/video/player";
 import { VideyPlayer } from "@/components/video/videy-player";
 import { PopTapLayer } from "@/components/tap-popunder";
+import { AdblockGate } from "@/components/adblock-gate";
 import { hostLabel } from "@/lib/catalog/embed";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
@@ -333,12 +334,20 @@ export function WatchPage() {
             <>
           <div className="-mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0">
             {isVideyItem(item) ? (
-              <VideyPlayer key={item.id} item={item} />
-            ) : (
+              <AdblockGate key={`gate-${item.id}`} videoId={item.id}>
+                <VideyPlayer key={item.id} item={item} />
+              </AdblockGate>
+            ) : hostLabel(catalogPlayUrl(item)) === "IndoAV" ? (
+              // IndoAV: never gated (host ads + IndoAV view bonus).
               <div className="relative">
                 <VideoPlayer key={item.id} item={item} />
-                <PopTapLayer key={`pop-${item.id}`} videoId={item.id} host={hostLabel(catalogPlayUrl(item)).replace("Puterin", "Putarin")} />
+                <PopTapLayer key={`pop-${item.id}`} videoId={item.id} host="IndoAV" />
               </div>
+            ) : (
+              <AdblockGate key={`gate-${item.id}`} videoId={item.id}>
+                <VideoPlayer key={item.id} item={item} />
+                <PopTapLayer key={`pop-${item.id}`} videoId={item.id} host={hostLabel(catalogPlayUrl(item)).replace("Puterin", "Putarin")} />
+              </AdblockGate>
             )}
             {(() => {
               const src = catalogPlayUrl(item);
