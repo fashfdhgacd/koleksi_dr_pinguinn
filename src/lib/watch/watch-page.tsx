@@ -494,7 +494,7 @@ function EpisodeStrip({ episodes, currentId }: { episodes: Array<{ id: string; e
               className={
                 "inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-md border px-4 text-sm font-medium " +
                 (current
-                  ? "border-primary bg-primary text-white"
+                  ? "border-primary bg-primary text-primary-foreground"
                   : "border-white/25 bg-transparent text-foreground/85 hover:border-primary hover:text-primary")
               }
             >
@@ -506,7 +506,7 @@ function EpisodeStrip({ episodes, currentId }: { episodes: Array<{ id: string; e
       {next ? (
         <a
           href={`/watch/${next.id}`}
-          className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white sm:w-auto"
+          className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground sm:w-auto"
         >
           Episode selanjutnya (Episode {next.ep}) →
         </a>
