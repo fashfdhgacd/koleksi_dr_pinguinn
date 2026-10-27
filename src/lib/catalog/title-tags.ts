@@ -9,8 +9,12 @@
  * has any school/child word.
  */
 import { EXTRA_CATEGORY_RULES, normCategoryText } from "./title-category.js";
+import { MAX_TAGS as MAX_ALL_TAGS, extraTags } from "./tag-dictionary.js";
+import { findCategory } from "./categories";
 
+/** Cap of the original rules (kept so their output is unchanged); tag-dictionary.js then adds up to MAX_ALL_TAGS. */
 export const MAX_TAGS = 8;
+export { MAX_ALL_TAGS };
 
 /** Child / school wording: blocks every age-flavoured tag (teen-18, college-18). */
 const MINOR_WORDS =
@@ -102,6 +106,10 @@ export type TagOptions = {
   indoSource?: boolean;
   /** In the top POPULAR_SHARE by real views. */
   popular?: boolean;
+  /** embed / source / direct URLs, for host-based tags (tag-dictionary.js SOURCE_TAG_RULES). */
+  sourceText?: string;
+  /** Tags the Telegram bot stored at ingest (item.tags); only real category slugs are used. */
+  storedTags?: string[];
 };
 
 /** Auto-generated / branding text that says nothing about the video (bot and import templates). */
@@ -148,14 +156,19 @@ export function titleTags(title: string | undefined, primary: string, opts: TagO
   if (opts.indoSource && out.length < MAX_TAGS && !out.includes("amatir") && /\b(?:indo|indonesia|bokep indo)\b/.test(t)) {
     out.push("amatir");
   }
-  return out.slice(0, MAX_TAGS);
+  const base = out.slice(0, MAX_TAGS);
+  // Additive (2026-10-27): shared dictionary + host + stored bot tags, up to MAX_ALL_TAGS.
+  return base.concat(
+    extraTags(t, base, { sourceText: opts.sourceText, storedTags: opts.storedTags, allowed: (s: string) => findCategory(s)?.slug === s }),
+  );
 }
 
 /** Tag options for a catalog item (source flags + popularity). */
 export function tagOptions(
-  item: { id: string; embed?: string; source?: string; direct?: string },
+  item: { id: string; embed?: string; source?: string; direct?: string; tags?: unknown },
   popular: Set<string>,
 ): TagOptions {
   const blob = `${item.embed || ""} ${item.source || ""} ${item.direct || ""}`;
-  return { indoSource: /indoav|userbokep|putarin|puterin/i.test(blob), popular: popular.has(item.id) };
+  const storedTags = Array.isArray(item.tags) ? item.tags.filter((x): x is string => typeof x === "string") : [];
+  return { indoSource: /indoav|userbokep|putarin|puterin/i.test(blob), popular: popular.has(item.id), sourceText: blob, storedTags };
 }
