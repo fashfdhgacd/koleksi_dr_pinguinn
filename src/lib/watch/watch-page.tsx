@@ -483,7 +483,7 @@ function EpisodeStrip({ episodes, currentId }: { episodes: Array<{ id: string; e
   const next = at >= 0 && at + 1 < episodes.length ? episodes[at + 1] : null;
   return (
     <nav aria-label="Episode" className="space-y-2">
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible">
         {episodes.map((e) => {
           const current = e.id === currentId;
           return (
@@ -492,13 +492,13 @@ function EpisodeStrip({ episodes, currentId }: { episodes: Array<{ id: string; e
               href={`/watch/${e.id}`}
               aria-current={current ? "page" : undefined}
               className={
-                "inline-flex h-9 min-w-[3.25rem] shrink-0 items-center justify-center rounded-full px-3 text-sm font-medium " +
+                "inline-flex h-10 shrink-0 items-center justify-center whitespace-nowrap rounded-md border px-4 text-sm font-medium " +
                 (current
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-foreground hover:bg-primary hover:text-primary-foreground")
+                  ? "border-primary bg-primary text-white"
+                  : "border-white/25 bg-transparent text-foreground/85 hover:border-primary hover:text-primary")
               }
             >
-              Eps {e.ep}
+              Episode {e.ep}
             </a>
           );
         })}
@@ -506,9 +506,9 @@ function EpisodeStrip({ episodes, currentId }: { episodes: Array<{ id: string; e
       {next ? (
         <a
           href={`/watch/${next.id}`}
-          className="inline-flex h-10 w-full items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground sm:w-auto"
+          className="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-white sm:w-auto"
         >
-          Episode selanjutnya (Eps {next.ep}) →
+          Episode selanjutnya (Episode {next.ep}) →
         </a>
       ) : null}
     </nav>
