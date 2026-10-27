@@ -658,35 +658,59 @@ function VideoRows({
   );
 }
 
-/** Results for the search box in the "Upload terbaru" header (owner-only, in-memory search). */
+/** Page size for the owner search (whole catalog, server-side). */
+const SEARCH_PAGE = 50;
+
+/** Results for the search box in the "Upload terbaru" header: whole catalog (title, category, tags), paginated. */
 function SearchResults({ secret, q }: { secret: string; q: string }) {
   const [rows, setRows] = useState<CatalogRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(0);
   const [tick, setTick] = useState(0);
   const [searchNote, setSearchNote] = useState("Mencari…");
+  useEffect(() => setPage(0), [q]);
   useEffect(() => {
     const term = q.trim();
     if (term.length < 2) {
       setRows([]);
+      setTotal(0);
       setSearchNote("Ketik minimal 2 huruf.");
       return;
     }
     setSearchNote("Mencari…");
     const t = window.setTimeout(async () => {
-      const d = await ownerPost<{ ok?: boolean; error?: string; items?: CatalogRow[] }>(secret, {
+      const d = await ownerPost<{ ok?: boolean; error?: string; items?: CatalogRow[]; total?: number }>(secret, {
         action: "catalog-search",
         q: term,
+        limit: SEARCH_PAGE,
+        offset: page * SEARCH_PAGE,
       });
       setRows(d.items || []);
+      setTotal(Number(d.total) || d.items?.length || 0);
       setSearchNote(d.ok ? (d.items?.length ? "" : "Tidak ditemukan.") : "");
       if (!d.ok) ownerToast(`Pencarian gagal: ${d.error || "jaringan"}`);
     }, 300);
     return () => window.clearTimeout(t);
-  }, [q, secret, tick]);
+  }, [q, secret, tick, page]);
+  const pages = Math.max(1, Math.ceil(total / SEARCH_PAGE));
   return (
     <>
       <p className="mt-3 text-[13px] text-zinc-400">
-        {searchNote || `${fmt(rows.length)} hasil untuk "${q.trim()}"${rows.length >= 20 ? " (maks 20)" : ""}`}
+        {searchNote ||
+          `${fmt(total)} hasil untuk "${q.trim()}" di seluruh katalog (judul, kategori, tag)${
+            pages > 1 ? ` · halaman ${fmt(page + 1)}/${fmt(pages)}` : ""
+          }`}
       </p>
+      {pages > 1 ? (
+        <div className="mt-2 flex gap-2">
+          <button type="button" className={btn} disabled={page <= 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>
+            Sebelumnya
+          </button>
+          <button type="button" className={btn} disabled={page >= pages - 1} onClick={() => setPage((p) => Math.min(pages - 1, p + 1))}>
+            Berikutnya
+          </button>
+        </div>
+      ) : null}
       {rows.length ? <VideoRows rows={rows} secret={secret} onChanged={() => setTick((n) => n + 1)} /> : null}
     </>
   );
