@@ -32,6 +32,7 @@ import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/un
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
 import { MAX_EXTRA_CATEGORIES, bulkEditOwnerExtra, readOwnerEditState, setOwnerEdit } from "@/lib/catalog/owner-edit-store";
 import { isOwnerRequest, ownerSecret } from "@/lib/owner-auth";
+import { runPosterFill } from "@/lib/poster-fill";
 import {
   getWebhookInfo,
   lastSetupAt,
@@ -545,6 +546,16 @@ async function handleThumbMissing(body: { limit?: unknown; offset?: unknown } = 
 }
 
 /**
+ * "Isi poster": one small batch of the public catalog per owner click (see lib/poster-fill.ts).
+ * The panel walks offset 0..total itself, one request after another, only while the owner's run is on.
+ */
+async function handlePosterFill(body: { offset?: unknown; limit?: unknown }) {
+  const { cache } = await catalogBase();
+  const result = await runPosterFill(cache.items, cache.posters || {}, body);
+  return json(result, result.ok ? 200 : 503);
+}
+
+/**
  * Owner search over the whole catalog (hidden items too): title, id, main category (slug + label),
  * extra categories, stored tags and source. Every word must match somewhere. Paginated (limit/offset)
  * with a total, so bulk tagging can select beyond the first page. One in-memory pass, no KV write.
@@ -909,6 +920,14 @@ export const Route = createFileRoute("/api/owner-tools")({
         }
         if (body.action === "share") return handleShare(body);
         if (body.action === "upload") return handleUpload(body);
+        if (body.action === "poster-fill") {
+          try {
+            return await handlePosterFill(body);
+          } catch (err) {
+            console.error("[owner-tools] poster-fill", err);
+            return json({ ok: false, error: `poster_fill_failed: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
+          }
+        }
         if (body.action === "set-poster") return handleSetPoster(body);
         if (body.action === "set-posters") return handleSetPosters(body);
         if (body.action === "refresh-posters") return handleRefreshPosters(body);
