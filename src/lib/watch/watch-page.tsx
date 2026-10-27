@@ -393,6 +393,7 @@ export function WatchPage() {
               </span>
             </p>
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{cleanDisplayTitle(item.title)}</h1>
+            {item.episodes && item.episodes.length > 1 ? <EpisodeStrip episodes={item.episodes} currentId={item.id} /> : null}
             <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>
             <PushButton />
             {item.categories && item.categories.length ? (
@@ -473,5 +474,43 @@ export function WatchPage() {
         </article>
       )}
     </Shell>
+  );
+}
+
+/** Compact episode buttons under the title (series only): plain links, no thumbnails, no requests. */
+function EpisodeStrip({ episodes, currentId }: { episodes: Array<{ id: string; ep: number }>; currentId: string }) {
+  const at = episodes.findIndex((e) => e.id === currentId);
+  const next = at >= 0 && at + 1 < episodes.length ? episodes[at + 1] : null;
+  return (
+    <nav aria-label="Episode" className="space-y-2">
+      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+        {episodes.map((e) => {
+          const current = e.id === currentId;
+          return (
+            <a
+              key={e.id}
+              href={`/watch/${e.id}`}
+              aria-current={current ? "page" : undefined}
+              className={
+                "inline-flex h-9 min-w-[3.25rem] shrink-0 items-center justify-center rounded-full px-3 text-sm font-medium " +
+                (current
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-foreground hover:bg-primary hover:text-primary-foreground")
+              }
+            >
+              Eps {e.ep}
+            </a>
+          );
+        })}
+      </div>
+      {next ? (
+        <a
+          href={`/watch/${next.id}`}
+          className="inline-flex h-10 w-full items-center justify-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground sm:w-auto"
+        >
+          Episode selanjutnya (Eps {next.ep}) →
+        </a>
+      ) : null}
+    </nav>
   );
 }
