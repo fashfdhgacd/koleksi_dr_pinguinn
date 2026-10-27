@@ -16,6 +16,22 @@ export function normalizeSearchText(raw: unknown): string {
     .trim();
 }
 
+/**
+ * Brand tags our uploads carry in the title ("… - koleksidrpinguin.com", "( Koleksi Dr. Pinguin, M.S.B. )").
+ * Removed from the searchable text only (titles shown are unchanged), so "pinguin" matches videos
+ * that are really about it instead of every upload.
+ */
+const BRAND_RE = /\s*[-–|]?\s*(?:www\.)?koleksi\s*-?\s*dr\.?\s*-?\s*pinguin(?:\.com)?(?:\s*,\s*m\.?\s*s\.?\s*b\.?)?/giu;
+
+export function stripBrand(raw: unknown): string {
+  return String(raw ?? "").replace(BRAND_RE, " ");
+}
+
+/** Normalized text a video is matched against: title without brand tags + extra words. */
+export function searchHayText(title: unknown, extra = ""): string {
+  return normalizeSearchText(`${stripBrand(title)} ${extra}`);
+}
+
 export type SearchQuery = { phrase: string; tokens: string[] };
 
 export function parseSearchQuery(q: string): SearchQuery {

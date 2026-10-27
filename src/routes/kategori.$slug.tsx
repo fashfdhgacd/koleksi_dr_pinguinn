@@ -27,8 +27,10 @@ import { DEFAULT_OG, HOME_CANONICAL, SITE_NAME, SITE_ORIGIN, breadcrumbJsonLd, c
 
 function parsePage(value: unknown): number | undefined {
   const n = Math.floor(Number(value));
-  if (!Number.isFinite(n) || n <= 1) return undefined;
-  return Math.min(n, 500);
+  // No upper cap here: a cap made validateSearch rewrite ?page=9999 to ?page=500 (extra 307 hop);
+  // the loader sends any page past the end straight to the real last page.
+  if (!Number.isSafeInteger(n) || n <= 1) return undefined;
+  return n;
 }
 
 /** Halaman paginasi di atas ini: noindex,follow (link video tetap di-crawl). */
