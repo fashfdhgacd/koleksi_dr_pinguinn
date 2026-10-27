@@ -38,6 +38,10 @@ export const Route = createRootRoute({
           "Koleksi Dr. Pinguin Bokep, M.S.B., katalog video dewasa 18+ di koleksidrpinguin.com.",
       },
       { name: "theme-color", content: "#09090b" },
+      // TrafficStars Client Hints (blog "Boost Earnings with Existing Ad Formats"): delegate UA hints
+      // to the TrafficStars ad servers (tsyndicate.com + our direct-link/VAST domain) for better mobile targeting.
+      { httpEquiv: "Accept-CH", content: "Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform, Sec-CH-UA-Model, Sec-CH-UA-Platform-Version, Sec-CH-UA-Full-Version-List" },
+      { httpEquiv: "delegate-ch", content: "sec-ch-ua https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-bitness https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-arch https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-model https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-platform https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-platform-version https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-full-version https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-full-version-list https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-mobile https://tsyndicate.com https://fozekikikiminu.com" },
       { name: "robots", content: "index,follow,max-image-preview:large" },
       { name: "rating", content: "adult" },
       // RTA label (rtalabel.org). Uppercase key so HeadContent does not dedupe it with "rating".
