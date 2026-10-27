@@ -635,6 +635,10 @@ export async function loadItemsRaw(): Promise<CatalogCache> {
   // A refresh that started before the latest Unhide change: rebuild with the current list.
   // Or a frameless Videy item just crossed VIDEY_NO_THUMB_HIDE_HOURS (CPU only, at most once per item).
   const due = Boolean(cache.videyNoThumbNextAt && Date.now() >= cache.videyNoThumbNextAt);
+  // The cache is shared with the other bundled copy of this module (local-shared.ts runtime). If it was
+  // built under a newer owner list than this copy has seen, re-read the lists (KV read only) before
+  // deciding to rebuild, so the two copies never rebuild back and forth over a stale key.
+  if (cache.raw && cache.unhideKey !== unhideKey && !due) await syncUnhidden(true);
   if (cache.raw && (cache.unhideKey !== unhideKey || due)) {
     const next = buildIndexes(cache.raw, cache.posters, cache.videyNo, cache.at);
     if (runtime.cache === cache) runtime.cache = next;
