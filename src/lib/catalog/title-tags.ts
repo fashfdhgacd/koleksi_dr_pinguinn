@@ -134,6 +134,8 @@ function stripVideyTemplate(title: string): string {
  * @param primary the video's primary category slug (slugOf); always first.
  */
 export function titleTags(title: string | undefined, primary: string, opts: TagOptions = {}): string[] {
+  // Gay videos (owner decision 2026-10-27) sit only in AI GAY: no straight-category tags.
+  if (primary === "ai-gay") return ["ai-gay"];
   const out: string[] = primary ? [primary] : [];
   // Videy titles are mostly generated SEO templates ("Videy Viral Terbaru 484"): tag only real words.
   const raw = stripTemplate(title || "");

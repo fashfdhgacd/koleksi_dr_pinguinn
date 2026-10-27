@@ -295,6 +295,8 @@ export function parseMessage(text = "") {
   }
   // Tag #aigay (or #ai-gay / #ai_gay) anywhere in the message = category AI GAY (/kategori/ai-gay).
   if (!category && /(?:^|\s)#ai[-_]?gay\b/i.test(text)) category = "ai-gay";
+  // Gay uploads from Boy Friend TV ("BoyFriendTV" / "Boy Friend TV" in the message) also go to AI GAY.
+  if (!category && /boy\s*friend\s*tv/i.test(text)) category = "ai-gay";
   // Same for the 2026-10-26 SEO categories: #blunder, #kelasbintang, #tiktok, ... (first one wins).
   if (!category) {
     const m = /(?:^|\s)#(blunder|kelas[-_]?bintang|tiktok|mantan|vcs|kompilasi|tetangga|kacamata|kantor|anal|cantik)\b/i.exec(text);
