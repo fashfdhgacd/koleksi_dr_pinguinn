@@ -158,9 +158,11 @@ export function titleTags(title: string | undefined, primary: string, opts: TagO
   }
   const base = out.slice(0, MAX_TAGS);
   // Additive (2026-10-27): shared dictionary + host + stored bot tags, up to MAX_ALL_TAGS.
-  return base.concat(
+  const all = base.concat(
     extraTags(t, base, { sourceText: opts.sourceText, storedTags: opts.storedTags, allowed: (s: string) => findCategory(s)?.slug === s }),
   );
+  // JAV and hentai are never listed under Amatir as an extra tag (their main category is unchanged).
+  return primary === "jav" || primary === "hentai" ? all.filter((s) => s !== "amatir") : all;
 }
 
 /** Tag options for a catalog item (source flags + popularity). */

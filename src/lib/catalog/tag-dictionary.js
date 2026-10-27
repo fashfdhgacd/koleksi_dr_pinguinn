@@ -73,8 +73,9 @@ export const KEYWORD_TAG_RULES = [
 
 /** Host / source -> tags (only real catalog themes, never source-pure slugs). */
 export const SOURCE_TAG_RULES = [
-  // IndoAV / UserBokep / Putarin / Videy-hosted Indo uploads are Indonesian amateur clips.
-  ["amatir", /indoav|userbokep|putarin|puterin|videy/i],
+  // IndoAV / UserBokep uploads are Indonesian amateur clips. Putarin (JAV / hentai) and Videy (own
+  // category) are not source-tagged amatir (2026-10-27 audit: every Putarin + Videy video was in Amatir).
+  ["amatir", /indoav|userbokep/i],
 ];
 
 /**
