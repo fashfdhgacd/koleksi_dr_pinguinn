@@ -37,8 +37,10 @@ SOURCES = [
     "src/lib/catalog/folder-batch-*.json",
     "src/lib/catalog/data-*.json",
     "data/videos-latest.json",
+    "data/videos-latest-p[0-9]*.json",  # later chunks (src/lib/catalog/chunk-contract.js)
     "data/putarin.json",
     "data/putarin-latest.json",
+    "data/putarin-latest-p[0-9]*.json",  # later chunks (src/lib/catalog/chunk-contract.js)
 ]
 DUR_KEYS = ("duration", "duration_sec", "duration_seconds", "durationSeconds", "length", "video_length", "runtime")
 VIEW_KEYS = ("views", "view_count", "views_count", "viewCount", "total_views", "plays")

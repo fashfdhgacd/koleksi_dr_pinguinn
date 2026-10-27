@@ -43,8 +43,10 @@ SOURCES = [
     "src/lib/catalog/data-*.json",
     "data/videos.json",
     "data/videos-latest.json",
+    "data/videos-latest-p[0-9]*.json",  # later chunks (src/lib/catalog/chunk-contract.js)
     "data/putarin.json",
     "data/putarin-latest.json",
+    "data/putarin-latest-p[0-9]*.json",  # later chunks (src/lib/catalog/chunk-contract.js)
 ]
 UA = "Mozilla/5.0 (compatible; kdp-dead-check/1.0; +https://koleksidrpinguin.com)"
 CONFIRM_GAP_S = 6 * 3600
