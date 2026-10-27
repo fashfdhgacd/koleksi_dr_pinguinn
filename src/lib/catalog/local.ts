@@ -17,6 +17,7 @@ import {
 import { runtime } from "./local-shared";
 import { popularIds, tagOptions, titleTags } from "./title-tags";
 import { parseSearchQuery, scoreSearch, searchHayText } from "./search-rank";
+import { seriesIndex } from "./series";
 import { isPublicHidden, isVideyNoThumbHidden, loadItems, pageOf, sortByNewest } from "./local-cache";
 import type { CatalogCache } from "./local-shared";
 
@@ -280,24 +281,44 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
 /** Text links on a watch page to other videos of its main category (internal linking for crawlers). */
 const SAME_CATEGORY_LINKS = 6;
 
+/** Max other episodes of the same series listed first (before the category links). */
+const SERIES_LINKS = 12;
+
 /**
- * Up to SAME_CATEGORY_LINKS videos next to this one in its category list (the pool is built once per
- * catalog build, so this is an in-memory slice: no KV/D1 read). Hidden videos are skipped.
+ * Other episodes of this video's series first (sorted by episode, see series.ts), then up to
+ * SAME_CATEGORY_LINKS videos next to this one in its category list. Both indexes are built once per
+ * catalog build, so this is an in-memory slice: no KV/D1 read. Hidden videos are skipped.
  */
 async function sameCategoryLinks(cache: CatalogCache, item: RawItem): Promise<Array<{ id: string; title: string }>> {
   const slug = slugOf(item);
   if (!slug || NOINDEX_CATEGORY_SLUGS.has(slug)) return [];
-  const pool = categoryPool(cache, slug);
-  if (pool.length < 2) return [];
-  const at = Math.max(0, pool.findIndex((x) => x?.id === item.id));
   const out: Array<{ id: string; title: string }> = [];
-  for (let step = 1; step < pool.length && step <= SAME_CATEGORY_LINKS * 4 && out.length < SAME_CATEGORY_LINKS; step++) {
+  const series = seriesIndex(cache.items);
+  const key = series.byId.get(String(item.id));
+  if (key) {
+    for (const id of series.groups.get(key) || []) {
+      if (out.length >= SERIES_LINKS) break;
+      if (id === item.id || out.some((o) => o.id === id)) continue;
+      const ep = cache.byId.get(id);
+      const title = String(ep?.title || "").trim();
+      if (!ep || !title || NOINDEX_CATEGORY_SLUGS.has(slugOf(ep))) continue;
+      if (await isPublicHidden(id)) continue;
+      out.push({ id, title });
+    }
+  }
+  const pool = categoryPool(cache, slug);
+  if (pool.length < 2) return out;
+  const at = Math.max(0, pool.findIndex((x) => x?.id === item.id));
+  const limit = out.length + SAME_CATEGORY_LINKS;
+  let added = 0;
+  for (let step = 1; step < pool.length && step <= SAME_CATEGORY_LINKS * 4 && added < SAME_CATEGORY_LINKS && out.length < limit; step++) {
     const next = pool[(at + step) % pool.length];
     const id = String(next?.id || "");
     const title = String(next?.title || "").trim();
     if (!id || !title || id === item.id || out.some((o) => o.id === id)) continue;
     if (await isPublicHidden(id)) continue;
     out.push({ id, title });
+    added++;
   }
   return out;
 }
