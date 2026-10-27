@@ -537,22 +537,40 @@ async function handleThumbMissing(body: { limit?: unknown; offset?: unknown } = 
   });
 }
 
-async function handleCatalogSearch(body: { q?: unknown }) {
-  const q = String(body.q || "").trim().toLowerCase();
-  if (q.length < 2) return json({ ok: true, items: [] });
+/**
+ * Owner search over the whole catalog (hidden items too): title, id, main category (slug + label),
+ * extra categories, stored tags and source. Every word must match somewhere. Paginated (limit/offset)
+ * with a total, so bulk tagging can select beyond the first page. One in-memory pass, no KV write.
+ */
+async function handleCatalogSearch(body: { q?: unknown; limit?: unknown; offset?: unknown }) {
+  const q = String(body.q || "").trim().toLowerCase().slice(0, 120);
+  const limit = Math.min(100, Math.max(1, Math.floor(Number(body.limit) || 50)));
+  const offset = Math.max(0, Math.floor(Number(body.offset) || 0));
+  if (q.length < 2) return json({ ok: true, items: [], total: 0, offset, limit });
+  const words = q.split(/\s+/).filter(Boolean);
   const { raw, cache, hidden } = await catalogBase();
-  const out: CatalogRow[] = [];
+  const hits: { it: RawItem; shown: RawItem | undefined }[] = [];
   const seen = new Set<string>();
   for (const it of raw) {
     if (!it?.id || seen.has(it.id)) continue;
     seen.add(it.id);
     const shown = cache.byId?.get(it.id);
-    const hay = `${String(shown?.title || it.title || "").toLowerCase()} ${it.id.toLowerCase()}`;
-    if (!hay.includes(q)) continue;
-    out.push(toCatalogRow(it, shown, hidden.has(it.id), cache.posters));
-    if (out.length >= 20) break;
+    const view = shown || it;
+    const slug = slugOf(view);
+    const extra = Array.isArray(view.ownerExtraCategories) ? (view.ownerExtraCategories as unknown[]).map(String) : [];
+    const tags = Array.isArray(view.tags) ? (view.tags as unknown[]).map(String) : [];
+    const labels = [slug, ...extra, ...tags].map((s) => `${s} ${findCategory(s)?.label || ""}`).join(" ");
+    const hay = `${String(view.title || it.title || "")} ${it.id} ${labels} ${sourceLabel(it)}`.toLowerCase();
+    if (!words.every((w) => hay.includes(w))) continue;
+    hits.push({ it, shown });
   }
-  return json({ ok: true, items: out });
+  return json({
+    ok: true,
+    total: hits.length,
+    offset,
+    limit,
+    items: hits.slice(offset, offset + limit).map(({ it, shown }) => toCatalogRow(it, shown, hidden.has(it.id), cache.posters)),
+  });
 }
 
 async function handleEditVideo(body: { id?: unknown; title?: unknown; category?: unknown; extra?: unknown }) {
