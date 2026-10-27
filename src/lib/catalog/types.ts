@@ -52,6 +52,8 @@ export type VideoDetail = VideoCard & {
   uploadDate?: string | number | null;
   /** Up to 6 other videos of the same main category (id + raw title), for plain internal links. */
   sameCategory?: Array<{ id: string; title: string }>;
+  /** Episodes of this video's series (current included), sorted by episode number; only for series. */
+  episodes?: Array<{ id: string; ep: number }>;
 };
 
 export type CategoryInfo = {

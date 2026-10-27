@@ -17,6 +17,7 @@ import {
 import { runtime } from "./local-shared";
 import { popularIds, tagOptions, titleTags } from "./title-tags";
 import { parseSearchQuery, scoreSearch, searchHayText } from "./search-rank";
+import { parseSeries, seriesIndex } from "./series";
 import { isPublicHidden, isVideyNoThumbHidden, loadItems, pageOf, sortByNewest } from "./local-cache";
 import type { CatalogCache } from "./local-shared";
 
@@ -273,6 +274,7 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
     playable: Boolean(embed),
     categories: videoCategories(bag, item),
     sameCategory: await sameCategoryLinks(bag, item),
+    ...(await seriesEpisodes(bag, item)),
     ...((await isVideyNoThumbHidden(item.id)) ? { noindex: true } : {}),
   };
 }
@@ -300,6 +302,43 @@ async function sameCategoryLinks(cache: CatalogCache, item: RawItem): Promise<Ar
     out.push({ id, title });
   }
   return out;
+}
+
+/** Max episode buttons in the watch-page episode strip. */
+const MAX_EPISODES = 60;
+
+/**
+ * Episodes of this video's series (series.ts index, built once per catalog build: no KV/D1 read),
+ * sorted by episode number, current one included. Empty object when the video is not in a series
+ * or fewer than 2 public episodes remain after skipping hidden ones.
+ */
+async function seriesEpisodes(
+  cache: CatalogCache,
+  item: RawItem,
+): Promise<{ episodes?: Array<{ id: string; ep: number }> }> {
+  const key = seriesIndex(cache.items).byId.get(String(item.id));
+  if (!key) return {};
+  const ids = seriesIndex(cache.items).groups.get(key) || [];
+  const out: Array<{ id: string; ep: number }> = [];
+  const seen = new Set<number>();
+  for (const id of ids) {
+    if (out.length >= MAX_EPISODES) break;
+    const ep = cache.byId.get(id);
+    if (!ep) continue;
+    const n = parseSeries(String(ep.title || ""))?.ep || 0;
+    if (!n) continue;
+    // Duplicate uploads of the same episode: keep the current video, else the first one.
+    if (seen.has(n) && id !== item.id) continue;
+    if (id !== item.id && (await isPublicHidden(id))) continue;
+    if (seen.has(n)) {
+      const i = out.findIndex((o) => o.ep === n);
+      if (i >= 0) out[i] = { id, ep: n };
+      continue;
+    }
+    seen.add(n);
+    out.push({ id, ep: n });
+  }
+  return out.length >= 2 ? { episodes: out } : {};
 }
 
 /** Max category chips on a watch page. */
