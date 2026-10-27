@@ -208,13 +208,21 @@ function categoryPool(cache: CatalogCache, category: string): RawItem[] {
  * Newest-first items with their normalized search text, built once per catalog build (was: re-sorted
  * and re-normalized, ~8k titles, on every search request).
  */
+/** Main-category words so "jav" / "hentai" / "ai" find their category (teen/college excluded). */
+const NO_SEARCH_CATEGORY = new Set(["teen-18", "college-18", "lainnya"]);
+function searchCategoryWords(item: RawItem): string {
+  const slug = slugOf(item);
+  if (NO_SEARCH_CATEGORY.has(slug)) return "";
+  const cat = findCategory(slug);
+  return cat ? `${cat.label} ${cat.slug}` : slug;
+}
 const searchMemo = new WeakMap<object, { item: RawItem; hay: string }[]>();
 function searchIndex(cache: CatalogCache): { item: RawItem; hay: string }[] {
   let rows = searchMemo.get(cache);
   if (!rows) {
     rows = sortByNewest(cache.haystack.map((r) => r.item)).map((item) => ({
       item,
-      hay: normalizeSearchText(`${item.title || ""} ${item.id || ""}`),
+      hay: normalizeSearchText(`${item.title || ""} ${item.id || ""} ${searchCategoryWords(item)}`),
     }));
     searchMemo.set(cache, rows);
   }
