@@ -183,7 +183,7 @@ export function AlertStrip(props: {
               {noThumb == null ? "…" : noThumb ? `${fmt(noThumb)} video bokep` : "Semua video bokep"}
             </b>{" "}
             {noThumb ? "masih pakai logo" : noThumb === 0 ? "sudah punya thumbnail" : ""}
-            <span className="block text-[13px] leading-snug text-zinc-400">Byse / Lulu / Dood tanpa thumbnail</span>
+            <span className="block text-[13px] leading-snug text-zinc-400">Byse / Lulu / Dood / Putarin: gambar belum ketemu</span>
           </span>
           {noThumb ? (
             <button type="button" className={btn} onClick={onShowThumbs}>

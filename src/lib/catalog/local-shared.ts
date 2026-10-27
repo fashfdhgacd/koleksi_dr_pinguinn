@@ -429,6 +429,9 @@ export function thumbOf(item: RawItem, posters: Record<string, string>): string 
     directPoster(item.poster) ||
     directPoster(item.thumbnail) ||
     (isPutarin(item) ? javCoverFromTitle(String(item.title || "")) : "") ||
+    // Putarin without a known poster: the embed's own image (decrypted server-side). The card tries
+    // R2 first, then /thumb/<id> which resolves the same image once and stores it in R2.
+    (isPutarin(item) && /^[A-Za-z0-9]{6,20}$/.test(id) ? `https://koleksidrpinguin.com/api/puterin-thumb?id=${id}` : "") ||
     ""
   );
 }

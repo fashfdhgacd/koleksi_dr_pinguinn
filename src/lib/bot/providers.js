@@ -1,4 +1,6 @@
 import { BYSE_DOMAINS } from "../catalog/drp-hosts.js";
+import { fetchValidImage } from "@/lib/image-guard";
+import { fetchPuterinPoster } from "@/lib/puterin-poster";
 
 async function getJson(url, headers = {}) {
   const res = await fetch(url, { headers, redirect: "follow" });
@@ -369,6 +371,13 @@ export async function fetchPutarinMeta(code, env) {
     }
   }
   if (!title) title = await withTimeout(scrapePutarinTitle(code), 3000, "");
+  // No (valid) API thumb: resolve the embed's own player.image without a key (same as
+  // /api/puterin-thumb), and only keep a poster that passes the central image guard.
+  if (thumb && !(await withTimeout(fetchValidImage(thumb, "https://puterin.biz/"), 7000, { ok: false })).ok) thumb = "";
+  if (!thumb && code) {
+    const p = await withTimeout(fetchPuterinPoster(code).catch(() => null), 6000, null);
+    if (p && (await withTimeout(fetchValidImage(p, "https://puterin.biz/"), 7000, { ok: false })).ok) thumb = p;
+  }
   return { title, thumb };
 }
 

@@ -1,6 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { resolvePostersBucket } from "@/lib/poster-r2";
-import { fixDmmCover } from "@/lib/catalog/local-shared";
+import { fixDmmCover, javCoverFromTitle } from "@/lib/catalog/local-shared";
+import { checkImage, isPlaceholderMd5 } from "@/lib/image-guard";
+import { resolvePuterinImage } from "@/lib/puterin-poster";
+
+/** Putarin item for an id (putarin-latest feed), loaded lazily only on a full miss. */
+async function putarinItem(id: string): Promise<{ id?: string; title?: string; category?: string } | null> {
+  if (!/^[A-Za-z0-9]{6,20}$/.test(id)) return null;
+  const feed = (await import("../../data/putarin-latest.json").then((m) => m.default).catch(() => [])) as unknown;
+  const list = (Array.isArray(feed) ? feed : ((feed as { items?: unknown[] })?.items ?? [])) as Array<{ id?: string; title?: string; category?: string }>;
+  return list.find((it) => it?.id === id) || null;
+}
 
 // Poster maps are large: load them lazily (only on an edge-cache + R2 miss) instead of parsing
 // them in every isolate at boot.
@@ -121,7 +131,10 @@ export const Route = createFileRoute("/thumb/$id")({
           const key = keyFor(id);
           if (bucket) {
             const saved = await bucket.get(key).catch(() => null);
-            if (saved) {
+            // Self-heal: a copy whose md5 (R2 etag) is a known placeholder is deleted and re-resolved.
+            if (saved && isPlaceholderMd5((saved as { etag?: string }).etag)) {
+              await (bucket as { delete?: (k: string) => Promise<unknown> }).delete?.(key).catch(() => undefined);
+            } else if (saved) {
               const res = imageResponse(saved.body, saved.httpMetadata?.contentType || "image/jpeg");
               try {
                 await caches.default.put(request, res.clone());
@@ -132,7 +145,27 @@ export const Route = createFileRoute("/thumb/$id")({
             }
           }
 
-          const source = await sourceFor(id);
+          let source = await sourceFor(id);
+          // Putarin uploads carry no poster: try the DMM cover from a JAV code in the title, else the
+          // embed's own player.image (same decrypt as /api/puterin-thumb). Stored to R2 once.
+          const pItem = source ? null : await putarinItem(id);
+          if (pItem) {
+            const dmm = javCoverFromTitle(String(pItem.title || ""));
+            if (dmm) source = dmm;
+            else {
+              const pt = await resolvePuterinImage(id);
+              if (pt) {
+                if (bucket) await bucket.put(key, pt.buf, { httpMetadata: { contentType: pt.type } }).catch(() => undefined);
+                const res = imageResponse(pt.buf, pt.type);
+                try {
+                  await caches.default.put(request, res.clone());
+                } catch {
+                  /* cache optional */
+                }
+                return res;
+              }
+            }
+          }
           if (!source) {
             const vy = await videyStatic(id, request);
             if (!vy) return await cachedFallback(request);
@@ -148,10 +181,12 @@ export const Route = createFileRoute("/thumb/$id")({
             signal: AbortSignal.timeout(8000),
           }).catch(() => null);
           // DMM answers a missing cover with a redirect to its "NOW PRINTING" image: never save that.
-          if (!remote?.ok || /now_printing/i.test(remote.url || "")) return await cachedFallback(request);
+          if (!remote?.ok) return await cachedFallback(request);
           const buf = await remote.arrayBuffer().catch(() => null);
-          const type = buf ? sniffType(buf) : "";
-          if (!buf || !type || buf.byteLength < 800) return await cachedFallback(request);
+          // Central guard (image-guard.ts): placeholder URL/md5, < 3 KB, non-image never reach R2.
+          const verdict = await checkImage(buf, remote.url || source);
+          if (!buf || !verdict.ok) return await cachedFallback(request);
+          const type = verdict.type;
           if (bucket) {
             await bucket.put(key, buf, { httpMetadata: { contentType: type } }).catch(() => undefined);
           }

@@ -1,0 +1,11 @@
+{
+  "md5": {
+    "8c6455760bf9c0c487142280fcef1877": "DMM now_printing (590x800, 19378 B)",
+    "e6ec2d8dbcf1f14da06927fcf50c59b1": "img-place.com missing thumb (svg 1921 B)",
+    "71a50dbba44c78128b221b7df7bb51f1": "tapecontent 404 body (95 B)",
+    "0a2fc994bb39f6b01f6fe7e5e120cf61": "our brand-poster-6x5.jpg",
+    "82b8290bdd90eb3aa579c37879fb67c9": "our brand-poster-v2.jpg"
+  },
+  "urlPattern": "now_printing|noimage|no[-_]image|no_photo|placeholder|brand-poster|default[-_]?(?:thumb|poster|image)",
+  "minBytes": 3000
+}
