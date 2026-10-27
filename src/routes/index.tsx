@@ -21,8 +21,10 @@ type HomeSearch = {
 
 function parsePage(value: unknown): number | undefined {
   const n = Math.floor(Number(value));
-  if (!Number.isFinite(n) || n <= 1) return undefined;
-  return Math.min(n, 500);
+  // No upper cap here: a cap made validateSearch rewrite ?page=9999 to ?page=500 (extra 307 hop);
+  // the loader sends any page past the end straight to the real last page.
+  if (!Number.isSafeInteger(n) || n <= 1) return undefined;
+  return n;
 }
 
 function isSchemaPlaceholder(q?: string): boolean {

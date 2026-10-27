@@ -16,7 +16,7 @@ import {
 } from "./local-shared";
 import { runtime } from "./local-shared";
 import { popularIds, tagOptions, titleTags } from "./title-tags";
-import { normalizeSearchText, parseSearchQuery, scoreSearch } from "./search-rank";
+import { parseSearchQuery, scoreSearch, searchHayText } from "./search-rank";
 import { isPublicHidden, isVideyNoThumbHidden, loadItems, pageOf, sortByNewest } from "./local-cache";
 import type { CatalogCache } from "./local-shared";
 
@@ -222,7 +222,7 @@ function searchIndex(cache: CatalogCache): { item: RawItem; hay: string }[] {
   if (!rows) {
     rows = sortByNewest(cache.haystack.map((r) => r.item)).map((item) => ({
       item,
-      hay: normalizeSearchText(`${item.title || ""} ${item.id || ""} ${searchCategoryWords(item)}`),
+      hay: searchHayText(item.title || "", `${item.id || ""} ${searchCategoryWords(item)}`),
     }));
     searchMemo.set(cache, rows);
   }
