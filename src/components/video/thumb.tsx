@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { isPosterWarm, markPosterWarm } from "@/lib/poster-warm";
 
@@ -19,6 +19,13 @@ function r2PosterUrl(id: string): string {
   const key = id.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80);
   return key ? `${R2_POSTERS}${key}` : "";
 }
+
+/**
+ * Video id for VideoThumbs rendered without a videoId prop (the watch-page player poster): with it
+ * they use the same R2 poster -> /thumb/<id> -> source chain as the catalog cards, so a host whose
+ * image CDN is down (e.g. img.lulucdn.com 521) still shows the real poster instead of the penguin.
+ */
+export const PosterIdContext = createContext("");
 
 function isVideoSrc(src: string): boolean {
   if (!src || typeof src !== "string") return false;
@@ -51,13 +58,15 @@ export function VideoThumb({
   className?: string;
   onUnavailable?: () => void;
 }) {
+  const ctxId = useContext(PosterIdContext);
+  const posterId = videoId || ctxId;
   const srcStr = typeof src === "string" ? src : "";
   const dmm = dmmCoverFromTitle(alt);
   const real = srcStr && !isPosterSrc(srcStr) && !isVideoSrc(srcStr) && !srcStr.startsWith("data:") ? srcStr : "";
   // No .jpg suffix: old /thumb/{id}.jpg responses are cached as the brand penguin (immutable).
   // Our own static files (e.g. /videy-thumbs/{id}.jpg) are used as they are.
-  const local = videoId && real && /^https?:\/\//i.test(real) ? `/thumb/${videoId}` : "";
-  const r2 = local ? r2PosterUrl(videoId) : "";
+  const local = posterId && real && /^https?:\/\//i.test(real) ? `/thumb/${posterId}` : "";
+  const r2 = local ? r2PosterUrl(posterId) : "";
   const first = r2 || local || real || dmm || FALLBACK_POSTER;
   const [current, setCurrent] = useState(first);
   const [step, setStep] = useState(0);
