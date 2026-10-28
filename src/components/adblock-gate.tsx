@@ -1,5 +1,6 @@
-// Ad-blocker gate for non-IndoAV watch pages (IndoAV is never gated: its host ads and view bonus
-// must not be touched). Wraps the player; player.tsx and the iframe URLs stay as they are.
+// Ad-blocker gate for Videy watch pages only (watch-page.tsx wraps VideyPlayer with it). Every other
+// host (IndoAV, UserBokep, Putarin/Jav, Streamtape, ...) and every catalog page is never gated.
+// player.tsx and the iframe URLs stay as they are.
 // Detection, once per page load, client only, no polling:
 //  1. a bait element with ad-like class names; blockers' cosmetic filters hide it (height 0 /
 //     display none);
