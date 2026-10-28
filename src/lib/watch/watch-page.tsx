@@ -39,7 +39,7 @@ function xIntentUrl(title: string, url: string): string {
 
 const VIDEY_LABEL = "drpinguin videy";
 
-/** Videy plays in VideyPlayer (own HTML5 player) and has no "Buka Sumber". */
+/** Videy plays in VideyPlayer (own HTML5 player) and has no "Buka Sumber". Only Videy is adblock-gated. */
 function isVideyItem(item: VideoDetail): boolean {
   return item.creator === "Videy" || item.category === "videy";
 }
@@ -344,10 +344,11 @@ export function WatchPage() {
                 <PopTapLayer key={`pop-${item.id}`} videoId={item.id} host="IndoAV" />
               </div>
             ) : (
-              <AdblockGate key={`gate-${item.id}`} videoId={item.id}>
+              // Other hosts (UserBokep, Putarin/Jav, Streamtape, ...): no adblock gate, only Videy is gated.
+              <div className="relative">
                 <VideoPlayer key={item.id} item={item} />
                 <PopTapLayer key={`pop-${item.id}`} videoId={item.id} host={hostLabel(catalogPlayUrl(item)).replace("Puterin", "Putarin")} />
-              </AdblockGate>
+              </div>
             )}
             {(() => {
               const src = catalogPlayUrl(item);

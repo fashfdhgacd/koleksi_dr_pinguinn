@@ -10,7 +10,7 @@ import { isOwnerRequest } from "@/lib/owner-auth";
  *  Storage: D1 player_errors daily counters, host "VideyAd" (no IP, user agent or visitor id).
  *  Events: vast_empty (no ad in the answer), vast_timeout (no answer within 7 s), vast_error
  *  (request failed or blocked), ad_play, ad_muted (only allowed without sound), ad_error,
- *  ad_skip, ad_complete; adblock-gate.tsx (watch pages): adblock (blocker detected, playback
+ *  ad_skip, ad_complete; adblock-gate.tsx (Videy watch pages): adblock (blocker detected, playback
  *  gated), gate_pass (reloaded with the blocker off).
  *
  * GET (owner, header x-online-key): totals per event for today and the last 7 days.
