@@ -4,6 +4,7 @@ import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { VideoPlayer } from "@/components/video/player";
+import { PosterIdContext } from "@/components/video/thumb";
 import { VideyPlayer } from "@/components/video/videy-player";
 import { PopTapLayer } from "@/components/tap-popunder";
 import { AdblockGate } from "@/components/adblock-gate";
@@ -346,7 +347,11 @@ export function WatchPage() {
             ) : (
               // Other hosts (UserBokep, Putarin/Jav, Streamtape, ...): no adblock gate, only Videy is gated.
               <div className="relative">
-                <VideoPlayer key={item.id} item={item} />
+                {/* Player poster = the card's cached poster (R2 / /thumb), so a down image host
+                    (img.lulucdn.com) no longer turns it into the penguin. Iframe URLs unchanged. */}
+                <PosterIdContext.Provider value={item.id}>
+                  <VideoPlayer key={item.id} item={item} />
+                </PosterIdContext.Provider>
                 <PopTapLayer key={`pop-${item.id}`} videoId={item.id} host={hostLabel(catalogPlayUrl(item)).replace("Puterin", "Putarin")} />
               </div>
             )}
