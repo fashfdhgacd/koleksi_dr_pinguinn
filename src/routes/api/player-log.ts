@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getD1, type D1DatabaseLike } from "@/lib/analytics-d1";
 import { getDetail } from "@/lib/catalog/local";
-import { applyUnhidden, loadItemsRaw } from "@/lib/catalog/local-cache";
+import { applyUnhidden, loadItemsRaw, publicIdBeforeBuild } from "@/lib/catalog/local-cache";
 import { sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
 import { readUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState, setOwnerHidden } from "@/lib/catalog/owner-hide-store";
@@ -166,8 +166,13 @@ async function isPublicId(id: string): Promise<boolean> {
   if (hit && now - hit.at < 10 * 60_000) return hit.ok;
   let ok = false;
   try {
-    await getDetail(id);
-    ok = true;
+    // Fresh isolate: check the one id without building the catalog (same answer as getDetail).
+    const early = await publicIdBeforeBuild(id);
+    if (early !== null) ok = early;
+    else {
+      await getDetail(id);
+      ok = true;
+    }
   } catch {
     ok = false;
   }

@@ -110,12 +110,26 @@ export function drpKindOfHost(hostname) {
  * @returns {"lulu" | "dood" | "byse" | ""}
  */
 export function drpKindOfUrl(url) {
+  const key = String(url || "");
+  const hit = kindByUrl.get(key);
+  if (hit !== undefined) return hit;
+  /** @type {"lulu" | "dood" | "byse" | ""} */
+  let kind = "";
   try {
-    return drpKindOfHost(new URL(String(url || "")).hostname);
+    kind = drpKindOfHost(new URL(key).hostname);
   } catch {
-    return "";
+    kind = "";
   }
+  // Pure function of the URL string: memo per isolate (one URL parse per embed/direct, not one per
+  // call; a catalog build asks several times per item). Bounded so it can never grow without limit.
+  if (kindByUrl.size >= KIND_MEMO_MAX) kindByUrl.clear();
+  kindByUrl.set(key, kind);
+  return kind;
 }
+
+/** @type {Map<string, "lulu" | "dood" | "byse" | "">} */
+const kindByUrl = new Map();
+const KIND_MEMO_MAX = 50_000;
 
 /**
  * Kind from a stored catalog item: source label first (Byse custom domains), then embed/direct host.

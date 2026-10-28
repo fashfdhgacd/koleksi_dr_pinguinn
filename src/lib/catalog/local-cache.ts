@@ -692,6 +692,40 @@ export async function listVideyNoThumbHidden(): Promise<RawItem[]> {
   return sortByNewest([...ids].map((id) => cache.byId.get(id)).filter((it): it is RawItem => Boolean(it)), false);
 }
 
+/** Raw bundled items by id, only for publicIdBeforeBuild (dropped once the catalog is built). */
+let rawById: Map<string, RawItem> | null = null;
+
+/**
+ * Cheap id check for beacon-style endpoints (/api/like, /api/player-log) on a fresh isolate, so a
+ * like count or a player error report no longer builds the whole catalog (~1-2 s CPU) just to
+ * validate one id. Same answer as `getDetail(id)` succeeding: the id is in the bundled catalog,
+ * passes the same isHiddenRaw rules as buildIndexes (owner hide / lock / Unhide / edits, read from
+ * KV first exactly like loadItemsRaw) and is not in HIDDEN_IDS unless unhidden (isPublicHidden).
+ * Returns null once the catalog is built (or while live feeds exist): callers then use getDetail.
+ */
+export async function publicIdBeforeBuild(id: string): Promise<boolean | null> {
+  if (runtime.cache || runtime.inflight || BOT_FEEDS.length) {
+    rawById = null;
+    return null;
+  }
+  await syncUnhidden();
+  if (runtime.cache || runtime.inflight) {
+    rawById = null;
+    return null;
+  }
+  const key = String(id || "").trim();
+  if (!key) return false;
+  if (!rawById) {
+    rawById = new Map<string, RawItem>();
+    for (const it of assembleLocal().items) rawById.set(it.id, it);
+  }
+  const it = rawById.get(key);
+  if (!it || isHiddenRaw(it)) return false;
+  if (OWNER_HIDDEN.has(key)) return false;
+  if (UNHIDDEN.has(key)) return true;
+  return !HIDDEN_IDS.has(key);
+}
+
 /** True for hidden ids (minor/school-themed content); /watch answers 404 + noindex for them. */
 export async function isPublicHidden(id: string): Promise<boolean> {
   const key = String(id || "").trim();
