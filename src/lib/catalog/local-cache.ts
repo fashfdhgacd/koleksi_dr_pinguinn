@@ -62,6 +62,8 @@ import { isGenericTitle } from "./generic-title.js";
 // Frozen copy of the old repo's live feed (koleksi_dr_pinguin data/putarin.json, last change Oct 7 2026),
 // bundled so no request ever fetches it from raw.githubusercontent.com again (see BOT_FEEDS).
 import putarinFeedSnapshot from "./putarin-feed-20261007.json";
+import { restoreBuild, serializeBuild } from "./build-snapshot";
+import { keepAlive, readSnapshot, snapshotKey, writeSnapshot } from "./build-snapshot-store";
 
 // Re-bind mutable cache/inflight via shared module namespace
 import { runtime } from "./local-shared";
@@ -379,8 +381,10 @@ export function applyUnhidden(
   editsKey = nextEditsKey;
   unhideKey = key;
   const cur = runtime.cache as BuiltCache | null;
-  if (cur && cur.raw && cur.unhideKey !== key) {
+  // unhideKey first: a snapshot-restored cache assembles `raw` lazily, only when a rebuild needs it.
+  if (cur && cur.unhideKey !== key && cur.raw) {
     runtime.cache = buildIndexes(cur.raw, cur.posters, cur.videyNo, cur.at);
+    rememberBuild(runtime.cache as BuiltCache);
   }
 }
 
@@ -640,6 +644,16 @@ export function pageOf(pool: RawItem[], page: number, limit: number, posters: Re
   };
 }
 
+/** Poster map of the bundled data (the posters half of assembleLocal, no item work). */
+function localPosters(): Record<string, string> {
+  return {
+    ...(postersMap as Record<string, string>),
+    ...asPosterMap(javPosters),
+    ...asPosterMap(latestPosters),
+    ...asPosterMap(putarinFeedSnapshot),
+  };
+}
+
 export function assembleLocal(): { items: RawItem[]; posters: Record<string, string> } {
   const local = withIds(asList(localCatalog)).filter(isUsable);
   const latest = withIds(asList(latestVideos)).filter(isUsable);
@@ -652,12 +666,7 @@ export function assembleLocal(): { items: RawItem[]; posters: Record<string, str
   const drp = withIds(asList(drpBokepBatch)).filter(isUsable);
   // First, like the live feed it replaces (remote items used to be merged in front of the bundle).
   const feed = withIds(asList(putarinFeedSnapshot)).filter(isUsable);
-  const posters: Record<string, string> = {
-    ...(postersMap as Record<string, string>),
-    ...asPosterMap(javPosters),
-    ...asPosterMap(latestPosters),
-    ...asPosterMap(putarinFeedSnapshot),
-  };
+  const posters: Record<string, string> = localPosters();
   return { items: mergeById([...feed, ...latest, ...pl, ...st, ...st2, ...pu, ...local, ...fb, ...drp]), posters };
 }
 
@@ -678,6 +687,77 @@ export async function refreshRemote(base: { items: RawItem[]; posters: Record<st
 export function seedLocalCache(): CatalogCache {
   const local = assembleLocal();
   return buildIndexes(local.items, local.posters, buildVideyNo(local.items), Date.now());
+}
+
+/**
+ * Built catalog from a snapshot (build-snapshot.ts) made by this same deploy under the same owner
+ * lists. Same indexes and item objects as buildIndexes would give; `raw` (the pre-filter list, only
+ * read by owner tools and rebuilds) is assembled from the bundled data on first use.
+ */
+function cacheFromSnapshot(text: string, key: string): BuiltCache | null {
+  const parts = restoreBuild(text);
+  if (!parts) return null;
+  const cache: BuiltCache = { ...parts, posters: localPosters(), unhideKey: key };
+  let raw: RawItem[] | undefined;
+  Object.defineProperty(cache, "raw", {
+    enumerable: true,
+    configurable: true,
+    get: () => (raw ??= assembleLocal().items),
+    set: (v: RawItem[] | undefined) => {
+      raw = v;
+    },
+  });
+  lastHiddenIds = parts.hiddenIds;
+  return cache;
+}
+
+/** Saves a fresh build as this data centre's snapshot, after the response (waitUntil; best effort). */
+function rememberBuild(cache: BuiltCache): void {
+  if (BOT_FEEDS.length) return; // live feeds change between builds: never snapshot those
+  const listKey = cache.unhideKey ?? "";
+  const job = (async () => {
+    const key = await snapshotKey(listKey);
+    if (!key || runtime.cache !== cache) return;
+    const text = serializeBuild(cache);
+    if (text) await writeSnapshot(key, text);
+  })().catch(() => {});
+  keepAlive(job);
+}
+
+/** One cold seed per isolate, shared by both bundled copies of this module (like runtime). */
+const SEED_KEY = "__kdpCatalogSeedV1";
+const seedHost = globalThis as unknown as Record<string, Promise<CatalogCache> | undefined>;
+
+/**
+ * Cold isolate: read this data centre's snapshot for the current deploy + owner lists, else build
+ * (seedLocalCache, exactly as before) and save the build for the next cold isolate.
+ */
+async function coldSeed(): Promise<CatalogCache> {
+  if (BOT_FEEDS.length) return seedLocalCache();
+  const existing = seedHost[SEED_KEY];
+  if (existing) return existing;
+  const job = (async () => {
+    const listKey = unhideKey;
+    const key = await snapshotKey(listKey);
+    if (key) {
+      const text = await readSnapshot(key);
+      if (text && listKey === unhideKey) {
+        const cache = cacheFromSnapshot(text, listKey);
+        if (cache) return cache;
+      }
+    }
+    if (runtime.cache) return runtime.cache;
+    const built = seedLocalCache() as BuiltCache;
+    runtime.cache = built;
+    rememberBuild(built);
+    return built;
+  })();
+  seedHost[SEED_KEY] = job;
+  try {
+    return await job;
+  } finally {
+    seedHost[SEED_KEY] = undefined;
+  }
 }
 
 export function kickRemoteRefresh(base: { items: RawItem[]; posters: Record<string, string> }): void {
@@ -707,10 +787,13 @@ export async function loadItemsRaw(): Promise<CatalogCache> {
   // The cache is shared with the other bundled copy of this module (local-shared.ts runtime). If it was
   // built under a newer owner list than this copy has seen, re-read the lists (KV read only) before
   // deciding to rebuild, so the two copies never rebuild back and forth over a stale key.
-  if (cache.raw && cache.unhideKey !== unhideKey && !due) await syncUnhidden(true);
-  if (cache.raw && (cache.unhideKey !== unhideKey || due)) {
+  if (cache.unhideKey !== unhideKey && !due && cache.raw) await syncUnhidden(true);
+  if ((cache.unhideKey !== unhideKey || due) && cache.raw) {
     const next = buildIndexes(cache.raw, cache.posters, cache.videyNo, cache.at);
-    if (runtime.cache === cache) runtime.cache = next;
+    if (runtime.cache === cache) {
+      runtime.cache = next;
+      rememberBuild(next);
+    }
     return next;
   }
   return cache;
@@ -723,7 +806,10 @@ export async function loadItemsRaw(): Promise<CatalogCache> {
  * (BOT_FEEDS, empty now) are still merged in every CACHE_MS if any are ever added again.
  */
 async function loadItemsInner(): Promise<CatalogCache> {
-  if (!runtime.cache) runtime.cache = seedLocalCache();
+  if (!runtime.cache) {
+    const seeded = await coldSeed();
+    runtime.cache ??= seeded;
+  }
   if (!BOT_FEEDS.length) return runtime.cache;
   const now = Date.now();
   if (now - runtime.cache.at < CACHE_MS) return runtime.cache;
