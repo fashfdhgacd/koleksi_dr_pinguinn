@@ -55,6 +55,10 @@ import latestPutarinIndex from "../../../data/putarin-latest-index.json";
 import latestPosters from "../../../data/latest-posters.json";
 // Owner's Byse / DoodStream / LuluStream library (/kategori/bokep), one-off import 2026-10-19.
 import drpBokepBatch from "../../../data/drp-bokep.json";
+// Real titles/posters found for videos whose stored title is generic ("Koleksi Dr. Pinguin Bokep N",
+// titleAuto). Written by the /pemilik sweep (set-auto-meta) and the one-off Byse restore 2026-10-29.
+import autoMetaFile from "../../../data/auto-meta.json";
+import { isGenericTitle } from "./generic-title.js";
 // Frozen copy of the old repo's live feed (koleksi_dr_pinguin data/putarin.json, last change Oct 7 2026),
 // bundled so no request ever fetches it from raw.githubusercontent.com again (see BOT_FEEDS).
 import putarinFeedSnapshot from "./putarin-feed-20261007.json";
@@ -90,6 +94,47 @@ export function sortByNewest(items: RawItem[], sourceFirst = true): RawItem[] {
   return keyed.map((k) => k.it);
 }
 
+function hasPosterLink(it: RawItem): boolean {
+  return /^https:\/\//i.test(String(it.poster || "")) || /^https:\/\//i.test(String(it.thumbnail || ""));
+}
+
+/**
+ * Like uniqById (first copy of an id wins), but when the winning copy only has a generic title
+ * (bot fallback "Koleksi Dr. Pinguin Bokep N" / titleAuto) or no poster, a later copy of the same id
+ * fills them in. Example: Byse videos re-sent to the bot on 2026-10-29 shadowed the drp-bokep import
+ * that already had the real title and poster. A real title is never replaced; a hidden flag on any
+ * copy is kept (never publishes more). Videy is left as it is. One pass over a Map, no I/O.
+ */
+export function mergeById(items: RawItem[]): RawItem[] {
+  const at = new Map<string, number>();
+  const out: RawItem[] = [];
+  for (const it of items) {
+    if (!it?.id) continue;
+    const idx = at.get(it.id);
+    if (idx === undefined) {
+      at.set(it.id, out.length);
+      out.push(it);
+      continue;
+    }
+    const kept = out[idx];
+    if (isVidey(kept)) continue;
+    let next = kept;
+    if (isGenericTitle(kept.title, kept) && !isGenericTitle(it.title, it)) {
+      const { titleAuto: _auto, ...rest } = next as RawItem & { titleAuto?: unknown };
+      next = { ...rest, title: it.title } as RawItem;
+    }
+    if (!hasPosterLink(next) && hasPosterLink(it)) {
+      next = { ...next, ...(it.poster ? { poster: it.poster } : {}), ...(it.thumbnail ? { thumbnail: it.thumbnail } : {}) };
+    }
+    const dup = it as { hidden?: unknown; hidden_reason?: unknown };
+    if (dup.hidden === true && (next as { hidden?: unknown }).hidden !== true) {
+      next = { ...next, hidden: true, hidden_reason: dup.hidden_reason || "bot-flag" } as RawItem;
+    }
+    if (next !== kept) out[idx] = next;
+  }
+  return out;
+}
+
 export function uniqById(items: RawItem[]): RawItem[] {
   const seen = new Set<string>();
   const out: RawItem[] = [];
@@ -115,6 +160,13 @@ const STATS = videoStats as unknown as Record<string, [number, number, number]>;
 /** hidden: reason string (e.g. "source-gone") hides the item without deleting it; Unhide can restore it. */
 type ItemOverride = { title?: string; category?: string; poster?: string; hidden?: string };
 const OVERRIDES = itemOverrides as Record<string, ItemOverride>;
+/**
+ * data/auto-meta.json: id -> { title?, poster?, src?, hidden?, none? }. Applied only on top of a
+ * generic stored title / missing poster (never over a real one). `hidden` = the found title carries a
+ * minor/school theme: kept unpublished. `none` = the platform gave nothing (sweep skips it next time).
+ */
+type AutoMeta = { title?: string; poster?: string; src?: string; hidden?: string; none?: string };
+const AUTO_META = autoMetaFile as Record<string, AutoMeta>;
 /** Owner edits from /pemilik (KV owner:edit:v1, owner-edit-store.ts), applied on top of OVERRIDES. */
 type OwnerEditLite = { title?: string; category?: string; extra?: string[] };
 let EDITS: Record<string, OwnerEditLite> = {};
@@ -207,6 +259,7 @@ function adultReviewOnly(it: RawItem): boolean {
 
 /** Why an item is hidden by default ("" = not hidden). Ignores owner Unhide overrides. */
 export function hiddenReasonRaw(it: RawItem): string {
+  if (AUTO_META[it.id]?.hidden) return String(AUTO_META[it.id].hidden);
   if (hasCleanEdit(it.id)) {
     const rec = it as { hidden?: unknown; hidden_reason?: unknown };
     if (rec.hidden === true && !adultReviewOnly(it)) return String(rec.hidden_reason || "bot-flag");
@@ -214,6 +267,13 @@ export function hiddenReasonRaw(it: RawItem): string {
   }
   const listed = HIDDEN_REASONS[it.id];
   if (listed) return listed;
+  const auto = AUTO_META[it.id];
+  if (auto?.hidden) return String(auto.hidden);
+  if (auto?.title && !isVidey(it)) {
+    const t = String(auto.title);
+    const r = minorReasonMemo(t) || lockedReasonMemo(t);
+    if (r) return r;
+  }
   const rec = it as { hidden?: unknown; hidden_reason?: unknown };
   if (rec.hidden === true && !adultReviewOnly(it)) return String(rec.hidden_reason || "bot-flag");
   const ovHidden = OVERRIDES[it.id]?.hidden;
@@ -235,6 +295,7 @@ export function isLockedMinor(it: RawItem): boolean {
   if (isLockedMinorId(it.id)) return true;
   if (hasCleanEdit(it.id)) return false;
   if (EDITS[it.id]?.title && lockedReasonMemo(String(EDITS[it.id]?.title)) !== "") return true;
+  if (AUTO_META[it.id]?.title && lockedReasonMemo(String(AUTO_META[it.id].title)) !== "") return true;
   return lockedReasonMemo(String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "")) !== "";
 }
 
@@ -356,6 +417,14 @@ function withStats(it: RawItem): RawItem {
   }
   const restored = RESTORED[it.id];
   if (restored) out = { ...out, title: restored };
+  const auto = AUTO_META[it.id];
+  if (auto && !isVidey(it)) {
+    if (auto.title && isGenericTitle(out.title, out)) {
+      const { titleAuto: _auto, ...rest } = out as RawItem & { titleAuto?: unknown };
+      out = { ...rest, title: auto.title } as RawItem;
+    }
+    if (auto.poster && !out.poster && !out.thumbnail) out = { ...out, poster: auto.poster };
+  }
   const ov = OVERRIDES[it.id];
   if (ov) {
     out = {
@@ -589,7 +658,7 @@ export function assembleLocal(): { items: RawItem[]; posters: Record<string, str
     ...asPosterMap(latestPosters),
     ...asPosterMap(putarinFeedSnapshot),
   };
-  return { items: uniqById([...feed, ...latest, ...pl, ...st, ...st2, ...pu, ...local, ...fb, ...drp]), posters };
+  return { items: mergeById([...feed, ...latest, ...pl, ...st, ...st2, ...pu, ...local, ...fb, ...drp]), posters };
 }
 
 export async function refreshRemote(base: { items: RawItem[]; posters: Record<string, string> }): Promise<CatalogCache> {
@@ -601,7 +670,7 @@ export async function refreshRemote(base: { items: RawItem[]; posters: Record<st
     remote.push(...withIds(asList(data)).filter(isUsable));
     Object.assign(posters, asPosterMap(data));
   }
-  const items = uniqById([...remote, ...base.items]);
+  const items = mergeById([...remote, ...base.items]);
   const videyNo = buildVideyNo(items);
   return buildIndexes(items, posters, videyNo, Date.now());
 }
