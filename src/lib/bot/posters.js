@@ -327,3 +327,64 @@ export async function refreshMissingPosters(env, { limit = 25 } = {}) {
 }
 
 export { isHttpPoster, cleanId as cleanPosterId };
+
+const AUTO_META_FILE = "auto-meta.json";
+
+/**
+ * Fill data/auto-meta.json (id -> { title?, poster?, src?, hidden?, none?, at? }) from the /pemilik
+ * sweep: one commit per call. Fills only: an id that already has a title there is never changed,
+ * and a "none" (source gave no title) mark never replaces a title. `hidden` is only accepted with a
+ * title (the caller sets it when the found title trips the minor/school checks).
+ * @param {Record<string, { title?: string, none?: string, at?: string, hidden?: string }>} entries
+ * @returns {Promise<{ ok: boolean, added: number, marked: number, kept: number, total: number, error?: string }>}
+ */
+export async function mergeAutoMeta(/** @type {Record<string, any>} */ env, /** @type {Record<string, any>} */ entries) {
+  const incoming = entries && typeof entries === "object" && !Array.isArray(entries) ? entries : {};
+  const result = { ok: true, added: 0, marked: 0, kept: 0, total: 0 };
+  if (!Object.keys(incoming).length) return result;
+  const { token } = cfg(env);
+  const meta = await getMeta(env, AUTO_META_FILE);
+  if (!meta.ok) return { ...result, ok: false, error: meta.error || meta.reason || `GET ${meta.status}` };
+  /** @type {Record<string, any>} */
+  let current = {};
+  if (meta.status !== 404) {
+    try {
+      const parsed = JSON.parse((await readRaw(token, meta.body)) || "{}");
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) current = parsed;
+    } catch {
+      return { ...result, ok: false, error: "auto_meta_unreadable" };
+    }
+  }
+  /** @type {Record<string, any>} */
+  const next = { ...current };
+  for (const [rawId, e] of Object.entries(incoming)) {
+    const id = cleanId(rawId);
+    if (!id || !e || typeof e !== "object") continue;
+    const cur = next[id] && typeof next[id] === "object" ? next[id] : {};
+    if (cur.title) {
+      result.kept += 1;
+      continue;
+    }
+    const title = String(e.title || "").trim().slice(0, 200);
+    if (title) {
+      const { none: _n, at: _a, ...rest } = cur;
+      next[id] = { ...rest, title, src: rest.src || "sweep", ...(e.hidden ? { hidden: String(e.hidden).slice(0, 60) } : {}) };
+      result.added += 1;
+    } else if (e.none) {
+      const at = /^\d{4}-\d{2}-\d{2}$/.test(String(e.at || "")) ? String(e.at) : new Date().toISOString().slice(0, 10);
+      next[id] = { ...cur, none: String(e.none).slice(0, 40), at };
+      result.marked += 1;
+    }
+  }
+  /** @type {Record<string, any>} */
+  const sorted = {};
+  for (const k of Object.keys(next).sort()) sorted[k] = next[k];
+  result.total = Object.keys(sorted).length;
+  if (!result.added && !result.marked) return result;
+  try {
+    await putObject(env, AUTO_META_FILE, sorted, meta.body?.sha || null);
+    return result;
+  } catch (err) {
+    return { ...result, ok: false, added: 0, marked: 0, error: err instanceof Error ? err.message : String(err) };
+  }
+}
