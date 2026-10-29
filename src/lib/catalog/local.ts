@@ -18,7 +18,8 @@ import { runtime } from "./local-shared";
 import { popularIds, tagOptions, titleTags } from "./title-tags";
 import { parseSearchQuery, scoreSearch, searchHayText } from "./search-rank";
 import { parseSeries, seriesIndex } from "./series";
-import { isPublicHidden, isVideyNoThumbHidden, loadItems, pageOf, sortByNewest } from "./local-cache";
+import { isPublicHidden, isVideyNoThumbHidden, loadItems, multiServerOf, pageOf, sortByNewest } from "./local-cache";
+import { serverHostOf } from "./multi-server";
 import { aiPlusFrontOrder } from "./ai-plus-order";
 import type { CatalogCache } from "./local-shared";
 
@@ -254,11 +255,42 @@ export async function listSearch(
   return pageOf(matched, Math.min(Math.max(1, page), lastPage), limit, posters, videyNo);
 }
 
-export async function getDetail(id: string, _signal?: AbortSignal): Promise<VideoDetail> {
+/** Embed URL the player gets for one catalog item (Videy plays the cdn mp4 in VideyPlayer). */
+function embedOf(item: RawItem): string {
+  return isVidey(item) ? String(item.direct || item.embed || "") : String(item.embed || item.direct || "");
+}
+
+/**
+ * Server buttons of a main page (multi-server.ts), hidden copies skipped. Merged-away copies live in
+ * multi.away (out of byId and every list); they only play here. Undefined when fewer than 2 remain.
+ */
+async function serversOf(cache: CatalogCache, item: RawItem): Promise<VideoDetail["servers"]> {
+  const multi = multiServerOf(cache);
+  const ids = multi.servers.get(item.id);
+  if (!ids || ids.length < 2) return undefined;
+  const out: NonNullable<VideoDetail["servers"]> = [];
+  for (const sid of ids) {
+    const it = sid === item.id ? item : (multi.away.get(sid) as RawItem | undefined);
+    if (!it) continue;
+    if (sid !== item.id && (await isPublicHidden(sid))) continue;
+    const url = embedOf(it);
+    if (!url) continue;
+    out.push({ id: sid, host: serverHostOf(it), url });
+  }
+  return out.length >= 2 ? out : undefined;
+}
+
+/**
+ * Detail of one video. A copy merged into another page (multi-server.ts) answers with the main
+ * page's detail, so the caller sees `item.id !== id` (watch route: redirect to the main page).
+ */
+export async function getDetail(requestedId: string, _signal?: AbortSignal): Promise<VideoDetail> {
   let bag = await loadItems();
+  let id = multiServerOf(bag).mainOf.get(requestedId) || requestedId;
   let item = bag.byId.get(id);
   if (!item && runtime.inflight) {
     bag = await runtime.inflight;
+    id = multiServerOf(bag).mainOf.get(requestedId) || requestedId;
     item = bag.byId.get(id);
   }
   if (item && (await isPublicHidden(id))) item = undefined;
@@ -267,7 +299,8 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
   }
   const card = toCard(item, bag.posters, bag.videyNo);
   // Videy plays the cdn mp4 in our own player (VideyPlayer); others keep their embed.
-  const embed = isVidey(item) ? String(item.direct || item.embed || "") : String(item.embed || item.direct || "");
+  const embed = embedOf(item);
+  const servers = await serversOf(bag, item);
   return {
     ...card,
     video_url: embed || null,
@@ -278,6 +311,7 @@ export async function getDetail(id: string, _signal?: AbortSignal): Promise<Vide
     sameCategory: await sameCategoryLinks(bag, item),
     ...(await seriesEpisodes(bag, item)),
     ...((await isVideyNoThumbHidden(item.id)) ? { noindex: true } : {}),
+    ...(servers ? { servers } : {}),
   };
 }
 

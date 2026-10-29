@@ -64,6 +64,7 @@ import { isGenericTitle } from "./generic-title.js";
 import putarinFeedSnapshot from "./putarin-feed-20261007.json";
 import { restoreBuild, serializeBuild } from "./build-snapshot";
 import { keepAlive, readSnapshot, snapshotKey, writeSnapshot } from "./build-snapshot-store";
+import { emptyMultiServer, mergeServers, multiServerFrom, type MultiServer } from "./multi-server";
 
 // Re-bind mutable cache/inflight via shared module namespace
 import { runtime } from "./local-shared";
@@ -230,6 +231,8 @@ type BuiltCache = CatalogCache & {
   videyNoThumbIds?: Set<string>;
   /** Next time a frameless Videy item crosses the limit (0 = none pending); loadItemsRaw rebuilds then. */
   videyNoThumbNextAt?: number;
+  /** Multi-server groups (multi-server.ts): merged-away copies are out of byId and every list. */
+  multi?: MultiServer;
 };
 
 let lastHiddenIds = new Set<string>();
@@ -580,6 +583,13 @@ export function buildIndexes(
     else if (!videyNoThumbNextAt || hideAt < videyNoThumbNextAt) videyNoThumbNextAt = hideAt;
   }
   if (videyNoThumbIds.size) items = items.filter((it) => !videyNoThumbIds.has(it.id));
+  // Multi-server: copies of one video on other hosts fold into its main page (multi-server.ts).
+  // Built from the published items only, so a hidden copy is never a server. Nothing is deleted.
+  const multi = multiServerFrom(items, mergeServers(items).groups);
+  if (multi.mainOf.size) {
+    items = items.filter((it) => !multi.mainOf.has(it.id));
+    for (const id of multi.mainOf.keys()) byId.delete(id);
+  }
   const popular = popularIds(items);
   for (const it of items) {
     // Multi-category (title-tags.ts): the video joins its primary category and every tag category.
@@ -628,7 +638,25 @@ export function buildIndexes(
     unhideKey,
     videyNoThumbIds,
     videyNoThumbNextAt,
+    multi,
   };
+}
+
+/** Multi-server lookup of a built catalog (empty for a cache built without it). */
+export function multiServerOf(cache: CatalogCache): MultiServer {
+  return (cache as BuiltCache).multi || EMPTY_MULTI;
+}
+const EMPTY_MULTI = emptyMultiServer();
+
+/**
+ * Main page id for a copy that was merged into another page (multi-server.ts), else null. Used by
+ * server/middleware/watch-placeholder.ts for the 301 of old /watch/<id> URLs.
+ */
+export async function mergedMainOf(id: string): Promise<string | null> {
+  const key = String(id || "").trim();
+  if (!key) return null;
+  const cache = await loadItemsRaw();
+  return multiServerOf(cache).mainOf.get(key) || null;
 }
 
 export function pageOf(pool: RawItem[], page: number, limit: number, posters: Record<string, string>, videyNo: Map<string, number>): PagedVideos {
