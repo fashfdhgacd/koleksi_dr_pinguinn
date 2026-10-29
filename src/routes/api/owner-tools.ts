@@ -5,6 +5,7 @@ import { processUploadBatch } from "@/lib/bot/upload-handler.js";
 import {
   cleanPosterId,
   isHttpPoster,
+  mergeAutoMeta,
   mergeLatestPosters,
   refreshMissingPosters,
 } from "@/lib/bot/posters.js";
@@ -24,7 +25,8 @@ import rankMeta from "@/lib/catalog/rank-periods-meta.json";
 import latestPosters from "../../../data/latest-posters.json";
 import thumbsDeploy from "../../../data/.thumbs-deploy.json";
 import { findCategory } from "@/lib/catalog/categories";
-import { isLockedMinorId, lockedMinorReason, ownerEditBlockReason } from "@/lib/catalog/minor-lock.js";
+import { isLockedMinorId, lockedMinorReason, ownerEditBlockReason, schoolReason } from "@/lib/catalog/minor-lock.js";
+import { NO_SOURCE, isRealTitle } from "@/lib/catalog/generic-title.js";
 import { reviewPriority as detectorPriority, minorContentReason as ownerDetectorReason } from "@/lib/catalog/minor-detector.js";
 import { explainTitle } from "@/lib/catalog/minor-context.js";
 import itemOverrides from "@/lib/catalog/overrides.json";
@@ -549,6 +551,44 @@ async function handleThumbMissing(body: { limit?: unknown; offset?: unknown } = 
  * "Isi poster": one small batch of the public catalog per owner click (see lib/poster-fill.ts).
  * The panel walks offset 0..total itself, one request after another, only while the owner's run is on.
  */
+/**
+ * Titles found by the "Isi poster" sweep (or "sumber-nggak-ngasih" marks) into data/auto-meta.json:
+ * one commit per call, at most 50. Fills only (posters.js mergeAutoMeta never replaces a title).
+ * A found title that trips the minor/school checks is stored with `hidden`, so it never goes live.
+ */
+async function handleSetAutoMeta(body: { meta?: unknown }) {
+  const input = body.meta && typeof body.meta === "object" && !Array.isArray(body.meta) ? (body.meta as Record<string, unknown>) : null;
+  if (!input) return json({ ok: false, error: "no_meta" }, 400);
+  const entries: Record<string, { title?: string; none?: string; at?: string; hidden?: string }> = {};
+  const rejected: string[] = [];
+  let hiddenCount = 0;
+  for (const [rawId, raw] of Object.entries(input).slice(0, 50)) {
+    const id = cleanPosterId(rawId);
+    const e = raw && typeof raw === "object" ? (raw as { title?: unknown; none?: unknown; at?: unknown }) : null;
+    const title = String(e?.title || "").trim().slice(0, 200);
+    if (id && title && isRealTitle(title)) {
+      const hidden = ownerDetectorReason(title) || lockedMinorReason(title) || schoolReason(title) || "";
+      if (hidden) hiddenCount += 1;
+      entries[id] = { title, ...(hidden ? { hidden: String(hidden) } : {}) };
+    } else if (id && !title && e?.none === NO_SOURCE) {
+      entries[id] = { none: NO_SOURCE, at: String(e.at || "") };
+    } else rejected.push(String(rawId).slice(0, 64));
+  }
+  if (!Object.keys(entries).length) return json({ ok: false, error: "bad_meta", rejected }, 400);
+  const merged = await mergeAutoMeta(process.env, entries);
+  if (!merged.ok) return json({ ok: false, error: merged.error || "merge_failed", rejected }, 502);
+  return json({
+    ok: true,
+    added: merged.added,
+    marked: merged.marked,
+    kept: merged.kept,
+    hidden: hiddenCount,
+    total: merged.total,
+    rejected,
+    text: `${merged.added} judul diisi, ${merged.marked} ditandai sumber nggak ngasih. Tampil setelah deploy berikutnya (±2-3 menit).`,
+  });
+}
+
 async function handlePosterFill(body: { offset?: unknown; limit?: unknown }) {
   const { cache } = await catalogBase();
   const result = await runPosterFill(cache.items, cache.posters || {}, body);
@@ -806,6 +846,7 @@ type OwnerBody = {
   offset?: number;
   noThumb?: boolean;
   posters?: Record<string, string>;
+  meta?: Record<string, { title?: string; none?: string; at?: string }>;
 };
 
 /** Telegram webhook status for the owner: registered url, pending updates, last error, last OK. */
@@ -930,6 +971,7 @@ export const Route = createFileRoute("/api/owner-tools")({
         }
         if (body.action === "set-poster") return handleSetPoster(body);
         if (body.action === "set-posters") return handleSetPosters(body);
+        if (body.action === "set-auto-meta") return handleSetAutoMeta(body);
         if (body.action === "refresh-posters") return handleRefreshPosters(body);
         return json({ ok: false, error: "bad_action" }, 400);
       },
