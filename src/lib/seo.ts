@@ -68,6 +68,8 @@ export function cleanDisplayTitle(raw?: string | null): string {
     t = t.replace(/\s*[\-|–—,]\s*M\.?S\.?B\.?\s*$/gi, "");
   }
   t = t.replace(/[\s\-–—|:·,]+$/g, "").trim();
+  // "TerakotaEpisode 2" -> "Terakota Episode 2" (display only, the stored title is unchanged).
+  t = t.replace(/(\p{Ll})(Episode|Eps|Ep|Part|Bagian)(?=\.?\s*#?\s*\d)/gu, "$1 $2");
   return t || String(raw || "").replace(/_+/g, " ").replace(/\s+/g, " ").trim() || "Video";
 }
 
