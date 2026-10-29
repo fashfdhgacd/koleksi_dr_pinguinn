@@ -19,6 +19,7 @@ import { popularIds, tagOptions, titleTags } from "./title-tags";
 import { parseSearchQuery, scoreSearch, searchHayText } from "./search-rank";
 import { parseSeries, seriesIndex } from "./series";
 import { isPublicHidden, isVideyNoThumbHidden, loadItems, pageOf, sortByNewest } from "./local-cache";
+import { aiPlusFrontOrder } from "./ai-plus-order";
 import type { CatalogCache } from "./local-shared";
 
 export { loadItems } from "./local-cache";
@@ -192,14 +193,15 @@ function categoryPool(cache: CatalogCache, category: string): RawItem[] {
   const { items, bySlug, mainSorted, listOrder } = cache;
   const s = category.toLowerCase().trim();
   const mixed = listOrder?.get(s === "streamtape" ? "ai-plus" : s);
-  if (mixed && mixed.length) return mixed;
+  if (mixed && mixed.length) return s === "ai-plus" || s === "streamtape" ? aiPlusFrontOrder(mixed) : mixed;
   if (s === "jav") {
     const hit = bySlug.get("jav");
     return hit && hit.length ? hit : items.filter(isPutarin);
   }
   if (s === "ai-plus" || s === "streamtape") {
     const hit = bySlug.get("ai-plus");
-    return hit && hit.length ? hit : items.filter(isStreamtape);
+    // Indonesian/other AI titles ahead of Chinese dramas on the first pages (ordering only).
+    return aiPlusFrontOrder(hit && hit.length ? hit : items.filter(isStreamtape));
   }
   if (s === "videy") return bySlug.get("videy") || items.filter(isVidey);
   return bySlug.get(s) || mainSorted.filter((x) => slugOf(x) === s);
