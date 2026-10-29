@@ -1,5 +1,5 @@
 import { curatedDescription } from "@/lib/catalog/video-descriptions";
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { queryCatalog } from "@/lib/catalog/service";
 import { jsonLdString } from "@/lib/json-ld";
@@ -42,7 +42,15 @@ function watchBreadcrumb(category: string | null | undefined, title: string, url
   };
 }
 
+export type WatchSearch = {
+  /** Multi-server: id of the server (host copy) to play; absent = the page's default server. */
+  s?: string;
+};
+
 export const Route = createFileRoute("/watch/$id")({
+  validateSearch: (search: Record<string, unknown>): WatchSearch => ({
+    s: typeof search.s === "string" && /^[A-Za-z0-9_-]{3,64}$/.test(search.s) ? search.s : undefined,
+  }),
   loader: async ({ params }) => {
     const id = (params.id || "").trim();
     if (!id) return { ok: false as const, error: "ID kosong", code: "bad_request" as const };
@@ -51,6 +59,18 @@ export const Route = createFileRoute("/watch/$id")({
     // (+ noindex, lihat head di bawah dan server/middleware/cache-headers.ts). Error lain (sumber
     // sedang gangguan) tetap tampil sebagai halaman error biasa, bukan 404.
     if (!res.ok && res.code === "not_found") throw notFound();
+    // Multi-server: this id was merged into another page → its main page, playing this copy
+    // (?s=), so the player's "coba server lain" link to a merged copy plays that copy. Full page
+    // loads get a clean 301 earlier (server/middleware/watch-placeholder.ts).
+    if (res.ok && res.type === "detail" && res.item.id !== id) {
+      throw redirect({
+        to: "/watch/$id",
+        params: { id: res.item.id },
+        search: { s: id },
+        statusCode: 301,
+        replace: true,
+      });
+    }
     return res;
   },
   head: ({ loaderData }) => {

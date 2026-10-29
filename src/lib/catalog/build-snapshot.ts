@@ -12,14 +12,16 @@
  * a real build. Nothing is recomputed from titles, so the result does not depend on the detectors.
  */
 import type { CatalogCache, RawItem } from "./local-shared";
+import { emptyMultiServer, type MultiServer } from "./multi-server";
 
-/** Bump when the format or the fields below change. */
-export const SNAPSHOT_SCHEMA = 1;
+/** Bump when the format or the fields below change. 2: multi-server groups (ms, away). */
+export const SNAPSHOT_SCHEMA = 2;
 
 export type SnapshotSource = CatalogCache & {
   hiddenIds?: Set<string>;
   videyNoThumbIds?: Set<string>;
   videyNoThumbNextAt?: number;
+  multi?: MultiServer;
 };
 
 export type RestoredParts = {
@@ -35,6 +37,7 @@ export type RestoredParts = {
   hiddenIds: Set<string>;
   videyNoThumbIds: Set<string>;
   videyNoThumbNextAt: number;
+  multi: MultiServer;
 };
 
 type Wire = {
@@ -52,6 +55,10 @@ type Wire = {
   terbaru: number[];
   slugs: [string, number[]][];
   order: [string, number[]][];
+  /** Multi-server: [main id, server ids in order]. */
+  ms: [string, string[]][];
+  /** Multi-server: indexes into objs of merged-away copies (kept out of byId on restore). */
+  away: number[];
 };
 
 /** True when JSON keeps this value exactly (undefined is handled separately, one level deep). */
@@ -86,6 +93,19 @@ export function serializeBuild(c: SnapshotSource): string | null {
     at.set(it, i);
     objs.push(it);
     for (const [k, v] of Object.entries(it)) {
+      if (v === undefined) u.push([i, k]);
+      else if (!jsonSafe(v)) return null;
+    }
+  }
+  const away: number[] = [];
+  for (const [id, it] of c.multi?.away || []) {
+    const item = it as RawItem;
+    if (item.id !== id || at.has(item) || c.byId.has(id)) return null;
+    const i = objs.length;
+    at.set(item, i);
+    objs.push(item);
+    away.push(i);
+    for (const [k, v] of Object.entries(item)) {
       if (v === undefined) u.push([i, k]);
       else if (!jsonSafe(v)) return null;
     }
@@ -133,6 +153,8 @@ export function serializeBuild(c: SnapshotSource): string | null {
     terbaru,
     slugs,
     order,
+    ms: [...(c.multi?.servers || [])].map(([main, ids]) => [main, ids.slice()]),
+    away,
   };
   return JSON.stringify(wire);
 }
@@ -167,11 +189,27 @@ export function restoreBuild(text: string): RestoredParts | null {
     }
     return out;
   };
+  if (!Array.isArray(w.ms) || !Array.isArray(w.away)) return null;
+  const awayIx = new Set(w.away);
   const byId = new Map<string, RawItem>();
-  for (const it of objs) {
+  const multi = emptyMultiServer();
+  for (let i = 0; i < n; i++) {
+    const it = objs[i];
     if (!it || typeof it.id !== "string") return null;
-    byId.set(it.id, it);
+    if (awayIx.has(i)) multi.away.set(it.id, it);
+    else byId.set(it.id, it);
   }
+  if (multi.away.size !== awayIx.size) return null;
+  for (const [main, ids] of w.ms) {
+    if (typeof main !== "string" || !Array.isArray(ids) || !byId.has(main)) return null;
+    multi.servers.set(main, ids.slice());
+    for (const id of ids) {
+      if (id === main) continue;
+      if (!multi.away.has(id)) return null;
+      multi.mainOf.set(id, main);
+    }
+  }
+  if (multi.mainOf.size !== multi.away.size) return null;
   const items = pick(w.items);
   const mainSorted = pick(w.main);
   const terbaruSorted = pick(w.terbaru);
@@ -194,5 +232,6 @@ export function restoreBuild(text: string): RestoredParts | null {
     hiddenIds: new Set(w.hidden),
     videyNoThumbIds: new Set(w.vnt),
     videyNoThumbNextAt: w.vntNext || 0,
+    multi,
   };
 }
