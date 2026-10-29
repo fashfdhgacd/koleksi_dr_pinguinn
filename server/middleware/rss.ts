@@ -33,7 +33,13 @@ async function buildRss(): Promise<string> {
   const items = entries.map((e) => {
     const link = `${SITE_ORIGIN}/watch/${encodeURIComponent(e.id)}`;
     const title = cleanDisplayTitle(e.title || "") || "Video";
-    const desc = videoSeoDescription(title, e.category || null);
+    const desc = videoSeoDescription({
+      id: e.id,
+      title,
+      category: e.category || null,
+      duration: e.duration ?? null,
+      year: e.lastmod ? e.lastmod.slice(0, 4) : null,
+    });
     const thumb = seoVideoThumbnail(e.id, e.thumbnail);
     const date = rfc822(e.lastmod);
     return [

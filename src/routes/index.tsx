@@ -237,9 +237,16 @@ function HomePage() {
             <p className="mt-1 text-sm text-zinc-500">{subtitle}</p>
             <p className="mt-1 max-w-2xl text-sm text-zinc-600">{intro}</p>
             {q ? null : (
-              <p className="mt-2 text-sm">
+              // Plain crawlable links to the categories that bring search traffic (SEO internal linking).
+              <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
                 <a href="/kategori/videy" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
                   Video viral Videy terbaru →
+                </a>
+                <a href="/kategori/ai-plus" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
+                  Bokep AI+ terbaru →
+                </a>
+                <a href="/kategori/malaysia" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
+                  Bokep Malaysia viral →
                 </a>
               </p>
             )}
