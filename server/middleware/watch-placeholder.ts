@@ -4,8 +4,10 @@
  * (video tidak dihapus, cuma disembunyikan; 410 bikin Google cepat buang URL-nya).
  * Template /kategori/$slug yang bocor dari manifest router → 410.
  * Trailing slash (mis. /kategori/) → satu kali 301 ke versi tanpa slash.
+ * Multi-server: id salinan yang digabung ke halaman utama (multi-server.ts) → 301 ke /watch/<utama>
+ * (video tidak dihapus; salinannya jadi tombol server di halaman utama).
  */
-import { isPublicHidden } from "../../src/lib/catalog/local-cache";
+import { isPublicHidden, mergedMainOf } from "../../src/lib/catalog/local-cache";
 
 interface WatchPlaceholderEvent {
   url: URL;
@@ -62,6 +64,16 @@ export default async function watchPlaceholderMiddleware(
   if (m) {
     try {
       if (await isPublicHidden(m[1])) return notFound(410);
+      const main = event.req.method === "GET" || event.req.method === "HEAD" ? await mergedMainOf(m[1]) : null;
+      if (main && main !== m[1]) {
+        return new Response(null, {
+          status: 301,
+          headers: {
+            location: `https://koleksidrpinguin.com/watch/${encodeURIComponent(main)}`,
+            "cache-control": "public, max-age=3600",
+          },
+        });
+      }
     } catch {
       /* catalog unavailable: let the page decide */
     }

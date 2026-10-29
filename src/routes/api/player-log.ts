@@ -1,7 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getD1, type D1DatabaseLike } from "@/lib/analytics-d1";
 import { getDetail } from "@/lib/catalog/local";
-import { applyUnhidden, loadItemsRaw, publicIdBeforeBuild } from "@/lib/catalog/local-cache";
+import { applyUnhidden, loadItemsRaw, multiServerOf, publicIdBeforeBuild } from "@/lib/catalog/local-cache";
+import type { CatalogCache } from "@/lib/catalog/local-shared";
+import { HOST_RANK, serverHostOf } from "@/lib/catalog/multi-server";
+import { DRP_SOURCES, drpKindOfItem } from "@/lib/catalog/drp-hosts.js";
 import { sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
 import { readUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState, setOwnerHidden } from "@/lib/catalog/owner-hide-store";
@@ -37,7 +40,8 @@ import deadSources from "@/lib/catalog/dead-sources.json";
  *  when the owner opens the panel; the visitor beacon (and player.tsx) is unchanged.
  *
  * GET ?alt=<id> (public): another public catalog video with the same title or JAV code from a
- *  different host, for the player's "Coba server lain" button. Read-only, cacheable.
+ *  different host, for the player's "Coba server lain" button. Read-only, cacheable. A video with
+ *  several servers (multi-server.ts) answers with the next live server of its own group first.
  *
  * POST with header x-online-key (owner): {action:"owner-hide", id, hide:boolean}. Reversible hide
  *  through KV owner:hide:v1 (owner-hide-store.ts). Nothing is ever deleted.
@@ -491,15 +495,53 @@ function hostOf(it: RawItem): string {
   if (/userbokep/.test(u)) return "UserBokep";
   if (/streamtape|strcloud|streamta\.pe|tapecontent/.test(u)) return "Streamtape";
   if (/putarin|puterin/.test(u)) return "Putarin";
+  // Owner's own uploads (drp-hosts.js): LuluStream / DoodStream / Byse.
+  const drp = drpKindOfItem(it) as keyof typeof DRP_SOURCES | "";
+  if (drp && DRP_SOURCES[drp]) return DRP_SOURCES[drp];
   return "";
 }
 
-/** Preferred alternative: a different player stack first (Putarin, then Streamtape or IndoAV). */
+/**
+ * Preferred alternative: a different player stack first (Putarin, then the server order of
+ * multi-server.ts: IndoAV, LuluStream, DoodStream, Streamtape, UserBokep, ..., Byse last).
+ */
 function altRank(from: string, to: string): number {
   const family = (h: string) => (h === "IndoAV" || h === "UserBokep" ? "tv1" : h);
   if (family(from) === family(to)) return to === from ? 99 : 5;
   if (to === "Putarin") return 0;
-  return 1;
+  return 1 + (HOST_RANK[to] ?? 7) / 10;
+}
+
+/**
+ * Multi-server group of `id` (main page or merged copy): the next live server, a different host
+ * family first, then group order. Undefined when `id` is in no group.
+ */
+async function groupAlt(
+  cache: CatalogCache,
+  id: string,
+  gone: Record<string, unknown>,
+): Promise<{ id: string; host: string; title: string } | null | undefined> {
+  const multi = multiServerOf(cache);
+  const main = multi.mainOf.get(id) || (multi.servers.has(id) ? id : "");
+  const ids = main ? multi.servers.get(main) : undefined;
+  if (!ids) return undefined;
+  const itemOf = (sid: string) => (sid === main ? cache.byId.get(sid) : multi.away.get(sid)) as RawItem | undefined;
+  const self = itemOf(id);
+  const from = self ? serverHostOf(self) : "";
+  const family = (h: string) => (h === "IndoAV" || h === "UserBokep" ? "tv1" : h);
+  const order = ids
+    .map((sid, i) => ({ sid, i, it: itemOf(sid) }))
+    .filter((c): c is { sid: string; i: number; it: RawItem } => c.sid !== id && Boolean(c.it) && !gone[c.sid])
+    .sort((a, b) => {
+      const fa = family(serverHostOf(a.it)) === family(from) ? 1 : 0;
+      const fb = family(serverHostOf(b.it)) === family(from) ? 1 : 0;
+      return fa - fb || a.i - b.i;
+    });
+  for (const c of order) {
+    if (!(await isPublicId(c.sid))) continue;
+    return { id: c.sid, host: serverHostOf(c.it), title: String(c.it.title || "").slice(0, 140) };
+  }
+  return null;
 }
 
 type AltIndex = { at: number; byKey: Map<string, RawItem[]> };
@@ -538,8 +580,16 @@ async function handleAlt(id: string): Promise<Response> {
   const memo = altMemo.get(id);
   if (memo && now - memo.at < 30 * 60_000) return pub(200, { ok: true, alt: memo.alt });
   const index = await altIndexNow();
-  const cache = (await loadItemsRaw()) as { byId?: Map<string, RawItem>; items: RawItem[] };
-  const self = cache.byId?.get(id) || cache.items.find((it) => it.id === id);
+  const cache = await loadItemsRaw();
+  const gone0 = (deadSources as DeadFile).gone || {};
+  const inGroup = await groupAlt(cache, id, gone0);
+  if (inGroup) {
+    if (altMemo.size > 5000) altMemo.clear();
+    altMemo.set(id, { at: now, alt: inGroup });
+    return pub(200, { ok: true, alt: inGroup });
+  }
+  const self =
+    cache.byId.get(id) || (multiServerOf(cache).away.get(id) as RawItem | undefined) || cache.items.find((it) => it.id === id);
   if (!self) return pub(404, { ok: false, error: "not_found" });
   const from = hostOf(self);
   const keys: string[] = [];

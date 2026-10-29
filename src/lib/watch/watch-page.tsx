@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getRouteApi } from "@tanstack/react-router";
+import { Link, getRouteApi } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
@@ -20,6 +20,7 @@ import { CatalogBackLink } from "@/components/video/catalog-back-link";
 import { WatchStats } from "@/components/video/watch-stats";
 import { PushButton } from "@/components/video/push-button";
 import { DRP_CATEGORY, DRP_SOURCES, drpKindOfUrl } from "@/lib/catalog/drp-hosts.js";
+import deadSources from "@/lib/catalog/dead-sources.json";
 
 const routeApi = getRouteApi("/watch/$id");
 const SHARE_CARD_VERSION = "13";
@@ -56,6 +57,80 @@ function isDrpHostItem(item: VideoDetail): boolean {
   if (/^(?:by|lu|dd)-/i.test(String(item.id || ""))) return true;
   if (DRP_LABELS.has(String(item.creator || ""))) return true;
   return [item.video_url, ...item.qualities.map((q) => q.url)].some((u) => Boolean(u && drpKindOfUrl(u)));
+}
+
+type Server = NonNullable<VideoDetail["servers"]>[number];
+
+const GONE_IDS = new Set(Object.keys((deadSources as { gone?: Record<string, unknown> }).gone || {}));
+
+/**
+ * Multi-server: the server to play. `?s=` when it is one of this page's servers, else the main
+ * copy unless its source is gone (dead-sources.json), else the first live server in order.
+ */
+function pickServer(item: VideoDetail, wanted: string | undefined): Server | null {
+  const list = item.servers;
+  if (!list || list.length < 2) return null;
+  const asked = wanted ? list.find((sv) => sv.id === wanted) : undefined;
+  if (asked) return asked;
+  const main = list.find((sv) => sv.id === item.id);
+  if (main && !GONE_IDS.has(main.id)) return main;
+  return list.find((sv) => !GONE_IDS.has(sv.id)) || main || list[0];
+}
+
+/**
+ * The item handed to the player for one server: same page data, that copy's id and embed. The
+ * player keys logging, the dead-source notice and "coba server lain" on this id; the iframe URL is
+ * exactly the one that copy plays on its own.
+ */
+function itemForServer(item: VideoDetail, server: Server | null): VideoDetail {
+  if (!server || server.id === item.id) return item;
+  return {
+    ...item,
+    id: server.id,
+    video_url: server.url,
+    qualities: [{ label: item.quality, url: server.url, format: "embed" }],
+    playable: true,
+  };
+}
+
+/** Server buttons under the player (outside it). Plain links: ?s=<copy id>, the main copy without. */
+function ServerButtons({ item, current }: { item: VideoDetail; current: string }) {
+  const list = item.servers || [];
+  if (list.length < 2) return null;
+  const seen = new Map<string, number>();
+  return (
+    <nav aria-label="Pilih server" className="mt-3 flex flex-wrap items-center gap-2">
+      <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Server</span>
+      {list.map((sv) => {
+        const n = (seen.get(sv.host) || 0) + 1;
+        seen.set(sv.host, n);
+        const label = n > 1 ? `${sv.host} ${n}` : sv.host;
+        const active = sv.id === current;
+        const gone = GONE_IDS.has(sv.id);
+        return (
+          <Link
+            key={sv.id}
+            to="/watch/$id"
+            params={{ id: item.id }}
+            search={sv.id === item.id ? {} : { s: sv.id }}
+            replace
+            resetScroll={false}
+            aria-current={active ? "true" : undefined}
+            title={gone ? `${label} (sumber sudah tidak tersedia)` : label}
+            className={
+              "inline-flex h-9 items-center rounded-full border px-4 text-sm font-medium " +
+              (active
+                ? "border-[#2dd4bf] bg-[#2dd4bf] text-[#09090b]"
+                : "border-white/20 bg-white/5 text-white/90 hover:border-[#2dd4bf] hover:text-[#2dd4bf]") +
+              (gone ? " line-through opacity-60" : "")
+            }
+          >
+            {label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
 }
 
 function catalogPlayUrl(item: VideoDetail): string {
@@ -209,6 +284,7 @@ function VideoFacts({ item }: { item: VideoDetail }) {
 
 export function WatchPage() {
   const { id } = routeApi.useParams();
+  const { s: wantedServer } = routeApi.useSearch();
   const loaderData = routeApi.useLoaderData();
   const [item, setItem] = useState<VideoDetail | null>(() =>
     loaderData && loaderData.ok && loaderData.type === "detail" ? loaderData.item : null,
@@ -331,17 +407,20 @@ export function WatchPage() {
         <EmptyState title="Video tidak ditemukan" description="Judul ini tidak ada di katalog atau sudah dihapus." />
       ) : (
         <article className="space-y-8">
-          {item ? (
+          {item ? (() => {
+            const server = pickServer(item, wantedServer);
+            const playItem = itemForServer(item, server);
+            return (
             <>
           <div className="-mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0">
             {isVideyItem(item) ? (
               <AdblockGate key={`gate-${item.id}`} videoId={item.id}>
                 <VideyPlayer key={item.id} item={item} />
               </AdblockGate>
-            ) : hostLabel(catalogPlayUrl(item)) === "IndoAV" ? (
+            ) : hostLabel(catalogPlayUrl(playItem)) === "IndoAV" ? (
               // IndoAV: never gated (host ads + IndoAV view bonus).
               <div className="relative">
-                <VideoPlayer key={item.id} item={item} />
+                <VideoPlayer key={playItem.id} item={playItem} />
                 <PopTapLayer key={`pop-${item.id}`} videoId={item.id} host="IndoAV" />
               </div>
             ) : (
@@ -350,11 +429,12 @@ export function WatchPage() {
                 {/* Player poster = the card's cached poster (R2 / /thumb), so a down image host
                     (img.lulucdn.com) no longer turns it into the penguin. Iframe URLs unchanged. */}
                 <PosterIdContext.Provider value={item.id}>
-                  <VideoPlayer key={item.id} item={item} />
+                  <VideoPlayer key={playItem.id} item={playItem} />
                 </PosterIdContext.Provider>
-                <PopTapLayer key={`pop-${item.id}`} videoId={item.id} host={hostLabel(catalogPlayUrl(item)).replace("Puterin", "Putarin")} />
+                <PopTapLayer key={`pop-${item.id}`} videoId={item.id} host={hostLabel(catalogPlayUrl(playItem)).replace("Puterin", "Putarin")} />
               </div>
             )}
+            {server ? <ServerButtons item={item} current={server.id} /> : null}
             {(() => {
               const src = catalogPlayUrl(item);
               if (!src || /\.(mp4|webm|mov)($|\?)/i.test(src)) return null;
@@ -435,7 +515,7 @@ export function WatchPage() {
                 </ul>
               </nav>
             ) : null}
-            <VideoFacts item={item} />
+            <VideoFacts item={playItem} />
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
@@ -444,12 +524,12 @@ export function WatchPage() {
               >
                 Bagikan
               </button>
-              {isVideyItem(item) || isDrpHostItem(item) ? null : <button
+              {isVideyItem(playItem) || isDrpHostItem(playItem) ? null : <button
                 type="button"
                 className="h-12 min-w-[140px] rounded-xl bg-secondary px-5 text-base font-medium text-foreground active:scale-[0.98] disabled:opacity-50"
-                disabled={!catalogPlayUrl(item)}
+                disabled={!catalogPlayUrl(playItem)}
                 onClick={() => {
-                  const src = catalogPlayUrl(item);
+                  const src = catalogPlayUrl(playItem);
                   if (src) window.open(src, "_blank", "noopener"); // keep referrer so hoster sees koleksidrpinguin.com
                 }}
               >
@@ -459,7 +539,8 @@ export function WatchPage() {
             </div>
           </header>
             </>
-          ) : (
+            );
+          })() : (
             <div className="space-y-8">
               <Skeleton className="aspect-video rounded-2xl" />
               <Skeleton className="h-10 w-2/3 rounded-md" />
