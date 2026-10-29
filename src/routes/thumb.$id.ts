@@ -146,6 +146,13 @@ export const Route = createFileRoute("/thumb/$id")({
           }
 
           let source = await sourceFor(id);
+          // Multi-server main page without a poster of its own: the poster borrowed from another copy
+          // of the same video (local-cache.ts buildIndexes). Stored in R2 under this id like any other.
+          if (!source) {
+            source = await import("@/lib/catalog/local-cache")
+              .then((m) => m.mergedPosterOf(id))
+              .catch(() => "");
+          }
           // Putarin uploads carry no poster: try the DMM cover from a JAV code in the title, else the
           // embed's own player.image (same decrypt as /api/puterin-thumb). Stored to R2 once.
           const pItem = source ? null : await putarinItem(id);

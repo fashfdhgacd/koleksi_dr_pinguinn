@@ -234,3 +234,33 @@ export function multiServerFrom<T extends ServerItem>(items: readonly T[], group
   }
   return out;
 }
+
+/**
+ * Poster for each main page that has none of its own, taken from the first other copy in server
+ * order that has a real remote image (e.g. a Byse main with no poster borrows the Lulu one).
+ * `thumb` is the card's poster lookup (local-shared thumbOf). Titles need no such step: a copy with
+ * a generic / auto title never joins a group (mergeKeyOf), so every copy already has the real title.
+ */
+export function borrowedPosters<T extends ServerItem>(
+  items: readonly T[],
+  groups: readonly ServerGroup[],
+  thumb: (it: T) => string,
+): Map<string, string> {
+  const byId = new Map<string, T>();
+  for (const it of items) if (it?.id && !byId.has(it.id)) byId.set(it.id, it);
+  const out = new Map<string, string>();
+  for (const g of groups) {
+    const main = byId.get(g.main);
+    if (!main || thumb(main)) continue;
+    for (const id of g.ids) {
+      if (id === g.main) continue;
+      const it = byId.get(id);
+      const url = it ? String(thumb(it) || "").trim() : "";
+      if (/^https:\/\//i.test(url) && !/koleksidrpinguin\.com\/api\//i.test(url)) {
+        out.set(g.main, url);
+        break;
+      }
+    }
+  }
+  return out;
+}
