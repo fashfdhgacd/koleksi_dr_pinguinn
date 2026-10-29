@@ -12,6 +12,7 @@ import { DRP_CATEGORY } from "@/lib/catalog/drp-hosts.js";
 import { upsertVideosBatch } from "@/lib/bot/github.js";
 import { postNewVideosToChannelReport, channelReportLine } from "@/lib/bot/channel-post";
 import { pushNewVideos, pushReportLine } from "@/lib/web-push";
+import { indexNowAfterBatch } from "@/lib/bot/indexnow";
 import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
 import { lockedMinorReason, schoolReason } from "@/lib/catalog/minor-lock.js";
 import { reviewPriority as detectorPriority } from "@/lib/catalog/minor-detector.js";
@@ -694,6 +695,14 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     } catch (err) {
       lines.push(`🔔 Push gagal: ${err instanceof Error ? err.message : String(err)}`.slice(0, 220));
     }
+  }
+
+  // Once per upload batch: IndexNow ping for videos that are live now (earlier batches; see indexnow.ts).
+  // Runs even with 0 created so queued ids from the previous batch still go out. Never throws.
+  try {
+    lines.push(await indexNowAfterBatch(createdRecords));
+  } catch {
+    /* never break uploads */
   }
 
   const summary = `✅ ${createdTotal} dibuat · ⏭️ ${skippedTotal} skip · ⚠️ ${failedTotal} gagal${queuedTotal ? ` · 🕒 ${queuedTotal} antre` : ""}${heldTotal ? ` · ⛔ ${heldTotal} ditahan (judul perlu diganti)` : ""}${rejectedTotal ? ` · ⛔ ${rejectedTotal} ditolak` : ""}`;

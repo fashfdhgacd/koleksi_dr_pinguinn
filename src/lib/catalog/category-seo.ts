@@ -7,6 +7,12 @@ const BRAND = "Koleksi Dr. Pinguin";
 /** Suffix judul tab/SERP: domain (keputusan pemilik). */
 const TITLE_SUFFIX = "koleksidrpinguin.com";
 
+/**
+ * SEO FREEZE: categories that currently rank in search (ai-plus, malaysia, doggy, bokep, jav)
+ * keep their title and h1 exactly as they are. Search engines re-evaluate a page when its
+ * title/h1 change; two rewrites of ai-plus in 25 hours (Oct 26-27 2026) cost most of its
+ * Bing/DuckDuckGo traffic. Only touch intro/description of these, and only with a reason.
+ */
 const COPY: Record<string, { h1: string; intro: string; title?: string; description?: string }> = {
   jav: {
     h1: "JAV Sub Indo Terbaru",
@@ -14,11 +20,15 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     title: `JAV Sub Indo Terbaru ${YEAR} - Bokep Jepang Kode Lengkap | ${TITLE_SUFFIX}`,
     description: `Nonton JAV sub indo terbaru ${YEAR}: bokep Jepang dengan kode dan nama artis, bisa dicari dan diputar langsung di HP tanpa download.`,
   },
+  // FROZEN (SEO): title/h1 below are the wording that ranked on Bing/DDG (Oct 19-26 2026).
+  // Rewriting them on Oct 26 (#65) and Oct 27 (#116) preceded a ~80% drop in ai-plus search
+  // landings, so they were restored. Do NOT reword title/h1 of ranked categories
+  // (ai-plus, malaysia, doggy, bokep, jav); improve intro/description instead.
   "ai-plus": {
-    h1: "Bokep AI Indo Terbaru (AI+)",
-    intro: "AI+ adalah koleksi video buatan AI dengan wajah dan suasana ala Indonesia dan Asia: gambar tajam, durasi pendek, dan diputar lancar di HP. Video baru masuk hampir tiap hari, jadi halaman ini selalu berubah. Kalau mau yang rekaman asli, cek juga kategori Viral, Amatir atau Videy di bawah.",
-    title: `Bokep AI Indo Terbaru ${YEAR} - Video AI+ Jernih | ${TITLE_SUFFIX}`,
-    description: `Video AI+ terbaru ${YEAR}: bokep AI indo dan Asia buatan AI, gambar tajam dan lancar diputar di HP. Video baru masuk hampir tiap hari.`,
+    h1: "Bokep AI+ Terbaru",
+    intro: "Video AI+ terbaru yang lagi banyak dicari: bokep AI indo dan Asia buatan AI, gambar jernih dan streaming lancar di HP. Video baru masuk hampir tiap hari. Kalau mau yang rekaman asli, cek juga kategori Viral, Amatir atau Videy di bawah.",
+    title: `Bokep AI+ Terbaru ${YEAR} - Video AI Viral | ${TITLE_SUFFIX}`,
+    description: `Bokep AI+ terbaru ${YEAR}: video AI viral dan bokep AI indo yang lagi banyak dicari, jernih dan lancar diputar langsung di HP.`,
   },
   "ai-gay": {
     h1: "Video AI Gay Terbaru",

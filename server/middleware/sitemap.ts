@@ -37,10 +37,28 @@ function urlEntry(loc: string, opts?: { changefreq?: string; priority?: string; 
   return parts.join("\n");
 }
 
-function pageEntries(categories: CategoryInfo[]): string[] {
+/**
+ * lastmod per listing page = upload date of the newest public video on it (the page content changes
+ * when a video lands), so crawlers can tell which category pages actually changed.
+ */
+function listingLastmods(entries: Array<{ category?: string; lastmod?: string }>): { all?: string; bySlug: Map<string, string> } {
+  const bySlug = new Map<string, string>();
+  let all: string | undefined;
+  for (const e of entries) {
+    if (!e.lastmod) continue;
+    if (!all || e.lastmod > all) all = e.lastmod;
+    const slug = (e.category || "").toLowerCase();
+    if (!slug) continue;
+    const prev = bySlug.get(slug);
+    if (!prev || e.lastmod > prev) bySlug.set(slug, e.lastmod);
+  }
+  return { all, bySlug };
+}
+
+function pageEntries(categories: CategoryInfo[], mods: { all?: string; bySlug: Map<string, string> }): string[] {
   const out: string[] = [
-    urlEntry(`${SITE_ORIGIN}/`, { changefreq: "hourly", priority: "1.0" }),
-    urlEntry(`${SITE_ORIGIN}/kategori`, { changefreq: "daily", priority: "0.8" }),
+    urlEntry(`${SITE_ORIGIN}/`, { changefreq: "hourly", priority: "1.0", lastmod: mods.all }),
+    urlEntry(`${SITE_ORIGIN}/kategori`, { changefreq: "daily", priority: "0.8", lastmod: mods.all }),
     // Ranking pages (src/lib/catalog/rankings.ts), refreshed with the 12-hourly stats.
     urlEntry(`${SITE_ORIGIN}/kategori/paling-ditonton`, { changefreq: "daily", priority: "0.8" }),
     urlEntry(`${SITE_ORIGIN}/kategori/paling-disukai`, { changefreq: "daily", priority: "0.8" }),
@@ -58,6 +76,7 @@ function pageEntries(categories: CategoryInfo[]): string[] {
       urlEntry(`${SITE_ORIGIN}/kategori/${encodeURIComponent(c.slug)}`, {
         changefreq: "daily",
         priority: c.slug === "jav" || c.slug === "ai-plus" ? "0.8" : "0.7",
+        lastmod: mods.bySlug.get(c.slug.toLowerCase()),
       }),
     );
   }
@@ -66,7 +85,7 @@ function pageEntries(categories: CategoryInfo[]): string[] {
   const aiPlus = categories.find((c) => c.slug === "ai-plus");
   const aiPages = aiPlus && typeof aiPlus.count === "number" ? Math.min(5, Math.ceil(aiPlus.count / DEFAULT_PAGE_SIZE)) : 1;
   for (let n = 2; n <= aiPages; n++) {
-    out.push(urlEntry(`${SITE_ORIGIN}/kategori/ai-plus?page=${n}`, { changefreq: "daily", priority: "0.5" }));
+    out.push(urlEntry(`${SITE_ORIGIN}/kategori/ai-plus?page=${n}`, { changefreq: "daily", priority: "0.5", lastmod: mods.bySlug.get("ai-plus") }));
   }
   for (const path of LEGAL_PATHS) {
     out.push(urlEntry(`${SITE_ORIGIN}${path}`, { changefreq: "monthly", priority: "0.3" }));
@@ -77,7 +96,14 @@ function pageEntries(categories: CategoryInfo[]): string[] {
 function videoBlock(item: Awaited<ReturnType<typeof listSitemapWatchEntries>>[number]): string {
   const pageUrl = `${SITE_ORIGIN}/watch/${encodeURIComponent(item.id)}`;
   const title = cleanDisplayTitle(item.title || "") || "Video";
-  const desc = videoSeoDescription(title, item.category || null);
+  // id/duration/year make each description its own (seeded variants + real facts), not one template.
+  const desc = videoSeoDescription({
+    id: item.id,
+    title,
+    category: item.category || null,
+    duration: item.duration ?? null,
+    year: item.lastmod ? item.lastmod.slice(0, 4) : null,
+  });
   const thumb = seoVideoThumbnail(item.id, item.thumbnail);
   const player = item.embed || pageUrl;
   const parts = [
@@ -141,7 +167,8 @@ function errorXml(method: string, message: string): Response {
 }
 
 async function buildPagesXml(): Promise<string> {
-  return wrapUrlset(pageEntries(await listListedCategories({ sitemap: true })));
+  const [categories, entries] = await Promise.all([listListedCategories({ sitemap: true }), listSitemapWatchEntries()]);
+  return wrapUrlset(pageEntries(categories, listingLastmods(entries)));
 }
 
 async function buildWatchXml(chunkIndex?: number): Promise<{ xml: string; total: number; chunks: number }> {

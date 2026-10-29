@@ -87,13 +87,60 @@ export function withoutDomainSuffix(raw?: string | null): string {
   return cut || t.trim();
 }
 
+/**
+ * Label kategori untuk kalimat/judul SEO halaman tonton. Kategori "bokep" berlabel nama brand
+ * ("Koleksi Dr. Pinguin Bokep") dan Videy berlabel "drpinguin videy": di judul dan deskripsi itu
+ * jadi "Bokep Koleksi Dr. Pinguin Bokep" / "penggemar Koleksi Dr. Pinguin Bokep", jadi dipetakan
+ * ke kata yang dicari orang.
+ */
+function videoTextLabel(category?: string | null): string {
+  const key = (category || "").trim().toLowerCase();
+  if (!key || key === "bokep" || key === "lainnya" || /pinguin/i.test(categoryLabel(category))) return "Indo";
+  if (key === "videy") return "Videy";
+  return safeSeoLabel(category);
+}
+
+/** Potong di batas kata (tanpa sisa tanda baca/pemisah), tambah "…" hanya kalau benar-benar dipotong. */
+function clipWords(s: string, max: number): string {
+  const t = s.trim().replace(/\s+/g, " ");
+  if (t.length <= max) return t;
+  const cut = t.slice(0, max);
+  const sp = cut.lastIndexOf(" ");
+  const head = sp >= Math.floor(max * 0.5) ? cut.slice(0, sp) : cut;
+  return `${head.replace(/[\s,.;:·|–—-]+$/, "")}…`;
+}
+
+/**
+ * Untuk judul yang terlalu panjang saja: "(Koleksi Dr. Pinguin Bokep, M.S.B.)" di tengah judul dilepas
+ * sebelum dipotong, supaya hasilnya tidak berhenti di "(Koleksi Dr…". Domain " | koleksidrpinguin.com"
+ * tetap dipasang pageTitle(), dan judul yang muat utuh tidak diubah.
+ */
+function clipTitleText(s: string, max: number): string {
+  if (s.length <= max) return s;
+  const compact = s.replace(/\s*[([]\s*(?:koleksi\s+)?dr\.?\s*pinguin[^)\]]*[)\]]/gi, "").replace(/\s+/g, " ").trim();
+  return clipWords(compact || s, max);
+}
+
+/** Batas panjang bagian judul sebelum " | koleksidrpinguin.com" (total ±80 karakter). */
+const VIDEO_TITLE_HEAD_MAX = 58;
+
+/** Judul tanpa domain dan tanpa "(Koleksi Dr. Pinguin …)" walau keduanya menempel ("… (Koleksi Dr. Pinguin) - koleksidrpinguin.com"). */
+function seoBaseTitle(raw?: string | null): string {
+  return withoutDomainSuffix(cleanDisplayTitle(withoutDomainSuffix(raw)));
+}
+
 export function videoSeoTitle(title: string, category?: string | null): string {
-  const base = withoutDomainSuffix(cleanDisplayTitle(title));
-  const label = safeSeoLabel(category);
-  const hasLabel = new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i").test(base);
-  const head = !label ? base : hasLabel ? `${base} – Bokep` : `${base} – Bokep ${label}`;
-  const clipped = head.length > 58 ? `${head.slice(0, 55).trimEnd()}…` : head;
-  return pageTitle([clipped]);
+  const base = seoBaseTitle(title);
+  const label = videoTextLabel(category);
+  const esc = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const hasLabel = new RegExp(`(?:^|[^\\p{L}\\p{N}])${esc}(?![\\p{L}\\p{N}])`, "iu").test(base);
+  const hasBokep = /\bbokep\b/i.test(base);
+  // Kategori hanya ditempel kalau muat utuh; tidak pernah jadi potongan seperti "– Bo…".
+  const tails = hasLabel ? (hasBokep ? [] : [" – Bokep"]) : hasBokep ? [` – ${label}`] : [` – Bokep ${label}`, " – Bokep"];
+  for (const tail of tails) {
+    if (base.length + tail.length <= VIDEO_TITLE_HEAD_MAX) return pageTitle([`${base}${tail}`]);
+  }
+  return pageTitle([clipTitleText(base, VIDEO_TITLE_HEAD_MAX)]);
 }
 
 /** Hash stabil biar deskripsi meta tidak berubah tiap load. */
@@ -161,10 +208,10 @@ function safeTags(item: SeoVideoInput, label: string): string[] {
  * memakai judul, kategori, tag, durasi, sumber, tahun. Target 140–160 karakter.
  */
 function buildSentences(item: SeoVideoInput): { lead: string; detail: string; close: string } {
-  const label = safeSeoLabel(item.category);
-  const rawTitle = withoutDomainSuffix(cleanDisplayTitle(item.title));
+  const label = videoTextLabel(item.category);
+  const rawTitle = seoBaseTitle(item.title);
   const titleOk = !MINOR_RE.test(rawTitle);
-  const t = titleOk ? (rawTitle.length > 60 ? `${rawTitle.slice(0, 57).trimEnd()}…` : rawTitle) : "";
+  const t = titleOk ? clipTitleText(rawTitle, 60) : "";
   const src0 = String(item.creator || item.source || "").trim();
   const src = src0 && !MINOR_RE.test(src0) && src0.toLowerCase() !== label.toLowerCase() ? src0 : "";
   const dur = durationPhrase(item.duration);
@@ -373,7 +420,7 @@ export function videoJsonLd(input: {
   const content = (input.contentUrl || "").trim();
   const thumb = seoVideoThumbnail(input.id, input.thumbnail);
   const pageUrl = `${SITE_ORIGIN}/watch/${input.id}`;
-  const label = safeSeoLabel(input.category);
+  const label = videoTextLabel(input.category);
 
   return {
     "@context": "https://schema.org",
