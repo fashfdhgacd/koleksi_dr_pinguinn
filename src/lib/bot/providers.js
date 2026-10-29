@@ -288,6 +288,21 @@ export async function fetchDrpPageMeta(kind, embedUrl, code) {
 }
 
 /**
+ * Byse keeps each thumbnail at img-place.com/<code>_xt.jpg (sometimes only _t.jpg). Public, no key,
+ * and reachable when Byse's details endpoint refuses server IPs ("proxy/vpn access is not allowed").
+ * Returns the first URL that answers with a real image, else "" (fresh uploads have none yet).
+ */
+export async function fetchBysePoster(/** @type {unknown} */ code) {
+  const c = String(code || "");
+  if (!/^[A-Za-z0-9]{4,40}$/.test(c)) return "";
+  for (const suffix of ["_xt", "_t"]) {
+    const url = `https://img-place.com/${encodeURIComponent(c)}${suffix}.jpg`;
+    if (await looksLikeImage(url, "")) return url;
+  }
+  return "";
+}
+
+/**
  * Byse public player details (no API key): <embed domain>/api/videos/<code>/embed/details.
  * Tries the link's own domain first, then the known Byse domains. ok=true only for a real Byse
  * answer (used to accept links on an unknown domain). embed = Byse's own embed_frame_url when given.
@@ -337,7 +352,9 @@ export async function fetchByseMeta(origin, code) {
     // Last resort for a known Byse domain: the embed page itself (og:image / <title>).
     if (origin && !/^https?:\/\/(?:api\.)?byse\.sx$/i.test(origin)) {
       const meta = await fetchDrpPageMeta("byse", `${origin}/e/${code}`, code);
-      return { ...empty, title: meta.title, thumb: meta.thumb };
+      // Details refused (server IP blocked): the poster still lives on img-place.
+      const thumb = meta.thumb || (await fetchBysePoster(code));
+      return { ...empty, title: meta.title, thumb };
     }
     return empty;
   };

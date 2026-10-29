@@ -18,6 +18,7 @@ import { reviewPriority as detectorPriority } from "@/lib/catalog/minor-detector
 import { ownerChecked18 } from "@/lib/catalog/minor-context.js";
 import { uploadRejectReason, uploadWarnReason } from "@/lib/bot/title-guard.js";
 import { HOLD_REASON, explainTerm, holdReplyLines, titleHold, uploadAction } from "@/lib/bot/title-hold.js";
+import { isGenericTitle } from "@/lib/catalog/generic-title.js";
 
 /** Title is clean for the hard checks too (reject list + minor-lock). Used for hold suggestions. */
 function hardOk(t) {
@@ -285,6 +286,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   const postersCommitted = { added: 0, updated: 0, total: 0, any: false };
   const createdRecords = [];
 
+  /** @type {any[]} */
   const queue = [];
   // Folder pages are fetched in parallel (puterin.biz can take 3-25 s per page): a sequential loop
   // over 10+ folders ran past the Worker's waitUntil budget and the batch died with no reply.
@@ -319,11 +321,38 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     queue.push(folderTitle && folderTitle !== "Video" ? { ...video, title: folderTitle } : video);
   });
 
+  // Lulu/Dood/Byse already on the site (any catalog copy, incl. the data/drp-bokep.json import): a
+  // resend is a duplicate. The bot's own dedupe only sees data/videos-latest*.json, so on 2026-10-29
+  // 295 Byse links already in drp-bokep were stored again with generic numbered titles that shadowed
+  // the real ones. Held drafts (title-hold.js) still go through: a resend is how they get published.
+  // A known real title is kept for the reply and reused if the record is ever written again.
+  const knownDrp = new Map();
+  if (queue.some((v) => isDrpHost(v.host))) {
+    if (catalogRaw === null) catalogRaw = await rawCatalogItems();
+    for (const it of catalogRaw) {
+      const id = String(it?.id || "").toLowerCase();
+      if (!/^(?:lu|dd|by)-/.test(id)) continue;
+      const prev = knownDrp.get(id);
+      const real = isGenericTitle(it.title, it) ? "" : String(it.title || "");
+      const held = it.hidden === true && it.hidden_reason === HOLD_REASON;
+      knownDrp.set(id, { title: prev?.title || real, held: Boolean(prev?.held || held) });
+    }
+    for (let i = queue.length - 1; i >= 0; i--) {
+      const v = queue[i];
+      if (!isDrpHost(v.host)) continue;
+      const known = knownDrp.get(String(v.id || "").toLowerCase());
+      if (!known || known.held) continue;
+      queue.splice(i, 1);
+      skippedTotal += 1;
+      lines.push(`⏭️ ${v.id} sudah ada di web${known.title ? ` — ${known.title}` : ""} (dilewati, judul lama dipakai)`);
+    }
+  }
+
   if (!queue.length) {
     await tgSendChunks(
       token,
       chatId,
-      [`✅ 0 dibuat · ⏭️ 0 skip · ⚠️ ${failedTotal} gagal`, "", ...lines].join("\n") || "Tidak ada yang diproses.",
+      [`✅ 0 dibuat · ⏭️ ${skippedTotal} skip · ⚠️ ${failedTotal} gagal`, "", ...lines].join("\n") || "Tidak ada yang diproses.",
       { reply_markup: MAIN_KEYBOARD },
     );
     return;
@@ -333,6 +362,14 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const given = cleanTitle(String(video.title || parsedMsg.title || ""));
     return resolveMetaFast(video, given, env);
   });
+
+  // Lulu/Dood/Byse without a host title but already known with a real one (e.g. a held draft resent
+  // without a typed title): reuse it before falling back to a number.
+  for (let i = 0; i < metas.length; i++) {
+    if (!metas[i]?.titleAuto || !isDrpHost(queue[i]?.host)) continue;
+    const known = knownDrp.get(String(queue[i].id || "").toLowerCase());
+    if (known?.title) metas[i] = { ...metas[i], title: cleanTitle(known.title), titleAuto: false };
+  }
 
   // Lulu/Dood/Byse without a real title (none, or a page-title placeholder like "Jelajahi video
   // ExaStream"): "Koleksi Dr. Pinguin Bokep N", numbered on from the highest N in the catalog.
