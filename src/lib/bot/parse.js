@@ -273,7 +273,53 @@ function parseDrpLink(kind, parsed) {
     file: `videos.json`,
     // Byse panel link (byse.sx/...): the real embed domain comes from the details endpoint.
     ...(kind === "byse" && BYSE_PANEL_HOST.test(host) ? { needsEmbedDomain: true } : {}),
+    // Byse share link /d/<code>/<title-slug>: the slug is the video's real title. A fallback only
+    // (upload-handler: typed title > Byse details title > slugTitle > numbered auto title).
+    ...(kind === "byse" ? slugTitleOf(parsed.pathname, code) : {}),
   };
+}
+
+/** { slugTitle } from a /d|e|v|f/<code>/<slug> path, else {}. @param {string} path @param {string} code */
+function slugTitleOf(path, code) {
+  const m = String(path || "").match(/^\/(?:d|e|v|f)\/[A-Za-z0-9]{4,40}\/([^/?#]+)\/?$/i);
+  const slugTitle = m ? titleFromSlug(m[1], code) : "";
+  return slugTitle ? { slugTitle } : {};
+}
+
+/** Lowercase words inside a title made from a URL slug (Indonesian function words). */
+const SLUG_SMALL_WORDS = new Set([
+  "di", "ke", "dari", "dan", "yang", "untuk", "dengan", "pada", "atau", "oleh", "dalam", "bagi", "tapi",
+]);
+const SLUG_UPPER_WORDS = new Set(["ai", "abg", "jav", "vcs", "pov", "hd", "ii", "iii", "iv"]);
+
+/**
+ * Title from a share-link slug, e.g. Byse https://bysejikuar.com/d/<code>/tragedi-si-cantik-pulau-episode-2
+ * -> "Tragedi Si Cantik Pulau Episode 2". "" when the slug is no title: a uuid / hex / number blob,
+ * the file code itself, or fewer than 2 words with letters.
+ * @param {string} slug
+ * @param {string} [code]
+ */
+export function titleFromSlug(slug, code = "") {
+  let raw = String(slug || "");
+  try {
+    raw = decodeURIComponent(raw);
+  } catch {
+    /* keep raw */
+  }
+  raw = raw.replace(/\.html?$/i, "").trim();
+  if (!raw || (code && raw.toLowerCase() === String(code).toLowerCase())) return "";
+  if (/^[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}$/i.test(raw)) return "";
+  const words = raw.split(/[-_+\s]+/).filter(Boolean);
+  if (words.filter((w) => /[a-z]{2,}/i.test(w)).length < 2) return "";
+  if (words.every((w) => /^[0-9a-f]+$/i.test(w) && /\d/.test(w))) return "";
+  return words
+    .map((w, i) => {
+      const lw = w.toLowerCase();
+      if (SLUG_UPPER_WORDS.has(lw)) return lw.toUpperCase();
+      if (i > 0 && SLUG_SMALL_WORDS.has(lw)) return lw;
+      return lw.charAt(0).toUpperCase() + lw.slice(1);
+    })
+    .join(" ");
 }
 
 /** Hosts whose "link judul" on one line means: the text after the link is that video's title. */

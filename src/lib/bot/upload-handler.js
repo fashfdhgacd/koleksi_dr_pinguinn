@@ -112,6 +112,8 @@ async function resolveMetaFast(video, givenTitle, env) {
         if (!thumb && isHttpPoster(meta.thumb)) thumb = meta.thumb;
         if (meta.embed) embed = meta.embed;
         if (meta.length) length = meta.length;
+        // Share-link slug (/d/<code>/<title-slug>, parse.js) when Byse's details gave no title.
+        if (!title && video.slugTitle) title = cleanTitle(video.slugTitle);
       } else if (!thumb || !title) {
         const meta = await fetchDrpPageMeta(video.host, video.embed, video.code);
         if (!title && meta.title) title = cleanTitle(meta.title);
@@ -125,6 +127,7 @@ async function resolveMetaFast(video, givenTitle, env) {
   }
 
   if (isDrpHost(video.host)) {
+    if (!title && video.slugTitle) title = cleanTitle(video.slugTitle);
     const auto = !title || title === "Video";
     return { title: auto ? drpAutoTitle(video) : title, thumb, embed: "", byseOk: false, length: 0, titleAuto: auto };
   }
