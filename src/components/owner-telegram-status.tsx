@@ -29,7 +29,17 @@ function wib(iso: string | null | undefined): string {
   return `${d.toLocaleString("id-ID", { timeZone: "Asia/Jakarta", dateStyle: "medium", timeStyle: "short" })} WIB`;
 }
 
-type RecentRow = { id: string; title: string; host: string; at: string; status: "live" | "hidden" | "pending"; reason: string };
+/** "merged": a copy folded into another page as a server (multi-server); mainId/mainTitle name that page. */
+type RecentRow = {
+  id: string;
+  title: string;
+  host: string;
+  at: string;
+  status: "live" | "merged" | "hidden" | "pending";
+  reason: string;
+  mainId?: string;
+  mainTitle?: string;
+};
 type RecentResponse = { ok?: boolean; error?: string; rows?: RecentRow[]; putarinTotal?: number; videosTotal?: number };
 type CronStatus = { flush?: string; last?: string };
 
@@ -77,8 +87,8 @@ function RecentUploads({ secret }: { secret: string }) {
   }, [load]);
 
   const rows = data?.rows || [];
-  const label = (s: RecentRow["status"]) => (s === "live" ? "Tayang" : s === "hidden" ? "Disembunyikan" : "Belum tayang");
-  const color = (s: RecentRow["status"]) => (s === "live" ? "text-[#2dd4bf]" : s === "hidden" ? "text-amber-400" : "text-zinc-500");
+  const label = (s: RecentRow["status"]) => (s === "live" ? "Tayang" : s === "hidden" ? "Disembunyiin" : "Belum tayang");
+  const color = (s: RecentRow["status"]) => (s === "live" || s === "merged" ? "text-[#2dd4bf]" : s === "hidden" ? "text-amber-400" : "text-zinc-500");
 
   return (
     <div className="mt-5 border-t border-white/[0.06] pt-4">
@@ -109,10 +119,19 @@ function RecentUploads({ secret }: { secret: string }) {
                 )}
                 <span className="ml-1.5 text-zinc-500">{wib(r.at)}</span>
               </span>
-              <span className={`shrink-0 ${color(r.status)}`}>
-                {label(r.status)}
-                {r.reason ? ` (${r.reason})` : ""}
-              </span>
+              {r.status === "merged" && r.mainId ? (
+                <span className={`shrink-0 ${color(r.status)}`}>
+                  Digabung ke{" "}
+                  <a href={`/watch/${r.mainId}`} target="_blank" rel="noopener" className="underline">
+                    {r.mainTitle || r.mainId}
+                  </a>
+                </span>
+              ) : (
+                <span className={`shrink-0 ${color(r.status)}`}>
+                  {label(r.status)}
+                  {r.reason ? ` (${r.reason})` : ""}
+                </span>
+              )}
             </li>
           ))}
         </ul>
