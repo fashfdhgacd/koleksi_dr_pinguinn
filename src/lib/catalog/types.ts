@@ -54,6 +54,12 @@ export type VideoDetail = VideoCard & {
   sameCategory?: Array<{ id: string; title: string }>;
   /** Episodes of this video's series (current included), sorted by episode number; only for series. */
   episodes?: Array<{ id: string; ep: number }>;
+  /**
+   * Multi-server (multi-server.ts): every host copy of this video, in server order (this page's own
+   * copy included). Only set when at least 2 public copies remain. `url` is the same embed the
+   * player gets for that copy as its own page.
+   */
+  servers?: Array<{ id: string; host: string; url: string }>;
 };
 
 export type CategoryInfo = {
