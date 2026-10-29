@@ -20,6 +20,7 @@ import {
   isDrpBokep,
   mainCatalog,
   slugOf,
+  thumbOf,
   toCard,
   videyNoThumbHideAt,
 } from "./local-shared";
@@ -64,7 +65,7 @@ import { isGenericTitle } from "./generic-title.js";
 import putarinFeedSnapshot from "./putarin-feed-20261007.json";
 import { restoreBuild, serializeBuild } from "./build-snapshot";
 import { keepAlive, readSnapshot, snapshotKey, writeSnapshot } from "./build-snapshot-store";
-import { emptyMultiServer, mergeServers, multiServerFrom, type MultiServer } from "./multi-server";
+import { borrowedPosters, emptyMultiServer, mergeServers, multiServerFrom, type MultiServer } from "./multi-server";
 
 // Re-bind mutable cache/inflight via shared module namespace
 import { runtime } from "./local-shared";
@@ -585,9 +586,20 @@ export function buildIndexes(
   if (videyNoThumbIds.size) items = items.filter((it) => !videyNoThumbIds.has(it.id));
   // Multi-server: copies of one video on other hosts fold into its main page (multi-server.ts).
   // Built from the published items only, so a hidden copy is never a server. Nothing is deleted.
-  const multi = multiServerFrom(items, mergeServers(items).groups);
+  const groups = mergeServers(items).groups;
+  const multi = multiServerFrom(items, groups);
   if (multi.mainOf.size) {
-    items = items.filter((it) => !multi.mainOf.has(it.id));
+    // A main page with no poster of its own shows the best poster of its other copies.
+    const borrowed = borrowedPosters(items, groups, (it) => thumbOf(it, posters));
+    items = items
+      .filter((it) => !multi.mainOf.has(it.id))
+      .map((it) => {
+        const poster = borrowed.get(it.id);
+        if (!poster) return it;
+        const next = { ...it, poster };
+        byId.set(it.id, next);
+        return next;
+      });
     for (const id of multi.mainOf.keys()) byId.delete(id);
   }
   const popular = popularIds(items);
@@ -657,6 +669,20 @@ export async function mergedMainOf(id: string): Promise<string | null> {
   if (!key) return null;
   const cache = await loadItemsRaw();
   return multiServerOf(cache).mainOf.get(key) || null;
+}
+
+/**
+ * Poster borrowed from another copy (buildIndexes) for a multi-server main page, else "". Used by
+ * /thumb/<id> after its own poster maps miss, so the borrowed poster is fetched and stored in R2
+ * under the main id once. Only main pages of a group are looked at.
+ */
+export async function mergedPosterOf(id: string): Promise<string> {
+  const key = String(id || "").trim();
+  if (!key) return "";
+  const cache = await loadItemsRaw();
+  if (!multiServerOf(cache).servers.has(key)) return "";
+  const poster = String(cache.byId.get(key)?.poster || "").trim();
+  return /^https:\/\//i.test(poster) ? poster : "";
 }
 
 export function pageOf(pool: RawItem[], page: number, limit: number, posters: Record<string, string>, videyNo: Map<string, number>): PagedVideos {

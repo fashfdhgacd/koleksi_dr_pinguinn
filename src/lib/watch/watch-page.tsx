@@ -115,6 +115,8 @@ function ServerButtons({ item, current }: { item: VideoDetail; current: string }
             search={sv.id === item.id ? {} : { s: sv.id }}
             replace
             resetScroll={false}
+            // Exact search match: the main copy's link (no ?s) is not "active" while ?s=<copy> plays.
+            activeOptions={{ exact: true, includeSearch: true }}
             aria-current={active ? "true" : undefined}
             title={gone ? `${label} (sumber sudah tidak tersedia)` : label}
             className={

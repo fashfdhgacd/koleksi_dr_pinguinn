@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { mergeServers, multiServerFrom, serverHostOf } from "./multi-server.ts";
+import { borrowedPosters, mergeServers, multiServerFrom, serverHostOf } from "./multi-server.ts";
 
 const T = "Mahasiswi Cantik Main Di Kos Sampai Pagi";
 const indo = (id: string, extra: Record<string, unknown> = {}) => ({
@@ -87,5 +87,33 @@ describe("multiServerFrom", () => {
     assert.equal(m.mainOf.has("new1"), false);
     assert.deepEqual(m.servers.get("new1"), ["new1", "old1"]);
     assert.equal(m.away.get("old1"), items[0]);
+  });
+});
+
+describe("borrowedPosters", () => {
+  const thumb = (it: object) => String((it as { poster?: unknown }).poster || "");
+  it("gives a main page without a poster the poster of the first other copy that has one", () => {
+    const items = [
+      byse("by-old", { createdAt: 1 }),
+      tape("t1", { createdAt: 2 }),
+      tape("t2", { createdAt: 3, title: "Lain Sekali Judulnya Sampai Panjang" }),
+    ];
+    const items2 = [indo("main1", { createdAt: 9 }), byse("by-a", { createdAt: 1, poster: "https://img.example/a.jpg" }), tape("t3", { createdAt: 2, poster: "https://img.example/t.jpg" })];
+    const all = [...items, ...items2.map((x) => ({ ...x, title: "Tante Cantik Pulang Kerja Langsung Main" }))];
+    const groups = mergeServers(all).groups;
+    const got = borrowedPosters(all, groups, thumb);
+    // Byse main (oldest, no IndoAV copy) has no poster and neither does t1: nothing to borrow.
+    assert.equal(got.has("by-old"), false);
+    // IndoAV main with no poster: Streamtape comes before Byse in server order.
+    assert.equal(got.get("main1"), "https://img.example/t.jpg");
+  });
+  it("keeps a main page's own poster and skips our own api urls", () => {
+    const items = [
+      indo("m", { createdAt: 1, poster: "https://img.example/own.jpg" }),
+      tape("t", { createdAt: 2, poster: "https://img.example/t.jpg" }),
+    ];
+    assert.equal(borrowedPosters(items, mergeServers(items).groups, thumb).size, 0);
+    const items2 = [indo("m2", { createdAt: 1 }), tape("t2", { createdAt: 2, poster: "https://koleksidrpinguin.com/api/puterin-thumb?id=t2" })];
+    assert.equal(borrowedPosters(items2, mergeServers(items2).groups, thumb).size, 0);
   });
 });
