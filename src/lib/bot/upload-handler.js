@@ -14,7 +14,7 @@ import { postNewVideosToChannelReport, channelReportLine } from "@/lib/bot/chann
 import { pushNewVideos, pushReportLine } from "@/lib/web-push";
 import { indexNowAfterBatch } from "@/lib/bot/indexnow";
 import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
-import { lockedMinorReason, schoolReason } from "@/lib/catalog/minor-lock.js";
+import { lockedMinorReason, schoolReason, youthCampusReason } from "@/lib/catalog/minor-lock.js";
 import { reviewPriority as detectorPriority } from "@/lib/catalog/minor-detector.js";
 import { ownerChecked18 } from "@/lib/catalog/minor-context.js";
 import { uploadRejectReason, uploadWarnReason } from "@/lib/bot/title-guard.js";
@@ -493,6 +493,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const hiddenReason =
       schoolReason(minorText) ||
       lockedMinorReason(minorText) ||
+      youthCampusReason(minorText) ||
       (detectorPriority("", minorText) === "review" && !ownerChecked18(minorText) ? "detector-review" : "");
     const flagged = autoTitled.has(i) ? { ...baseRecord, titleAuto: true } : baseRecord;
     let record = hiddenReason

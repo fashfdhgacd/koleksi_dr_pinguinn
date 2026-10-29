@@ -44,6 +44,20 @@ export function schoolReason(text) {
 }
 
 /**
+ * Campus setting framed as adolescence ("masa muda di kampus", "remaja kampus"): held for the
+ * owner's review. Needs BOTH a campus word and a youth-period word; plain "mahasiswi muda/baru"
+ * or "ABG kampus" alone does not match.
+ */
+const CAMPUS_WORD = /\b(?:kampus|campus|kuliah(?:an)?|mahasisw[ai]|universitas|college)\b/;
+const YOUTH_PERIOD = /\bmasa\s+(?:muda|remaja)\b|\bremaja\b|\bbelia\b|\bbocil\b|\bdi\s?bawah\s+umur\b/;
+
+/** @param {string} text @returns {string} "" or "youth-campus" */
+export function youthCampusReason(text = "") {
+  const t = lower(text).replace(/[-_]+/g, " ");
+  return CAMPUS_WORD.test(t) && YOUTH_PERIOD.test(t) ? "youth-campus" : "";
+}
+
+/**
  * Single check for owner title edits (owner-tools.ts edit-video, owner-videy.ts): rejected when the
  * hard lock, the hidden-ids school/minor rules (with the adult-age uniform exception) or the owner
  * detector "block" fires.
