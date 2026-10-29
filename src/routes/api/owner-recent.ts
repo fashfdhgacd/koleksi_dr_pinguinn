@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { isOwnerKey, ownerKeyFrom, ownerSecret } from "@/lib/owner-auth";
-import { hiddenReasonRaw, loadItemsRaw } from "@/lib/catalog/local-cache";
+import { hiddenReasonRaw, loadItemsRaw, multiServerOf } from "@/lib/catalog/local-cache";
 import type { RawItem } from "@/lib/catalog/local-shared";
 import { mergeChunks } from "@/lib/catalog/chunk-contract.js";
 import latestVideosIndex from "../../../data/videos-latest-index.json";
@@ -22,6 +22,8 @@ const latestPutarin: unknown[] = mergeChunks(
  * Owner-only "Baru masuk": newest Telegram uploads from the bundled bot files
  * (data/putarin-latest.json, data/videos-latest.json) with their status in the live catalog.
  * Reads only bundled data and the in-memory catalog, so no D1/KV/GitHub calls.
+ * Status: "live" (own page), "merged" (a copy folded into another page as a server, multi-server.ts;
+ * mainId/mainTitle name that page), "hidden" (hidden_reason set) or "pending" (not in this deploy yet).
  */
 const LIMIT = 80;
 
@@ -45,6 +47,7 @@ export const Route = createFileRoute("/api/owner-recent")({
         if (!ownerSecret()) return json({ ok: false, error: "not_configured" }, 503);
         if (!(await isOwnerKey(ownerKeyFrom(request)))) return json({ ok: false, error: "forbidden" }, 403);
         const cache = await loadItemsRaw();
+        const mainOf = multiServerOf(cache).mainOf;
         const rows = [
           ...asList(latestPutarin).map((it) => ({ it, host: "Putarin" })),
           ...asList(latestVideos).map((it) => ({ it, host: /videy/i.test(`${it.source || ""} ${it.embed || ""} ${it.direct || ""}`) ? "Videy" : String(it.source || "Lain") })),
@@ -53,14 +56,17 @@ export const Route = createFileRoute("/api/owner-recent")({
           .slice(0, LIMIT)
           .map(({ it, host }) => {
             const live = cache.byId.has(it.id);
-            const reason = live ? "" : hiddenReasonRaw(it);
+            const mainId = live ? "" : mainOf.get(it.id) || "";
+            const reason = live || mainId ? "" : hiddenReasonRaw(it);
+            const main = mainId ? cache.byId.get(mainId) : undefined;
             return {
               id: it.id,
               title: String(it.title || it.id),
               host,
               at: stamp(it),
-              status: live ? "live" : reason ? "hidden" : "pending",
+              status: live ? "live" : mainId ? "merged" : reason ? "hidden" : "pending",
               reason,
+              ...(mainId ? { mainId, mainTitle: String(main?.title || mainId) } : {}),
             };
           });
         const putarinTotal = asList(latestPutarin).length;
