@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { parseSeries, seriesIndex } from "./series.ts";
+import { episodeLabel, parseSeries, seriesIndex } from "./series.ts";
 
 const key = (t: string) => parseSeries(t)?.key;
 const ep = (t: string) => parseSeries(t)?.ep;
@@ -73,5 +73,35 @@ describe("seriesIndex", () => {
     assert.ok(k);
     assert.deepEqual([...(idx.groups.get(k!) || [])].sort(), ["a", "b", "c", "d"]);
     assert.equal(idx.byId.get("e"), undefined);
+  });
+});
+
+describe("episode ranges", () => {
+  const B = "Pasangan Seks Saya Seorang Dokter Kandungan ";
+  const S = " - koleksidrpinguin.com";
+  const info = (e: string) => {
+    const s = parseSeries(`${B}${e}${S}`);
+    return s ? `${s.key}#${s.ep}.${s.sub}` : null;
+  };
+
+  it("never reads a range as 12, or 12 as a range", () => {
+    assert.match(info("Episode 12") || "", /#12\.0$/);
+    for (const e of ["Episode 1-2", "Episode 1- 2", "Episode 1 -2", "Episode 1 - 2"]) {
+      assert.match(info(e) || "", /#1\.2$/, e);
+      assert.notEqual(info(e), info("Episode 12"), e);
+    }
+    // A range is its own merge key: never the same page as Episode 1, 2, 3 or 12.
+    for (const e of ["Episode 1", "Episode 2", "Episode 3", "Episode 12"]) assert.notEqual(info("Episode 1 - 2"), info(e), e);
+  });
+
+  it("labels a chip as a range only when a dash is written", () => {
+    assert.equal(episodeLabel(`${B}Episode 1 - 2${S}`, 1), "1 - 2");
+    assert.equal(episodeLabel(`${B}Episode 1-2${S}`, 1), "1 - 2");
+    assert.equal(episodeLabel(`${B}Episode 1- 2${S}`, 1), "1 - 2");
+    assert.equal(episodeLabel("AI drama China Kebangkitan paman EP1-2 di dapur", 1), "1 - 2");
+    assert.equal(episodeLabel(`${B}Episode 12${S}`, 12), "12");
+    assert.equal(episodeLabel(`${B}Episode 1 2${S}`, 1), "1"); // ambiguous, no dash: left alone
+    assert.equal(episodeLabel(`${B}Episode 3${S}`, 3), "3");
+    assert.equal(episodeLabel("Judul Episode 2-1", 2), "2"); // second number not bigger
   });
 });

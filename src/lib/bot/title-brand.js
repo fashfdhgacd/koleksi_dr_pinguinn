@@ -288,6 +288,21 @@ export function isPlaceholderTitle(raw = "") {
 }
 
 /**
+ * Rentang episode setelah penanda episode: "Episode 1- 2", "Eps 1-2", "Part 3 -4", "Episode 1 – 2"
+ * (satu video berisi beberapa episode). Pembersih di bawah mengganti semua "-" jadi spasi, yang
+ * dulu membuat "Episode 1- 2" jadi "Episode 1 2". Tanda hubungnya ditahan dulu dengan penanda
+ * U+2063, lalu ditulis "1 - 2" (keputusan pemilik). Hanya angka 1–3 digit setelah kata penanda
+ * episode, jadi kode JAV ("SSIS-123"), tanggal, dan "18-19" tanpa penanda tidak berubah.
+ */
+const EPISODE_RANGE_RE =
+  /(?<![\p{L}\p{N}])(episode|episod|epiose|epsiode|eps|ep|part|pt|bagian|vol|chapter|ch|sesi)(\.?\s*#?\s*)(\d{1,3})\s*[-–—~]\s*(\d{1,3})(?!\d)/giu;
+
+/** @param {string} t */
+function keepEpisodeRanges(t) {
+  return String(t).replace(EPISODE_RANGE_RE, (_m, word, gap, a, b) => `${word}${gap}${a}\u2063${b}`);
+}
+
+/**
  * Judul dasar tanpa branding siapa pun (situs lain maupun pinguin). Idempotent.
  * Kosong → "Video" (dipakai bot untuk tahu "tidak ada judul").
  */
@@ -329,8 +344,9 @@ export function cleanUploadTitle(raw = "") {
 
   if (isPlaceholderTitle(t)) return "Video";
   const out =
-    adultAgeWording(t)
+    keepEpisodeRanges(adultAgeWording(t))
       .replace(/[_-]+/g, " ")
+      .replace(/\u2063/g, " - ")
       .replace(/\s+/g, " ")
       .trim()
       .replace(/^[\-|]+|[\-|]+$/g, "")

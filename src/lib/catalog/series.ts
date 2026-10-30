@@ -52,6 +52,8 @@ const CJK_MARKER = /第\s*0*(\d{1,2})\s*[集话話部回]/;
 // stripped). A bare number takes no leading zeros: "Agent 007" is not episode 7.
 const TRAILING = /(?:\s\(0*(\d{1,2})\)|\s#\s*0*(\d{1,2})|\s(\d{1,2}))\s*$/;
 const JAV_CODE = /\b[a-z]{2,6}-\d{2,5}\b/i;
+// "-2" / " - 2" / "–2" right after an episode marker's number (see parseSeries).
+const EP_RANGE_TAIL = /^\s*[-–—~]\s*0*(\d{1,2})(?!\d)/;
 
 /** words: base title words, only for trailing-number keys (plausibility check in seriesIndex). */
 export type SeriesInfo = { key: string; ep: number; sub: number; words?: string };
@@ -98,12 +100,21 @@ export function parseSeries(rawTitle: string): SeriesInfo | null {
         .flatMap((r) => [...rest.matchAll(new RegExp(r.source, r.flags + "g"))])
         .find((x) => Number(x[1]) === ep)
     : MARKER.exec(rest) || GLUED.exec(rest) || GLUED_LONG.exec(rest) || CJK_MARKER.exec(rest);
+  let sub = 0;
   if (m && m.index !== undefined) {
     if (!se) ep = Number(m[1]);
-    rest = (rest.slice(0, m.index) + " " + stripTail(rest.slice(m.index + m[0].length))).trim();
+    let after = rest.slice(m.index + m[0].length);
+    // Range right after the marker, with a dash: "Episode 1-2", "Episode 1 - 2", "EP1-2 di dapur"
+    // (one video holding episodes 1 and 2). The end goes to `sub` (like "Episode 1 2"), so the base
+    // title stays the series key and "1-2" never reads as 12 nor merges with Episode 1, 2 or 12.
+    const rg = se ? null : EP_RANGE_TAIL.exec(after);
+    if (rg && Number(rg[1]) > ep) {
+      sub = Number(rg[1]);
+      after = after.slice(rg[0].length);
+    }
+    rest = (rest.slice(0, m.index) + " " + stripTail(after)).trim();
   }
-  let sub = 0;
-  const tr = TRAILING.exec(rest);
+  const tr = sub ? null : TRAILING.exec(rest);
   if (tr) {
     const n = Number(tr[1] || tr[2] || tr[3]);
     const plain = Boolean(tr[3]);
@@ -121,6 +132,22 @@ export function parseSeries(rawTitle: string): SeriesInfo | null {
   const key = words.replace(/ /g, "");
   if (key.length < 3) return null;
   return se || m ? { key: "m:" + key, ep, sub } : { key: "t:" + key, ep, sub, words };
+}
+
+/**
+ * Episode range written with a dash right after an episode marker: "Episode 1 - 2", "Eps 1-2",
+ * "Part 3 – 4" (one video holding several episodes). Only with a dash and only when the second
+ * number is bigger, so "Episode 12" stays 12 and the ambiguous "Episode 1 2" stays a plain episode.
+ */
+const EP_RANGE =
+  /(?<![\p{L}\p{N}])(?:episode|episod|epiose|epsiode|eps|ep|part|bagian)\.?\s*#?\s*0*(\d{1,2})\s*[-–—~]\s*0*(\d{1,2})(?!\d)/iu;
+
+/** Chip label for one episode: "1 - 2" for a range whose first number is the parsed episode, else "1". */
+export function episodeLabel(title: string, ep: number): string {
+  const m = EP_RANGE.exec(String(title || "").normalize("NFKC"));
+  const a = m ? Number(m[1]) : 0;
+  const b = m ? Number(m[2]) : 0;
+  return a === ep && b > a ? `${a} - ${b}` : String(ep);
 }
 
 /**

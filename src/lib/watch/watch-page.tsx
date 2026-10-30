@@ -570,7 +570,7 @@ export function WatchPage() {
 const EP_ACCENT = "#2dd4bf"; // site teal accent (bg-primary is gray in this theme)
 const EP_WINDOW = 24;
 
-function EpisodeLink({ id, ep, current }: { id: string; ep: number; current: boolean }) {
+function EpisodeLink({ id, ep, label, current }: { id: string; ep: number; label?: string; current: boolean }) {
   return (
     <a
       href={`/watch/${id}`}
@@ -583,7 +583,7 @@ function EpisodeLink({ id, ep, current }: { id: string; ep: number; current: boo
           : "border-white/20 bg-white/5 font-medium text-white/90 hover:border-[#2dd4bf] hover:text-[#2dd4bf]")
       }
     >
-      Episode {ep}
+      Episode {label ?? ep}
     </a>
   );
 }
@@ -591,7 +591,13 @@ function EpisodeLink({ id, ep, current }: { id: string; ep: number; current: boo
 const EP_GRID =
   "-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid sm:max-w-3xl sm:grid-cols-[repeat(auto-fill,minmax(112px,1fr))] sm:overflow-visible sm:px-0";
 
-function EpisodeStrip({ episodes, currentId }: { episodes: Array<{ id: string; ep: number }>; currentId: string }) {
+function EpisodeStrip({
+  episodes,
+  currentId,
+}: {
+  episodes: Array<{ id: string; ep: number; label?: string }>;
+  currentId: string;
+}) {
   const at = episodes.findIndex((e) => e.id === currentId);
   const next = at >= 0 && at + 1 < episodes.length ? episodes[at + 1] : null;
   const many = episodes.length > EP_WINDOW;
@@ -605,7 +611,7 @@ function EpisodeStrip({ episodes, currentId }: { episodes: Array<{ id: string; e
     <nav aria-label="Episode" className="space-y-2">
       <div className={EP_GRID}>
         {shown.map((e) => (
-          <EpisodeLink key={e.id} id={e.id} ep={e.ep} current={e.id === currentId} />
+          <EpisodeLink key={e.id} id={e.id} ep={e.ep} label={e.label} current={e.id === currentId} />
         ))}
       </div>
       {many ? (
@@ -615,7 +621,7 @@ function EpisodeStrip({ episodes, currentId }: { episodes: Array<{ id: string; e
           </summary>
           <div className={EP_GRID + " mt-2"}>
             {episodes.map((e) => (
-              <EpisodeLink key={e.id} id={e.id} ep={e.ep} current={e.id === currentId} />
+              <EpisodeLink key={e.id} id={e.id} ep={e.ep} label={e.label} current={e.id === currentId} />
             ))}
           </div>
         </details>
@@ -626,7 +632,7 @@ function EpisodeStrip({ episodes, currentId }: { episodes: Array<{ id: string; e
           style={{ backgroundColor: EP_ACCENT, color: "#09090b" }}
           className="inline-flex h-10 w-full items-center justify-center rounded-md px-4 text-sm font-semibold hover:opacity-90 active:scale-[0.98] sm:w-auto"
         >
-          Episode selanjutnya (Episode {next.ep}) →
+          Episode selanjutnya (Episode {next.label ?? next.ep}) →
         </a>
       ) : null}
     </nav>

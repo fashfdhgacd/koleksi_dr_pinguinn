@@ -52,8 +52,11 @@ export type VideoDetail = VideoCard & {
   uploadDate?: string | number | null;
   /** Up to 6 other videos of the same main category (id + raw title), for plain internal links. */
   sameCategory?: Array<{ id: string; title: string }>;
-  /** Episodes of this video's series (current included), sorted by episode number; only for series. */
-  episodes?: Array<{ id: string; ep: number }>;
+  /**
+   * Episodes of this video's series (current included), sorted by episode number; only for series.
+   * `label` only for a range video ("1 - 2" from "Episode 1 - 2"); otherwise the chip shows `ep`.
+   */
+  episodes?: Array<{ id: string; ep: number; label?: string }>;
   /**
    * Multi-server (multi-server.ts): every host copy of this video, in server order (this page's own
    * copy included). Only set when at least 2 public copies remain. `url` is the same embed the
