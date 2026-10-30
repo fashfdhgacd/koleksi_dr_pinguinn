@@ -242,8 +242,11 @@ let UNHIDDEN = new Set<string>();
 let OWNER_HIDDEN = new Set<string>();
 let unhideKey = "";
 let unhideCheckedAt = 0;
-let unhideInflight: Promise<void> | null = null;
+/** When this isolate's current list read started (0 = none running). A timestamp, never a shared promise. */
+let unhideReadAt = 0;
 const UNHIDE_TTL_MS = 30_000;
+/** A list read older than this is treated as lost (its request was canceled) and a new one may start. */
+const UNHIDE_READ_STALE_MS = 15_000;
 
 /** Owner-edited title that passes both detectors: it replaces the stored title for title-based rules. */
 function hasCleanEdit(id: string): boolean {
@@ -392,17 +395,28 @@ export function applyUnhidden(
   }
 }
 
+/**
+ * Re-reads the owner lists (KV) at most every UNHIDE_TTL_MS per isolate.
+ * A request never awaits a read started by another request: in Workers, when the request that
+ * started an I/O promise is canceled (visitor closed the tab), that promise can stay pending, and
+ * every later request awaiting it hangs with ~0 ms CPU until the client gives up (the pattern in the
+ * Worker logs on /api/owner-tools, /api/data, /api/like, /api/player-log). So:
+ *  - lists already applied once and a fresh read running elsewhere: keep the current lists (≤ TTL old);
+ *  - otherwise (cold isolate, forced, or the running read looks lost): this request reads them itself.
+ */
 async function syncUnhidden(force = false): Promise<void> {
-  if (!force && Date.now() - unhideCheckedAt < UNHIDE_TTL_MS) return;
-  if (unhideInflight) return unhideInflight;
-  unhideInflight = (async () => {
+  const now = Date.now();
+  if (!force && now - unhideCheckedAt < UNHIDE_TTL_MS) return;
+  if (!force && unhideCheckedAt && unhideReadAt && now - unhideReadAt < UNHIDE_READ_STALE_MS) return;
+  const startedAt = now;
+  unhideReadAt = startedAt;
+  try {
     const lists = await fetchUnhiddenIds();
     if (lists) applyUnhidden(lists.unhidden, lists.ownerHidden, lists.edits);
     else unhideCheckedAt = Date.now(); // keep the previous list; retry after the TTL
-  })().finally(() => {
-    unhideInflight = null;
-  });
-  return unhideInflight;
+  } finally {
+    if (unhideReadAt === startedAt) unhideReadAt = 0;
+  }
 }
 
 /**
@@ -778,40 +792,32 @@ function rememberBuild(cache: BuiltCache): void {
   keepAlive(job);
 }
 
-/** One cold seed per isolate, shared by both bundled copies of this module (like runtime). */
-const SEED_KEY = "__kdpCatalogSeedV1";
-const seedHost = globalThis as unknown as Record<string, Promise<CatalogCache> | undefined>;
-
 /**
  * Cold isolate: read this data centre's snapshot for the current deploy + owner lists, else build
  * (seedLocalCache, exactly as before) and save the build for the next cold isolate.
+ * Each request does its own snapshot read (Cache API, no billing) instead of awaiting one shared
+ * promise: a shared read whose request was canceled never settles and hung every cold request
+ * behind it. The CPU work stays once per isolate: whoever finishes first sets runtime.cache
+ * (synchronously, both bundled copies share it) and the others return that cache.
  */
 async function coldSeed(): Promise<CatalogCache> {
   if (BOT_FEEDS.length) return seedLocalCache();
-  const existing = seedHost[SEED_KEY];
-  if (existing) return existing;
-  const job = (async () => {
-    const listKey = unhideKey;
-    const key = await snapshotKey(listKey);
-    if (key) {
-      const text = await readSnapshot(key);
-      if (text && listKey === unhideKey) {
-        const cache = cacheFromSnapshot(text, listKey);
-        if (cache) return cache;
-      }
-    }
+  const listKey = unhideKey;
+  const key = await snapshotKey(listKey);
+  if (runtime.cache) return runtime.cache;
+  if (key) {
+    const text = await readSnapshot(key);
     if (runtime.cache) return runtime.cache;
-    const built = seedLocalCache() as BuiltCache;
-    runtime.cache = built;
-    rememberBuild(built);
-    return built;
-  })();
-  seedHost[SEED_KEY] = job;
-  try {
-    return await job;
-  } finally {
-    seedHost[SEED_KEY] = undefined;
+    if (text && listKey === unhideKey) {
+      const cache = cacheFromSnapshot(text, listKey);
+      if (cache) return (runtime.cache ??= cache);
+    }
   }
+  if (runtime.cache) return runtime.cache;
+  const built = seedLocalCache() as BuiltCache;
+  runtime.cache = built;
+  rememberBuild(built);
+  return built;
 }
 
 export function kickRemoteRefresh(base: { items: RawItem[]; posters: Record<string, string> }): void {
