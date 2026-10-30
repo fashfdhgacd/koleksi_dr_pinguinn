@@ -17,7 +17,7 @@ import {
 import { runtime } from "./local-shared";
 import { popularIds, tagOptions, titleTags } from "./title-tags";
 import { parseSearchQuery, scoreSearch, searchHayText } from "./search-rank";
-import { parseSeries, seriesIndex } from "./series";
+import { episodeLabel, parseSeries, seriesIndex } from "./series";
 import { isPublicHidden, isVideyNoThumbHidden, loadItems, multiServerOf, pageOf, sortByNewest } from "./local-cache";
 import { serverHostOf } from "./multi-server";
 import { aiPlusFrontOrder } from "./ai-plus-order";
@@ -351,28 +351,31 @@ const MAX_EPISODES = 60;
 async function seriesEpisodes(
   cache: CatalogCache,
   item: RawItem,
-): Promise<{ episodes?: Array<{ id: string; ep: number }> }> {
+): Promise<{ episodes?: Array<{ id: string; ep: number; label?: string }> }> {
   const key = seriesIndex(cache.items).byId.get(String(item.id));
   if (!key) return {};
   const ids = seriesIndex(cache.items).groups.get(key) || [];
-  const out: Array<{ id: string; ep: number }> = [];
-  const seen = new Set<number>();
+  const out: Array<{ id: string; ep: number; label?: string }> = [];
+  // Keyed by label, so "Episode 1 - 2" and a separate "Episode 1" both keep their own chip.
+  const seen = new Set<string>();
   for (const id of ids) {
     if (out.length >= MAX_EPISODES) break;
     const ep = cache.byId.get(id);
     if (!ep) continue;
     const n = parseSeries(String(ep.title || ""))?.ep || 0;
     if (!n) continue;
+    const label = episodeLabel(String(ep.title || ""), n);
+    const row = label === String(n) ? { id, ep: n } : { id, ep: n, label };
     // Duplicate uploads of the same episode: keep the current video, else the first one.
-    if (seen.has(n) && id !== item.id) continue;
+    if (seen.has(label) && id !== item.id) continue;
     if (id !== item.id && (await isPublicHidden(id))) continue;
-    if (seen.has(n)) {
-      const i = out.findIndex((o) => o.ep === n);
-      if (i >= 0) out[i] = { id, ep: n };
+    if (seen.has(label)) {
+      const i = out.findIndex((o) => (o.label ?? String(o.ep)) === label);
+      if (i >= 0) out[i] = row;
       continue;
     }
-    seen.add(n);
-    out.push({ id, ep: n });
+    seen.add(label);
+    out.push(row);
   }
   return out.length >= 2 ? { episodes: out } : {};
 }
