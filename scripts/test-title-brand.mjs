@@ -4,6 +4,16 @@ import { parseMessage } from "../src/lib/bot/parse.js";
 
 const S = " - koleksidrpinguin.com";
 const cases = [
+  // Rentang episode: tanda hubung dipertahankan jadi " - "; tanpa tanda hubung tidak diubah
+  ["Pasangan Seks Saya Seorang Dokter Kandungan Episode 1- 2", "Pasangan Seks Saya Seorang Dokter Kandungan Episode 1 - 2"],
+  ["Pasangan Seks Saya Seorang Dokter Kandungan Episode 1-2", "Pasangan Seks Saya Seorang Dokter Kandungan Episode 1 - 2"],
+  ["Pasangan Seks Saya Seorang Dokter Kandungan Episode 1 -2", "Pasangan Seks Saya Seorang Dokter Kandungan Episode 1 - 2"],
+  ["Pasangan Seks Saya Seorang Dokter Kandungan Episode 1 - 2", "Pasangan Seks Saya Seorang Dokter Kandungan Episode 1 - 2"],
+  ["Pasangan Seks Saya Seorang Dokter Kandungan Episode 1 - 2 - koleksidrpinguin.com", "Pasangan Seks Saya Seorang Dokter Kandungan Episode 1 - 2"],
+  ["Pasangan Seks Saya Seorang Dokter Kandungan Episode 12", "Pasangan Seks Saya Seorang Dokter Kandungan Episode 12"],
+  ["Pasangan Seks Saya Seorang Dokter Kandungan Episode 1 2", "Pasangan Seks Saya Seorang Dokter Kandungan Episode 1 2"],
+  ["AI drama China - Kebangkitan paman EP1-2 di dapur - AVTub", "AI drama China Kebangkitan paman EP1 - 2 di dapur"],
+  ["Drama Kantor Eps 3 – 4 | BokepHot", "Drama Kantor Eps 3 - 4"],
   // Branding situs lain di akhir → dibuang
   ["Janda Muda Pirang Selingkuh dengan Brondong Tetangga - AVTub", "Janda Muda Pirang Selingkuh dengan Brondong Tetangga"],
   ["Janda Muda Pirang Selingkuh dengan Brondong Tetangga - babi bakar", "Janda Muda Pirang Selingkuh dengan Brondong Tetangga"],
