@@ -79,6 +79,98 @@ describe("mergeServers", () => {
   });
 });
 
+describe("mergeServers: the same upload sent again (Oct 29 + Oct 30 2026 batches)", () => {
+  const lulu = (id: string, title: string, date: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    title,
+    embed: `https://luluvdo.com/e/${id}`,
+    date,
+    ...extra,
+  });
+  const tapeD = (id: string, title: string, date: string) => ({ id, title, embed: `https://streamtape.com/e/${id}`, date });
+  const byseD = (id: string, title: string, date: string, extra: Record<string, unknown> = {}) => ({
+    id,
+    title,
+    source: "byse",
+    embed: `https://byse.example/e/${id}`,
+    date,
+    ...extra,
+  });
+  const S = "Remake Brave New World Episode 2 - koleksidrpinguin.com";
+
+  it("joins every copy of both multi-host uploads into one page, the oldest main stays main", () => {
+    const r = mergeServers([
+      lulu("lu-old", S, "2026-10-29"),
+      tapeD("st-old", S, "2026-10-29"),
+      byseD("by-old", S, "2026-10-29"),
+      lulu("lu-new", S, "2026-10-30"),
+      tapeD("st-new", S, "2026-10-30"),
+      byseD("by-new", S, "2026-10-30"),
+    ]);
+    assert.equal(r.groups.length, 1);
+    assert.equal(r.groups[0].main, "lu-old");
+    assert.deepEqual(r.groups[0].ids, ["lu-old", "lu-new", "st-old", "st-new", "by-old", "by-new"]);
+    assert.deepEqual(r.extra, []);
+  });
+
+  it("a second copy on one host from the same upload keeps its own page and does not block the rest", () => {
+    const F = "Penjaga Malam Feng Agung 2 Versi Modifikasi - koleksidrpinguin.com";
+    const r = mergeServers([
+      lulu("lu-a", F, "2026-10-30"),
+      tapeD("st-a", F, "2026-10-30"),
+      byseD("by-a", F, "2026-10-30"),
+      byseD("by-b", F, "2026-10-30", { poster: "https://img.example/b.jpg" }),
+    ]);
+    assert.equal(r.groups.length, 1);
+    assert.deepEqual(r.groups[0].ids, ["lu-a", "st-a", "by-b"]);
+    assert.deepEqual(r.extra.map((e) => e.id), ["by-a"]);
+  });
+
+  it("one host on two days without a multi-host upload on each day joins only once", () => {
+    const H = "Acesher Hijab Ngentot di Hotel Mewah";
+    const r = mergeServers([tapeD("t1", H, "2026-10-02"), tapeD("t2", H, "2026-10-03"), byseD("by-1", H, "2026-10-29")]);
+    assert.equal(r.groups.length, 1);
+    assert.deepEqual(r.groups[0].ids, ["t1", "by-1"]);
+    assert.deepEqual(r.extra.map((e) => e.id), ["t2"]);
+  });
+
+  it("titles that differ only in case, brackets, apostrophes, '&' or a final dot are one video", () => {
+    const pairs: Array<[string, string]> = [
+      ["[Ailin] Haremku di Benua Douluo Bab 1 (Kisah Ning Rongrong)", "Ailin Haremku di Benua Douluo Bab 1 Kisah Ning Rongrong"],
+      ["There's a Bitch Next Door Episode 2", "Theres A Bitch Next Door Episode 2"],
+      ["Little White Flower & The Landlady's Female Tenant Episode 1", "Little White Flower The Landladys Female Tenant Episode 1"],
+      ["Saudari saya menyerahkan dirinya kepada saya demi uang.", "Saudari Saya Menyerahkan Dirinya Kepada Saya Demi Uang"],
+      ["Kisah Hantu Dinasti Tang (Versi Modifikasi) Episode 1", "Kisah Hantu Dinasti Tang Versi Modifikasi Episode 1"],
+    ];
+    for (const [a, b] of pairs) {
+      const r = mergeServers([lulu("x1", `${a} - koleksidrpinguin.com`, "2026-10-30"), byseD("x2", `${b} - koleksidrpinguin.com`, "2026-10-30")]);
+      assert.equal(r.groups.length, 1, a);
+    }
+  });
+
+  it("never joins different episodes or numbers: 1 - 2 / 1 2 vs 1-2 / 12, Feng Agung 2 vs 3", () => {
+    const P = "Pasangan Seks Saya Seorang Dokter Kandungan Episode";
+    const r = mergeServers([
+      lulu("p12a", `${P} 1 - 2`, "2026-10-30"),
+      tapeD("p12b", `${P} 1 2`, "2026-10-30"),
+      byseD("p12c", `${P} 1-2`, "2026-10-30"),
+      tapeD("p12x", `${P} 12`, "2026-10-29"),
+      lulu("p10", `${P} 10`, "2026-10-30"),
+      tapeD("p1", `${P} 1`, "2026-10-30"),
+      lulu("f2", "Penjaga Malam Feng Agung 2 Versi Modifikasi", "2026-10-30"),
+      tapeD("f3", "Penjaga Malam Feng Agung 3 Versi Modifikasi", "2026-10-30"),
+      lulu("h1", "Cinta di Halaman 1 2 Versi Modifikasi", "2026-10-30"),
+      tapeD("h12", "Cinta di Halaman 12 Versi Modifikasi", "2026-10-30"),
+    ]);
+    assert.deepEqual(
+      r.groups.map((g) => g.ids.slice().sort()),
+      [["p12a", "p12b"]],
+    );
+    // "1-2" glued reads as another series' episode 1, so its flat-title join is refused.
+    assert.ok(r.blocked.some((b) => b.why === "episode-differs" && b.ids.includes("p12c")));
+  });
+});
+
 describe("multiServerFrom", () => {
   it("maps every merged copy to its main and keeps the copy itself", () => {
     const items = [tape("old1", { createdAt: 1 }), indo("new1", { createdAt: 2 })];
