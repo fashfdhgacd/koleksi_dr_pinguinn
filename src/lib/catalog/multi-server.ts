@@ -15,8 +15,14 @@
  *  - never merged: Videy, generic / auto titles, numbered brand titles ("Koleksi Dr Pinguin 12"),
  *    keys shorter than 16 chars or 3 words (6 chars for CJK titles);
  *  - series titles keep the episode in the key, so Ep 2 only merges with Ep 2;
- *  - a group needs at least 2 different hosts; the same host twice only when those copies have the
- *    same known duration (a re-upload), otherwise the whole group is left alone;
+ *  - copies also meet on the whole title as letters and digits ("[Ailin] … Bab 1 (Kisah …)" =
+ *    "Ailin … Bab 1 Kisah …"), with a boundary kept between separate numbers so "1 - 2" / "1 2" never
+ *    equals "12"; a group whose copies still read as different episodes is left alone;
+ *  - a group needs at least 2 different hosts. The same host twice joins when those copies have the
+ *    same known duration, or come from different upload days that each put the video on 2+ hosts
+ *    (the same multi-host upload sent again, Oct 29 + Oct 30 2026). Any other same-host copy is a
+ *    duplicate: only the first joins and the rest keep their own page. Same-host copies whose known
+ *    durations differ leave the whole group alone;
  *  - known durations may differ by at most max(20 s, 10 %), otherwise the group is left alone.
  * Main page: the oldest IndoAV copy when there is one (IndoAV is never hurt), else the oldest copy.
  * Server order: IndoAV, LuluStream, DoodStream, Streampie, Streamtape, Putarin, UserBokep, Byse last.
@@ -114,8 +120,21 @@ export function mergeKeyOf(it: ServerItem): { key: string | null; why: SkipReaso
   const cjk = CJK.test(k);
   if ((!cjk && (k.length < 16 || words.length < 3)) || (cjk && k.length < 6)) return { key: null, why: "too-short" };
   const s = parseSeries(String(it.title || ""));
-  return s ? { key: `${s.key}#${s.ep}.${s.sub}`, why: "series" } : { key: `x:${k}`, why: "title" };
+  return s ? { key: `${s.key}#${s.ep}.${s.sub}`, why: "series" } : { key: `x:${flatKey(lower)}`, why: "title" };
 }
+
+/** Letters and digits of a cleaned lower-case title, with "_" between two separate numbers. */
+function flatKey(lower: string): string {
+  return lower.replace(/(\p{N})[^\p{L}\p{N}]+(?=\p{N})/gu, "$1_").replace(/[^\p{L}\p{N}_]+/gu, "");
+}
+
+/** Every key a copy can meet another copy on: its merge key and its whole flat title. */
+function keysOf(it: ServerItem, key: string): string[] {
+  return [key, `f:${flatKey(cleanTitle(it.title).toLowerCase())}`];
+}
+
+/** Episode of a series key ("…#3.0"), "" for a plain title. */
+const episodeOf = (key: string): string => (/#\d+\.\d+$/.exec(key)?.[0] ?? "");
 
 function durationOf(it: ServerItem): number {
   const d = Number(it.duration);
@@ -132,6 +151,14 @@ function timeOf(it: ServerItem): number {
   return n < 1e12 ? n * 1000 : n;
 }
 
+/** Upload day (UTC) of a copy, "" when unknown (unknown days count as one day). */
+function dayOf(it: ServerItem): string {
+  const t = timeOf(it);
+  return Number.isFinite(t) ? new Date(t).toISOString().slice(0, 10) : "";
+}
+
+const hasPoster = (it: ServerItem): boolean => Boolean(String(it.poster || it.thumbnail || "").trim());
+
 export type ServerGroup = {
   key: string;
   /** Main page id (canonical, sitemap, listings). */
@@ -143,14 +170,24 @@ export type ServerGroup = {
 
 export type MergeResult = {
   groups: ServerGroup[];
-  blocked: Array<{ key: string; ids: string[]; why: "host-twice" | "duration-differs" }>;
+  blocked: Array<{ key: string; ids: string[]; why: "host-twice" | "duration-differs" | "episode-differs" }>;
+  /** Same host, same upload day: copies left out of a group (they keep their own page). */
+  extra: Array<{ key: string; id: string; host: ServerHost }>;
   skip: Partial<Record<SkipReason, number>>;
 };
 
 export function mergeServers(items: readonly ServerItem[]): MergeResult {
-  const byKey = new Map<string, { it: ServerItem; host: ServerHost; at: number }[]>();
+  type Row = { it: ServerItem; host: ServerHost; at: number; key: string };
+  const rows: Row[] = [];
   const skip: Partial<Record<SkipReason, number>> = {};
   const seen = new Set<string>();
+  // Union-find over the copies: two copies are one video when they share any key (keysOf).
+  const parent: number[] = [];
+  const find = (i: number): number => {
+    while (parent[i] !== i) i = parent[i] = parent[parent[i]];
+    return i;
+  };
+  const firstOf = new Map<string, number>();
   items.forEach((it, at) => {
     if (!it?.id || seen.has(it.id)) return;
     seen.add(it.id);
@@ -160,36 +197,105 @@ export function mergeServers(items: readonly ServerItem[]): MergeResult {
       skip[r] = (skip[r] || 0) + 1;
       return;
     }
-    const row = { it, host: serverHostOf(it), at };
-    const list = byKey.get(key);
+    const i = rows.length;
+    rows.push({ it, host: serverHostOf(it), at, key });
+    parent.push(i);
+    for (const k of keysOf(it, key)) {
+      const j = firstOf.get(k);
+      if (j === undefined) firstOf.set(k, i);
+      else {
+        const a = find(i);
+        const b = find(j);
+        if (a !== b) parent[Math.max(a, b)] = Math.min(a, b);
+      }
+    }
+  });
+  const byRoot = new Map<number, Row[]>();
+  rows.forEach((row, i) => {
+    const r = find(i);
+    const list = byRoot.get(r);
     if (list) list.push(row);
-    else byKey.set(key, [row]);
+    else byRoot.set(r, [row]);
   });
   const groups: ServerGroup[] = [];
   const blocked: MergeResult["blocked"] = [];
-  for (const [key, arr] of byKey) {
-    if (arr.length < 2) continue;
-    const hosts = new Set(arr.map((x) => x.host));
-    if (hosts.size < 2) continue;
-    const ids = arr.map((x) => x.it.id);
-    const perHost = new Map<string, number[]>();
-    for (const x of arr) {
-      const l = perHost.get(x.host);
-      if (l) l.push(durationOf(x.it));
-      else perHost.set(x.host, [durationOf(x.it)]);
+  const extra: MergeResult["extra"] = [];
+  const oldest = (a: Row, b: Row) => timeOf(a.it) - timeOf(b.it) || rankOf(a.host) - rankOf(b.host) || a.at - b.at;
+  const queue = [...byRoot.values()];
+  for (let q = 0; q < queue.length; q++) {
+    const all = queue[q];
+    if (all.length < 2) continue;
+    if (new Set(all.map((x) => x.host)).size < 2) continue;
+    const key = all.slice().sort(oldest)[0].key;
+    const ids = all.map((x) => x.it.id);
+    // Copies joined through the flat title must still agree on the episode; when they do not, the
+    // flat-title join is dropped and each merge key is tried on its own.
+    const eps = new Set(all.map((x) => episodeOf(x.key)).filter(Boolean));
+    if (eps.size > 1) {
+      blocked.push({ key, ids, why: "episode-differs" });
+      const byKey = new Map<string, Row[]>();
+      for (const x of all) {
+        const l = byKey.get(x.key);
+        if (l) l.push(x);
+        else byKey.set(x.key, [x]);
+      }
+      queue.push(...byKey.values());
+      continue;
     }
-    const dupOk = [...perHost.values()].every((ds) => ds.length < 2 || ds.every((d) => d > 0 && d === ds[0]));
-    if (!dupOk) {
+    // Same host twice: different known durations block the group. Without matching durations, a
+    // copy joins from each upload day that put the video on 2+ hosts (a whole re-upload); otherwise
+    // only the first copy of that host joins (one with a poster first, then the oldest).
+    const perHost = new Map<string, Row[]>();
+    for (const x of all) {
+      const l = perHost.get(x.host);
+      if (l) l.push(x);
+      else perHost.set(x.host, [x]);
+    }
+    // Hosts per upload day: a day counts as its own upload only when it put the video on 2+ hosts.
+    const dayHosts = new Map<string, Set<string>>();
+    for (const x of all) {
+      const d = dayOf(x.it);
+      const set = dayHosts.get(d);
+      if (set) set.add(x.host);
+      else dayHosts.set(d, new Set([x.host]));
+    }
+    let hostClash = false;
+    const left = new Set<Row>();
+    for (const list of perHost.values()) {
+      if (list.length < 2) continue;
+      const known = list.map((x) => durationOf(x.it)).filter((d) => d > 0);
+      if (new Set(known).size > 1) {
+        hostClash = true;
+        break;
+      }
+      if (known.length === list.length) continue; // same known duration: a re-upload
+      const days = list.map((x) => dayOf(x.it));
+      const ownUploads = days.every((d) => (dayHosts.get(d)?.size || 0) >= 2);
+      const byDay = new Map<string, Row[]>();
+      list.forEach((x, i) => {
+        const d = ownUploads ? days[i] : "";
+        const l = byDay.get(d);
+        if (l) l.push(x);
+        else byDay.set(d, [x]);
+      });
+      for (const same of byDay.values()) {
+        if (same.length < 2) continue;
+        const keep = same.slice().sort((a, b) => Number(hasPoster(b.it)) - Number(hasPoster(a.it)) || oldest(a, b))[0];
+        for (const x of same) if (x !== keep) left.add(x);
+      }
+    }
+    if (hostClash) {
       blocked.push({ key, ids, why: "host-twice" });
       continue;
     }
+    const arr = all.filter((x) => !left.has(x));
+    if (new Set(arr.map((x) => x.host)).size < 2) continue;
     const ds = arr.map((x) => durationOf(x.it));
     if (!ds.every((a) => ds.every((b) => durOk(a, b)))) {
       blocked.push({ key, ids, why: "duration-differs" });
       continue;
     }
-    const oldest = (a: (typeof arr)[number], b: (typeof arr)[number]) =>
-      timeOf(a.it) - timeOf(b.it) || rankOf(a.host) - rankOf(b.host) || a.at - b.at;
+    for (const x of all) if (left.has(x)) extra.push({ key, id: x.it.id, host: x.host });
     const indo = arr.filter((x) => x.host === "IndoAV").sort(oldest);
     const main = (indo[0] || arr.slice().sort(oldest)[0]).it.id;
     const ordered = arr
@@ -202,7 +308,7 @@ export function mergeServers(items: readonly ServerItem[]): MergeResult {
       );
     groups.push({ key, main, ids: ordered.map((x) => x.it.id), hosts: ordered.map((x) => x.host) });
   }
-  return { groups, blocked, skip };
+  return { groups, blocked, extra, skip };
 }
 
 /** Lookup form kept on the built catalog (local-cache.ts). */
