@@ -1,7 +1,7 @@
 [
   {
     "id": "aZ397b6q7Atxk4Q",
-    "title": "sebuah perjalanan tak terungkapkan melalui masa di kampus Episode 1 - koleksidrpinguin.com",
+    "title": "Sebuah Perjalanan Tak Terungkapkan Melalui Masa di Kampus Episode 1 - koleksidrpinguin.com",
     "embed": "https://streamtape.com/e/aZ397b6q7Atxk4Q",
     "direct": "https://streamtape.com/e/aZ397b6q7Atxk4Q",
     "source": "Streamtape",
@@ -15,7 +15,9 @@
     "date": "2026-10-30",
     "updated_at": "2026-10-30T03:20:24.047Z",
     "poster": "https://thumb.tapecontent.net/thumb/aZ397b6q7Atxk4Q/LqWqwbG9joSRVZe.jpg",
-    "thumbnail": "https://thumb.tapecontent.net/thumb/aZ397b6q7Atxk4Q/LqWqwbG9joSRVZe.jpg"
+    "thumbnail": "https://thumb.tapecontent.net/thumb/aZ397b6q7Atxk4Q/LqWqwbG9joSRVZe.jpg",
+    "hidden": true,
+    "hidden_reason": "duplicate-copy"
   },
   {
     "id": "by-0vo43hj8ikb9",
@@ -160,7 +162,7 @@
   },
   {
     "id": "by-0sjgd1uu9jbi",
-    "title": "Sebuah Perjalanan Tak Terungkapkan Melalui Masa Muda di Kampus Episode 1 - koleksidrpinguin.com",
+    "title": "Sebuah Perjalanan Tak Terungkapkan Melalui Masa di Kampus Episode 1 - koleksidrpinguin.com",
     "embed": "https://bysejikuar.com/e/0sjgd1uu9jbi",
     "direct": "https://bysejikuar.com/e/0sjgd1uu9jbi",
     "source": "Byse",
@@ -173,9 +175,7 @@
     ],
     "date": "2026-10-30",
     "updated_at": "2026-10-30T02:45:59.665Z",
-    "code": "0sjgd1uu9jbi",
-    "hidden": true,
-    "hidden_reason": "youth-campus"
+    "code": "0sjgd1uu9jbi"
   },
   {
     "id": "by-46436hnpa8tl",
@@ -1598,7 +1598,7 @@
   },
   {
     "id": "eKooG1PeeBI9gk",
-    "title": "sebuah perjalanan tak terungkapkan melalui masa muda di kampus Episode 1 - koleksidrpinguin.com",
+    "title": "Sebuah Perjalanan Tak Terungkapkan Melalui Masa di Kampus Episode 1 - koleksidrpinguin.com",
     "embed": "https://streamtape.com/e/eKooG1PeeBI9gk",
     "direct": "https://streamtape.com/e/eKooG1PeeBI9gk",
     "source": "Streamtape",
@@ -1612,9 +1612,7 @@
     "date": "2026-10-30",
     "updated_at": "2026-10-30T02:45:59.665Z",
     "poster": "https://thumb.tapecontent.net/thumb/eKooG1PeeBI9gk/ajKyRVmzKoiWxB.jpg",
-    "thumbnail": "https://thumb.tapecontent.net/thumb/eKooG1PeeBI9gk/ajKyRVmzKoiWxB.jpg",
-    "hidden": true,
-    "hidden_reason": "youth-campus"
+    "thumbnail": "https://thumb.tapecontent.net/thumb/eKooG1PeeBI9gk/ajKyRVmzKoiWxB.jpg"
   },
   {
     "id": "bgKpY80p2xHPv4A",
@@ -2902,7 +2900,7 @@
   },
   {
     "id": "lu-p98wiz07mm6p",
-    "title": "sebuah perjalanan tak terungkapkan melalui masa muda di kampus Episode 1 - koleksidrpinguin.com",
+    "title": "Sebuah Perjalanan Tak Terungkapkan Melalui Masa di Kampus Episode 1 - koleksidrpinguin.com",
     "embed": "https://luluvdo.com/e/p98wiz07mm6p",
     "direct": "https://luluvdo.com/e/p98wiz07mm6p",
     "source": "LuluStream",
@@ -2917,9 +2915,7 @@
     "updated_at": "2026-10-30T02:45:59.665Z",
     "poster": "https://img.lulucdn.com/p98wiz07mm6p_xt.jpg",
     "thumbnail": "https://img.lulucdn.com/p98wiz07mm6p_xt.jpg",
-    "code": "p98wiz07mm6p",
-    "hidden": true,
-    "hidden_reason": "youth-campus"
+    "code": "p98wiz07mm6p"
   },
   {
     "id": "lu-b4z7azyz3xo0",
