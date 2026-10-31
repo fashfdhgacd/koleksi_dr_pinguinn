@@ -104,6 +104,10 @@ export type CatalogRow = {
   hidden: boolean;
   locked: boolean;
   noThumb?: boolean;
+  /** Plays as a server of this main page (merged). */
+  mergedInto?: string;
+  /** Main page of a merged group: number of servers. */
+  servers?: number;
 };
 
 type Overview = {
@@ -489,6 +493,43 @@ function VideoRows({
   const [patched, setPatched] = useState<
     Record<string, { title?: string; categoryLabel?: string; category?: string; extra?: string[] }>
   >({});
+  const [merging, setMerging] = useState(false);
+  /** "Gabung jadi satu" / "Pisahkan": one owner action, one KV write (owner-tools merge-videos). */
+  async function mergeSel(op: "merge" | "unmerge") {
+    const ids = [...sel];
+    if (op === "merge" && ids.length < 2) return;
+    const ask =
+      op === "merge"
+        ? `Gabung ${ids.length} video jadi satu halaman (tiap video jadi tombol server)?`
+        : `Pisahkan ${ids.length} video (dan grupnya) jadi halaman sendiri lagi?`;
+    if (!window.confirm(ask)) return;
+    setMerging(true);
+    try {
+      const res = await fetch("/api/owner-tools", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-online-key": secret },
+        body: JSON.stringify({ action: "merge-videos", op, ids }),
+      });
+      const d = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; main?: string; servers?: number } | null;
+      if (!d?.ok) {
+        ownerToast(`Gagal: ${d?.error || res.status}`);
+        return;
+      }
+      setNote(
+        op === "merge"
+          ? d.main
+            ? `Digabung: 1 halaman (${d.main}) dengan ${d.servers || ids.length} server. Halaman lain diarahkan ke sana.`
+            : "Tersimpan. Gabungan tampil dalam ±1 menit."
+          : "Dipisahkan: tiap video punya halaman sendiri lagi (±1 menit).",
+      );
+      setSel(new Set());
+      onChanged();
+    } catch {
+      ownerToast("Gagal: koneksi bermasalah.");
+    } finally {
+      setMerging(false);
+    }
+  }
   async function hide(r: CatalogRow) {
     setBusy(r.id);
     try {
@@ -529,6 +570,16 @@ function VideoRows({
           />
           Pilih semua di halaman ini ({fmt(rows.length)})
         </label>
+        {sel.size >= 2 ? (
+          <button type="button" className={btn} disabled={merging} onClick={() => void mergeSel("merge")}>
+            Gabung jadi satu ({fmt(sel.size)})
+          </button>
+        ) : null}
+        {rows.some((r) => sel.has(r.id) && (r.mergedInto || r.servers)) ? (
+          <button type="button" className={btn} disabled={merging} onClick={() => void mergeSel("unmerge")}>
+            Pisahkan
+          </button>
+        ) : null}
       </div>
       <BulkTagBar
         secret={secret}
@@ -573,6 +624,11 @@ function VideoRows({
                   · {r.source}
                   {r.noThumb ? " · Gambar belum ketemu" : showTime && r.createdAt ? ` · ${timeWib(r.createdAt)}` : ""}
                   {r.locked ? " · terkunci" : r.hidden ? " · tersembunyi" : ""}
+                  {r.mergedInto ? (
+                    <span className="text-[#2dd4bf]"> · digabung, jadi server dari {r.mergedInto}</span>
+                  ) : r.servers ? (
+                    <span className="text-[#2dd4bf]"> · halaman utama, {r.servers} server</span>
+                  ) : null}
                 </span>
               </a>
               {r.locked || r.hidden ? (
