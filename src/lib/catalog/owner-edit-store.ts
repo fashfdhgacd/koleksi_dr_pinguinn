@@ -13,14 +13,45 @@ import { resolveAnalyticsKV } from "@/lib/analytics-kv";
 /** `extra`: additional category slugs the video also appears in (besides its main `category`). */
 export type OwnerEdit = { title?: string; category?: string; extra?: string[]; at: number };
 export const MAX_EXTRA_CATEGORIES = 6;
-export type OwnerEditState = { ids: Record<string, OwnerEdit> };
+/**
+ * Manual multi-server merges from /pemilik ("Gabung jadi satu" / "Pisahkan"), same KV blob.
+ * `merges`: groups of ids the owner joined into one page (multi-server.ts applyManualMerges).
+ * `splits`: ids the owner split off an automatic same-title group (they keep their own page).
+ * Written only on those owner actions; nothing is ever deleted from the catalog.
+ */
+export type OwnerMerges = { merges: string[][]; splits: string[] };
+export type OwnerEditState = { ids: Record<string, OwnerEdit>; merges?: string[][]; splits?: string[] };
+const MAX_MERGE_GROUPS = 1000;
+export const MAX_MERGE_IDS = 20;
 
 const KEY = "owner:edit:v1";
 const ID_RE = /^[A-Za-z0-9_-]{3,64}$/;
 const SLUG_RE = /^[A-Za-z0-9_-]{1,60}$/;
 
+/** Valid, disjoint groups of 2+ ids (an id stays in the first group that lists it) + split ids. */
+export function cleanMerges(raw: { merges?: unknown; splits?: unknown } | null | undefined): OwnerMerges {
+  const taken = new Set<string>();
+  const merges: string[][] = [];
+  for (const g of Array.isArray(raw?.merges) ? raw.merges : []) {
+    if (!Array.isArray(g) || merges.length >= MAX_MERGE_GROUPS) continue;
+    const ids = [...new Set(g.map(String).filter((id) => ID_RE.test(id) && !taken.has(id)))].slice(0, MAX_MERGE_IDS);
+    if (ids.length < 2) continue;
+    for (const id of ids) taken.add(id);
+    merges.push(ids);
+  }
+  const splits = [...new Set((Array.isArray(raw?.splits) ? raw.splits : []).map(String))]
+    .filter((id) => ID_RE.test(id) && !taken.has(id))
+    .slice(0, MAX_MERGE_GROUPS * 4);
+  return { merges, splits };
+}
+
 function clean(raw: unknown): OwnerEditState {
-  const out: OwnerEditState = { ids: {} };
+  const m = cleanMerges(raw as { merges?: unknown; splits?: unknown });
+  const out: OwnerEditState = {
+    ids: {},
+    ...(m.merges.length ? { merges: m.merges } : {}),
+    ...(m.splits.length ? { splits: m.splits } : {}),
+  };
   const ids = (raw as { ids?: unknown })?.ids;
   if (!ids || typeof ids !== "object") return out;
   for (const [id, v] of Object.entries(ids as Record<string, unknown>)) {
@@ -156,4 +187,43 @@ export async function bulkEditOwnerExtra(
   const extra: Record<string, string[]> = {};
   for (const id of changed) extra[id] = cleaned.ids[id]?.extra || [];
   return { changed, unchanged, full, extra };
+}
+
+/**
+ * "Gabung jadi satu" (merge) / "Pisahkan" (unmerge) for the ids picked in /pemilik, in ONE KV read +
+ * ONE KV write, only on that owner action.
+ * merge: the ids (plus any manual group that already holds one of them) become one manual group,
+ * and they are no longer split off automatic groups.
+ * unmerge: every manual group holding one of the ids is removed, and the ids are split off
+ * automatic same-title groups, so each gets its own page again. `autoMates` (optional) lists the
+ * other ids of their automatic groups, which are split too so the whole group comes apart.
+ */
+export async function setOwnerMerges(
+  ids: string[],
+  op: "merge" | "unmerge",
+  autoMates: string[] = [],
+): Promise<OwnerMerges> {
+  const pick = [...new Set(ids.filter((id) => ID_RE.test(id)))];
+  const r = await resolveAnalyticsKV();
+  if (!r) throw new Error("kv_unavailable");
+  const state = await readForWrite(r.kv as never);
+  const cur = cleanMerges(state);
+  const set = new Set(pick);
+  let merges = cur.merges;
+  let splits = cur.splits;
+  if (op === "merge") {
+    const joined = new Set(pick);
+    for (const g of merges) if (g.some((id) => set.has(id))) for (const id of g) joined.add(id);
+    if (joined.size > MAX_MERGE_IDS) throw new Error("too_many");
+    merges = [...merges.filter((g) => !g.some((id) => set.has(id))), [...joined]];
+    splits = splits.filter((id) => !joined.has(id));
+  } else {
+    const freed = new Set([...pick, ...autoMates.filter((id) => ID_RE.test(id))]);
+    for (const g of merges) if (g.some((id) => set.has(id))) for (const id of g) freed.add(id);
+    merges = merges.filter((g) => !g.some((id) => set.has(id)));
+    splits = [...new Set([...splits, ...freed])];
+  }
+  const next = clean({ ...state, merges, splits });
+  await r.kv.put(KEY, JSON.stringify(next));
+  return { merges: next.merges || [], splits: next.splits || [] };
 }

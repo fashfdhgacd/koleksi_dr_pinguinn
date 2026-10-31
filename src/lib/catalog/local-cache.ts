@@ -65,7 +65,15 @@ import { isGenericTitle } from "./generic-title.js";
 import putarinFeedSnapshot from "./putarin-feed-20261007.json";
 import { restoreBuild, serializeBuild } from "./build-snapshot";
 import { keepAlive, readSnapshot, snapshotKey, writeSnapshot } from "./build-snapshot-store";
-import { borrowedPosters, emptyMultiServer, mergeServers, multiServerFrom, type MultiServer } from "./multi-server";
+import {
+  applyManualMerges,
+  borrowedPosters,
+  borrowedTitles,
+  emptyMultiServer,
+  mergeServers,
+  multiServerFrom,
+  type MultiServer,
+} from "./multi-server";
 
 // Re-bind mutable cache/inflight via shared module namespace
 import { runtime } from "./local-shared";
@@ -175,6 +183,10 @@ const AUTO_META = autoMetaFile as Record<string, AutoMeta>;
 type OwnerEditLite = { title?: string; category?: string; extra?: string[] };
 let EDITS: Record<string, OwnerEditLite> = {};
 let editsKey = "";
+/** Owner manual merges / splits (same KV blob, owner-edit-store.ts), applied by buildIndexes. */
+export type ManualMergesLite = { merges: string[][]; splits: string[] };
+let MERGES: ManualMergesLite = { merges: [], splits: [] };
+let mergesKey = "";
 
 function overrideTitle(id: string): string {
   return String(EDITS[id]?.title || OVERRIDES[id]?.title || "");
@@ -325,6 +337,8 @@ type HideLists = {
   ownerHidden: string[] | null;
   /** Owner edits (null = could not read them; keep the previous ones). */
   edits: Record<string, OwnerEditLite> | null;
+  /** Owner merges (null = could not read them; keep the previous ones). */
+  merges?: ManualMergesLite | null;
 };
 
 async function fetchUnhiddenIds(): Promise<HideLists | null> {
@@ -340,13 +354,16 @@ async function fetchUnhiddenIds(): Promise<HideLists | null> {
         ownerHidden = null;
       }
       let edits: HideLists["edits"] = null;
+      let merges: HideLists["merges"] = null;
       try {
         const editMod = await import("./owner-edit-store");
-        edits = (await editMod.readOwnerEditState()).ids;
+        const editState = await editMod.readOwnerEditState();
+        edits = editState.ids;
+        merges = { merges: editState.merges || [], splits: editState.splits || [] };
       } catch {
         edits = null;
       }
-      return { unhidden: Object.keys(state.ids), ownerHidden, edits };
+      return { unhidden: Object.keys(state.ids), ownerHidden, edits, merges };
     }
     const res = await fetch("/api/hidden-ids");
     if (!res.ok) return null;
@@ -373,19 +390,27 @@ export function applyUnhidden(
   ids: Iterable<string>,
   ownerHidden?: Iterable<string> | null,
   edits?: Record<string, OwnerEditLite> | null,
+  merges?: ManualMergesLite | null,
 ): void {
   const next = new Set<string>(ids);
   const nextHidden = ownerHidden ? new Set<string>(ownerHidden) : OWNER_HIDDEN;
   const nextEdits = edits || EDITS;
   const nextEditsKey = edits ? JSON.stringify(edits) : editsKey;
+  const nextMerges = merges || MERGES;
+  const nextMergesKey = merges ? (merges.merges.length || merges.splits.length ? JSON.stringify(merges) : "") : mergesKey;
   const key =
-    keyOf(next) + (nextHidden.size ? `|hide:${keyOf(nextHidden)}` : "") + (nextEditsKey ? `|edit:${nextEditsKey}` : "");
+    keyOf(next) +
+    (nextHidden.size ? `|hide:${keyOf(nextHidden)}` : "") +
+    (nextEditsKey ? `|edit:${nextEditsKey}` : "") +
+    (nextMergesKey ? `|merge:${nextMergesKey}` : "");
   unhideCheckedAt = Date.now();
   if (key === unhideKey) return;
   UNHIDDEN = next;
   OWNER_HIDDEN = nextHidden;
   EDITS = nextEdits;
   editsKey = nextEditsKey;
+  MERGES = nextMerges;
+  mergesKey = nextMergesKey;
   unhideKey = key;
   const cur = runtime.cache as BuiltCache | null;
   // unhideKey first: a snapshot-restored cache assembles `raw` lazily, only when a rebuild needs it.
@@ -412,7 +437,7 @@ async function syncUnhidden(force = false): Promise<void> {
   unhideReadAt = startedAt;
   try {
     const lists = await fetchUnhiddenIds();
-    if (lists) applyUnhidden(lists.unhidden, lists.ownerHidden, lists.edits);
+    if (lists) applyUnhidden(lists.unhidden, lists.ownerHidden, lists.edits, lists.merges);
     else unhideCheckedAt = Date.now(); // keep the previous list; retry after the TTL
   } finally {
     if (unhideReadAt === startedAt) unhideReadAt = 0;
@@ -600,17 +625,21 @@ export function buildIndexes(
   if (videyNoThumbIds.size) items = items.filter((it) => !videyNoThumbIds.has(it.id));
   // Multi-server: copies of one video on other hosts fold into its main page (multi-server.ts).
   // Built from the published items only, so a hidden copy is never a server. Nothing is deleted.
-  const groups = mergeServers(items).groups;
+  // Owner "Gabung jadi satu" / "Pisahkan" (MERGES) apply on top of the automatic groups.
+  const groups = applyManualMerges(items, mergeServers(items).groups, MERGES);
   const multi = multiServerFrom(items, groups);
   if (multi.mainOf.size) {
     // A main page with no poster of its own shows the best poster of its other copies.
     const borrowed = borrowedPosters(items, groups, (it) => thumbOf(it, posters));
+    // A main page with a generic title (possible in a manual merge) shows a real title of a copy.
+    const titles = borrowedTitles(items, groups);
     items = items
       .filter((it) => !multi.mainOf.has(it.id))
       .map((it) => {
         const poster = borrowed.get(it.id);
-        if (!poster) return it;
-        const next = { ...it, poster };
+        const title = titles.get(it.id);
+        if (!poster && !title) return it;
+        const next = { ...it, ...(poster ? { poster } : {}), ...(title ? { title } : {}) };
         byId.set(it.id, next);
         return next;
       });

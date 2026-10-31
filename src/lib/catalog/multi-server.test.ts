@@ -1,6 +1,13 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { borrowedPosters, mergeServers, multiServerFrom, serverHostOf } from "./multi-server.ts";
+import {
+  applyManualMerges,
+  borrowedPosters,
+  borrowedTitles,
+  mergeServers,
+  multiServerFrom,
+  serverHostOf,
+} from "./multi-server.ts";
 
 const T = "Mahasiswi Cantik Main Di Kos Sampai Pagi";
 const indo = (id: string, extra: Record<string, unknown> = {}) => ({
@@ -207,5 +214,50 @@ describe("borrowedPosters", () => {
     assert.equal(borrowedPosters(items, mergeServers(items).groups, thumb).size, 0);
     const items2 = [indo("m2", { createdAt: 1 }), tape("t2", { createdAt: 2, poster: "https://koleksidrpinguin.com/api/puterin-thumb?id=t2" })];
     assert.equal(borrowedPosters(items2, mergeServers(items2).groups, thumb).size, 0);
+  });
+});
+
+describe("applyManualMerges", () => {
+  it("joins copies with different titles into one page; the IndoAV copy is main even when newer", () => {
+    const items = [
+      byse("byse1", { title: "Raja Episode 1", createdAt: 1000 }),
+      tape("tape1", { title: "Raja Eps 1 full", createdAt: 2000 }),
+      indo("indo1", { title: "Raja 1", createdAt: 4000 }),
+      byse("other", { title: "Lain Lagi Sama Sekali", createdAt: 500 }),
+    ];
+    const groups = applyManualMerges(items, [], { merges: [["byse1", "tape1", "indo1", "gone1"]], splits: [] });
+    assert.equal(groups.length, 1);
+    assert.equal(groups[0].main, "indo1");
+    assert.deepEqual([...groups[0].ids].sort(), ["byse1", "indo1", "tape1"]);
+    const ms = multiServerFrom(items, groups);
+    assert.equal(ms.servers.get("indo1")?.length, 3);
+    assert.equal(ms.mainOf.get("byse1"), "indo1");
+    assert.equal(ms.mainOf.has("other"), false);
+  });
+
+  it("without an IndoAV copy the oldest is main; the same host twice is allowed", () => {
+    const items = [byse("b-new", { createdAt: 5000 }), byse("b-old", { createdAt: 1000 }), tape("t-mid", { createdAt: 3000 })];
+    const [g] = applyManualMerges(items, [], { merges: [["b-new", "b-old", "t-mid"]], splits: [] });
+    assert.equal(g.main, "b-old");
+    assert.equal(g.ids.length, 3);
+  });
+
+  it("absorbs an automatic group it touches, and splits undo an automatic group", () => {
+    const items = [indo("i1", { createdAt: 1 }), tape("t1", { createdAt: 2 }), byse("b9", { title: "Judul Beda Total", createdAt: 3 })];
+    const auto = mergeServers(items).groups;
+    assert.equal(auto.length, 1);
+    const joined = applyManualMerges(items, auto, { merges: [["t1", "b9"]], splits: [] });
+    assert.equal(joined.length, 1);
+    assert.deepEqual([...joined[0].ids].sort(), ["b9", "i1", "t1"]);
+    assert.equal(joined[0].main, "i1");
+    assert.equal(applyManualMerges(items, auto, { merges: [], splits: ["i1", "t1"] }).length, 0);
+    assert.deepEqual(applyManualMerges(items, auto, { merges: [], splits: [] }), auto);
+  });
+
+  it("borrowedTitles gives a generic-titled main the real title of a copy", () => {
+    const items = [indo("i2", { title: "Video", createdAt: 1 }), tape("t2", { title: "Raja Episode 1 Asli", createdAt: 2 })];
+    const groups = applyManualMerges(items, [], { merges: [["i2", "t2"]], splits: [] });
+    assert.equal(groups[0].main, "i2");
+    assert.equal(borrowedTitles(items, groups).get("i2"), "Raja Episode 1 Asli");
   });
 });
