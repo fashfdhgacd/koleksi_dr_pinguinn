@@ -370,3 +370,84 @@ export function borrowedPosters<T extends ServerItem>(
   }
   return out;
 }
+
+/**
+ * Owner merges on top of the automatic groups (KV owner:edit:v1, owner-edit-store.ts).
+ * - `splits`: ids taken out of automatic groups (a group left with < 2 copies is dropped).
+ * - `merges`: each manual group becomes one page; automatic groups touching it are absorbed.
+ *   Main = the oldest IndoAV copy, else the oldest copy; servers in host order like automatic groups.
+ * Only ids present in `items` (published copies) count, so a hidden copy is never a server.
+ */
+export function applyManualMerges(
+  items: readonly ServerItem[],
+  auto: readonly ServerGroup[],
+  manual: { merges: readonly (readonly string[])[]; splits: readonly string[] },
+): ServerGroup[] {
+  if (!manual.merges.length && !manual.splits.length) return auto.slice();
+  const byId = new Map<string, { it: ServerItem; at: number }>();
+  items.forEach((it, at) => {
+    if (it?.id && !byId.has(it.id)) byId.set(it.id, { it, at });
+  });
+  const split = new Set(manual.splits);
+  let groups = auto.map((g) => g.ids.filter((id) => !split.has(id))).filter((ids) => ids.length >= 2);
+  const keyOf = new Map<string, string>(auto.flatMap((g) => g.ids.map((id) => [id, g.key] as [string, string])));
+  const out: ServerGroup[] = [];
+  const taken = new Set<string>();
+  const build = (ids: string[], key: string): ServerGroup | null => {
+    const rows = ids.map((id) => byId.get(id)).filter((x): x is { it: ServerItem; at: number } => Boolean(x));
+    if (rows.length < 2) return null;
+    const oldest = (a: { it: ServerItem; at: number }, b: { it: ServerItem; at: number }) =>
+      timeOf(a.it) - timeOf(b.it) || a.at - b.at;
+    const indo = rows.filter((x) => serverHostOf(x.it) === "IndoAV").sort(oldest);
+    const main = (indo[0] || rows.slice().sort(oldest)[0]).it.id;
+    const ordered = rows
+      .slice()
+      .sort(
+        (a, b) =>
+          rankOf(serverHostOf(a.it)) - rankOf(serverHostOf(b.it)) ||
+          Number(b.it.id === main) - Number(a.it.id === main) ||
+          oldest(a, b),
+      );
+    return { key, main, ids: ordered.map((x) => x.it.id), hosts: ordered.map((x) => serverHostOf(x.it)) };
+  };
+  for (const m of manual.merges) {
+    const ids = new Set(m.filter((id) => byId.has(id) && !taken.has(id)));
+    if (!ids.size) continue;
+    groups = groups.filter((g) => {
+      if (!g.some((id) => ids.has(id))) return true;
+      for (const id of g) if (!taken.has(id)) ids.add(id);
+      return false;
+    });
+    const g = build([...ids], `manual:${[...ids].sort()[0]}`);
+    if (!g) continue;
+    for (const id of g.ids) taken.add(id);
+    out.push(g);
+  }
+  for (const ids of groups) {
+    const g = build(ids, keyOf.get(ids[0]) || `auto:${ids[0]}`);
+    if (g) out.push(g);
+  }
+  return out;
+}
+
+/**
+ * Title for each main page whose own title is generic (manual merges can pick such a main), taken
+ * from the first other copy in server order with a real title (one that has a merge key).
+ */
+export function borrowedTitles<T extends ServerItem>(items: readonly T[], groups: readonly ServerGroup[]): Map<string, string> {
+  const byId = new Map<string, T>();
+  for (const it of items) if (it?.id && !byId.has(it.id)) byId.set(it.id, it);
+  const out = new Map<string, string>();
+  for (const g of groups) {
+    const main = byId.get(g.main);
+    if (!main || mergeKeyOf(main).key) continue;
+    for (const id of g.ids) {
+      const it = id === g.main ? undefined : byId.get(id);
+      if (it && mergeKeyOf(it).key) {
+        out.set(g.main, String(it.title || ""));
+        break;
+      }
+    }
+  }
+  return out;
+}

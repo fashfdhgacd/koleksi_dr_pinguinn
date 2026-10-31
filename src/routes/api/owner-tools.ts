@@ -17,6 +17,7 @@ import {
   applyUnhidden,
   isLockedMinor,
   loadItemsRaw,
+  multiServerOf,
   type HiddenCandidate,
 } from "@/lib/catalog/local-cache";
 import { isDrpBokep, isPutarin, javCoverFromTitle, PLACEHOLDER_IMAGE_RE, slugOf, sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
@@ -32,7 +33,14 @@ import { explainTitle } from "@/lib/catalog/minor-context.js";
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
-import { MAX_EXTRA_CATEGORIES, bulkEditOwnerExtra, readOwnerEditState, setOwnerEdit } from "@/lib/catalog/owner-edit-store";
+import {
+  MAX_EXTRA_CATEGORIES,
+  MAX_MERGE_IDS,
+  bulkEditOwnerExtra,
+  readOwnerEditState,
+  setOwnerEdit,
+  setOwnerMerges,
+} from "@/lib/catalog/owner-edit-store";
 import { isOwnerRequest, ownerSecret } from "@/lib/owner-auth";
 import { runPosterFill } from "@/lib/poster-fill";
 import {
@@ -358,6 +366,10 @@ type CatalogRow = {
   locked: boolean;
   /** Owner's own Byse/Lulu/Dood upload without any poster: the site shows the penguin logo. */
   noThumb: boolean;
+  /** Merged into this main page ("Gabung jadi satu" or same title): it plays as one of its servers. */
+  mergedInto?: string;
+  /** Main page of a multi-server group: number of servers (copies) it shows. */
+  servers?: number;
 };
 
 type BuiltLike = {
@@ -420,6 +432,7 @@ function toCatalogRow(
   shown: RawItem | undefined,
   hidden: boolean,
   posters?: Record<string, string>,
+  merge?: ReturnType<typeof multiServerOf>,
 ): CatalogRow {
   const view = shown || it;
   const slug = slugOf(view);
@@ -436,6 +449,8 @@ function toCatalogRow(
     hidden,
     locked: isLockedItem(it),
     noThumb: lacksThumb(it, posters),
+    ...(merge?.mainOf.get(it.id) ? { mergedInto: merge.mainOf.get(it.id) } : {}),
+    ...((merge?.servers.get(it.id)?.length || 0) > 1 ? { servers: merge!.servers.get(it.id)!.length } : {}),
   };
 }
 
@@ -443,8 +458,10 @@ async function catalogBase(): Promise<{ raw: RawItem[]; cache: BuiltLike; hidden
   const cache = (await loadItemsRaw()) as unknown as BuiltLike;
   const raw = cache.raw || cache.items;
   const shownIds = new Set(cache.items.map((it) => it.id));
+  // A copy merged into another page is not hidden: it plays as a server of that page.
+  const merged = multiServerOf(cache as never).mainOf;
   const hidden = new Set<string>();
-  for (const it of raw) if (it?.id && !shownIds.has(it.id)) hidden.add(it.id);
+  for (const it of raw) if (it?.id && !shownIds.has(it.id) && !merged.has(it.id)) hidden.add(it.id);
   return { raw, cache, hidden };
 }
 
@@ -497,13 +514,13 @@ async function handleCatalogOverview(
     .sort((a, b) => b.t - a.t);
   const page = recent0
     .slice(offset, offset + limit)
-    .map(({ it }) => toCatalogRow(it, cache.byId?.get(it.id), hidden.has(it.id), posters));
+    .map(({ it }) => toCatalogRow(it, cache.byId?.get(it.id), hidden.has(it.id), posters, multiServerOf(cache as never)));
   // "Perlu dicek": Jav items whose title looks like an episode (maybe hentai). Owner moves them in one tap.
   const EP_RE = /\b(?:episode|ep)\.?\s*\d{1,3}\b/i;
   const checkRows = cache.items
     .filter((it) => slugOf(it) === "jav" && EP_RE.test(String(it.title || "")))
     .slice(0, 40)
-    .map((it) => toCatalogRow(it, cache.byId?.get(it.id), hidden.has(it.id), posters));
+    .map((it) => toCatalogRow(it, cache.byId?.get(it.id), hidden.has(it.id), posters, multiServerOf(cache as never)));
   const dead = deadSources as { checkedAt?: string | null };
   return json({
     ok: true,
@@ -543,7 +560,7 @@ async function handleThumbMissing(body: { limit?: unknown; offset?: unknown } = 
     ok: true,
     total: rows.length,
     offset,
-    items: rows.slice(offset, offset + limit).map(({ it }) => toCatalogRow(it, it, false, cache.posters)),
+    items: rows.slice(offset, offset + limit).map(({ it }) => toCatalogRow(it, it, false, cache.posters, multiServerOf(cache as never))),
   });
 }
 
@@ -627,7 +644,7 @@ async function handleCatalogSearch(body: { q?: unknown; limit?: unknown; offset?
     total: hits.length,
     offset,
     limit,
-    items: hits.slice(offset, offset + limit).map(({ it, shown }) => toCatalogRow(it, shown, hidden.has(it.id), cache.posters)),
+    items: hits.slice(offset, offset + limit).map(({ it, shown }) => toCatalogRow(it, shown, hidden.has(it.id), cache.posters, multiServerOf(cache as never))),
   });
 }
 
@@ -642,7 +659,7 @@ async function handleEditGet(body: { id?: unknown }) {
   const { raw, cache, hidden } = await catalogBase();
   const it = raw.find((x) => x?.id === id);
   if (!it) return json({ ok: false, error: "Video tidak ditemukan di katalog." }, 404);
-  const row = toCatalogRow(it, cache.byId?.get(id), hidden.has(id), cache.posters);
+  const row = toCatalogRow(it, cache.byId?.get(id), hidden.has(id), cache.posters, multiServerOf(cache as never));
   let stored: { extra?: string[]; category?: string } | undefined;
   try {
     stored = (await readOwnerEditState()).ids[id];
@@ -762,6 +779,61 @@ const BULK_MAX_IDS = 300;
 function cleanSlugList(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
   return [...new Set(v.map((s) => String(s).trim().toLowerCase()).filter(Boolean))].slice(0, 20);
+}
+
+/**
+ * "Gabung jadi satu" / "Pisahkan" from /pemilik: one KV read + one KV write (owner:edit:v1), only on
+ * this owner action. Merge: 2+ published copies become one page with a server button per copy
+ * (multi-server.ts applyManualMerges). Unmerge: the picked ids (and their whole group) get their own
+ * pages again. Nothing is deleted; locked (minor-flagged) videos are never merged.
+ */
+async function handleMergeVideos(body: { ids?: unknown; op?: unknown }) {
+  const op = body.op === "unmerge" ? "unmerge" : "merge";
+  const ids = Array.isArray(body.ids)
+    ? [...new Set(body.ids.map((s) => String(s).trim()).filter((s) => /^[A-Za-z0-9_-]{3,64}$/.test(s)))]
+    : [];
+  if (op === "merge" && ids.length < 2) return json({ ok: false, error: "Pilih minimal 2 video untuk digabung." }, 400);
+  if (!ids.length) return json({ ok: false, error: "Belum ada video yang dipilih." }, 400);
+  if (ids.length > MAX_MERGE_IDS) return json({ ok: false, error: `Maksimal ${MAX_MERGE_IDS} video sekali gabung.` }, 400);
+  const { raw, cache, hidden } = await catalogBase();
+  const byId = new Map<string, RawItem>();
+  for (const it of raw) if (it?.id && !byId.has(it.id)) byId.set(it.id, it);
+  const missing = ids.filter((id) => !byId.has(id));
+  if (missing.length) return json({ ok: false, error: `Video tidak ditemukan: ${missing.slice(0, 3).join(", ")}` }, 400);
+  if (op === "merge") {
+    const bad = ids.filter((id) => isLockedItem(byId.get(id)!) || hidden.has(id));
+    if (bad.length) return json({ ok: false, error: `Video terkunci/tersembunyi tidak bisa digabung: ${bad.slice(0, 3).join(", ")}` }, 400);
+  }
+  // Unmerge: the other copies of the picked ids' current groups (automatic ones too) come apart as well.
+  const multi = multiServerOf(cache as never);
+  const mates: string[] = [];
+  if (op === "unmerge") {
+    for (const id of ids) mates.push(...(multi.servers.get(multi.mainOf.get(id) || id) || []));
+  }
+  let res;
+  try {
+    res = await setOwnerMerges(ids, op, mates);
+  } catch (err) {
+    const msg = String((err as Error)?.message || err);
+    if (msg === "too_many") return json({ ok: false, error: `Satu halaman maksimal ${MAX_MERGE_IDS} server.` }, 400);
+    return json(
+      { ok: false, error: msg === "kv_unavailable" ? "Penyimpanan KV tidak tersedia." : `Gagal menyimpan: ${msg.slice(0, 120)}` },
+      503,
+    );
+  }
+  try {
+    const [unhide, hiddenState, edits] = await Promise.all([
+      readUnhideState(),
+      readOwnerHideState().catch(() => null),
+      readOwnerEditState(),
+    ]);
+    applyUnhidden(Object.keys(unhide.ids), hiddenState ? Object.keys(hiddenState.ids) : null, edits.ids, res);
+  } catch {
+    /* the regular 30 s sync applies it */
+  }
+  const after = multiServerOf((await loadItemsRaw()) as never);
+  const main = op === "merge" ? after.mainOf.get(ids[0]) || (after.servers.has(ids[0]) ? ids[0] : "") : "";
+  return json({ ok: true, op, main, servers: main ? after.servers.get(main)?.length || 0 : 0 });
 }
 
 /** One request, one KV write: add/remove extra category slugs on many videos. Never title/main category/hide. */
@@ -949,6 +1021,14 @@ export const Route = createFileRoute("/api/owner-tools")({
           } catch (err) {
             console.error("[owner-tools] edit-video", err);
             return json({ ok: false, error: `Edit gagal: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
+          }
+        }
+        if (body.action === "merge-videos") {
+          try {
+            return await handleMergeVideos(body as never);
+          } catch (err) {
+            console.error("[owner-tools] merge-videos", err);
+            return json({ ok: false, error: `Gabung gagal: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
           }
         }
         if (body.action === "bulk-tags") {
