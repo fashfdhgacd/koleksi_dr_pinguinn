@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-10-31T00:38:00Z",
+  "updatedAt": "2026-10-31T12:32:00Z",
   "currency": "USD",
   "source": "TrafficStars publisher report (UTC days)",
   "days": [
@@ -15,6 +15,6 @@
     { "date": "2026-10-28", "impressions": 16052, "clicks": 34, "earnings": 3.87 },
     { "date": "2026-10-29", "impressions": 19292, "clicks": 83, "earnings": 4.25 },
     { "date": "2026-10-30", "impressions": 20218, "clicks": 34, "earnings": 4.87 },
-    { "date": "2026-10-31", "impressions": 394, "clicks": 1, "earnings": 0.09 }
+    { "date": "2026-10-31", "impressions": 7068, "clicks": 9, "earnings": 1.82 }
   ]
 }
