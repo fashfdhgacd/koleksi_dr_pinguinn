@@ -23,7 +23,7 @@ export function owesAd(videoId: string): boolean {
 export function popTap(videoId: string): boolean {
   if (!owesAd(videoId)) return false;
   sendPlayerLog(videoId, "Videy", "pop_fire");
-  const r = firePop(videoId, POP_MAX_VIDEY);
+  const r = firePop(videoId, POP_MAX_VIDEY, "Videy");
   if (r === "ok") {
     sendPlayerLog(videoId, "Videy", "pop_ok");
     return true;

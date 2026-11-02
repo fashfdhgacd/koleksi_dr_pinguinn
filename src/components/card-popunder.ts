@@ -6,6 +6,9 @@
 // least POP_MIN_GAP_MS between two pops on the same video. sessionStorage only; timestamps are compared on tap
 // (no server writes, no timers). A blocked window.open counts nothing.
 // Counters: popc_fire / popc_ok / popc_block in player-log (once per video+event per session).
+// Every opened tab is also logged by its position for that video (pop_n1 / pop_n2 / pop_n3, one D1
+// upsert per opened tab, same beacon as today), so /pemilik can compare ALL our opens with
+// TrafficStars' paid impressions instead of only the first tab per video.
 import { sendPlayerLog, type PlayerLogHost } from "@/lib/player-log-client";
 
 const DIRECT_LINK = "https://fozekikikiminu.com/api/v1/direct/587547ff73c844b39ab9f02d1285154b";
@@ -67,7 +70,11 @@ export function popsLeft(videoId: string, max: number = POP_MAX_PER_VIDEO): bool
  * Opens the direct link synchronously (call inside the click handler). Returns "ok" when a tab
  * opened (counted), "block" when the browser blocked it (not counted), "skip" when the cap says no.
  */
-export function firePop(videoId: string, max: number = POP_MAX_PER_VIDEO): "ok" | "block" | "skip" {
+export function firePop(
+  videoId: string,
+  max: number = POP_MAX_PER_VIDEO,
+  host?: PlayerLogHost,
+): "ok" | "block" | "skip" {
   if (!canPop(videoId, max)) return "skip";
   let w: Window | null = null;
   try {
@@ -78,7 +85,9 @@ export function firePop(videoId: string, max: number = POP_MAX_PER_VIDEO): "ok" 
   }
   if (!w) return "block";
   const st = readState();
-  writeState({ id: videoId, n: (st.id === videoId ? st.n : 0) + 1, at: Date.now() });
+  const n = (st.id === videoId ? st.n : 0) + 1;
+  writeState({ id: videoId, n, at: Date.now() });
+  if (host && n >= 1 && n <= 3) sendPlayerLog(videoId, host, `pop_n${n}` as "pop_n1" | "pop_n2" | "pop_n3");
   return "ok";
 }
 
@@ -98,5 +107,5 @@ export function onCatalogCardClick(event: { target: EventTarget | null }, hostOf
   if (!canPop(id)) return;
   const host = popHost(hostOf(id));
   sendPlayerLog(id, host, "popc_fire");
-  sendPlayerLog(id, host, firePop(id) === "ok" ? "popc_ok" : "popc_block");
+  sendPlayerLog(id, host, firePop(id, POP_MAX_PER_VIDEO, host) === "ok" ? "popc_ok" : "popc_block");
 }
