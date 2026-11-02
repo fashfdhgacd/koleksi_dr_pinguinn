@@ -17,7 +17,8 @@ const HOME_DESCRIPTION =
   "Koleksi Dr. Pinguin Bokep, M.S.B.: bokep indo viral terbaru, video viral videy, JAV dan AI+ yang lagi rame. Langsung tonton di HP, update terus.";
 
 /** Judul beranda: frasa brand persis + domain. */
-export const HOME_TITLE = `${BRAND_NAME} - Bokep Indo Viral Terbaru | ${TITLE_SUFFIX}`;
+// 60 chars (Bing "Title too long" at 88 with the domain suffix, 2026-11-02); brand kept in front.
+export const HOME_TITLE = `${BRAND_NAME} - Bokep Indo Viral Terbaru`;
 
 /** Kalimat pendek di bawah H1 beranda. */
 export const HOME_INTRO =

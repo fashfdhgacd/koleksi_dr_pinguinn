@@ -1,5 +1,6 @@
 import { DEFAULT_PAGE_SIZE } from "./types";
 import { popularIds, tagOptions, titleTags } from "./title-tags";
+import { isIndoAiTitle } from "./title-text";
 import { findCategory } from "./categories";
 import type { PagedVideos } from "./types";
 import {
@@ -714,6 +715,10 @@ function ownSlugs(it: RawItem, popular: ReadonlySet<string>): string[] {
   for (const x of extra) {
     const cat = typeof x === "string" ? findCategory(x) : undefined;
     if (cat && !slugs.includes(cat.slug)) slugs.push(cat.slug);
+  }
+  // AI Indo: AI+ videos with an Indonesian title also sit in /kategori/ai-indo (never AI GAY ones).
+  if (slugs.includes("ai-plus") && !slugs.includes("ai-gay") && !slugs.includes("ai-indo") && isIndoAiTitle(it.title)) {
+    slugs.push("ai-indo");
   }
   return slugs;
 }

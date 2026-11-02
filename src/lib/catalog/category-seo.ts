@@ -30,6 +30,14 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     title: `Bokep AI+ Terbaru ${YEAR} - Video AI Viral | ${TITLE_SUFFIX}`,
     description: `Bokep AI+ terbaru ${YEAR}: video AI viral dan bokep AI indo yang lagi banyak dicari, jernih dan lancar diputar langsung di HP.`,
   },
+  // AI Indo (2026-11-02): rising Google query "bokep indo ai". Only AI+ videos whose own title is
+  // Indonesian (title-tags.ts isIndoAiTitle), so the page matches the query without invented content.
+  "ai-indo": {
+    h1: "Bokep Indo AI Terbaru",
+    intro: "Kumpulan bokep indo AI: video AI+ dengan judul dan cerita Indonesia, semua pemeran dewasa buatan AI. Diurutkan dari yang baru masuk dan bisa langsung diputar di HP. Mau semua video AI? Buka kategori AI+ di bawah.",
+    title: `Bokep Indo AI Terbaru ${YEAR} - Video AI Indonesia | ${TITLE_SUFFIX}`,
+    description: `Bokep indo AI terbaru ${YEAR}: video AI dengan cerita Indonesia, pemeran dewasa buatan AI, tonton langsung di HP tanpa download.`,
+  },
   "ai-gay": {
     h1: "Video AI Gay Terbaru",
     intro: "Kumpulan video AI gay buatan AI: adegan sesama pria hasil generate AI, semua pemeran dewasa. Kategori baru, videonya ditambah bertahap.",
@@ -292,7 +300,8 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
 
 /** Related category links shown under the intro of the busiest landing pages (internal linking). */
 const RELATED: Record<string, string[]> = {
-  "ai-plus": ["viral", "jav", "hentai", "amatir", "jilbab", "videy"],
+  "ai-plus": ["ai-indo", "viral", "jav", "hentai", "amatir", "jilbab", "videy"],
+  "ai-indo": ["ai-plus", "viral", "amatir", "jilbab", "videy"],
   jav: ["ai-plus", "hentai", "barat", "chindo", "videy"],
   jilbab: ["viral", "amatir", "istri", "malaysia", "videy"],
   viral: ["amatir", "jilbab", "colmek", "percakapan", "videy"],

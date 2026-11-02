@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { AgeGate } from "@/components/age-gate";
 import { Header } from "./header";
+import { PopularCategories } from "./popular-categories";
 
 export function Shell({
   children,
@@ -20,6 +21,9 @@ export function Shell({
           {children}
         </main>
         <footer className="mt-auto border-t border-white/25 pb-[env(safe-area-inset-bottom)]">
+          <div className="mx-auto max-w-[1600px] border-b border-white/15 px-4 py-6 sm:px-8">
+            <PopularCategories />
+          </div>
           <div className="mx-auto flex max-w-[1600px] flex-col gap-5 px-4 py-7 text-white/80 sm:flex-row sm:items-center sm:justify-between sm:px-8 sm:py-9">
             <div className="space-y-2">
               <p className="pixel text-sm text-white sm:text-lg">

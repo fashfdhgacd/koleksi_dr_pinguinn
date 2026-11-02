@@ -10,6 +10,9 @@ export const CATEGORIES: CategoryDef[] = [
   { slug: "ai-plus", label: "AI+", query: "ai-plus" },
   // Gay AI videos; tagged on upload with #aigay or "kategori: ai gay" (src/lib/bot/parse.js).
   { slug: "ai-gay", label: "AI GAY", query: "ai-gay" },
+  // AI+ videos with an Indonesian title ("Bokep Indo ..."): landing page for the rising Google query
+  // "bokep indo ai" (2026-11-02). Members come only from title-tags.ts isIndoAiTitle on AI+ videos.
+  { slug: "ai-indo", label: "AI Indo", query: "ai-indo" },
   { slug: "jilbab", label: "Jilbab", query: "jilbab" },
   { slug: "tante", label: "Tante", query: "tante" },
   { slug: "amatir", label: "Amatir", query: "amatir" },
@@ -93,6 +96,7 @@ export const MIN_INDEXED_CATEGORY_COUNT = 5;
  */
 export const SEO_MIN_COUNT: Record<string, number> = {
   "ai-gay": MIN_INDEXED_CATEGORY_COUNT,
+  "ai-indo": 8,
   "blunder": 8,
   "kelas-bintang": 8,
   "tiktok": 8,

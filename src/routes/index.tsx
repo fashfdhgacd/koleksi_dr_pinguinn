@@ -130,7 +130,7 @@ export const Route = createFileRoute("/")({
     const q = typeof match.search.q === "string" ? match.search.q : undefined;
     const page = typeof match.search.page === "number" ? match.search.page : 1;
     const seo = homeSeo(q);
-    const title = !q && page > 1 ? `Video Terbaru Halaman ${page} - ${BRAND_NAME} | koleksidrpinguin.com` : seo.title;
+    const title = !q && page > 1 ? `Video Terbaru Halaman ${page} | ${BRAND_NAME}` : seo.title;
     const description = !q && page > 1 ? `Halaman ${page} video terbaru ${BRAND_NAME}: bokep indo viral, videy, JAV dan AI+ terbaru.` : seo.description;
     const url = q
       ? HOME_CANONICAL
@@ -254,6 +254,12 @@ function HomePage() {
                 </a>
                 <a href="/kategori/malaysia" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
                   Bokep Malaysia viral →
+                </a>
+                <a href="/kategori/ai-indo" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
+                  Bokep Indo AI →
+                </a>
+                <a href="/kategori/paling-ditonton" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
+                  Paling ditonton →
                 </a>
               </p>
             )}
