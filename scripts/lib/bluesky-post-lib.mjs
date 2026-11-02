@@ -5,6 +5,7 @@
 import { uploadModeration } from "../../src/lib/catalog/moderation.js";
 import { reviewPendingReason, titleReviewReason } from "../../src/lib/catalog/review-pending.js";
 import { titleHold } from "../../src/lib/bot/title-hold.js";
+import { toEnglishTitle } from "./bluesky-english.mjs";
 
 export const ORIGIN = "https://koleksidrpinguin.com";
 export const MAX_PER_DAY = 6;
@@ -38,7 +39,10 @@ const BLOCK_RE = new RegExp(
       "grab", "mahasi\\w*", "kampus", "kuliah", "kost", "gadis", "cewe\\w*\\s+sma", "suster", "nakes",
       "ai", "dibuat\\s+oleh", "buatan", "nezha", "yosuga\\w*", "anime", "hentai", "kartun", "cartoon",
       "bude", "pakde", "saudari\\w*", "keluarga\\w*", "guru\\w*", "dosen", "tocil", "abang\\w*", "bo", "open\\s*bo",
-      "lacur", "murahan", "negro\\w*", "nigg\\w*", "menyelinap", "dibawa\\s+pulang", "bar", "clubbing", "dugem", "pelacur\\w*", "jual\\w*",
+      "lacur", "murahan", "inses", "diglir\\w*", "mantan\\w*", "ngampus", "kosan", "ukhty", "tkw", "nilasing", "lasing",
+      "hanime\\w*", "animation", "aiporn", "edited", "hyuuga", "nakano", "greyrat", "ichinose", "waguri", "briar",
+      "shuna", "kaoruko", "tifa", "chainsmoker", "daughter", "father", "mom", "mother", "sister", "brother", "teacher",
+      "nursing", "pregnant", "hamil", "bumil", "negro\\w*", "nigg\\w*", "menyelinap", "dibawa\\s+pulang", "bar", "clubbing", "dugem", "pelacur\\w*", "jual\\w*",
       // animated / game / adapted-series titles (characters of unclear age)
       "episode", "episose", "eps?", "bab", "modifikasi", "douluo", "ailin", "rongrong", "comic", "komik", "donghua",
       "reinkarnasi", "bereinkarnasi", "harem\\w*", "sistem", "game", "3d", "animasi",
@@ -88,6 +92,21 @@ export function blockReason(item) {
   return "";
 }
 
+/** Same rules on the generated English text (English wording). */
+const EN_BLOCK_RE =
+  /\b(?:leak\w*|hidden|spy|secret\w*|caught|voyeur|cctv|drunk|sleep\w*|asleep|passed\s*out|forced?|rape\w*|non-?consent\w*|revenge|blackmail\w*|teen\w*|young\w*|girl|girls|boy|boys|kid\w*|child\w*|minor\w*|school\w*|student\w*|uniform|petite|tiny|little|small|innocent|virgin|barely|daughter|son|father|dad\w*|mom|mother|step\w*|sister|brother|family|aunt|uncle|niece|nephew|cousin|teacher|celeb\w*|tiktok\w*|viral|scandal|deepfake|ai|\d{1,2}\s?(?:yo|years?))\b/i;
+
+/** "" when the English post text is safe, else the reason. */
+export function englishBlockReason(text) {
+  const m = String(text || "").match(EN_BLOCK_RE);
+  return m ? `kata Inggris "${m[0].toLowerCase()}"` : "";
+}
+
+/** English title for a catalog item (deterministic). */
+export function englishTitle(item) {
+  return toEnglishTitle(baseTitle(item.title), item.id).title;
+}
+
 /** Count of posts made in the 24 h before `now`. */
 export function postsLast24h(state, now = Date.now()) {
   return (state?.posted || []).filter((p) => now - Date.parse(p.at) < 86_400_000).length;
@@ -117,7 +136,7 @@ export function pickNext(items, liveIds, state, now = Date.now()) {
       continue;
     }
     if (postedTitles.has(baseTitle(it.title).toLowerCase())) continue;
-    const why = blockReason(it);
+    const why = blockReason(it) || englishBlockReason(englishTitle(it));
     if (why) {
       skipped.push([id, why]);
       continue;
@@ -148,19 +167,30 @@ function clip(s, max) {
   return `${cut.replace(/\s+\S*$/, "") || cut}…`;
 }
 
-/** app.bsky.feed.post record: text + link facet + external card (no image), self-labelled adult. */
-export function buildPost(item, now = new Date()) {
-  const title = clip(baseTitle(item.title), 200);
+/**
+ * Link-card image: the site's brand card (penguin logo, no video frame). Never the video's own
+ * thumbnail, which may be explicit. Committed file = live /og-v2.jpg.
+ */
+export const CARD_IMAGE_PATH = "public/og.jpg";
+
+/**
+ * app.bsky.feed.post record (English): text + link facet + external card, self-labelled adult.
+ * @param {any} item catalog item
+ * @param {Date} [now]
+ * @param {any} [thumb] blob ref from com.atproto.repo.uploadBlob (brand image only)
+ */
+export function buildPost(item, now = new Date(), thumb = null) {
+  const title = clip(englishTitle(item), 200);
   const url = watchUrl(item.id);
   const shown = `koleksidrpinguin.com/watch/${item.id}`;
-  const head = `${title}\n\n🔞 18+ · Tonton: `;
+  const head = `${title}\n🔞 18+ · Watch: `;
   const text = `${head}${shown}`;
   const start = byteLen(head);
   return {
     $type: "app.bsky.feed.post",
     text,
     createdAt: now.toISOString(),
-    langs: ["id"],
+    langs: ["en"],
     facets: [
       {
         index: { byteStart: start, byteEnd: start + byteLen(shown) },
@@ -172,7 +202,8 @@ export function buildPost(item, now = new Date()) {
       external: {
         uri: url,
         title: clip(title, 120),
-        description: "Video dewasa 18+ di koleksidrpinguin.com. Langsung putar, tanpa daftar akun.",
+        description: "18+ adult video on koleksidrpinguin.com. Plays instantly, no sign-up.",
+        ...(thumb ? { thumb } : {}),
       },
     },
     labels: { $type: "com.atproto.label.defs#selfLabels", values: [{ val: POST_LABEL }] },
@@ -181,17 +212,20 @@ export function buildPost(item, now = new Date()) {
 
 export const PROFILE_NAME = "Koleksi Dr. Pinguin";
 export const PROFILE_BIO =
-  "Koleksi video dewasa Indonesia, update tiap hari. 🔞 Khusus 18+: kalau umurmu di bawah 18 tahun, jangan buka. https://koleksidrpinguin.com";
+  "Hot adult videos, updated daily. 🔞 18+ only, leave if you are under 18. https://koleksidrpinguin.com";
 
-/** Profile record with name/bio/adult label filled only where missing (null = nothing to change). */
-export function profilePatch(current) {
+/**
+ * Profile record to write, or null when nothing changes. Display name / adult label only when
+ * empty; the bio is (over)written with PROFILE_BIO when `forceBio` (bio text changed) or empty.
+ */
+export function profilePatch(current, { forceBio = false } = {}) {
   const cur = current && typeof current === "object" ? { ...current } : { $type: "app.bsky.actor.profile" };
   let changed = false;
   if (!String(cur.displayName || "").trim()) {
     cur.displayName = PROFILE_NAME;
     changed = true;
   }
-  if (!String(cur.description || "").trim()) {
+  if ((forceBio || !String(cur.description || "").trim()) && cur.description !== PROFILE_BIO) {
     cur.description = PROFILE_BIO;
     changed = true;
   }
