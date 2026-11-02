@@ -109,19 +109,50 @@ function rawRegex(label) {
 }
 
 /**
+ * Words that are only an age-ambiguous translation ("teen", "ABG", "student") rather than a school
+ * grade. Owner rule 2026-11-02: one translated word is not proof of a minor, so with an explicit
+ * adult age in the title (18yo / 18+ / 20 tahun) the upload is NOT held; it goes live and into the
+ * owner's "Perlu dicek" queue instead (src/lib/catalog/moderation.js), since the title's own age
+ * claim is not verification. School grades (SMA/SMP/SD, high school, seragam sekolah) still hold.
+ */
+const AGE_AMBIGUOUS_TERMS = new Set(["teenager", "abg", "student"]);
+const ADULT_AGE_IN_TITLE =
+  /(?<!\b(?:eps?|episode|part|pt|vol|volume|chapter|ch|no|bagian|seri)\s?)\b(?:1[89]|[2-9]\d)\s?(?:yo|y o|years?\s?old|tahun|thn|th|\+)(?![\p{L}\p{N}])/u;
+
+/** @param {string} title */
+function holdRule(title) {
+  const t = norm(title);
+  for (const rule of HOLD_RULES) {
+    const term = String(rule[0]);
+    if (!/** @type {RegExp} */ (rule[1]).test(t)) continue;
+    if (term === "student" && ADULT_STUDENT.test(t) && !/\s(?:high|middle|school)\s/.test(t)) continue;
+    if (AGE_AMBIGUOUS_TERMS.has(term) && ADULT_AGE_IN_TITLE.test(t)) continue;
+    return rule;
+  }
+  return null;
+}
+
+/**
+ * Age-ambiguous word that titleHold() let through only because the title states an adult age
+ * ("Teen 18yo"): "" when none. The caller routes these to the owner review queue (not hidden).
+ */
+export function waivedHoldTerm(title = "") {
+  const t = norm(title);
+  if (!ADULT_AGE_IN_TITLE.test(t) || holdRule(title)) return "";
+  for (const rule of HOLD_RULES) {
+    const term = String(rule[0]);
+    if (AGE_AMBIGUOUS_TERMS.has(term) && /** @type {RegExp} */ (rule[1]).test(t)) return term;
+  }
+  return "";
+}
+
+/**
  * Hold check for a NEW upload title. Returns null when the title is fine, else
  * { term, meaning, suggestions } (suggestions are 2-3 titles that pass this check themselves).
  * `extraOk(title)` lets the caller also run the hard reject list on the suggestions.
  */
 export function titleHold(title = "", extraOk = () => true) {
-  const t = norm(title);
-  let hit = null;
-  for (const rule of HOLD_RULES) {
-    if (!rule[1].test(t)) continue;
-    if (rule[0] === "student" && ADULT_STUDENT.test(t) && !/\s(?:high|middle|school)\s/.test(t)) continue;
-    hit = rule;
-    break;
-  }
+  const hit = holdRule(title);
   if (!hit) return null;
   const [term, , meaning, swaps] = hit;
   return { term, meaning, suggestions: suggestTitles(title, term, swaps, extraOk) };

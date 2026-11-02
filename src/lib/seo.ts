@@ -17,7 +17,8 @@ const HOME_DESCRIPTION =
   "Koleksi Dr. Pinguin Bokep, M.S.B.: bokep indo viral terbaru, video viral videy, JAV dan AI+ yang lagi rame. Langsung tonton di HP, update terus.";
 
 /** Judul beranda: frasa brand persis + domain. */
-export const HOME_TITLE = `${BRAND_NAME} - Bokep Indo Viral Terbaru | ${TITLE_SUFFIX}`;
+// 60 chars (Bing "Title too long" at 88 with the domain suffix, 2026-11-02); brand kept in front.
+export const HOME_TITLE = `${BRAND_NAME} - Bokep Indo Viral Terbaru`;
 
 /** Kalimat pendek di bawah H1 beranda. */
 export const HOME_INTRO =
@@ -95,8 +96,9 @@ export function withoutDomainSuffix(raw?: string | null): string {
  */
 function videoTextLabel(category?: string | null): string {
   const key = (category || "").trim().toLowerCase();
-  if (!key || key === "bokep" || key === "lainnya" || /pinguin/i.test(categoryLabel(category))) return "Indo";
+  // Videy first: its label is "drpinguin videy", which the /pinguin/ brand check would turn into "Indo".
   if (key === "videy") return "Videy";
+  if (!key || key === "bokep" || key === "lainnya" || /pinguin/i.test(categoryLabel(category))) return "Indo";
   return safeSeoLabel(category);
 }
 

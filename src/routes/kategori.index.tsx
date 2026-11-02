@@ -31,9 +31,10 @@ export const Route = createFileRoute("/kategori/")({
     return { categories: PUBLIC_CATEGORY_LIST, specials: [], extra };
   },
   head: () => {
-    const title = "Kategori Bokep Indo, JAV, AI & Videy - Koleksi Dr. Pinguin | koleksidrpinguin.com";
+    // CTR experiment 2026-11-02 (GSC pos 13.2, CTR 7.4%): the old 83-char title was cut off in the SERP.
+    const title = "Kategori Bokep Indo Viral, JAV, AI & Videy | koleksidrpinguin.com";
     const description =
-      "Semua kategori Koleksi Dr. Pinguin: bokep indo viral, JAV sub indo, bokep AI indo, videy, Malaysia, jilbab, tante, dan lainnya. Pilih lalu tonton langsung di HP.";
+      "Semua kategori Koleksi Dr. Pinguin di satu halaman: bokep indo viral, videy, JAV sub indo, AI indo, Malaysia, jilbab, tante dan lainnya. Pilih, lalu tonton di HP.";
     const url = `${SITE_ORIGIN}/kategori`;
     return {
       meta: [

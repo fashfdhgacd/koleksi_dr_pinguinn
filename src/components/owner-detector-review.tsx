@@ -15,6 +15,7 @@ type Row = {
   thumbUrl: string;
   watchUrl: string;
   decidedAt: number | null;
+  pending?: boolean;
 };
 
 async function post<T>(secret: string, body: Record<string, unknown>): Promise<T & { ok?: boolean; error?: string }> {
@@ -42,6 +43,7 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
   const [showDone, setShowDone] = useState(false);
   const [editing, setEditing] = useState<Row | null>(null);
   const [verdicts, setVerdicts] = useState<Record<string, EditVerdict>>({});
+  const [proofs, setProofs] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     setErr("");
@@ -54,13 +56,18 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
     void load();
   }, [load]);
 
-  const decide = async (id: string, decision: "show" | "hide") => {
+  const decide = async (id: string, decision: "show" | "hide" | "keep") => {
     setBusy(id);
-    const d = await post<{ held?: boolean }>(secret, { action: "detector-review-decide", id, decision });
+    const proof = (proofs[id] || "").trim();
+    const d = await post<{ held?: boolean }>(secret, { action: "detector-review-decide", id, decision, ...(proof ? { proof } : {}) });
     setBusy("");
     if (!d.ok) {
       setErr(d.error === "locked_minor"
           ? "Judul ini terkunci (minor), tidak bisa ditayangkan."
+          : d.error === "proof_required"
+            ? "Tulis bukti dulu (min. 10 huruf): sumber/rilis resmi yang menunjukkan semua pemeran 18+ saat produksi."
+            : d.error === "review_pending_needs_proof"
+              ? "Video ini REVIEW_PENDING: setujui di kotak ini dengan bukti umur, bukan lewat Unhide/Edit."
           : d.error === "title_needs_rename"
             ? "Judul masih perlu diganti. Tap Edit, ganti judulnya, lalu Tayangkan lagi."
             : d.error || "Gagal.");
@@ -69,7 +76,19 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
     setRows((rs) =>
       (rs || []).map((r) =>
         r.id === id
-          ? { ...r, decidedAt: Date.now(), held: decision === "hide", status: decision === "hide" ? "Disembunyiin pemilik" : "Tayang (diputuskan pemilik)" }
+          ? {
+              ...r,
+              decidedAt: Date.now(),
+              held: decision !== "show",
+              status:
+                decision === "keep"
+                  ? "Tetap ditahan: umur pemeran belum terkonfirmasi"
+                  : decision === "hide"
+                    ? "Disembunyiin pemilik"
+                    : r.pending
+                      ? `Disetujui pemilik (bukti: ${proof})`
+                      : "Tayang (diputuskan pemilik)",
+            }
           : r,
       ),
     );
@@ -103,7 +122,8 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
     <div className="flex flex-col gap-2.5">
       <p className="text-[12px] leading-relaxed text-zinc-400">
         {pending.length} perlu dicek · {rows.length - pending.length} sudah diputuskan. Upload baru yang ditahan belum tayang sampai kamu tap
-        Tayangkan; katalog lama tetap tayang sampai kamu putuskan. Judul "minor" langsung terkunci dan tidak muncul di sini.
+        Tayangkan; katalog lama tetap tayang sampai kamu putuskan. Judul "minor" langsung terkunci dan tidak muncul di sini. REVIEW_PENDING (umur pemeran belum terkonfirmasi) tidak tayang
+        sampai kamu setujui dengan bukti semua pemeran 18+ saat produksi.
       </p>
       {err ? <p role="alert" className="text-[13px] text-red-300">{err}</p> : null}
       <label className="flex items-center gap-2 text-[12px] text-zinc-400">
@@ -124,10 +144,33 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
                 {r.held ? "Pratinjau (khusus pemilik)" : "Tonton"}
               </a>
             </p>
+            {r.pending ? (
+              <label className="mt-2 flex flex-col gap-1 text-[12px] text-zinc-400">
+                Bukti semua pemeran 18+ saat produksi (wajib untuk Tayangkan)
+                <input
+                  type="text"
+                  value={proofs[r.id] || ""}
+                  maxLength={500}
+                  onChange={(e) => setProofs((p) => ({ ...p, [r.id]: e.target.value }))}
+                  placeholder="mis. link rilis resmi studio + catatan 2257 / ID pemeran"
+                  className="rounded-lg border border-white/[0.1] bg-black/40 px-2.5 py-1.5 text-[13px] text-zinc-100"
+                />
+              </label>
+            ) : null}
             <div className="mt-2 flex flex-wrap gap-1.5">
-              <button type="button" disabled={busy === r.id} onClick={() => decide(r.id, "show")} className={`${btn} bg-[#2dd4bf] font-medium text-zinc-950`}>
-                Tayangkan
+              <button
+                type="button"
+                disabled={busy === r.id || (r.pending && (proofs[r.id] || "").trim().length < 10)}
+                onClick={() => decide(r.id, "show")}
+                className={`${btn} bg-[#2dd4bf] font-medium text-zinc-950`}
+              >
+                {r.pending ? "Setujui (ada bukti 18+)" : "Tayangkan"}
               </button>
+              {r.pending ? (
+                <button type="button" disabled={busy === r.id} onClick={() => decide(r.id, "keep")} className={`${btn} border border-white/[0.1] bg-white/[0.04] text-zinc-200`}>
+                  Tetap ditahan
+                </button>
+              ) : null}
               <button type="button" disabled={busy === r.id} onClick={() => decide(r.id, "hide")} className={`${btn} border border-white/[0.1] bg-white/[0.04] text-zinc-200`}>
                 Sembunyiin
               </button>

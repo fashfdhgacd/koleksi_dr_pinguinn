@@ -7,6 +7,8 @@ export type ReviewState = {
   publish: Record<string, PublishState>;
   firstSeen: Record<string, number>;
   seeded?: boolean;
+  /** REVIEW_PENDING approvals: the owner's proof note that every performer was 18+ at production. */
+  proof?: Record<string, { note: string; at: number }>;
 };
 
 const KEY = "owner:review-state:v1";

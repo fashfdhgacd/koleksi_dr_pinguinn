@@ -1174,6 +1174,7 @@ const SLUG_ICON: Record<string, string> = {
   jav: "jav",
   "ai-plus": "chip",
   "ai-gay": "chip",
+  "ai-indo": "chip",
   jilbab: "hijab",
   tante: "woman",
   amatir: "camera",

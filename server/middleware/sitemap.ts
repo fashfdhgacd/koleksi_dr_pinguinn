@@ -55,6 +55,9 @@ function listingLastmods(entries: Array<{ category?: string; lastmod?: string }>
   return { all, bySlug };
 }
 
+/** Landing pages whose ?page=2..5 go in the sitemap (only listed categories; ai-plus as before). */
+const PAGED_SITEMAP_SLUGS = ["ai-plus", "ai-indo", "videy", "malaysia", "bokep", "jav"];
+
 function pageEntries(categories: CategoryInfo[], mods: { all?: string; bySlug: Map<string, string> }): string[] {
   const out: string[] = [
     urlEntry(`${SITE_ORIGIN}/`, { changefreq: "hourly", priority: "1.0", lastmod: mods.all }),
@@ -80,12 +83,14 @@ function pageEntries(categories: CategoryInfo[], mods: { all?: string; bySlug: M
       }),
     );
   }
-  // AI+ is the top landing page: its pagination pages 2..5 are indexable (same cap as
-  // DEEP_PAGE_NOINDEX on the category route), so list them while they exist.
-  const aiPlus = categories.find((c) => c.slug === "ai-plus");
-  const aiPages = aiPlus && typeof aiPlus.count === "number" ? Math.min(5, Math.ceil(aiPlus.count / DEFAULT_PAGE_SIZE)) : 1;
-  for (let n = 2; n <= aiPages; n++) {
-    out.push(urlEntry(`${SITE_ORIGIN}/kategori/ai-plus?page=${n}`, { changefreq: "daily", priority: "0.5", lastmod: mods.bySlug.get("ai-plus") }));
+  // Pagination pages 2..5 of the top landing pages are indexable (same cap as DEEP_PAGE_NOINDEX on
+  // the category route), so list them while they exist: crawlers reach older videos faster.
+  for (const slug of PAGED_SITEMAP_SLUGS) {
+    const cat = categories.find((c) => c.slug === slug);
+    const pages = cat && typeof cat.count === "number" ? Math.min(5, Math.ceil(cat.count / DEFAULT_PAGE_SIZE)) : 1;
+    for (let n = 2; n <= pages; n++) {
+      out.push(urlEntry(`${SITE_ORIGIN}/kategori/${slug}?page=${n}`, { changefreq: "daily", priority: "0.5", lastmod: mods.bySlug.get(slug) }));
+    }
   }
   for (const path of LEGAL_PATHS) {
     out.push(urlEntry(`${SITE_ORIGIN}${path}`, { changefreq: "monthly", priority: "0.3" }));

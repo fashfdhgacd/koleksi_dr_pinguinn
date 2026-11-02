@@ -11,14 +11,11 @@
 import { EXTRA_CATEGORY_RULES, normCategoryText } from "./title-category.js";
 import { MAX_TAGS as MAX_ALL_TAGS, extraTags } from "./tag-dictionary.js";
 import { findCategory } from "./categories";
+import { MINOR_WORDS, stripTemplate } from "./title-text";
 
 /** Cap of the original rules (kept so their output is unchanged); tag-dictionary.js then adds up to MAX_ALL_TAGS. */
 export const MAX_TAGS = 8;
 export { MAX_ALL_TAGS };
-
-/** Child / school wording: blocks every age-flavoured tag (teen-18, college-18). */
-const MINOR_WORDS =
-  /\b(?:sd|smp|sma|smk|mts|bocil|bocah|anak|pelajar|sekolah|siswi|siswa|seragam sekolah|abg|remaja|di ?bawah umur|loli|lolita|underage|child|kid|kids|schoolgirl)\b/;
 
 const extra = new Map<string, RegExp>(EXTRA_CATEGORY_RULES as [string, RegExp][]);
 const mahasiswiRule = extra.get("mahasiswi");
@@ -111,15 +108,6 @@ export type TagOptions = {
   /** Tags the Telegram bot stored at ingest (item.tags); only real category slugs are used. */
   storedTags?: string[];
 };
-
-/** Auto-generated / branding text that says nothing about the video (bot and import templates). */
-function stripTemplate(title: string): string {
-  return title
-    .replace(/video viral videy indo terbaru\s*\d*/gi, " ")
-    .replace(/koleksi\s*dr\.?\s*pinguin(?:\s*bokep)?/gi, " ")
-    .replace(/koleksidrpinguin(?:\.com)?/gi, " ")
-    .replace(/m\.s\.b\.?/gi, " ");
-}
 
 /** Words the Videy title templates are built from; removed before tagging Videy titles. */
 function stripVideyTemplate(title: string): string {

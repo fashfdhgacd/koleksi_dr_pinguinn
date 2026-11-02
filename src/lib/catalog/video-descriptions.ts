@@ -3,6 +3,11 @@
  * Dibuat dari /workspace/desc/build.py. Video tanpa entri tetap pakai generator di seo.ts.
  */
 const VIDEO_DESCRIPTIONS: Record<string, string> = {
+  // CTR experiment 2026-11-02 (GSC 28 hari s/d 31 Okt): halaman 1 tapi klik sedikit. Hanya fakta dari judul/sumber/durasi.
+  "cPK9t6oFfhuh": "Florieqt, awek rempit Malay, dalam klip empat menit dari IndoAV. Masuk kategori Bokep Malaysia, bisa langsung diputar di HP tanpa download. Khusus 18+.",
+  "by-wpljw8ldy4yx": "Bokep indo posisi WOT (woman on top) dengan goyangan yang luar biasa, dari koleksi Dr. Pinguin. Langsung putar di HP tanpa download. Khusus 18+.",
+  "by-1e8lrobbzc7c": "Mahasiswi rambut pendek berkacamata dalam video privat, dientot keras. Bokep indo dari koleksi Dr. Pinguin, langsung putar di HP tanpa download. Khusus 18+.",
+  "IJ57HH4Q1": "Link videy viral yang langsung diputar di sini, tanpa buka link videy satu-satu. Bagian dari kumpulan bokep videy indo di Koleksi Dr. Pinguin. Khusus 18+.",
   "XyqeEIe5pG6q": "Cerita perselingkuhan singkat seorang wanita berjilbab yang diam-diam bertemu pria lain. Video amatir IndoAV berdurasi tiga menitan, ringkas dan langsung ke inti.",
   "VmZDSj6zkEvv": "Rekaman panjang 25 menit soal pergaulan bebas anak muda Indonesia, lengkap dengan obrolan santai sebelum adegan intim. Kategori Amatir, diputar dari IndoAV.",
   "IEew7jrgHvVu": "Video Brother Musang versi challenge berdurasi hampir satu jam, salah satu judul amatir lokal yang paling sering dicari penonton di rak Amatir.",
@@ -26,7 +31,6 @@ const VIDEO_DESCRIPTIONS: Record<string, string> = {
   "F3uwEeTI4NtB": "Model lokal bernama Sisil dalam versi penuh 20 menit, rilisan terbarunya dengan resolusi 720p. Kategori Amatir via IndoAV.",
   "ET5CTRfYkHIF": "Enam menit animasi realistis buatan Secrets AI dengan adegan intim yang mulus dari awal sampai akhir. Masuk koleksi AI+.",
   "GajgEE7on5In": "Hanya semenit, tapi gaya woman on top wanita cantik ini cukup menjelaskan kenapa klipnya sering diputar ulang di rak Goyang WOT.",
-  "KCKHCOSFfzg5": "Andini Permata, nama yang sempat ramai di linimasa, dalam klip solo dua menit beresolusi 720p. Kategori Colmek.",
   "pa2RfOdVThds": "Wanita berhijab bertubuh berisi bersama pria berambut pirang dalam rekaman sepuluh menit. Kontras penampilan keduanya jadi daya tarik video ini.",
   "EyTOs3dQCUYM": "Saat menjalani hubungan jarak jauh, sang pacar justru siaran live bersama pria lain. Rekaman sejam penuh drama, kategori Live.",
   "gA3fDB3EtDEj": "Video lama yang melibatkan Cut Tari dan Ariel, salah satu skandal selebritas Indonesia paling terkenal. Sembilan menit di kategori Selebgram.",
@@ -171,6 +175,22 @@ const VIDEO_DESCRIPTIONS: Record<string, string> = {
   "OV6vOKP7Twb8": "Skandal pasangan mesum lengkap dengan obrolan yang terdengar jelas. Dua menit di kategori Dewasa.",
   "QVCtjfCftdVd": "Awalnya hanya mampir untuk numpang makan, tapi teman wanitanya yang bertubuh berisi punya rencana lain. Sejam penuh dalam 480p.",
 };
+
+/**
+ * Judul tab/SERP manual per video (CTR experiment 2026-11-02, GSC 28 hari s/d 31 Okt). Hanya untuk
+ * halaman yang sudah di halaman 1 Google tapi kliknya sedikit; kata diambil dari judul video sendiri
+ * + kata yang dicari orang (tanpa klaim palsu). H1 dan judul tampilan tidak berubah.
+ */
+const VIDEO_SEO_TITLES: Record<string, string> = {
+  "cPK9t6oFfhuh": "Florieqt Awek Rempit Malay – Bokep Malay Rempit | koleksidrpinguin.com",
+  "by-wpljw8ldy4yx": "Bokep Indo WOT Yang Luar Biasa – Goyang Woman on Top | koleksidrpinguin.com",
+  "by-1e8lrobbzc7c": "Mahasiswi Berkacamata Rambut Pendek Dientot Keras | koleksidrpinguin.com",
+  "IJ57HH4Q1": "Link Videy Viral Hari Ini 2 – Bokep Videy Indo | koleksidrpinguin.com",
+};
+
+export function curatedSeoTitle(id: string | null | undefined): string {
+  return (id && VIDEO_SEO_TITLES[id]) || "";
+}
 
 export function curatedDescription(id: string | null | undefined): string {
   return (id && VIDEO_DESCRIPTIONS[id]) || "";

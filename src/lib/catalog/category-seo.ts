@@ -30,6 +30,14 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     title: `Bokep AI+ Terbaru ${YEAR} - Video AI Viral | ${TITLE_SUFFIX}`,
     description: `Bokep AI+ terbaru ${YEAR}: video AI viral dan bokep AI indo yang lagi banyak dicari, jernih dan lancar diputar langsung di HP.`,
   },
+  // AI Indo (2026-11-02): rising Google query "bokep indo ai". Only AI+ videos whose own title is
+  // Indonesian (title-tags.ts isIndoAiTitle), so the page matches the query without invented content.
+  "ai-indo": {
+    h1: "Bokep Indo AI Terbaru",
+    intro: "Kumpulan bokep indo AI: video AI+ dengan judul dan cerita Indonesia, semua pemeran dewasa buatan AI. Diurutkan dari yang baru masuk dan bisa langsung diputar di HP. Mau semua video AI? Buka kategori AI+ di bawah.",
+    title: `Bokep Indo AI Terbaru ${YEAR} - Video AI Indonesia | ${TITLE_SUFFIX}`,
+    description: `Bokep indo AI terbaru ${YEAR}: video AI dengan cerita Indonesia, pemeran dewasa buatan AI, tonton langsung di HP tanpa download.`,
+  },
   "ai-gay": {
     h1: "Video AI Gay Terbaru",
     intro: "Kumpulan video AI gay buatan AI: adegan sesama pria hasil generate AI, semua pemeran dewasa. Kategori baru, videonya ditambah bertahap.",
@@ -112,7 +120,9 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     h1: "Bokep Malaysia & Melayu Viral",
     intro: "Video Malaysia dan melayu yang lagi viral, termasuk rekaman bertudung dan amatir dari negeri jiran. Bahasanya dekat dengan bahasa kita, jadi tetap enak ditonton.",
     title: `Bokep Malaysia Viral Terbaru ${YEAR} - Video Melayu & Tudung | ${TITLE_SUFFIX}`,
-    description: `Bokep Malaysia viral terbaru ${YEAR}: video melayu, bertudung dan amatir dari negeri jiran yang lagi ramai, langsung putar di HP.`,
+    // Description only (title/h1 FROZEN). CTR experiment 2026-11-02: GSC queries "bokep cewek malaysia",
+    // "bokep malay rempit", "tudung mesum" (pos 8-14, CTR <5%); all three exist in this category's titles.
+    description: `Bokep Malaysia viral terbaru ${YEAR}: cewek Malaysia dan awek melayu, video tudung mesum sampai awek rempit, amatir asli negeri jiran. Langsung putar di HP.`,
   },
   chindo: {
     h1: "Bokep Chindo Viral Terbaru",
@@ -280,7 +290,9 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     h1: "Video Viral Videy Terbaru",
     intro: "Kumpulan link videy viral dan bokep videy indo terbaru, langsung diputar di sini tanpa buka link satu-satu. Selalu nambah tiap ada video videy baru yang lagi rame.",
     title: `Bokep Videy Indo Viral Terbaru ${YEAR} - Link Videy | ${TITLE_SUFFIX}`,
-    description: `Video viral videy terbaru ${YEAR}: kumpulan link videy dan bokep videy indo yang lagi rame, bisa langsung ditonton di HP tanpa buka link satu-satu.`,
+    // CTR experiment 2026-11-02: GSC "bokep videy indo" / "videy indo bokep" (pos 10-15). Title already
+    // leads with the query, so only the snippet changes: query wording first, then what the page does.
+    description: `Bokep videy indo terbaru ${YEAR}: video videy viral yang langsung diputar di sini, tanpa buka link videy satu-satu. Nambah tiap ada video videy baru.`,
   },
   bokep: {
     h1: "Koleksi Dr. Pinguin Bokep",
@@ -292,7 +304,8 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
 
 /** Related category links shown under the intro of the busiest landing pages (internal linking). */
 const RELATED: Record<string, string[]> = {
-  "ai-plus": ["viral", "jav", "hentai", "amatir", "jilbab", "videy"],
+  "ai-plus": ["ai-indo", "viral", "jav", "hentai", "amatir", "jilbab", "videy"],
+  "ai-indo": ["ai-plus", "viral", "amatir", "jilbab", "videy"],
   jav: ["ai-plus", "hentai", "barat", "chindo", "videy"],
   jilbab: ["viral", "amatir", "istri", "malaysia", "videy"],
   viral: ["amatir", "jilbab", "colmek", "percakapan", "videy"],

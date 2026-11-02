@@ -32,6 +32,7 @@ import { reviewPriority as detectorPriority, minorContentReason as ownerDetector
 import { explainTitle } from "@/lib/catalog/minor-context.js";
 import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
+import { isReviewPendingReason } from "@/lib/catalog/review-pending.js";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
 import {
   MAX_EXTRA_CATEGORIES,
@@ -172,7 +173,10 @@ async function setHiddenOverride(body: {
   if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return { ok: false, error: "bad_id", status: 400 };
   if (typeof body.unhide !== "boolean") return { ok: false, error: "bad_unhide", status: 400 };
   const candidates = await listHiddenCandidates();
-  if (!candidates.some((c) => c.item.id === id)) return { ok: false, error: "not_hidden_item", status: 404 };
+  const cand = candidates.find((c) => c.item.id === id);
+  if (!cand) return { ok: false, error: "not_hidden_item", status: 404 };
+  // REVIEW_PENDING is approved only from "Perlu dicek" with a proof note (owner-detector-review.ts).
+  if (body.unhide && isReviewPendingReason(cand.reason)) return { ok: false, error: "review_pending_needs_proof", status: 409 };
   try {
     const state = await setUnhidden(id, body.unhide);
     applyUnhidden(Object.keys(state.ids));
@@ -203,7 +207,9 @@ async function setHiddenOverrideBulk(body: {
   if (!Array.isArray(body.ids) || !body.ids.length) return { ok: false, error: "no_ids", status: 400 };
   if (body.ids.length > 2000) return { ok: false, error: "too_many_ids", status: 400 };
   const ids = [...new Set(body.ids.map((x) => String(x || "").trim()))];
-  const flagged = new Set((await listHiddenCandidates()).map((c) => c.item.id));
+  const cands = await listHiddenCandidates();
+  // REVIEW_PENDING never bulk-approves: each needs its own proof note in "Perlu dicek".
+  const flagged = new Set(cands.filter((c) => !(body.unhide && isReviewPendingReason(c.reason))).map((c) => c.item.id));
   const applied = ids.filter((id) => /^[A-Za-z0-9_-]{3,64}$/.test(id) && flagged.has(id));
   const rejected = ids.filter((id) => !applied.includes(id));
   if (!applied.length) return { ok: false, error: "not_hidden_item", status: 404, rejected };
