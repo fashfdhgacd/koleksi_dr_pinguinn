@@ -8,6 +8,17 @@ export function itemDate(item: { createdAt?: string | number; date?: string }): 
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
+/** "Baru" badge window: uploads in the last 3 days. */
+export const NEW_UPLOAD_MS = 3 * 24 * 60 * 60 * 1000;
+
+/** True when the item's upload date is within NEW_UPLOAD_MS of `now` (no date or a future date = false). */
+export function isNewUpload(item: { createdAt?: string | number; date?: string }, now = Date.now()): boolean {
+  const t = itemDate(item);
+  // Raw dates can be seconds or milliseconds; anything before 2001 in ms is treated as seconds.
+  const ms = t > 0 && t < 1e12 ? t * 1000 : t;
+  return ms > 0 && ms <= now + 60_000 && now - ms < NEW_UPLOAD_MS;
+}
+
 export function sortByDateDesc<T extends { createdAt?: string | number; date?: string }>(items: T[]): T[] {
   return [...items].sort((a, b) => itemDate(b) - itemDate(a));
 }

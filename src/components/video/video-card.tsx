@@ -48,6 +48,11 @@ export function VideoCard({
           eager={eager}
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent opacity-80" />
+        {video.isNew ? (
+          <span className="pointer-events-none absolute left-2 top-2 rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground sm:text-[11px]">
+            Baru
+          </span>
+        ) : null}
         <div className="pointer-events-none absolute inset-0 hidden items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 sm:flex">
           <span className="flex size-11 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <Play className="size-4 fill-current" style={{ marginLeft: 2 }} />

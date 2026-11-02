@@ -33,6 +33,8 @@ export type VideoCard = {
   likes?: number | null;
   /** Our own likes (D1 video_likes, 12-hour snapshot in site-likes.json). Cards only; the watch page reads D1 live. */
   siteLikes?: number | null;
+  /** Uploaded within NEW_UPLOAD_MS (3 days) when the card was built; shows the "Baru" badge. */
+  isNew?: boolean;
   /** Ranking week/month tabs only: our own pageviews in that period (siteViews cache). */
   periodViews?: number | null;
   /** "minggu ini" | "bulan ini" — paired with periodViews. */
