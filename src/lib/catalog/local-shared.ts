@@ -10,6 +10,7 @@ import {
   refineCategory,
 } from "./title-category.js";
 import siteLikesSnapshot from "./site-likes.json";
+import { isNewUpload } from "./feed-order";
 import { DRP_CATEGORY, DRP_SOURCES, drpKindOfItem } from "./drp-hosts.js";
 
 /** Our own D1 likes (video_likes), 12-hour snapshot written by the stats workflow. Cards only. */
@@ -482,5 +483,6 @@ export function toCard(item: RawItem, posters: Record<string, string>, videyNo?:
     views: typeof item.views === "number" ? item.views : null,
     likes: typeof item.likes === "number" ? item.likes : null,
     siteLikes: typeof SITE_LIKES[id] === "number" && SITE_LIKES[id] > 0 ? SITE_LIKES[id] : null,
+    ...(isNewUpload(item) ? { isNew: true } : {}),
   };
 }

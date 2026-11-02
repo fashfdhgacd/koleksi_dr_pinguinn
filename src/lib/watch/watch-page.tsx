@@ -19,6 +19,7 @@ import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { CatalogBackLink } from "@/components/video/catalog-back-link";
 import { WatchStats } from "@/components/video/watch-stats";
 import { PushButton } from "@/components/video/push-button";
+import { rememberWatched } from "@/components/video/recently-watched";
 import { DRP_CATEGORY, DRP_SOURCES, drpKindOfUrl } from "@/lib/catalog/drp-hosts.js";
 import deadSources from "@/lib/catalog/dead-sources.json";
 
@@ -362,6 +363,11 @@ export function WatchPage() {
 
     return () => controller.abort();
   }, [id, reload, loaderData]);
+
+  // "Baru ditonton" row on home (browser-only localStorage).
+  useEffect(() => {
+    if (status === "success" && item && item.id === id) rememberWatched(item);
+  }, [status, item, id]);
 
   useEffect(() => {
     if (status !== "success" || !id) return;
