@@ -10,11 +10,25 @@
  * Tayangkan = Unhide (+ hapus owner-hide); Sembunyiin = owner-hide. Kunci minor-lock tetap
  * menang di local-cache (isHiddenRaw), jadi Tayangkan tidak pernah membuka judul terkunci.
  */
-import { applyUnhidden, hiddenReasonRaw, isLockedMinor, isPublicHidden, loadItemsRaw } from "@/lib/catalog/local-cache";
+import {
+  applyUnhidden,
+  hiddenReasonRaw,
+  isLockedMinor,
+  isPublicHidden,
+  loadItemsRaw,
+} from "@/lib/catalog/local-cache";
 import { healDecisions, recordDecision, reviewGroup, triggerText } from "@/lib/owner-decisions.js";
-import { isReviewPendingReason, strictPendingReason, titleReviewReason } from "@/lib/catalog/review-pending.js";
+import {
+  isReviewPendingReason,
+  strictPendingReason,
+  titleReviewReason,
+} from "@/lib/catalog/review-pending.js";
 import { readUnhideState, setUnhidden, setUnhiddenMany } from "@/lib/catalog/unhide-store";
-import { readOwnerHideState, setOwnerHidden, unhideOwnerHiddenMany } from "@/lib/catalog/owner-hide-store";
+import {
+  readOwnerHideState,
+  setOwnerHidden,
+  unhideOwnerHiddenMany,
+} from "@/lib/catalog/owner-hide-store";
 import { readReviewState, writeReviewState } from "@/lib/owner-review-store";
 import { minorContentReason } from "@/lib/catalog/minor-detector.js";
 import { explainTitle, schoolReviewCue } from "@/lib/catalog/minor-context.js";
@@ -54,13 +68,23 @@ export async function publishHeldDraft(
       readOwnerHideState().catch(() => null),
       readOwnerEditState(),
     ]);
-    applyUnhidden(Object.keys(unhide0.ids), hide0 ? Object.keys(hide0.ids) : null, withSavedEdit(edits0.ids, id, saved));
+    applyUnhidden(
+      Object.keys(unhide0.ids),
+      hide0 ? Object.keys(hide0.ids) : null,
+      withSavedEdit(edits0.ids, id, saved),
+    );
     const cache = (await loadItemsRaw()) as unknown as { raw?: AnyItem[]; items: AnyItem[] };
     const held = (cache.raw || cache.items).find((x) => x?.id === id);
     const still = held ? hiddenReasonRaw(held as never) : "";
-    if (isReviewPendingReason(still)) return { ok: false, saved: true, error: "review_pending_needs_proof", reason: still };
+    if (isReviewPendingReason(still))
+      return { ok: false, saved: true, error: "review_pending_needs_proof", reason: still };
     if (!canPublishTitle(title, hardOk) || titleReviewReason(title)) {
-      return { ok: false, saved: true, error: "title_needs_rename", reason: titleReviewReason(title) || String(titleHold(title, hardOk)?.term || "") };
+      return {
+        ok: false,
+        saved: true,
+        error: "title_needs_rename",
+        reason: titleReviewReason(title) || String(titleHold(title, hardOk)?.term || ""),
+      };
     }
     const hideIds = Object.keys((await setOwnerHidden(id, false)).ids);
     const unhideIds = Object.keys((await setUnhidden(id, true)).ids);
@@ -88,6 +112,8 @@ export type DetectorReviewRow = {
   trigger: string;
   /** Strict REVIEW_PENDING (Andini Permata set, strong youth signal, anime/hentai): Tayangkan needs a proof note. */
   strict: boolean;
+  /** Hard minor lock reason (explicit SD/SMP/SMA, age under 18, "di bawah umur"): never approvable, title still editable. */
+  locked: string;
   /** When the owner decided (approved / held rows). */
   decidedAt: number | null;
   /** Approved rows: true while the video is public. */
@@ -96,26 +122,77 @@ export type DetectorReviewRow = {
 
 /** Glosarium kata Mandarin yang sering muncul di judul (terjemahan kata kunci, bukan mesin). */
 const ZH: [string, string][] = [
-  ["高考", "ujian masuk kuliah"], ["高三", "kelas 3 SMA"], ["高中", "SMA"], ["初中", "SMP"], ["中学", "sekolah menengah"],
-  ["小学", "SD"], ["学生妹", "cewek pelajar"], ["学生", "pelajar"], ["校服", "seragam sekolah"], ["老师", "guru"],
-  ["萝莉", "loli"], ["幼", "anak kecil"], ["儿子", "anak laki-laki"], ["女儿", "anak perempuan"], ["妈妈", "ibu"],
-  ["母亲", "ibu"], ["继母", "ibu tiri"], ["后妈", "ibu tiri"], ["爸爸", "ayah"], ["父亲", "ayah"], ["姐姐", "kakak perempuan"],
-  ["妹妹", "adik perempuan"], ["弟弟", "adik laki-laki"], ["哥哥", "kakak laki-laki"], ["老婆", "istri"], ["妻子", "istri"],
-  ["人妻", "istri orang"], ["丈夫", "suami"], ["阿姨", "tante"], ["大学生", "mahasiswa"], ["大学", "kampus"], ["奖励", "hadiah"],
-  ["考试", "ujian"], ["前", "sebelum"], ["后", "sesudah"], ["偷情", "selingkuh"], ["强奸", "pemerkosaan"], ["迷奸", "dibius"],
-  ["性爱", "seks"], ["做爱", "bercinta"], ["中出", "keluar di dalam"], ["巨乳", "payudara besar"], ["美女", "cewek cantik"],
-  ["少妇", "wanita muda (menikah)"], ["熟女", "wanita matang"], ["自慰", "masturbasi"], ["国产", "lokal China"], ["视频", "video"],
+  ["高考", "ujian masuk kuliah"],
+  ["高三", "kelas 3 SMA"],
+  ["高中", "SMA"],
+  ["初中", "SMP"],
+  ["中学", "sekolah menengah"],
+  ["小学", "SD"],
+  ["学生妹", "cewek pelajar"],
+  ["学生", "pelajar"],
+  ["校服", "seragam sekolah"],
+  ["老师", "guru"],
+  ["萝莉", "loli"],
+  ["幼", "anak kecil"],
+  ["儿子", "anak laki-laki"],
+  ["女儿", "anak perempuan"],
+  ["妈妈", "ibu"],
+  ["母亲", "ibu"],
+  ["继母", "ibu tiri"],
+  ["后妈", "ibu tiri"],
+  ["爸爸", "ayah"],
+  ["父亲", "ayah"],
+  ["姐姐", "kakak perempuan"],
+  ["妹妹", "adik perempuan"],
+  ["弟弟", "adik laki-laki"],
+  ["哥哥", "kakak laki-laki"],
+  ["老婆", "istri"],
+  ["妻子", "istri"],
+  ["人妻", "istri orang"],
+  ["丈夫", "suami"],
+  ["阿姨", "tante"],
+  ["大学生", "mahasiswa"],
+  ["大学", "kampus"],
+  ["奖励", "hadiah"],
+  ["考试", "ujian"],
+  ["前", "sebelum"],
+  ["后", "sesudah"],
+  ["偷情", "selingkuh"],
+  ["强奸", "pemerkosaan"],
+  ["迷奸", "dibius"],
+  ["性爱", "seks"],
+  ["做爱", "bercinta"],
+  ["中出", "keluar di dalam"],
+  ["巨乳", "payudara besar"],
+  ["美女", "cewek cantik"],
+  ["少妇", "wanita muda (menikah)"],
+  ["熟女", "wanita matang"],
+  ["自慰", "masturbasi"],
+  ["国产", "lokal China"],
+  ["视频", "video"],
 ];
 
 export function translateZh(title: string): string | null {
   if (!/[\u4e00-\u9fff]/.test(title)) return null;
   let s = title;
-  for (const [zh, id] of [...ZH].sort((a, b) => b[0].length - a[0].length)) s = s.split(zh).join(` ${id} `);
-  s = s.replace(/[\u4e00-\u9fff]+/g, "…").replace(/\s+/g, " ").trim();
+  for (const [zh, id] of [...ZH].sort((a, b) => b[0].length - a[0].length))
+    s = s.split(zh).join(` ${id} `);
+  s = s
+    .replace(/[\u4e00-\u9fff]+/g, "…")
+    .replace(/\s+/g, " ")
+    .trim();
   return `${s} (terjemahan kata kunci)`;
 }
 
-type AnyItem = { id: string; title?: unknown; embed?: unknown; direct?: unknown; hidden?: unknown; hidden_reason?: unknown; review_reason?: unknown };
+type AnyItem = {
+  id: string;
+  title?: unknown;
+  embed?: unknown;
+  direct?: unknown;
+  hidden?: unknown;
+  hidden_reason?: unknown;
+  review_reason?: unknown;
+};
 
 function http(v: unknown): string | null {
   const s = String(v || "").trim();
@@ -169,7 +246,9 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
     if (it.hidden === true && it.hidden_reason === HOLD_REASON) {
       // Upload held because the title needs renaming (title-hold.js).
       flagged = true;
-      trigger = canPublishTitle(title, hardOk) ? "judul sudah aman" : String(titleHold(title, hardOk)?.term || "cek judul");
+      trigger = canPublishTitle(title, hardOk)
+        ? "judul sudah aman"
+        : String(titleHold(title, hardOk)?.term || "cek judul");
     } else {
       const rawReason = hiddenReasonRaw(it as never);
       const pendingReason = isReviewPendingReason(rawReason)
@@ -181,8 +260,18 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
         // REVIEW_PENDING: performers' age unconfirmed (review-pending.js).
         flagged = true;
         trigger = triggerText(pendingReason);
-        strict = Boolean(strictPendingReason(id, [title, String(it.title || "")], String((it as { category?: unknown }).category || "")));
-      } else if (it.hidden === true && it.hidden_reason === "detector-review" && minorContentReason(title) !== "minor") {
+        strict = Boolean(
+          strictPendingReason(
+            id,
+            [title, String(it.title || "")],
+            String((it as { category?: unknown }).category || ""),
+          ),
+        );
+      } else if (
+        it.hidden === true &&
+        it.hidden_reason === "detector-review" &&
+        minorContentReason(title) !== "minor"
+      ) {
         // New upload held by the context detector.
         flagged = true;
         const ex = explainTitle(title, minorContentReason(title));
@@ -190,11 +279,23 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
       }
     }
     if (!flagged && !decision) continue;
-    if (isLockedMinor(it as never)) continue; // hard minor lock: never in this list, never approvable
+    // Hard minor lock: listed under "Ditahan" with its reason (title still editable), never approvable.
+    const locked = lockReason(it, title);
+    // Sensitive set is judged on the title itself (also for held rows, whose hidden reason is the owner hide).
+    if (!strict)
+      strict = Boolean(
+        strictPendingReason(
+          id,
+          [title, String(it.title || "")],
+          String((it as { category?: unknown }).category || ""),
+        ),
+      );
     const legacy = flagged ? state.checked[`det:${id}`] || null : null;
     const unhidden = Boolean(unhide.ids[id]);
     const ownerHidden = Boolean(ownerHide.ids[id]);
-    const group = reviewGroup({ decision, unhidden, ownerHidden, legacyDecidedAt: legacy });
+    const group = locked
+      ? "held"
+      : reviewGroup({ decision, unhidden, ownerHidden, legacyDecidedAt: legacy });
     if (group === "pending" && (!flagged || !(await isPublicHidden(id)))) continue; // already public: nothing to decide
     const live = group === "approved" ? !(await isPublicHidden(id)) : null;
     out.push({
@@ -206,7 +307,15 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
       group,
       trigger,
       strict,
-      decidedAt: decision?.at || legacy || (unhidden ? Number(unhide.ids[id]?.at) || null : ownerHidden ? Number(ownerHide.ids[id]?.at) || null : null),
+      locked,
+      decidedAt:
+        decision?.at ||
+        legacy ||
+        (unhidden
+          ? Number(unhide.ids[id]?.at) || null
+          : ownerHidden
+            ? Number(ownerHide.ids[id]?.at) || null
+            : null),
       live,
     });
   }
@@ -219,7 +328,10 @@ export function isReviewPendingItem(it: AnyItem): boolean {
   // Judged on the current hidden reason: a clean owner title has already released a non-strict hold,
   // so the stored upload reason alone no longer keeps it in "Perlu dicek".
   const r = hiddenReasonRaw(it as never);
-  return isReviewPendingReason(r) || (Boolean(r) && isReviewPendingReason(String(it.hidden_reason || "")));
+  return (
+    isReviewPendingReason(r) ||
+    (Boolean(r) && isReviewPendingReason(String(it.hidden_reason || "")))
+  );
 }
 
 /**
@@ -228,9 +340,30 @@ export function isReviewPendingItem(it: AnyItem): boolean {
  * and the strict REVIEW_PENDING set (Andini Permata, strong youth signal, anime/hentai) needs a
  * proof note. A rename-held draft is approved as is: the owner's tap is the decision.
  */
-function approvalBlock(it: AnyItem, title: string, proof: string): { error: string; status: number } | null {
-  if (minorContentReason(title) === "minor" || lockedMinorReason(title) || isLockedMinor(it as never)) return { error: "locked_minor", status: 403 };
-  if (isReviewPendingItem(it) && strictPendingReason(it.id, [title, String(it.title || "")], String((it as { category?: unknown }).category || "")) && proof.length < 10) {
+function lockReason(it: AnyItem, title: string): string {
+  const r = String(lockedMinorReason(title) || "").replace(/^locked:/, "");
+  if (r === "minor-detector") return "judul menyebut anak di bawah umur";
+  if (r) return `judul jelas soal anak sekolah / di bawah umur (${r.replace(/-/g, " ")})`;
+  if (minorContentReason(title) === "minor") return "judul menyebut anak di bawah umur";
+  return isLockedMinor(it as never) ? "dikunci sebagai konten di bawah umur" : "";
+}
+
+function approvalBlock(
+  it: AnyItem,
+  title: string,
+  proof: string,
+): { error: string; status: number; reason?: string } | null {
+  const locked = lockReason(it, title);
+  if (locked) return { error: "locked_minor", status: 403, reason: locked };
+  // Sensitive set (Andini Permata, strong youth signal, anime/hentai): a short owner note is enough.
+  if (
+    strictPendingReason(
+      it.id,
+      [title, String(it.title || "")],
+      String((it as { category?: unknown }).category || ""),
+    ) &&
+    !proof
+  ) {
     return { error: "proof_required", status: 400 };
   }
   return null;
@@ -240,19 +373,33 @@ function approvalBlock(it: AnyItem, title: string, proof: string): { error: stri
  * "Tayangkan semua": approves many non-sensitive videos in one go (one KV write per store).
  * Strict items (need proof) and hard minor content are skipped and reported, never approved.
  */
-export async function approveDetectorReviewBulk(body: { ids?: unknown }): Promise<{ ok: boolean; error?: string; status?: number; approved?: string[]; skipped?: string[] }> {
-  if (!Array.isArray(body.ids) || !body.ids.length) return { ok: false, error: "no_ids", status: 400 };
+export async function approveDetectorReviewBulk(body: {
+  ids?: unknown;
+}): Promise<{
+  ok: boolean;
+  error?: string;
+  status?: number;
+  approved?: string[];
+  skipped?: string[];
+}> {
+  if (!Array.isArray(body.ids) || !body.ids.length)
+    return { ok: false, error: "no_ids", status: 400 };
   if (body.ids.length > 500) return { ok: false, error: "too_many_ids", status: 400 };
-  const ids = [...new Set(body.ids.map((x) => String(x || "").trim()))].filter((id) => /^[A-Za-z0-9_-]{3,64}$/.test(id));
+  const ids = [...new Set(body.ids.map((x) => String(x || "").trim()))].filter((id) =>
+    /^[A-Za-z0-9_-]{3,64}$/.test(id),
+  );
   const cache = (await loadItemsRaw()) as unknown as { raw?: AnyItem[]; items: AnyItem[] };
   const byId = new Map<string, AnyItem>();
   for (const it of cache.raw || cache.items) if (it?.id && !byId.has(it.id)) byId.set(it.id, it);
-  const edits = await readOwnerEditState().catch(() => ({ ids: {} as Record<string, { title?: string }> }));
+  const edits = await readOwnerEditState().catch(() => ({
+    ids: {} as Record<string, { title?: string }>,
+  }));
   const approved: string[] = [];
   const skipped: string[] = [];
   for (const id of ids) {
     const it = byId.get(id);
-    if (!it || approvalBlock(it, String(edits.ids[id]?.title || it.title || ""), "")) skipped.push(id);
+    if (!it || approvalBlock(it, String(edits.ids[id]?.title || it.title || ""), ""))
+      skipped.push(id);
     else approved.push(id);
   }
   if (!approved.length) return { ok: true, approved, skipped };
@@ -264,7 +411,10 @@ export async function approveDetectorReviewBulk(body: { ids?: unknown }): Promis
     const now = Date.now();
     for (const id of approved) {
       state.checked[`det:${id}`] = now;
-      state.decisions = recordDecision(state.decisions, id, "show", { title: String(edits.ids[id]?.title || byId.get(id)?.title || ""), now });
+      state.decisions = recordDecision(state.decisions, id, "show", {
+        title: String(edits.ids[id]?.title || byId.get(id)?.title || ""),
+        now,
+      });
     }
     await writeReviewState(state);
     return { ok: true, approved, skipped };
@@ -279,17 +429,27 @@ export async function approveDetectorReviewBulk(body: { ids?: unknown }): Promis
  * again; "keep" = owner hide, so a later clean title does not release it. Both are also written to
  * the decision ledger. Hard minor locks are refused; strict REVIEW_PENDING needs a proof note.
  */
-export async function decideDetectorReview(body: { id?: unknown; decision?: unknown; proof?: unknown }): Promise<{ ok: boolean; error?: string; status?: number; held?: boolean }> {
+export async function decideDetectorReview(body: {
+  id?: unknown;
+  decision?: unknown;
+  proof?: unknown;
+}): Promise<{ ok: boolean; error?: string; status?: number; held?: boolean; reason?: string }> {
   const id = String(body.id || "").trim();
   if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return { ok: false, error: "bad_id", status: 400 };
-  if (body.decision !== "show" && body.decision !== "hide" && body.decision !== "keep") return { ok: false, error: "bad_decision", status: 400 };
+  if (body.decision !== "show" && body.decision !== "hide" && body.decision !== "keep")
+    return { ok: false, error: "bad_decision", status: 400 };
   const show = body.decision === "show";
   const cache = (await loadItemsRaw()) as unknown as { raw?: AnyItem[]; items: AnyItem[] };
   const it = (cache.raw || cache.items).find((x) => x?.id === id);
   if (!it) return { ok: false, error: "not_found", status: 404 };
-  const edits = await readOwnerEditState().catch(() => ({ ids: {} as Record<string, { title?: string }> }));
+  const edits = await readOwnerEditState().catch(() => ({
+    ids: {} as Record<string, { title?: string }>,
+  }));
   const title = String(edits.ids[id]?.title || it.title || "");
-  const proof = String(body.proof ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
+  const proof = String(body.proof ?? "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 500);
   if (show) {
     const block = approvalBlock(it, title, proof);
     if (block) return { ok: false, ...block };
@@ -308,7 +468,8 @@ export async function decideDetectorReview(body: { id?: unknown; decision?: unkn
     const state = await readReviewState(true);
     state.checked[`det:${id}`] = Date.now();
     state.decisions = recordDecision(state.decisions, id, show ? "show" : "keep", { title });
-    if (show && proof) state.proof = { ...(state.proof || {}), [id]: { note: proof, at: Date.now() } };
+    if (show && proof)
+      state.proof = { ...(state.proof || {}), [id]: { note: proof, at: Date.now() } };
     if (!show && state.proof?.[id]) delete state.proof[id];
     await writeReviewState(state);
     return { ok: true, held: !show };
