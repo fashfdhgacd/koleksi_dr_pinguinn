@@ -33,18 +33,12 @@ function shareCardImage(thumbnail: string | null | undefined): string {
 function watchBreadcrumb(category: string | null | undefined, title: string, url: string) {
   const slug = categorySlugFor(category);
   const crumbs: Array<{ name: string; url: string }> = [{ name: "Beranda", url: SITE_ORIGIN }];
-  if (slug && category)
-    crumbs.push({ name: String(category), url: `${SITE_ORIGIN}/kategori/${slug}` });
+  if (slug && category) crumbs.push({ name: String(category), url: `${SITE_ORIGIN}/kategori/${slug}` });
   crumbs.push({ name: title, url });
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: crumbs.map((c, i) => ({
-      "@type": "ListItem",
-      position: i + 1,
-      name: c.name,
-      item: c.url,
-    })),
+    itemListElement: crumbs.map((c, i) => ({ "@type": "ListItem", position: i + 1, name: c.name, item: c.url })),
   };
 }
 
@@ -64,8 +58,7 @@ function ogImageType(url: string): string {
 
 export const Route = createFileRoute("/watch/$id")({
   validateSearch: (search: Record<string, unknown>): WatchSearch => ({
-    s:
-      typeof search.s === "string" && /^[A-Za-z0-9_-]{3,64}$/.test(search.s) ? search.s : undefined,
+    s: typeof search.s === "string" && /^[A-Za-z0-9_-]{3,64}$/.test(search.s) ? search.s : undefined,
   }),
   loader: async ({ params }) => {
     const id = (params.id || "").trim();
@@ -104,16 +97,17 @@ export const Route = createFileRoute("/watch/$id")({
     const description = curated
       ? curated
       : gen
-        ? gen.description
-        : item
-          ? resolveVideoSeoDescription(item)
-          : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
+      ? gen.description
+      : item
+        ? resolveVideoSeoDescription(item)
+        : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
     const image = item ? shareCardImage(item.thumbnail) : DEFAULT_OG;
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
     const embedUrl = item
       ? (item.video_url || item.qualities?.[0]?.url || "").trim() || null
       : null;
-    const contentUrl = embedUrl && /\.(mp4|webm|mov)($|\?)/i.test(embedUrl) ? embedUrl : null;
+    const contentUrl =
+      embedUrl && /\.(mp4|webm|mov)($|\?)/i.test(embedUrl) ? embedUrl : null;
     const jsonLd = item
       ? videoJsonLd({
           id: item.id,
@@ -154,10 +148,7 @@ export const Route = createFileRoute("/watch/$id")({
         { name: "twitter:description", content: description },
         { name: "twitter:image", content: image },
         { name: "twitter:image:alt", content: OG_SITE_NAME },
-        {
-          name: "robots",
-          content: item && !item.noindex ? "index,follow,max-video-preview:120" : "noindex,follow",
-        },
+        { name: "robots", content: item && !item.noindex ? "index,follow,max-video-preview:120" : "noindex,follow" },
         { name: "rating", content: "adult" },
       ],
       links: [{ rel: "canonical", href: url }],
@@ -166,9 +157,7 @@ export const Route = createFileRoute("/watch/$id")({
             { type: "application/ld+json", children: jsonLdString(jsonLd) },
             {
               type: "application/ld+json",
-              children: jsonLdString(
-                watchBreadcrumb(item!.category, cleanDisplayTitle(item!.title), url),
-              ),
+              children: jsonLdString(watchBreadcrumb(item!.category, cleanDisplayTitle(item!.title), url)),
             },
           ]
         : [],
