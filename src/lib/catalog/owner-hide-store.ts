@@ -70,3 +70,17 @@ export async function setOwnerHidden(id: string, hide: boolean): Promise<OwnerHi
   journal.set(id, { on: hide, at: Date.now() });
   return state;
 }
+
+/** Removes many ids in one read-modify-write (bulk Tayangkan). Returns the new state. */
+export async function unhideOwnerHiddenMany(ids: string[]): Promise<OwnerHideState> {
+  const r = await resolveAnalyticsKV();
+  if (!r) throw new Error("kv_unavailable");
+  const state = await readOwnerHideState();
+  const gone = ids.filter((id) => ID_RE.test(id) && state.ids[id]);
+  if (!gone.length) return state;
+  for (const id of gone) delete state.ids[id];
+  await r.kv.put(KEY, JSON.stringify(clean(state)));
+  const now = Date.now();
+  for (const id of gone) journal.set(id, { on: false, at: now });
+  return state;
+}

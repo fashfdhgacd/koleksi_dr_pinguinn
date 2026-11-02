@@ -11,7 +11,7 @@ import {
 } from "@/lib/bot/posters.js";
 
 import { listHiddenForReview, setReviewMark } from "@/lib/owner-hidden-review";
-import { decideDetectorReview, listDetectorReview } from "@/lib/owner-detector-review";
+import { approveDetectorReviewBulk, decideDetectorReview, listDetectorReview } from "@/lib/owner-detector-review";
 import {
   listHiddenCandidates,
   applyUnhidden,
@@ -177,8 +177,12 @@ async function setHiddenOverride(body: {
   const candidates = await listHiddenCandidates();
   const cand = candidates.find((c) => c.item.id === id);
   if (!cand) return { ok: false, error: "not_hidden_item", status: 404 };
-  // REVIEW_PENDING is approved only from "Perlu dicek" with a proof note (owner-detector-review.ts).
-  if (body.unhide && isReviewPendingReason(cand.reason)) return { ok: false, error: "review_pending_needs_proof", status: 409 };
+  // REVIEW_PENDING: same one-tap rule as "Perlu dicek" Tayangkan (only the strict set needs a proof note).
+  if (body.unhide && isReviewPendingReason(cand.reason)) {
+    const r = await decideDetectorReview({ id, decision: "show" });
+    if (!r.ok) return { ok: false, error: r.error === "proof_required" ? "review_pending_needs_proof" : r.error, status: r.status || 409 };
+    return { ok: true, unhidden: true };
+  }
   try {
     const state = await setUnhidden(id, body.unhide);
     applyUnhidden(Object.keys(state.ids));
@@ -210,11 +214,25 @@ async function setHiddenOverrideBulk(body: {
   if (body.ids.length > 2000) return { ok: false, error: "too_many_ids", status: 400 };
   const ids = [...new Set(body.ids.map((x) => String(x || "").trim()))];
   const cands = await listHiddenCandidates();
-  // REVIEW_PENDING never bulk-approves: each needs its own proof note in "Perlu dicek".
-  const flagged = new Set(cands.filter((c) => !(body.unhide && isReviewPendingReason(c.reason))).map((c) => c.item.id));
+  // REVIEW_PENDING goes through the "Tayangkan semua" rule: non-sensitive ones are approved (durable
+  // decision), the strict set (needs a proof note) is skipped and reported.
+  const pendingIds = new Set(cands.filter((c) => body.unhide && isReviewPendingReason(c.reason)).map((c) => c.item.id));
+  const pendingAsked = ids.filter((id) => pendingIds.has(id));
+  let pendingApproved: string[] = [];
+  let pendingSkipped: string[] = [];
+  if (pendingAsked.length) {
+    const r = await approveDetectorReviewBulk({ ids: pendingAsked });
+    if (!r.ok) return { ok: false, error: r.error, status: r.status || 503 };
+    pendingApproved = r.approved || [];
+    pendingSkipped = r.skipped || [];
+  }
+  const flagged = new Set(cands.filter((c) => !pendingIds.has(c.item.id)).map((c) => c.item.id));
   const applied = ids.filter((id) => /^[A-Za-z0-9_-]{3,64}$/.test(id) && flagged.has(id));
-  const rejected = ids.filter((id) => !applied.includes(id));
-  if (!applied.length) return { ok: false, error: "not_hidden_item", status: 404, rejected };
+  const rejected = ids.filter((id) => !applied.includes(id) && !pendingApproved.includes(id));
+  if (!applied.length && pendingApproved.length) {
+    return { ok: true, unhidden: true, changed: pendingApproved.length, applied: pendingApproved, rejected, total: 0 };
+  }
+  if (!applied.length) return { ok: false, error: "not_hidden_item", status: 404, rejected: [...new Set([...rejected, ...pendingSkipped])] };
   try {
     const state = await readUnhideState();
     let changed = 0;
@@ -230,7 +248,14 @@ async function setHiddenOverrideBulk(body: {
     }
     await writeUnhideState(state);
     applyUnhidden(Object.keys(state.ids));
-    return { ok: true, unhidden: body.unhide, changed, applied, rejected, total: Object.keys(state.ids).length };
+    return {
+      ok: true,
+      unhidden: body.unhide,
+      changed: changed + pendingApproved.length,
+      applied: [...applied, ...pendingApproved],
+      rejected,
+      total: Object.keys(state.ids).length,
+    };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "kv_error", status: 503 };
   }
@@ -1002,6 +1027,10 @@ export const Route = createFileRoute("/api/owner-tools")({
         if (body.action === "detector-review-list") {
           const items = await listDetectorReview();
           return json({ ok: true, count: items.length, pending: items.filter((r) => r.group === "pending").length, items });
+        }
+        if (body.action === "detector-review-approve-all") {
+          const r = await approveDetectorReviewBulk(body as never);
+          return json(r, r.status || 200);
         }
         if (body.action === "detector-review-decide") {
           const r = await decideDetectorReview(body as never);

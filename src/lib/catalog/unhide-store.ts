@@ -78,3 +78,14 @@ export async function setUnhidden(id: string, unhide: boolean): Promise<UnhideSt
   journal.set(id, { on: unhide, at: Date.now() });
   return state;
 }
+
+/** Adds many ids in one read-modify-write (bulk Tayangkan). Returns the new state. */
+export async function setUnhiddenMany(ids: string[]): Promise<UnhideState> {
+  const state = await readUnhideState();
+  const now = Date.now();
+  const add = ids.filter((id) => ID_RE.test(id));
+  for (const id of add) state.ids[id] = { at: now };
+  await writeUnhideState(state);
+  for (const id of add) journal.set(id, { on: true, at: now });
+  return state;
+}
