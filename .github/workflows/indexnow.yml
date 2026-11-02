@@ -1,0 +1,50 @@
+# IndexNow tiap 6 jam (07:45, 13:45, 19:45, 01:45 WIB; yang 01:45 = 45 menit sesudah Daily video sync).
+# scripts/indexnow-sync.mjs baca sitemap LIVE, kirim cuma URL baru/berubah/hilang ke api.indexnow.org
+# (Bing, Yandex, Seznam, Naver; DuckDuckGo pakai index Bing), lalu commit data/indexnow-urls.txt.
+# Gratis di GitHub Actions: tanpa secret, tanpa env Worker, tanpa KV. Commit pakai [skip ci] supaya
+# Workers Builds tidak build ulang (file state tidak dipakai situs).
+name: IndexNow sync
+
+on:
+  schedule:
+    - cron: "45 0,6,12,18 * * *"
+  workflow_dispatch:
+    inputs:
+      all:
+        description: "Kirim SEMUA URL sitemap (sekali saja, mis. sesudah perubahan besar)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: indexnow-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Submit new/changed URLs
+        run: node scripts/indexnow-sync.mjs ${{ inputs.all && '--all' || '' }}
+
+      - name: Commit state (only if changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git add data/indexnow-urls.txt
+          git diff --cached --quiet && { echo "Tidak ada perubahan."; exit 0; }
+          git commit -m "chore: IndexNow state ($(date -u '+%Y-%m-%d %H:%M') UTC) [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep 10
+          done
+          exit 1
