@@ -5,6 +5,7 @@ import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { CatalogPager } from "@/components/video/catalog-pager";
 import { Hero } from "@/components/video/hero";
+import { RecentlyWatched } from "@/components/video/recently-watched";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { findCategory } from "@/lib/catalog/categories";
 import { queryCatalog } from "@/lib/catalog/service";
@@ -228,6 +229,12 @@ function HomePage() {
         {heroVideos.length ? (
           <SafeBoundary>
             <Hero videos={heroVideos} />
+          </SafeBoundary>
+        ) : null}
+
+        {mode === "home" && page === 1 ? (
+          <SafeBoundary>
+            <RecentlyWatched />
           </SafeBoundary>
         ) : null}
 
