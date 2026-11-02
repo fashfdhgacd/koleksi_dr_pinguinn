@@ -28,7 +28,8 @@ test("streamtape.json and posters.json are valid JSON objects/arrays", () => {
   assert.ok(posters);
   const tapeCount = Array.isArray(tape) ? tape.length : Object.keys(tape).length;
   const posterCount = Array.isArray(posters) ? posters.length : Object.keys(posters).length;
-  assert.ok(tapeCount > 0);
+  // Streamtape was retired as a source: the bundled list may be empty but must stay valid JSON.
+  assert.ok(tapeCount >= 0);
   assert.ok(posterCount > 100);
 });
 
