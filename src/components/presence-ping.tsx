@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { inSample, wibDayKey } from "@/lib/traffic-valve";
+import { parseUtm } from "@/lib/utm";
 
 /**
  * Pageview ping: one POST /api/online per page (first load and every SPA navigation), nothing else.
@@ -15,6 +16,13 @@ import { inSample, wibDayKey } from "@/lib/traffic-valve";
  * outside the sample stops pinging for an hour (then one ping re-checks); N = 1 on normal days.
  */
 const ID_KEY = "drp_online_id";
+
+/**
+ * UTM tags of the landing URL, read once when the bundle loads (before any SPA navigation can drop
+ * the query). Sent with the first pageview ping only, so campaigns cost no extra request or write.
+ */
+let landingUtm: string | null =
+  typeof window !== "undefined" ? parseUtm(window.location.search) : null;
 const SAMPLE_KEY = "drp_s";
 
 /** A remembered rate is re-checked after an hour (one ping), so a calmer hour lets visitors back in. */
@@ -97,6 +105,10 @@ export function PresencePing() {
           ref: document.referrer || "",
           host: window.location.hostname,
         };
+        if (landingUtm) {
+          body.utm = landingUtm;
+          landingUtm = null;
+        }
         const payload = JSON.stringify({
           ...body,
           eventId: `${id}-${pathname || ""}-${Math.floor(Date.now() / 60000)}`,

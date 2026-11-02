@@ -326,6 +326,8 @@ export async function recordHit(input: {
   country?: string;
   /** Sample weight (traffic-valve.ts); 1 = every pageview recorded. */
   weight?: number;
+  /** Landing UTM key "source|medium|campaign|content" (utm.ts); only on the landing pageview. */
+  utm?: string | null;
 }): Promise<void> {
   const now = Date.now();
   const path = normalizePath(input.path);
@@ -362,6 +364,7 @@ export async function recordHit(input: {
         now,
         hourUtc: hourUtcBucket(now).toISOString(),
         weight: input.weight,
+        utm: input.utm || null,
       });
       // KV daystats fallback: refreshed from D1 every DAYSTATS_MIRROR_MS, not per hit.
       await mirrorDayStatsKv(d1, now).catch(() => undefined);
