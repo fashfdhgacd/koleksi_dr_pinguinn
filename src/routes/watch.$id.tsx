@@ -33,12 +33,18 @@ function shareCardImage(thumbnail: string | null | undefined): string {
 function watchBreadcrumb(category: string | null | undefined, title: string, url: string) {
   const slug = categorySlugFor(category);
   const crumbs: Array<{ name: string; url: string }> = [{ name: "Beranda", url: SITE_ORIGIN }];
-  if (slug && category) crumbs.push({ name: String(category), url: `${SITE_ORIGIN}/kategori/${slug}` });
+  if (slug && category)
+    crumbs.push({ name: String(category), url: `${SITE_ORIGIN}/kategori/${slug}` });
   crumbs.push({ name: title, url });
   return {
     "@context": "https://schema.org",
     "@type": "BreadcrumbList",
-    itemListElement: crumbs.map((c, i) => ({ "@type": "ListItem", position: i + 1, name: c.name, item: c.url })),
+    itemListElement: crumbs.map((c, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: c.name,
+      item: c.url,
+    })),
   };
 }
 
@@ -47,9 +53,19 @@ export type WatchSearch = {
   s?: string;
 };
 
+/** MIME type for og:image:type from the image URL's extension (default jpeg). */
+function ogImageType(url: string): string {
+  const ext = /\.(webp|png|gif|jpe?g)(?:[?#]|$)/i.exec(url)?.[1]?.toLowerCase();
+  if (ext === "webp") return "image/webp";
+  if (ext === "png") return "image/png";
+  if (ext === "gif") return "image/gif";
+  return "image/jpeg";
+}
+
 export const Route = createFileRoute("/watch/$id")({
   validateSearch: (search: Record<string, unknown>): WatchSearch => ({
-    s: typeof search.s === "string" && /^[A-Za-z0-9_-]{3,64}$/.test(search.s) ? search.s : undefined,
+    s:
+      typeof search.s === "string" && /^[A-Za-z0-9_-]{3,64}$/.test(search.s) ? search.s : undefined,
   }),
   loader: async ({ params }) => {
     const id = (params.id || "").trim();
@@ -88,17 +104,16 @@ export const Route = createFileRoute("/watch/$id")({
     const description = curated
       ? curated
       : gen
-      ? gen.description
-      : item
-        ? resolveVideoSeoDescription(item)
-        : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
+        ? gen.description
+        : item
+          ? resolveVideoSeoDescription(item)
+          : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
     const image = item ? shareCardImage(item.thumbnail) : DEFAULT_OG;
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
     const embedUrl = item
       ? (item.video_url || item.qualities?.[0]?.url || "").trim() || null
       : null;
-    const contentUrl =
-      embedUrl && /\.(mp4|webm|mov)($|\?)/i.test(embedUrl) ? embedUrl : null;
+    const contentUrl = embedUrl && /\.(mp4|webm|mov)($|\?)/i.test(embedUrl) ? embedUrl : null;
     const jsonLd = item
       ? videoJsonLd({
           id: item.id,
@@ -130,7 +145,8 @@ export const Route = createFileRoute("/watch/$id")({
         { property: "og:url", content: url },
         { property: "og:image", content: image },
         { property: "og:image:secure_url", content: image },
-        { property: "og:image:type", content: "image/jpeg" },
+        // Label the real format: IndoAV posters are .webp (a jpeg label makes some previews skip them).
+        { property: "og:image:type", content: ogImageType(image) },
         { property: "og:image:width", content: "1280" },
         { property: "og:image:height", content: "720" },
         { name: "twitter:card", content: "summary_large_image" },
@@ -138,7 +154,10 @@ export const Route = createFileRoute("/watch/$id")({
         { name: "twitter:description", content: description },
         { name: "twitter:image", content: image },
         { name: "twitter:image:alt", content: OG_SITE_NAME },
-        { name: "robots", content: item && !item.noindex ? "index,follow,max-video-preview:120" : "noindex,follow" },
+        {
+          name: "robots",
+          content: item && !item.noindex ? "index,follow,max-video-preview:120" : "noindex,follow",
+        },
         { name: "rating", content: "adult" },
       ],
       links: [{ rel: "canonical", href: url }],
@@ -147,7 +166,9 @@ export const Route = createFileRoute("/watch/$id")({
             { type: "application/ld+json", children: jsonLdString(jsonLd) },
             {
               type: "application/ld+json",
-              children: jsonLdString(watchBreadcrumb(item!.category, cleanDisplayTitle(item!.title), url)),
+              children: jsonLdString(
+                watchBreadcrumb(item!.category, cleanDisplayTitle(item!.title), url),
+              ),
             },
           ]
         : [],

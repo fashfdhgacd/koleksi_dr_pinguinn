@@ -63,7 +63,10 @@ export const UNLISTED_CATEGORY_SLUGS = new Set<string>([]);
  * new slug, and every stored / bot / source value with the old name still lands in the new category.
  * The title classifier keeps its internal keys "abg" / "mahasiswi"; slugOf() maps them here.
  */
-export const LEGACY_CATEGORY_SLUGS: Record<string, string> = { abg: "teen-18", mahasiswi: "college-18" };
+export const LEGACY_CATEGORY_SLUGS: Record<string, string> = {
+  abg: "teen-18",
+  mahasiswi: "college-18",
+};
 
 /**
  * Categories kept out of search and public navigation (owner decision 2026-10-27): no sitemap entry,
@@ -72,12 +75,14 @@ export const LEGACY_CATEGORY_SLUGS: Record<string, string> = { abg: "teen-18", m
  */
 export const NOINDEX_CATEGORY_SLUGS = new Set<string>(["teen-18", "college-18"]);
 
-export const CATEGORY_LIST: CategoryInfo[] = CATEGORIES.filter((c) => !UNLISTED_CATEGORY_SLUGS.has(c.slug)).map(
-  ({ slug, label }) => ({ slug, label }),
-);
+export const CATEGORY_LIST: CategoryInfo[] = CATEGORIES.filter(
+  (c) => !UNLISTED_CATEGORY_SLUGS.has(c.slug),
+).map(({ slug, label }) => ({ slug, label }));
 
 /** CATEGORY_LIST without NOINDEX_CATEGORY_SLUGS: what visitors and crawlers see. */
-export const PUBLIC_CATEGORY_LIST: CategoryInfo[] = CATEGORY_LIST.filter((c) => !NOINDEX_CATEGORY_SLUGS.has(c.slug));
+export const PUBLIC_CATEGORY_LIST: CategoryInfo[] = CATEGORY_LIST.filter(
+  (c) => !NOINDEX_CATEGORY_SLUGS.has(c.slug),
+);
 
 /** Kategori dengan video lebih sedikit dari ini tidak tampil di /kategori dan sitemap (halaman tetap bisa dibuka). */
 export const MIN_LISTED_CATEGORY_COUNT = 20;
@@ -93,38 +98,46 @@ export const MIN_INDEXED_CATEGORY_COUNT = 5;
  */
 export const SEO_MIN_COUNT: Record<string, number> = {
   "ai-gay": MIN_INDEXED_CATEGORY_COUNT,
-  "blunder": 8,
+  blunder: 8,
   "kelas-bintang": 8,
-  "tiktok": 8,
-  "mantan": 8,
-  "vcs": 8,
-  "kompilasi": 8,
-  "tetangga": 8,
-  "kacamata": 8,
-  "kantor": 8,
-  "anal": 8,
-  "cantik": 8,
+  tiktok: 8,
+  mantan: 8,
+  vcs: 8,
+  kompilasi: 8,
+  tetangga: 8,
+  kacamata: 8,
+  kantor: 8,
+  anal: 8,
+  cantik: 8,
 };
+
+/**
+ * "Lainnya" is the catch-all for videos no rule could place: a thin, mixed page, so it stays
+ * noindex,follow until it holds this many videos (kept out of SEO_MIN_COUNT so it is not treated
+ * as an SEO category for listing or category assignment).
+ */
+export const LAINNYA_MIN_INDEXED = 24;
 
 /** Fewest videos for a category page to be indexable (1 = any non-empty page). */
 export function minIndexedCount(slug: string | null | undefined): number {
+  if (slug === "lainnya") return LAINNYA_MIN_INDEXED;
   return (slug && SEO_MIN_COUNT[slug]) || 1;
 }
 
 /** Upload hashtags (#aigay, #kelasbintang, ...) per category slug; see src/lib/bot/parse.js. */
 export const HASHTAG_CATEGORY: Record<string, string> = {
   aigay: "ai-gay",
-  "blunder": "blunder",
-  "kelasbintang": "kelas-bintang",
-  "tiktok": "tiktok",
-  "mantan": "mantan",
-  "vcs": "vcs",
-  "kompilasi": "kompilasi",
-  "tetangga": "tetangga",
-  "kacamata": "kacamata",
-  "kantor": "kantor",
-  "anal": "anal",
-  "cantik": "cantik",
+  blunder: "blunder",
+  kelasbintang: "kelas-bintang",
+  tiktok: "tiktok",
+  mantan: "mantan",
+  vcs: "vcs",
+  kompilasi: "kompilasi",
+  tetangga: "tetangga",
+  kacamata: "kacamata",
+  kantor: "kantor",
+  anal: "anal",
+  cantik: "cantik",
 };
 
 /** Chip utama di header; sisanya di menu "Lainnya". */
@@ -140,8 +153,8 @@ export const PRIMARY_CATEGORY_SLUGS = [
   "live",
 ] as const;
 
-export const PRIMARY_CATEGORIES: CategoryInfo[] = PRIMARY_CATEGORY_SLUGS.map(
-  (slug) => CATEGORY_LIST.find((c) => c.slug === slug)!,
+export const PRIMARY_CATEGORIES: CategoryInfo[] = PRIMARY_CATEGORY_SLUGS.map((slug) =>
+  CATEGORY_LIST.find((c) => c.slug === slug)!,
 ).filter(Boolean);
 
 export const MORE_CATEGORIES: CategoryInfo[] = PUBLIC_CATEGORY_LIST.filter(
