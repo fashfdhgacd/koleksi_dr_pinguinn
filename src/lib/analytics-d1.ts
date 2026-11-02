@@ -153,6 +153,13 @@ export function ensureD1Schema(db: D1DatabaseLike): Promise<void> {
         .all()
         .catch(() => undefined),
     )
+    // Landing UTM key (utm.ts), set only on the pageview that arrived with utm_* params.
+    .then(() =>
+      db
+        .prepare(`alter table analytics_events add column utm text`)
+        .all()
+        .catch(() => undefined),
+    )
     .then(() => undefined)
     .catch((err) => {
       g.__d1SchemaPromise__ = undefined;
@@ -298,13 +305,21 @@ export async function d1RecordHit(
     hourUtc: string;
     /** Sample weight (traffic-valve.ts); 1 when every pageview is recorded. */
     weight?: number;
+    /** Landing UTM key "source|medium|campaign|content" (utm.ts), null on other pageviews. */
+    utm?: string | null;
   },
 ): Promise<void> {
   const w = Math.max(1, Math.floor(Number(e.weight) || 1));
   await db.batch([
     db
       .prepare(
-        `insert into analytics_events
+        // utm only in the statement when present, so ordinary pageviews never depend on that column.
+        e.utm
+          ? `insert into analytics_events
+          (id, event_type, visitor_id, session_id, page, path, referrer, user_agent, device_type, browser, host, created_at, country, w, utm)
+         values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15)
+         on conflict (id) do nothing`
+          : `insert into analytics_events
           (id, event_type, visitor_id, session_id, page, path, referrer, user_agent, device_type, browser, host, created_at, country, w)
          values (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14)
          on conflict (id) do nothing`,
@@ -324,6 +339,7 @@ export async function d1RecordHit(
         e.now,
         e.country || null,
         w > 1 ? w : null,
+        ...(e.utm ? [e.utm] : []),
       ),
     db
       .prepare(

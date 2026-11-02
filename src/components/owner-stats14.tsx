@@ -264,6 +264,24 @@ export function OwnerStats14(props: { secret: string }) {
         </p>
       </Card>
 
+      <Card title="Kampanye (UTM) (14 hari)">
+        {data.campaigns?.length ? (
+          <TopList
+            items={data.campaigns}
+            by="uniq"
+            label={(c) => c.label || c.key}
+            value={(c) => `${fmt(c.uniq)} orang · ${fmt(c.views)} masuk`}
+          />
+        ) : (
+          <p className="text-sm text-zinc-400">Belum ada pengunjung dari link ber-UTM.</p>
+        )}
+        <p className="mt-2 text-[12px] text-zinc-500">
+          Dihitung dari link yang memakai ?utm_source=…&amp;utm_medium=…&amp;utm_campaign=… (contoh:
+          ?utm_source=telegram&amp;utm_medium=channel&amp;utm_campaign=organic). Format: sumber / media · kampanye ·
+          konten. Hanya kunjungan pertama yang masuk lewat link itu yang dihitung.
+        </p>
+      </Card>
+
       {data.pages.length ? (
         <Card title="Halaman terbanyak (14 hari)">
           <TopList

@@ -11,12 +11,16 @@
  *   country — two-letter code ("" = unknown)
  *   browser — chrome / safari / ...
  *   path    — top PATHS_PER_DAY pages per day
+ *   utm     — landing campaign "source|medium|campaign|content" (utm.ts), top UTM_PER_DAY per day;
+ *             views = landings with that tag, uniq = distinct visitors who landed with it
  */
+import { normalizeUtmKey, utmLabel } from "./utm.ts";
 
 export const STATS14_DAYS = 14;
 export const PATHS_PER_DAY = 150;
 export const REF_PER_DAY = 20;
-export const BREAKDOWN_KINDS = ["device", "src", "ref", "country", "browser", "path"] as const;
+export const UTM_PER_DAY = 50;
+export const BREAKDOWN_KINDS = ["device", "src", "ref", "country", "browser", "path", "utm"] as const;
 export type BreakdownKind = (typeof BREAKDOWN_KINDS)[number];
 
 export const SOURCE_KEYS = [
@@ -110,6 +114,32 @@ export function foldDayRows(day: string, rows: DimVisitorRow[]): BreakdownRow[] 
   return out.concat(refs.slice(0, REF_PER_DAY));
 }
 
+/** One landing-with-UTM aggregate row: utm key + one visitor's weight and landing count. */
+export type UtmVisitorRow = { utm: string; visitor: string; vw: number; n: number };
+
+/** Fold landing UTM rows into "utm" breakdown rows for one day (top UTM_PER_DAY by visitors). */
+export function foldUtmRows(day: string, rows: UtmVisitorRow[]): BreakdownRow[] {
+  const acc = new Map<string, { views: number; vis: Map<string, number> }>();
+  for (const r of rows) {
+    const key = normalizeUtmKey(r.utm);
+    if (!key) continue;
+    let e = acc.get(key);
+    if (!e) acc.set(key, (e = { views: 0, vis: new Map() }));
+    const w = Math.max(1, Number(r.vw) || 1);
+    e.views += w * Math.max(0, Number(r.n) || 0);
+    const v = r.visitor || "";
+    e.vis.set(v, Math.max(e.vis.get(v) || 0, w));
+  }
+  const out: BreakdownRow[] = [];
+  for (const [key, e] of acc) {
+    let uniq = 0;
+    for (const w of e.vis.values()) uniq += w;
+    out.push({ day, kind: "utm", key, views: e.views, uniq });
+  }
+  out.sort((a, b) => b.uniq - a.uniq || b.views - a.views);
+  return out.slice(0, UTM_PER_DAY);
+}
+
 /** WIB day keys ending at `today`, `days` long, oldest first. */
 export function wibDayList(today: string, days: number): string[] {
   const t = Date.parse(`${today}T00:00:00Z`);
@@ -137,6 +167,8 @@ export type Stats14 = {
   pages: TopItem[];
   countries: TopItem[];
   browsers: TopItem[];
+  /** "Kampanye (UTM)": landings per utm key (label = readable form), most visitors first. */
+  campaigns: TopItem[];
   updatedAt: string;
 };
 
@@ -234,6 +266,7 @@ export function buildStats14(
     pages: top(rows, "path", cur, 20, "views"),
     countries: top(rows, "country", cur, 10, "uniq"),
     browsers: top(rows, "browser", cur, 8, "uniq"),
+    campaigns: top(rows, "utm", cur, 20, "uniq").map((c) => ({ ...c, label: utmLabel(c.key) })),
     updatedAt: new Date(now).toISOString(),
   };
 }

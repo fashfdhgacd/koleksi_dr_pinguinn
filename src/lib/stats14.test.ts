@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildStats14, changeWords, classifySource, foldDayRows, wibDayList } from "./stats14.ts";
+import { buildStats14, changeWords, classifySource, foldDayRows, foldUtmRows, wibDayList } from "./stats14.ts";
 
 test("classifySource maps real referrers from the site", () => {
   const cases: [string, string][] = [
@@ -80,4 +80,25 @@ test("changeWords is plain words, no percentages", () => {
   assert.equal(changeWords(1000, 2500, f), "turun 1.500 dari 14 hari sebelumnya (2.500)");
   assert.equal(changeWords(5, 5, f), "sama dengan 14 hari sebelumnya");
   assert.doesNotMatch(changeWords(1, 2, f), /%/);
+});
+
+test("foldUtmRows + buildStats14 give the Kampanye (UTM) list", () => {
+  const today = "2026-11-02";
+  const rows = foldUtmRows(today, [
+    { utm: "justpaste|paste|organic|", visitor: "a", vw: 1, n: 1 },
+    { utm: "justpaste|paste|organic|", visitor: "b", vw: 2, n: 1 },
+    { utm: "telegram|channel|organic|", visitor: "c", vw: 1, n: 2 },
+    { utm: "|bad||", visitor: "d", vw: 1, n: 1 },
+  ]);
+  assert.deepEqual(
+    rows.map((r) => [r.kind, r.key, r.views, r.uniq]),
+    [
+      ["utm", "justpaste|paste|organic|", 3, 3],
+      ["utm", "telegram|channel|organic|", 2, 1],
+    ],
+  );
+  const s = buildStats14(today, rows, [], 0);
+  assert.equal(s.campaigns[0].label, "justpaste / paste · organic");
+  assert.equal(s.campaigns[0].uniq, 3);
+  assert.equal(s.campaigns.length, 2);
 });

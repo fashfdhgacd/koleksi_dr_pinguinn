@@ -9,6 +9,7 @@ import { kvCountOnline, kvReadRoll, kvTouchLive, rollToStats } from "@/lib/kv-li
 import { ONLINE_WINDOW_D1_MS, d1CountOnline, readyD1 } from "@/lib/analytics-d1";
 import { currentSampleRate } from "@/lib/owner-analytics-presence";
 import { inSample } from "@/lib/traffic-valve";
+import { normalizeUtmKey } from "@/lib/utm";
 import { isOwnerKey, ownerKeyFrom, ownerSecret } from "@/lib/owner-auth";
 
 const BOT_UA =
@@ -195,6 +196,7 @@ async function handlePost(request: Request): Promise<Response> {
   let ref = "";
   let host = "";
   let eventId = "";
+  let utm: string | null = null;
   try {
     const body = (await request.json()) as {
       id?: string;
@@ -203,6 +205,7 @@ async function handlePost(request: Request): Promise<Response> {
       ref?: string;
       host?: string;
       eventId?: string;
+      utm?: string;
     };
     id = typeof body?.id === "string" ? body.id.trim().slice(0, 64) : "";
     bodyKey = typeof body?.key === "string" ? body.key : "";
@@ -210,6 +213,7 @@ async function handlePost(request: Request): Promise<Response> {
     ref = typeof body?.ref === "string" ? body.ref : "";
     host = typeof body?.host === "string" ? body.host : "";
     eventId = typeof body?.eventId === "string" ? body.eventId : "";
+    utm = normalizeUtmKey(typeof body?.utm === "string" ? body.utm.slice(0, 200) : "");
   } catch {
     return json(request, { ok: true, skipped: "bad_json" });
   }
@@ -268,6 +272,7 @@ async function handlePost(request: Request): Promise<Response> {
           eventId,
           country: request.headers.get("cf-ipcountry") || "",
           weight: rate,
+          utm,
         });
       }
       // PG presence + peak for every presence touch and every pageview (SPA nav).

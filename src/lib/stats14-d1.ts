@@ -16,10 +16,12 @@ import {
   type DayTotal,
   type DimVisitorRow,
   type Stats14,
+  type UtmVisitorRow,
   PATHS_PER_DAY,
   STATS14_DAYS,
   buildStats14,
   foldDayRows,
+  foldUtmRows,
   wibDayList,
 } from "@/lib/stats14";
 
@@ -68,7 +70,7 @@ export async function computeDay(db: D1DatabaseLike, day: string): Promise<Break
   const t0 = wibDayStartMs(day);
   const t1 = t0 + DAY_MS;
   const RANGE = `created_at >= ?1 and created_at < ?2 and event_type = 'pageview'`;
-  const [dims, paths] = await Promise.all([
+  const [dims, paths, utms] = await Promise.all([
     all<DimVisitorRow>(
       db,
       `select coalesce(device_type,'other') as device, coalesce(referrer,'(direct)') as ref,
@@ -90,8 +92,17 @@ export async function computeDay(db: D1DatabaseLike, day: string): Promise<Break
       t1,
       PATHS_PER_DAY,
     ),
+    // Landing UTM tags (only rows that arrived with utm_*). Empty if the utm column is not there yet.
+    all<UtmVisitorRow>(
+      db,
+      `select utm, coalesce(visitor_id,'') as visitor, max(${W}) as vw, count(*) as n
+         from analytics_events where ${RANGE} and utm is not null
+        group by 1, 2`,
+      t0,
+      t1,
+    ).catch(() => [] as UtmVisitorRow[]),
   ]);
-  const rows = foldDayRows(day, dims);
+  const rows = foldDayRows(day, dims).concat(foldUtmRows(day, utms));
   for (const p of paths) {
     rows.push({ day, kind: "path", key: String(p.path || "/").slice(0, 200), views: Number(p.views) || 0, uniq: Number(p.uniq) || 0 });
   }
