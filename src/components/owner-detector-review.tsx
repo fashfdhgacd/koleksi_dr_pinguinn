@@ -1,22 +1,19 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { OwnerEditSheet, verdictText, type EditVerdict } from "@/components/owner-edit-sheet";
 
+/** Same shape as DetectorReviewRow (src/lib/owner-detector-review.ts). */
 type Row = {
   id: string;
   title: string;
   translation: string | null;
-  assessment: string;
-  reason: string;
-  signals: string[];
-  held: boolean;
-  status: string;
   thumbUrl: string;
   watchUrl: string;
+  group: "pending" | "approved" | "held";
+  trigger: string;
+  strict: boolean;
   decidedAt: number | null;
-  pending?: boolean;
-  strict?: boolean;
+  live: boolean | null;
 };
 
 async function post<T>(secret: string, body: Record<string, unknown>): Promise<T & { ok?: boolean; error?: string }> {
@@ -33,23 +30,62 @@ async function post<T>(secret: string, body: Record<string, unknown>): Promise<T
   }
 }
 
-/** Kotak "Perlu dicek": judul verdict "review" dari detector minor, satu tap Tayangkan/Sembunyiin. */
 const btn =
   "rounded-lg px-3 py-1.5 text-[13px] transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#2dd4bf] disabled:opacity-50";
 
+function when(at: number | null): string {
+  if (!at) return "";
+  return new Date(at).toLocaleString("id-ID", { timeZone: "Asia/Jakarta", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) + " WIB";
+}
+
+function errText(e?: string): string {
+  if (e === "locked_minor") return "Video ini terkunci (minor), tidak bisa ditayangkan.";
+  if (e === "proof_required") return "Tulis bukti dulu (min. 10 huruf) bahwa semua pemeran 18+.";
+  if (e === "title_needs_rename") return "Judul masih kena cek. Ganti judulnya dulu, lalu Simpan judul.";
+  return e || "Gagal.";
+}
+
+/**
+ * "Perlu dicek" (owner request 2026-11-02: one simple list). Only videos still waiting for the owner;
+ * Tayangkan moves a video to "Sudah disetujui" for good (automatic checks never hold it again),
+ * Tetap tahan moves it to "Ditahan". Both decided lists are collapsed.
+ */
 export function DetectorReviewSection({ secret, onCount }: { secret: string; onCount?: (n: number) => void }) {
   const [rows, setRows] = useState<Row[] | null>(null);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState("");
-  const [showDone, setShowDone] = useState(false);
-  const [editing, setEditing] = useState<Row | null>(null);
-  const [verdicts, setVerdicts] = useState<Record<string, EditVerdict>>({});
   const [proofs, setProofs] = useState<Record<string, string>>({});
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
 
-  // Inline title edit (owner rule 2026-11-02): always saves; a clean title releases an automatic
-  // hold at once, the strict set (Andini Permata / anime) still needs "Setujui".
+  const load = useCallback(async () => {
+    const d = await post<{ items?: Row[] }>(secret, { action: "detector-review-list" });
+    if (d.ok && d.items) {
+      setRows(d.items);
+      setErr("");
+    } else setErr(d.error || "Gagal memuat.");
+  }, [secret]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const decide = async (r: Row, decision: "show" | "keep") => {
+    setBusy(r.id);
+    setErr("");
+    const proof = (proofs[r.id] || "").trim();
+    const d = await post(secret, { action: "detector-review-decide", id: r.id, decision, ...(proof ? { proof } : {}) });
+    setBusy("");
+    if (!d.ok) {
+      setNotes((n) => ({ ...n, [r.id]: errText(d.error) }));
+      return;
+    }
+    // Move it at once; the server list (reloaded below) is the source of truth.
+    setRows((rs) => (rs || []).map((x) => (x.id === r.id ? { ...x, group: decision === "show" ? "approved" : "held", decidedAt: Date.now(), live: decision === "show" } : x)));
+    void load();
+  };
+
+  // Inline title edit: always saved. A title that passes the check goes live, and is recorded as approved.
   const saveTitle = async (r: Row) => {
     const title = (drafts[r.id] ?? r.title).replace(/\s+/g, " ").trim();
     if (!title || title === r.title) return;
@@ -60,73 +96,25 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
       setNotes((n) => ({ ...n, [r.id]: `Gagal menyimpan: ${d.error || "?"}` }));
       return;
     }
-    setNotes((n) => ({
-      ...n,
-      [r.id]: d.live
-        ? "Judul tersimpan dan lolos cek: video sudah tayang."
-        : d.note || (r.strict ? "Judul tersimpan. Video ini tetap perlu Setujui dengan bukti 18+." : "Judul tersimpan, tapi masih kena cek judul. Lihat alasan di atas setelah dimuat ulang."),
-    }));
     setDrafts((x) => {
       const next = { ...x };
       delete next[r.id];
       return next;
     });
+    if (d.live) {
+      await decide({ ...r, title }, "show");
+      return;
+    }
+    setNotes((n) => ({ ...n, [r.id]: r.strict ? "Judul tersimpan. Tulis bukti 18+ lalu Tayangkan." : d.note || "Judul tersimpan, tapi masih kena cek. Ganti kata yang ditandai." }));
     await load();
   };
 
-  const load = useCallback(async () => {
-    setErr("");
-    const d = await post<{ items?: Row[] }>(secret, { action: "detector-review-list" });
-    if (d.ok && d.items) setRows(d.items);
-    else setErr(d.error || "Gagal memuat.");
-  }, [secret]);
-
+  const pending = (rows || []).filter((r) => r.group === "pending");
+  const approved = (rows || []).filter((r) => r.group === "approved");
+  const held = (rows || []).filter((r) => r.group === "held");
   useEffect(() => {
-    void load();
-  }, [load]);
-
-  const decide = async (id: string, decision: "show" | "hide" | "keep") => {
-    setBusy(id);
-    const proof = (proofs[id] || "").trim();
-    const d = await post<{ held?: boolean }>(secret, { action: "detector-review-decide", id, decision, ...(proof ? { proof } : {}) });
-    setBusy("");
-    if (!d.ok) {
-      setErr(d.error === "locked_minor"
-          ? "Judul ini terkunci (minor), tidak bisa ditayangkan."
-          : d.error === "proof_required"
-            ? "Tulis bukti dulu (min. 10 huruf): sumber/rilis resmi yang menunjukkan semua pemeran 18+ saat produksi."
-            : d.error === "review_pending_needs_proof"
-              ? "Video ini perlu Setujui dengan bukti umur (judul tetap bisa diedit)."
-          : d.error === "title_needs_rename"
-            ? "Judul masih kena cek. Ganti judulnya lalu Simpan judul; yang lolos cek langsung tayang."
-            : d.error || "Gagal.");
-      return;
-    }
-    setRows((rs) =>
-      (rs || []).map((r) =>
-        r.id === id
-          ? {
-              ...r,
-              decidedAt: Date.now(),
-              held: decision !== "show",
-              status:
-                decision === "keep"
-                  ? "Tetap ditahan: umur pemeran belum terkonfirmasi"
-                  : decision === "hide"
-                    ? "Disembunyiin pemilik"
-                    : r.pending
-                      ? `Disetujui pemilik (bukti: ${proof})`
-                      : "Tayang (diputuskan pemilik)",
-            }
-          : r,
-      ),
-    );
-  };
-
-  const pendingCount = rows ? rows.filter((r) => !r.decidedAt).length : null;
-  useEffect(() => {
-    if (pendingCount != null) onCount?.(pendingCount);
-  }, [pendingCount, onCount]);
+    if (rows) onCount?.(pending.length);
+  }, [rows, pending.length, onCount]);
 
   if (err && !rows)
     return (
@@ -145,51 +133,35 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
         ))}
       </div>
     );
-  const pending = rows.filter((r) => !r.decidedAt);
-  const list = showDone ? rows : pending;
+
   return (
-    <div className="flex flex-col gap-2.5">
-      <p className="text-[12px] leading-relaxed text-zinc-400">
-        {pending.length} perlu dicek · {rows.length - pending.length} sudah diputuskan. Semua video di sini bisa diedit. Kalau cuma judulnya yang bikin ketahan, ganti judulnya lalu
-        Simpan judul: judul yang lolos cek langsung tayang. Video Andini Permata dan anime/hentai yang umurnya tidak jelas tetap perlu Setujui dengan bukti semua pemeran
-        18+ saat produksi.
-      </p>
+    <div className="flex flex-col gap-3">
+      <h2 className="text-sm font-semibold text-zinc-100">Perlu dicek ({pending.length})</h2>
       {err ? <p role="alert" className="text-[13px] text-red-300">{err}</p> : null}
-      <label className="flex items-center gap-2 text-[12px] text-zinc-400">
-        <input type="checkbox" checked={showDone} onChange={(e) => setShowDone(e.target.checked)} /> Tampilkan yang sudah diputuskan
-      </label>
-      {list.map((r) => (
+      {pending.map((r) => (
         <div key={r.id} className="flex flex-col gap-3 rounded-lg border border-amber-400/15 bg-[#0c0e0f] p-3 sm:flex-row">
-          <img src={r.thumbUrl} alt="" loading="lazy" className="aspect-video w-full shrink-0 rounded-lg bg-black object-cover sm:h-20 sm:w-32" />
+          <a href={r.watchUrl} target="_blank" rel="noreferrer noopener" className="shrink-0" aria-label="Pratinjau">
+            <img src={r.thumbUrl} alt="" loading="lazy" className="aspect-video w-full rounded-lg bg-black object-cover sm:h-20 sm:w-32" />
+          </a>
           <div className="min-w-0 flex-1 text-sm">
             <p className="break-words font-medium leading-snug text-zinc-100">{r.title}</p>
-            {r.translation ? <p className="text-[13px] text-zinc-400">🇮🇩 {r.translation}</p> : null}
-            <p className="mt-1 text-[13px] text-amber-300">Penilaian: {r.assessment}</p>
-            <p className="text-[13px] text-zinc-300">{r.reason}</p>
-            {r.signals.length ? <p className="text-[12px] text-zinc-500">Sinyal: {r.signals.join(" · ")}</p> : null}
-            <p className="text-[12px] text-zinc-500">
-              {r.status} ·{" "}
-              <a href={r.watchUrl} target="_blank" rel="noreferrer noopener" className="text-[#2dd4bf] underline">
-                {r.held ? "Pratinjau (khusus pemilik)" : "Tonton"}
-              </a>
-            </p>
+            {r.translation ? <p className="text-[12px] text-zinc-500">🇮🇩 {r.translation}</p> : null}
+            {r.trigger ? <p className="mt-1 text-[13px] text-amber-300">Kena: {r.trigger}</p> : null}
             <form
-              className="mt-2 flex flex-col gap-1 text-[12px] text-zinc-400 sm:flex-row sm:items-end"
+              className="mt-2 flex gap-1.5"
               onSubmit={(e) => {
                 e.preventDefault();
                 void saveTitle(r);
               }}
             >
-              <label className="flex min-w-0 flex-1 flex-col gap-1">
-                Judul (simpan = cek ulang; lolos cek langsung tayang{r.strict ? ", kecuali video ini: tetap perlu Setujui" : ""})
-                <input
-                  type="text"
-                  value={drafts[r.id] ?? r.title}
-                  maxLength={200}
-                  onChange={(e) => setDrafts((x) => ({ ...x, [r.id]: e.target.value }))}
-                  className="rounded-lg border border-white/[0.1] bg-black/40 px-2.5 py-1.5 text-[13px] text-zinc-100"
-                />
-              </label>
+              <input
+                type="text"
+                aria-label="Judul"
+                value={drafts[r.id] ?? r.title}
+                maxLength={200}
+                onChange={(e) => setDrafts((x) => ({ ...x, [r.id]: e.target.value }))}
+                className="min-w-0 flex-1 rounded-lg border border-white/[0.1] bg-black/40 px-2.5 py-1.5 text-[13px] text-zinc-100"
+              />
               <button
                 type="submit"
                 disabled={busy === r.id || !(drafts[r.id] ?? "").trim() || (drafts[r.id] ?? "").trim() === r.title}
@@ -198,68 +170,76 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
                 Simpan judul
               </button>
             </form>
-            {notes[r.id] ? <p className="mt-1 text-[12px] text-amber-200">{notes[r.id]}</p> : null}
-            {r.pending ? (
-              <label className="mt-2 flex flex-col gap-1 text-[12px] text-zinc-400">
-                Bukti semua pemeran 18+ saat produksi (wajib untuk Tayangkan)
-                <input
-                  type="text"
-                  value={proofs[r.id] || ""}
-                  maxLength={500}
-                  onChange={(e) => setProofs((p) => ({ ...p, [r.id]: e.target.value }))}
-                  placeholder="mis. link rilis resmi studio + catatan 2257 / ID pemeran"
-                  className="rounded-lg border border-white/[0.1] bg-black/40 px-2.5 py-1.5 text-[13px] text-zinc-100"
-                />
-              </label>
+            {r.strict ? (
+              <input
+                type="text"
+                aria-label="Bukti semua pemeran 18+"
+                value={proofs[r.id] || ""}
+                maxLength={500}
+                onChange={(e) => setProofs((p) => ({ ...p, [r.id]: e.target.value }))}
+                placeholder="Bukti semua pemeran 18+ (wajib untuk video ini)"
+                className="mt-1.5 w-full rounded-lg border border-white/[0.1] bg-black/40 px-2.5 py-1.5 text-[13px] text-zinc-100"
+              />
             ) : null}
+            {notes[r.id] ? <p className="mt-1 text-[12px] text-amber-200">{notes[r.id]}</p> : null}
             <div className="mt-2 flex flex-wrap gap-1.5">
               <button
                 type="button"
-                disabled={busy === r.id || (r.pending && (proofs[r.id] || "").trim().length < 10)}
-                onClick={() => decide(r.id, "show")}
+                disabled={busy === r.id || (r.strict && (proofs[r.id] || "").trim().length < 10)}
+                onClick={() => decide(r, "show")}
                 className={`${btn} bg-[#2dd4bf] font-medium text-zinc-950`}
               >
-                {r.pending ? "Setujui (ada bukti 18+)" : "Tayangkan"}
+                Tayangkan
               </button>
-              {r.pending ? (
-                <button type="button" disabled={busy === r.id} onClick={() => decide(r.id, "keep")} className={`${btn} border border-white/[0.1] bg-white/[0.04] text-zinc-200`}>
-                  Tetap ditahan
-                </button>
-              ) : null}
-              <button type="button" disabled={busy === r.id} onClick={() => decide(r.id, "hide")} className={`${btn} border border-white/[0.1] bg-white/[0.04] text-zinc-200`}>
-                Sembunyiin
-              </button>
-              <button type="button" onClick={() => setEditing(r)} className={`${btn} border border-[#2dd4bf]/40 text-[#5eead4]`}>
-                Edit
+              <button type="button" disabled={busy === r.id} onClick={() => decide(r, "keep")} className={`${btn} border border-white/[0.1] bg-white/[0.04] text-zinc-200`}>
+                Tetap tahan
               </button>
             </div>
-            {verdicts[r.id] ? (
-              <p className="mt-2 rounded-lg bg-black/30 px-2.5 py-1.5 text-[12px] text-zinc-200">
-                Setelah edit: <span className="font-medium text-amber-200">{verdictText(verdicts[r.id])}</span>
-              </p>
-            ) : null}
           </div>
         </div>
       ))}
-      {!list.length ? (
-        <div className="flex flex-col items-center gap-1 rounded-lg border border-dashed border-white/[0.08] px-4 py-8 text-center">
+      {!pending.length ? (
+        <div className="flex flex-col items-center gap-1 rounded-lg border border-dashed border-white/[0.08] px-4 py-6 text-center">
           <span className="text-lg text-[#2dd4bf]" aria-hidden="true">✓</span>
-          <p className="text-sm font-medium text-zinc-200">Semua beres</p>
-          <p className="text-[12px] text-zinc-500">{rows.length ? "Tidak ada judul yang menunggu keputusan." : "Belum ada judul yang ditandai."}</p>
+          <p className="text-sm font-medium text-zinc-200">Semua beres, tidak ada yang menunggu.</p>
         </div>
       ) : null}
-      {editing ? (
-        <OwnerEditSheet
-          secret={secret}
-          id={editing.id}
-          title={editing.title}
-          onClose={() => setEditing(null)}
-          onSaved={({ title, verdict }) => {
-            setRows((rs) => (rs || []).map((x) => (x.id === editing.id ? { ...x, title } : x)));
-            if (verdict) setVerdicts((v) => ({ ...v, [editing.id]: verdict }));
-          }}
-        />
-      ) : null}
+
+      <details className="rounded-lg border border-white/[0.08] bg-black/20 p-3">
+        <summary className="cursor-pointer text-sm font-medium text-emerald-300">Sudah disetujui ({approved.length})</summary>
+        <p className="mt-1 text-[12px] text-zinc-500">Tetap tayang. Cek otomatis tidak akan menahannya lagi.</p>
+        <ul className="mt-2 flex flex-col gap-1.5">
+          {approved.map((r) => (
+            <li key={r.id} className="flex items-center gap-2 text-[13px]">
+              <img src={r.thumbUrl} alt="" loading="lazy" className="h-9 w-16 shrink-0 rounded bg-black object-cover" />
+              <a href={r.watchUrl} target="_blank" rel="noreferrer noopener" className="min-w-0 flex-1 truncate text-zinc-200 hover:underline">
+                {r.title}
+              </a>
+              <span className={`shrink-0 text-[12px] ${r.live === false ? "text-amber-300" : "text-emerald-300"}`}>{r.live === false ? "belum tayang" : "✓ tayang"}</span>
+              <span className="shrink-0 text-[12px] text-zinc-500">{when(r.decidedAt)}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
+
+      <details className="rounded-lg border border-white/[0.08] bg-black/20 p-3">
+        <summary className="cursor-pointer text-sm font-medium text-zinc-300">Ditahan ({held.length})</summary>
+        <ul className="mt-2 flex flex-col gap-1.5">
+          {held.map((r) => (
+            <li key={r.id} className="flex items-center gap-2 text-[13px]">
+              <img src={r.thumbUrl} alt="" loading="lazy" className="h-9 w-16 shrink-0 rounded bg-black object-cover" />
+              <span className="min-w-0 flex-1 truncate text-zinc-300">{r.title}</span>
+              <span className="shrink-0 text-[12px] text-zinc-500">{when(r.decidedAt)}</span>
+              {r.strict ? null : (
+                <button type="button" disabled={busy === r.id} onClick={() => decide(r, "show")} className={`${btn} shrink-0 border border-[#2dd4bf]/40 px-2 py-1 text-[12px] text-[#5eead4]`}>
+                  Tayangkan
+                </button>
+              )}
+            </li>
+          ))}
+          {held.map((r) => (notes[r.id] ? <li key={`${r.id}-n`} className="text-[12px] text-amber-200">{notes[r.id]}</li> : null))}
+        </ul>
+      </details>
     </div>
   );
 }

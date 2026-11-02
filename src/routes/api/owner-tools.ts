@@ -1001,7 +1001,7 @@ export const Route = createFileRoute("/api/owner-tools")({
         }
         if (body.action === "detector-review-list") {
           const items = await listDetectorReview();
-          return json({ ok: true, count: items.length, pending: items.filter((r) => !r.decidedAt).length, items });
+          return json({ ok: true, count: items.length, pending: items.filter((r) => r.group === "pending").length, items });
         }
         if (body.action === "detector-review-decide") {
           const r = await decideDetectorReview(body as never);

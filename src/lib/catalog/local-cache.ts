@@ -36,6 +36,7 @@ import { softenMinorTerms } from "./minor-title-guard";
 import { HIDDEN_IDS as HIDDEN_ID_REASONS, RESTORED_TITLES, minorContentReason } from "./hidden-ids.js";
 import { isLockedMinorId, lockedMinorReason, schoolReason } from "./minor-lock.js";
 import { reviewPendingReason } from "./review-pending.js";
+import { effectiveHidden } from "../owner-decisions.js";
 import { ownerTitleReleases } from "./moderation.js";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
@@ -348,11 +349,17 @@ export function isLockedMinor(it: RawItem): boolean {
   return lockedReasonMemo(String(OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "")) !== "";
 }
 
+/**
+ * Owner decisions win over automatic checks (owner-decisions.js): owner hide > hard minor lock >
+ * Unhide (Tayangkan) > any automatic reason. An approved video is never hidden again by a re-run check.
+ */
 function isHiddenRaw(it: RawItem): boolean {
-  if (OWNER_HIDDEN.has(it.id)) return true;
-  if (isLockedMinor(it)) return true;
-  if (UNHIDDEN.has(it.id)) return false;
-  return hiddenReasonRaw(it) !== "";
+  return effectiveHidden({
+    ownerHidden: OWNER_HIDDEN.has(it.id),
+    locked: () => isLockedMinor(it),
+    unhidden: UNHIDDEN.has(it.id),
+    reason: () => hiddenReasonRaw(it),
+  });
 }
 
 function keyOf(ids: Iterable<string>): string {

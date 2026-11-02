@@ -10,7 +10,8 @@
  * Tayangkan = Unhide (+ hapus owner-hide); Sembunyiin = owner-hide. Kunci minor-lock tetap
  * menang di local-cache (isHiddenRaw), jadi Tayangkan tidak pernah membuka judul terkunci.
  */
-import { applyUnhidden, hiddenReasonRaw, isLockedMinor, loadItemsRaw } from "@/lib/catalog/local-cache";
+import { applyUnhidden, hiddenReasonRaw, isLockedMinor, isPublicHidden, loadItemsRaw } from "@/lib/catalog/local-cache";
+import { healDecisions, recordDecision, reviewGroup, triggerText } from "@/lib/owner-decisions.js";
 import { isReviewPendingReason, strictPendingReason, titleReviewReason } from "@/lib/catalog/review-pending.js";
 import { readUnhideState, setUnhidden } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState, setOwnerHidden } from "@/lib/catalog/owner-hide-store";
@@ -66,6 +67,7 @@ export async function publishHeldDraft(
     applyUnhidden(unhideIds, hideIds, withSavedEdit((await readOwnerEditState()).ids, id, saved));
     const state = await readReviewState(true);
     state.checked[`det:${id}`] = Date.now();
+    state.decisions = recordDecision(state.decisions, id, "show", { title });
     await writeReviewState(state);
     return { ok: true, saved: true };
   } catch (e) {
@@ -77,20 +79,19 @@ export type DetectorReviewRow = {
   id: string;
   title: string;
   translation: string | null;
-  /** Selalu dari detector pemilik: "review_pending" di kotak ini. */
-  moderation: "review_pending";
-  assessment: string;
-  reason: string;
-  signals: string[];
-  held: boolean;
-  status: string;
   thumbUrl: string;
+  /** Owner-only preview (source embed) while hidden; /watch once live. */
   watchUrl: string;
+  /** "pending" = awaiting the owner; "approved" = Tayangkan (for good); "held" = Tetap tahan. */
+  group: "pending" | "approved" | "held";
+  /** The word / rule that held it (pending rows). */
+  trigger: string;
+  /** Strict REVIEW_PENDING (Andini Permata set, strong youth signal, anime/hentai): Tayangkan needs a proof note. */
+  strict: boolean;
+  /** When the owner decided (approved / held rows). */
   decidedAt: number | null;
-  /** REVIEW_PENDING row: approve needs a proof note; "keep" leaves it withheld. */
-  pending?: boolean;
-  /** Strict REVIEW_PENDING (Andini Permata set, anime/hentai): a new title is saved but only "Setujui" releases it. */
-  strict?: boolean;
+  /** Approved rows: true while the video is public. */
+  live: boolean | null;
 };
 
 /** Glosarium kata Mandarin yang sering muncul di judul (terjemahan kata kunci, bukan mesin). */
@@ -123,109 +124,94 @@ function http(v: unknown): string | null {
 
 export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
   const cache = (await loadItemsRaw()) as unknown as { raw?: AnyItem[]; items: AnyItem[] };
-  const [unhide, ownerHide, state, edits] = await Promise.all([
-    readUnhideState(),
-    readOwnerHideState(),
+  let [unhide, ownerHide] = await Promise.all([readUnhideState(), readOwnerHideState()]);
+  const [state, edits] = await Promise.all([
     readReviewState(true),
     readOwnerEditState().catch(() => ({ ids: {} as Record<string, { title?: string }> })),
   ]);
+  const items = cache.raw || cache.items;
+  const byId = new Map<string, AnyItem>();
+  for (const it of items) if (it?.id && !byId.has(it.id)) byId.set(it.id, it);
+  const decisions = state.decisions || {};
+  // Owner decision wins: put back an approval/hold a stale KV write dropped (owner-only, rare write).
+  const heal = healDecisions(decisions, {
+    unhide: unhide.ids,
+    ownerHide: ownerHide.ids,
+    locked: (id) => {
+      const it = byId.get(id);
+      return !it || isLockedMinor(it as never);
+    },
+  });
+  if (heal.unhide.length || heal.hide.length) {
+    try {
+      for (const id of heal.unhide) {
+        if (ownerHide.ids[id]) ownerHide = await setOwnerHidden(id, false);
+        unhide = await setUnhidden(id, true);
+      }
+      for (const id of heal.hide) {
+        ownerHide = await setOwnerHidden(id, true);
+        if (unhide.ids[id]) unhide = await setUnhidden(id, false);
+      }
+      applyUnhidden(Object.keys(unhide.ids), Object.keys(ownerHide.ids));
+    } catch {
+      /* KV write failed: the ledger still holds the decision; next load retries. */
+    }
+  }
   const out: DetectorReviewRow[] = [];
-  const seen = new Set<string>();
-  for (const it of cache.raw || cache.items) {
-    if (!it?.id || seen.has(it.id)) continue;
-    seen.add(it.id);
-    // Upload held because the title needs renaming (title-hold.js): editable draft, never locked here.
-    const renameTag = it.hidden === true && it.hidden_reason === HOLD_REASON;
-    // The owner's edited title wins everywhere (owner rule 2026-11-02), not only on rename drafts.
-    const title = String(edits.ids[it.id]?.title || it.title || "");
-    if (renameTag) {
-      if (unhide.ids[it.id]) continue;
-      const hold = titleHold(title);
-      const clean = canPublishTitle(title, hardOk);
-      out.push({
-        id: it.id,
-        title,
-        translation: translateZh(title),
-        moderation: "review_pending",
-        assessment: clean ? "Judul sudah aman, tinggal Tayangkan" : "Judul perlu diganti",
-        reason: clean
-          ? "Judul sudah diganti dan lolos cek. Tap Tayangkan buat nayangin."
-          : hold
-            ? `Judul perlu diganti: kata "${hold.term}" = ${hold.meaning}. Tap Edit, ganti judulnya${hold.suggestions.length ? ` (saran: ${hold.suggestions.join(" / ")})` : ""}, lalu Tayangkan.`
-            : "Judul perlu diganti: masih kena cek judul. Tap Edit, ganti judulnya, lalu Tayangkan.",
-        signals: hold ? [String(hold.term)] : [],
-        held: true,
-        status: ownerHide.ids[it.id] ? "Disembunyiin pemilik" : "Ditahan (judul perlu diganti), belum tayang",
-        thumbUrl: `/thumb/${it.id}`,
-        watchUrl: http(it.embed) || http(it.direct) || `/watch/${it.id}`,
-        decidedAt: null,
-      });
-      continue;
+  for (const it of byId.values()) {
+    const id = it.id;
+    // The owner's edited title wins everywhere (owner rule 2026-11-02).
+    const title = String(edits.ids[id]?.title || it.title || "");
+    const decision = decisions[id] || null;
+    let trigger = "";
+    let flagged = false;
+    let strict = false;
+    if (it.hidden === true && it.hidden_reason === HOLD_REASON) {
+      // Upload held because the title needs renaming (title-hold.js).
+      flagged = true;
+      trigger = canPublishTitle(title, hardOk) ? "judul sudah aman" : String(titleHold(title, hardOk)?.term || "cek judul");
+    } else {
+      const rawReason = hiddenReasonRaw(it as never);
+      const pendingReason = isReviewPendingReason(rawReason)
+        ? rawReason
+        : isReviewPendingReason(String(it.hidden_reason || ""))
+          ? String(it.hidden_reason)
+          : "";
+      if (pendingReason) {
+        // REVIEW_PENDING: performers' age unconfirmed (review-pending.js).
+        flagged = true;
+        trigger = triggerText(pendingReason);
+        strict = Boolean(strictPendingReason(id, [title, String(it.title || "")], String((it as { category?: unknown }).category || "")));
+      } else if (it.hidden === true && it.hidden_reason === "detector-review" && minorContentReason(title) !== "minor") {
+        // New upload held by the context detector.
+        flagged = true;
+        const ex = explainTitle(title, minorContentReason(title));
+        trigger = ex.signals[0] || schoolReviewCue(title) || "isyarat umur";
+      }
     }
-    // REVIEW_PENDING: performers' age unconfirmed (review-pending.js). Withheld until approved with proof.
-    const rawReason = hiddenReasonRaw(it as never);
-    const pendingReason = isReviewPendingReason(rawReason)
-      ? rawReason
-      : isReviewPendingReason(String(it.hidden_reason || ""))
-        ? String(it.hidden_reason)
-        : "";
-    if (pendingReason) {
-      if (isLockedMinor(it as never)) continue;
-      const why = pendingReason.replace(/^review-pending:\s*/, "") || String(it.review_reason || "");
-      const ex = explainTitle(title, minorContentReason(title));
-      const approved = Boolean(unhide.ids[it.id]) && !ownerHide.ids[it.id];
-      const proof = state.proof?.[it.id];
-      out.push({
-        id: it.id,
-        title,
-        translation: translateZh(title),
-        moderation: "review_pending",
-        assessment: "Umur pemeran belum terkonfirmasi",
-        reason: `REVIEW_PENDING: ${why}. Tayangkan hanya dengan bukti kredibel bahwa semua pemeran 18+ saat produksi. ${ex.reason}`,
-        signals: ex.signals,
-        held: !approved,
-        status: approved
-          ? `Disetujui pemilik${proof?.note ? ` (bukti: ${proof.note})` : ""}`
-          : "Ditahan: umur pemeran belum terkonfirmasi",
-        thumbUrl: `/thumb/${it.id}`,
-        // /watch 404 while withheld; owner-only preview via the source embed.
-        watchUrl: approved ? `/watch/${it.id}` : http(it.embed) || http(it.direct) || `/watch/${it.id}`,
-        decidedAt: state.checked[`det:${it.id}`] || null,
-        pending: true,
-        strict: Boolean(strictPendingReason(it.id, [title, String(it.title || "")], String((it as { category?: unknown }).category || ""))),
-      });
-      continue;
-    }
-    const heldTag = it.hidden === true && it.hidden_reason === "detector-review";
-    const owner = minorContentReason(title);
-    // Isyarat sekolah tambahan: hanya antre "Perlu dicek", tidak pernah mengunci/menyembunyikan.
-    const cue = owner === "review" || owner === "minor" ? "" : schoolReviewCue(title);
-    // Aturan pemilik 2026-10-26: video yang sudah tayang tidak pernah ditandai/diantrekan lagi.
-    // Antrean hanya berisi upload baru yang sedang ditahan (hidden_reason "detector-review", belum Tayangkan).
-    if (!heldTag || unhide.ids[it.id]) continue;
-    if (owner === "minor" || isLockedMinor(it as never)) continue; // status "locked", bukan untuk dicek
-    // (Uploads with an 18yo claim are no longer held: they arrive above via review_reason.)
-    const ex = explainTitle(title, owner);
-    const ownerHidden = Boolean(ownerHide.ids[it.id]);
-    const held = ownerHidden || (heldTag && !unhide.ids[it.id]);
+    if (!flagged && !decision) continue;
+    if (isLockedMinor(it as never)) continue; // hard minor lock: never in this list, never approvable
+    const legacy = flagged ? state.checked[`det:${id}`] || null : null;
+    const unhidden = Boolean(unhide.ids[id]);
+    const ownerHidden = Boolean(ownerHide.ids[id]);
+    const group = reviewGroup({ decision, unhidden, ownerHidden, legacyDecidedAt: legacy });
+    if (group === "pending" && (!flagged || !(await isPublicHidden(id)))) continue; // already public: nothing to decide
+    const live = group === "approved" ? !(await isPublicHidden(id)) : null;
     out.push({
-      id: it.id,
+      id,
       title,
       translation: translateZh(title),
-      moderation: "review_pending",
-      assessment: ex.assessment,
-      reason: owner === "review" ? ex.reason : cue ? `Isyarat sekolah (${cue}), tidak dikunci. Pastikan tokohnya dewasa. ${ex.reason}` : `Ditahan saat upload (judul sudah berubah, cek ulang). ${ex.reason}`,
-      signals: ex.signals,
-      held,
-      status: ownerHidden ? "Disembunyiin pemilik" : held ? "Ditahan (upload baru), belum tayang" : "Masih tayang",
-      thumbUrl: `/thumb/${it.id}`,
-      // /watch 404 untuk item tertahan; pakai embed sumber sebagai pratinjau khusus pemilik.
-      watchUrl: held ? http(it.embed) || http(it.direct) || `/watch/${it.id}` : `/watch/${it.id}`,
-      decidedAt: state.checked[`det:${it.id}`] || null,
+      thumbUrl: `/thumb/${id}`,
+      watchUrl: live ? `/watch/${id}` : http(it.embed) || http(it.direct) || `/watch/${id}`,
+      group,
+      trigger,
+      strict,
+      decidedAt: decision?.at || legacy || (unhidden ? Number(unhide.ids[id]?.at) || null : ownerHidden ? Number(ownerHide.ids[id]?.at) || null : null),
+      live,
     });
   }
-  // Belum diputuskan dulu, yang ditahan paling atas.
-  return out.sort((a, b) => Number(!!a.decidedAt) - Number(!!b.decidedAt) || Number(b.held) - Number(a.held));
+  // Newest decision first in the decided lists; pending keeps catalog order.
+  return out.sort((a, b) => (b.decidedAt || 0) - (a.decidedAt || 0));
 }
 
 /** True when the item is REVIEW_PENDING (catalog rule or upload record). */
@@ -236,66 +222,49 @@ export function isReviewPendingItem(it: AnyItem): boolean {
   return isReviewPendingReason(r) || (Boolean(r) && isReviewPendingReason(String(it.hidden_reason || "")));
 }
 
+/**
+ * Tayangkan ("show") / Tetap tahan ("keep"; "hide" = same) from "Perlu dicek". The decision is
+ * durable (owner-decisions.js): "show" = Unhide + no owner hide, so automatic checks never hide it
+ * again; "keep" = owner hide, so a later clean title does not release it. Both are also written to
+ * the decision ledger. Hard minor locks are refused; strict REVIEW_PENDING needs a proof note.
+ */
 export async function decideDetectorReview(body: { id?: unknown; decision?: unknown; proof?: unknown }): Promise<{ ok: boolean; error?: string; status?: number; held?: boolean }> {
   const id = String(body.id || "").trim();
   if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return { ok: false, error: "bad_id", status: 400 };
   if (body.decision !== "show" && body.decision !== "hide" && body.decision !== "keep") return { ok: false, error: "bad_decision", status: 400 };
+  const show = body.decision === "show";
   const cache = (await loadItemsRaw()) as unknown as { raw?: AnyItem[]; items: AnyItem[] };
   const it = (cache.raw || cache.items).find((x) => x?.id === id);
   if (!it) return { ok: false, error: "not_found", status: 404 };
-  if (isReviewPendingItem(it)) {
-    if (minorContentReason(String(it.title || "")) === "minor" || isLockedMinor(it as never)) return { ok: false, error: "locked_minor", status: 403 };
-    const proof = String(body.proof ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
-    if (body.decision === "show" && proof.length < 10) return { ok: false, error: "proof_required", status: 400 };
-    try {
-      const state = await readReviewState(true);
-      state.checked[`det:${id}`] = Date.now();
-      let unhideIds: string[];
-      let hideIds: string[];
-      if (body.decision === "show") {
-        hideIds = Object.keys((await setOwnerHidden(id, false)).ids);
-        unhideIds = Object.keys((await setUnhidden(id, true)).ids);
-        state.proof = { ...(state.proof || {}), [id]: { note: proof, at: Date.now() } };
-      } else {
-        // "keep" / "hide": stays withheld; withdraw any earlier approval.
-        hideIds = Object.keys((body.decision === "hide" ? await setOwnerHidden(id, true) : await readOwnerHideState()).ids);
-        unhideIds = Object.keys((await setUnhidden(id, false)).ids);
-        if (state.proof?.[id]) delete state.proof[id];
-      }
-      applyUnhidden(unhideIds, hideIds);
-      await writeReviewState(state);
-      return { ok: true, held: body.decision !== "show" };
-    } catch (e) {
-      return { ok: false, error: e instanceof Error ? e.message : "kv_error", status: 503 };
-    }
+  const edits = await readOwnerEditState().catch(() => ({ ids: {} as Record<string, { title?: string }> }));
+  const title = String(edits.ids[id]?.title || it.title || "");
+  if (show && (minorContentReason(title) === "minor" || isLockedMinor(it as never))) return { ok: false, error: "locked_minor", status: 403 };
+  const proof = String(body.proof ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
+  if (show && isReviewPendingItem(it)) {
+    const strict = strictPendingReason(id, [title, String(it.title || "")], String((it as { category?: unknown }).category || ""));
+    if (strict && proof.length < 10) return { ok: false, error: "proof_required", status: 400 };
   }
-  if (body.decision === "keep") return { ok: false, error: "bad_decision", status: 400 };
-  if (it.hidden === true && it.hidden_reason === HOLD_REASON && body.decision === "show") {
-    // Held for its title: publish only once the (edited) title passes the same upload check.
-    const edits = await readOwnerEditState().catch(() => ({ ids: {} as Record<string, { title?: string }> }));
-    const current = String(edits.ids[id]?.title || it.title || "");
-    if (!canPublishTitle(current, hardOk)) return { ok: false, error: "title_needs_rename", status: 409 };
-    const r = await publishHeldDraft(id, current);
-    return r.ok ? { ok: true, held: false } : { ok: false, error: r.error, status: 503 };
+  if (show && it.hidden === true && it.hidden_reason === HOLD_REASON && !canPublishTitle(title, hardOk)) {
+    return { ok: false, error: "title_needs_rename", status: 409 };
   }
-  const title = String(it.title || "");
-  // status "locked": tidak bisa ditayangkan lewat tombol Tayangkan.
-  if (minorContentReason(title) === "minor" || isLockedMinor(it as never)) return { ok: false, error: "locked_minor", status: 403 };
   try {
-    let unhideIds: string[];
     let hideIds: string[];
-    if (body.decision === "show") {
+    let unhideIds: string[];
+    if (show) {
       hideIds = Object.keys((await setOwnerHidden(id, false)).ids);
-      unhideIds = it.hidden === true ? Object.keys((await setUnhidden(id, true)).ids) : Object.keys((await readUnhideState()).ids);
+      unhideIds = Object.keys((await setUnhidden(id, true)).ids);
     } else {
       hideIds = Object.keys((await setOwnerHidden(id, true)).ids);
-      unhideIds = Object.keys((await readUnhideState()).ids);
+      unhideIds = Object.keys((await setUnhidden(id, false)).ids);
     }
     applyUnhidden(unhideIds, hideIds);
     const state = await readReviewState(true);
     state.checked[`det:${id}`] = Date.now();
+    state.decisions = recordDecision(state.decisions, id, show ? "show" : "keep", { title });
+    if (show && proof) state.proof = { ...(state.proof || {}), [id]: { note: proof, at: Date.now() } };
+    if (!show && state.proof?.[id]) delete state.proof[id];
     await writeReviewState(state);
-    return { ok: true, held: body.decision === "hide" };
+    return { ok: true, held: !show };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "kv_error", status: 503 };
   }
