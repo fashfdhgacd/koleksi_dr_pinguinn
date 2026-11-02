@@ -47,6 +47,15 @@ export type WatchSearch = {
   s?: string;
 };
 
+/** MIME type for og:image:type from the image URL's extension (default jpeg). */
+function ogImageType(url: string): string {
+  const ext = /\.(webp|png|gif|jpe?g)(?:[?#]|$)/i.exec(url)?.[1]?.toLowerCase();
+  if (ext === "webp") return "image/webp";
+  if (ext === "png") return "image/png";
+  if (ext === "gif") return "image/gif";
+  return "image/jpeg";
+}
+
 export const Route = createFileRoute("/watch/$id")({
   validateSearch: (search: Record<string, unknown>): WatchSearch => ({
     s: typeof search.s === "string" && /^[A-Za-z0-9_-]{3,64}$/.test(search.s) ? search.s : undefined,
@@ -130,7 +139,8 @@ export const Route = createFileRoute("/watch/$id")({
         { property: "og:url", content: url },
         { property: "og:image", content: image },
         { property: "og:image:secure_url", content: image },
-        { property: "og:image:type", content: "image/jpeg" },
+        // Label the real format: IndoAV posters are .webp (a jpeg label makes some previews skip them).
+        { property: "og:image:type", content: ogImageType(image) },
         { property: "og:image:width", content: "1280" },
         { property: "og:image:height", content: "720" },
         { name: "twitter:card", content: "summary_large_image" },

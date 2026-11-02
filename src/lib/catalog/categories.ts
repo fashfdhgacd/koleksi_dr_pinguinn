@@ -106,8 +106,16 @@ export const SEO_MIN_COUNT: Record<string, number> = {
   "cantik": 8,
 };
 
+/**
+ * "Lainnya" is the catch-all for videos no rule could place: a thin, mixed page, so it stays
+ * noindex,follow until it holds this many videos (kept out of SEO_MIN_COUNT so it is not treated
+ * as an SEO category for listing or category assignment).
+ */
+export const LAINNYA_MIN_INDEXED = 24;
+
 /** Fewest videos for a category page to be indexable (1 = any non-empty page). */
 export function minIndexedCount(slug: string | null | undefined): number {
+  if (slug === "lainnya") return LAINNYA_MIN_INDEXED;
   return (slug && SEO_MIN_COUNT[slug]) || 1;
 }
 
