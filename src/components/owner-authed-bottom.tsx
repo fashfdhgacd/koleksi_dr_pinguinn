@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { OwnerChart } from "@/components/owner-chart";
+import { OwnerStats14 } from "@/components/owner-stats14";
 import { fmt, deviceLabel, dayLabel, type OwnerStats, type DeviceKind, type DayRow } from "@/components/owner-dashboard-shared";
 
 type DeviceRow = { device: DeviceKind; views: number; pct: number };
@@ -35,6 +36,7 @@ export function OwnerAuthedBottom(props: {
         </button>
         {open ? (
           <div className="flex flex-col gap-3 border-t border-white/[0.06] p-2 sm:p-3">
+            <OwnerStats14 secret={props.secret} />
       {days.length ? (
               <section className="rounded-xl border border-white/[0.05] bg-[#0c0e0f] p-4">
                 <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Kunjungan halaman 14 hari (WIB)</h2>
