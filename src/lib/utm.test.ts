@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { normalizeUtmKey, parseUtm, utmLabel } from "./utm.ts";
+import { normalizeUtmKey, parseUtm, taggedWatchUrl, utmLabel } from "./utm.ts";
 
 test("parseUtm reads the four utm params from a landing query", () => {
   assert.equal(parseUtm("?utm_source=justpaste&utm_medium=paste&utm_campaign=organic"), "justpaste|paste|organic|");
@@ -26,4 +26,10 @@ test("normalizeUtmKey re-validates stored keys", () => {
 test("utmLabel is readable", () => {
   assert.equal(utmLabel("justpaste|paste|organic|"), "justpaste / paste · organic");
   assert.equal(utmLabel("telegram|||post-12"), "telegram / - · post-12");
+});
+
+test("taggedWatchUrl builds a tagged watch link that parseUtm reads back", () => {
+  const url = taggedWatchUrl("https://koleksidrpinguin.com", "Ab_1", "telegram", "channel");
+  assert.equal(url, "https://koleksidrpinguin.com/watch/Ab_1?utm_source=telegram&utm_medium=channel&utm_campaign=organic&utm_content=Ab_1");
+  assert.equal(parseUtm(new URL(url).search), "telegram|channel|organic|ab_1");
 });

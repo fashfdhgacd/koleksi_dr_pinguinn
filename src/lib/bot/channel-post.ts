@@ -7,6 +7,7 @@
  */
 import { getD1, type D1DatabaseLike } from "@/lib/analytics-d1";
 import { botToken, redactToken } from "@/lib/telegram-webhook";
+import { taggedWatchUrl } from "@/lib/utm";
 
 const HOST = "https://koleksidrpinguin.com";
 const KEY_ID = "tg_channel_id";
@@ -235,7 +236,7 @@ export async function postNewVideosToChannelReport(passedToken: string, videos: 
     for (let i = 0; i < list.length; i++) {
       if (i > 0) await new Promise((r) => setTimeout(r, GAP_MS));
       const v = list[i];
-      const caption = `${String(v.title || v.id).slice(0, 900)}\nTonton: ${HOST}/watch/${encodeURIComponent(v.id)}`;
+      const caption = `${String(v.title || v.id).slice(0, 900)}\nTonton: ${taggedWatchUrl(HOST, v.id, "telegram", "channel")}`;
       // Never the video's own poster/host thumbnail (explicit images could get the channel banned):
       // always the site's brand card (same image as the og:image fallback).
       const poster = BRAND_PHOTO;

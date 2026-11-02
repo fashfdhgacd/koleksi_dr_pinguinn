@@ -58,3 +58,12 @@ export function utmLabel(key: string): string {
   if (content) out += ` · ${content}`;
   return out;
 }
+
+/**
+ * Site watch link tagged for a traffic source, e.g.
+ * https://koleksidrpinguin.com/watch/ID?utm_source=telegram&utm_medium=channel&utm_campaign=organic&utm_content=ID
+ */
+export function taggedWatchUrl(host: string, id: string, source: string, medium: string, campaign = "organic"): string {
+  const q = new URLSearchParams({ utm_source: source, utm_medium: medium, utm_campaign: campaign, utm_content: String(id) });
+  return `${host}/watch/${encodeURIComponent(id)}?${q}`;
+}

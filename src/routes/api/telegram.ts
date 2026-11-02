@@ -5,6 +5,7 @@ import { processUploadBatch } from "@/lib/bot/upload-handler.js";
 import { parseMessage } from "@/lib/bot/parse.js";
 import { handleMyChatMember } from "@/lib/bot/channel-post";
 import { isOwnerRequest } from "@/lib/owner-auth";
+import { taggedWatchUrl } from "@/lib/utm";
 import {
   TELEGRAM_SECRET_HEADER,
   healWebhookSecret,
@@ -274,7 +275,7 @@ async function handleShare(token: string, chatId: string | number, text: string)
 
   const body =
     `${take.length} link · tidak diulang hari ini\n\n` +
-    take.map((v) => `\u25b6 ${v.title}\n${HOST}/watch/${v.id}`).join("\n\n");
+    take.map((v) => `\u25b6 ${v.title}\n${taggedWatchUrl(HOST, v.id, "telegram", "channel")}`).join("\n\n");
   await tgSendChunks(token, chatId, body, { reply_markup: MAIN_KEYBOARD });
 }
 
