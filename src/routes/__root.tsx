@@ -5,6 +5,7 @@ import { PresencePing } from "@/components/presence-ping";
 import { SwCleanup } from "@/components/sw-cleanup";
 import { DEFAULT_OG, HOME_TITLE, OG_SITE_NAME } from "@/lib/seo";
 import appCss from "../styles.css?url";
+import figtreeFont from "../assets/fonts/figtree-latin.woff2?url";
 
 const CANONICAL_HOST = "koleksidrpinguin.com";
 
@@ -70,16 +71,12 @@ export const Route = createRootRoute({
       { rel: "alternate", type: "application/rss+xml", title: "Koleksi Dr. Pinguin - Video Terbaru", href: "https://koleksidrpinguin.com/rss.xml" },
       // Poster/thumbnail host (cards + preloaded hero images): open the connection with the HTML.
       { rel: "preconnect", href: "https://img.koleksidrpinguin.com" },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       { rel: "preconnect", href: "https://tv1.indoav.app" },
       { rel: "preconnect", href: "https://tv1.userbokep.com" },
       { rel: "dns-prefetch", href: "https://tv1.indoav.app" },
       { rel: "dns-prefetch", href: "https://tv1.userbokep.com" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Instrument+Serif:ital@0;1&family=Silkscreen:wght@400;700&display=swap",
-      },
+      // Body font, self-hosted (styles.css @font-face): fetched with the CSS instead of after it.
+      { rel: "preload", href: figtreeFont, as: "font", type: "font/woff2", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/site.webmanifest" },
       { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png?v=3" },
