@@ -1,0 +1,54 @@
+# Bluesky auto-post: tiap 4 jam (maks 6 post/hari), 1 post per run.
+# scripts/bluesky-post.mjs pilih 1 video BARU yang publik (ada di sitemap live), lolos cek judul situs
+# + blocklist ketat, belum pernah diposting; posting teks + kartu link TANPA gambar, label 18+ (porn),
+# link pakai UTM (utm_source=bluesky). State data/bluesky-posted.json di-commit pakai [skip ci].
+# Secret: BLUESKY_HANDLE, BLUESKY_APP_PASSWORD (app password Bluesky), tidak pernah dicetak.
+name: Bluesky post
+
+on:
+  schedule:
+    - cron: "17 */4 * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: tampilkan post yang akan dikirim, tidak posting"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bluesky-post
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Post to Bluesky
+        env:
+          BLUESKY_HANDLE: ${{ secrets.BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.BLUESKY_APP_PASSWORD }}
+        run: node scripts/bluesky-post.mjs ${{ inputs.dry_run && '--dry-run' || '' }}
+
+      - name: Commit state (only if changed)
+        if: ${{ !inputs.dry_run }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git add data/bluesky-posted.json
+          git diff --cached --quiet && { echo "Tidak ada perubahan."; exit 0; }
+          git commit -m "chore: Bluesky post state ($(date -u '+%Y-%m-%d %H:%M') UTC) [skip ci]"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep 10
+          done
+          exit 1
