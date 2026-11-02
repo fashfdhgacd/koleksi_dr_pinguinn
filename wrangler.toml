@@ -22,3 +22,9 @@ database_id = "97453aca-c414-4251-92db-a7fb6d8d3b54"
 [[r2_buckets]]
 binding = "POSTERS"
 bucket_name = "posters"
+
+# Cost guard: max CPU per request (paid default is 30 s). Data 26 Oct–2 Nov 2026: p99 0.4–2.5 s,
+# p999 2.4–4.1 s (cold catalog load, /pemilik owner tools ~1 s). 15 s is ~3.6x the worst p999, so normal
+# and owner requests never hit it; a runaway/looping request is cut at 15 s CPU instead of 30 s.
+[limits]
+cpu_ms = 15000
