@@ -150,6 +150,8 @@ export function waivedHoldTerm(title = "") {
  * Hold check for a NEW upload title. Returns null when the title is fine, else
  * { term, meaning, suggestions } (suggestions are 2-3 titles that pass this check themselves).
  * `extraOk(title)` lets the caller also run the hard reject list on the suggestions.
+ * @param {string} [title]
+ * @param {(t: string) => boolean} [extraOk]
  */
 export function titleHold(title = "", extraOk = () => true) {
   const hit = holdRule(title);
@@ -185,7 +187,7 @@ export function holdReplyLines(id, hold, { stored = true } = {}) {
   }
   lines.push(
     stored
-      ? "✏️ Benerin judulnya di /pemilik (Perlu dicek → Edit → Tayangkan), atau kirim ulang link-nya pakai judul baru. Video ini belum tayang."
+      ? "✏️ Benerin judulnya di /pemilik (Perlu dicek → Simpan judul), atau kirim ulang link-nya pakai judul baru. Judul yang lolos cek langsung tayang; sampai itu video ini belum tayang."
       : "✏️ Kirim ulang link-nya pakai judul baru. Kalau isinya memang anak sekolah/di bawah umur, jangan diupload.",
   );
   return lines;
@@ -198,12 +200,22 @@ export function sourceKey(rec) {
   return m ? m[1].toLowerCase() : e;
 }
 
-/** The held draft (hidden_reason HOLD_REASON) that a resent record replaces, or null. */
+/**
+ * Automatic upload holds a resend with a new title can lift: the title-rename draft, REVIEW_PENDING
+ * ("review-pending: ...") and the context-detector hold. Hard minor locks are not drafts.
+ * @param {unknown} reason
+ */
+export function isHeldDraftReason(reason) {
+  const r = String(reason || "");
+  return r === HOLD_REASON || r.startsWith("review-pending") || r === "detector-review";
+}
+
+/** The held draft (an automatic upload hold, isHeldDraftReason) that a resent record replaces, or null. */
 export function findHeldDraft(items, record) {
   const id = String(record?.id || "").toLowerCase();
   const key = sourceKey(record);
   for (const it of items || []) {
-    if (!it || it.hidden !== true || it.hidden_reason !== HOLD_REASON) continue;
+    if (!it || it.hidden !== true || !isHeldDraftReason(it.hidden_reason)) continue;
     if ((id && String(it.id || "").toLowerCase() === id) || (key && sourceKey(it) === key)) return it;
   }
   return null;
@@ -213,6 +225,8 @@ export function findHeldDraft(items, record) {
  * Can a held draft go live with this title? Same check as at upload time (titleHold) plus the
  * caller's hard checks (`extraOk`, e.g. title-guard reject + minor-lock). Used by /pemilik
  * Tayangkan after Edit, and by a resend.
+ * @param {string} title
+ * @param {(t: string) => boolean} [extraOk]
  */
 export function canPublishTitle(title, extraOk = () => true) {
   const t = String(title || "").trim();

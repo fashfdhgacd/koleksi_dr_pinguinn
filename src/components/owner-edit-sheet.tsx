@@ -266,7 +266,7 @@ export function OwnerEditSheet({
           </p>
         ) : null}
         <p className="mt-2 text-[11px] leading-snug text-zinc-500">
-          Edit judul tidak pernah membuka video yang terkunci. Perubahan tampil di situs dalam ±1 menit.
+          Semua video bisa diedit, termasuk yang ditahan. Judul yang lolos cek langsung melepas tahanan otomatis; kunci di bawah umur tetap menahan videonya. Perubahan langsung berlaku.
         </p>
 
         <div className="mt-3 flex gap-2">

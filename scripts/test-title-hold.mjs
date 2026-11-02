@@ -83,7 +83,8 @@ check(findHeldDraft(items, { id: "other", embed: "https://putarin.biz/e/ABC123" 
 // Video live (tidak ditahan) tidak pernah disentuh: upload ulang = normal (nanti di-skip duplikat)
 const live = [{ id: "abc123", embed: "https://putarin.biz/e/abc123", title: "Senior Year Love Story" }];
 check(uploadAction(live, rec, "Senior Kantor Love Story", hardOk).action === "new", "video live tidak dianggap draft");
-check(findHeldDraft([{ ...draft, hidden_reason: "detector-review" }], rec) === null, "alasan lain bukan draft judul");
+check(findHeldDraft([{ ...draft, hidden_reason: "detector-minor" }], rec) === null, "kunci umur bukan draft judul");
+check(findHeldDraft([{ ...draft, hidden_reason: "detector-review" }], rec)?.id === draft.id, "perlu dicek = draft judul (bisa diganti)");
 
 // Edit -> Tayangkan di /pemilik: judul harus lolos cek yang sama
 check(!canPublishTitle("Senior Year Love Story Episode 1", hardOk), "edit belum diganti -> tidak bisa tayang");

@@ -11,13 +11,14 @@
  * menang di local-cache (isHiddenRaw), jadi Tayangkan tidak pernah membuka judul terkunci.
  */
 import { applyUnhidden, hiddenReasonRaw, isLockedMinor, loadItemsRaw } from "@/lib/catalog/local-cache";
-import { isReviewPendingReason, titleReviewReason } from "@/lib/catalog/review-pending.js";
+import { isReviewPendingReason, strictPendingReason, titleReviewReason } from "@/lib/catalog/review-pending.js";
 import { readUnhideState, setUnhidden } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState, setOwnerHidden } from "@/lib/catalog/owner-hide-store";
 import { readReviewState, writeReviewState } from "@/lib/owner-review-store";
 import { minorContentReason } from "@/lib/catalog/minor-detector.js";
 import { explainTitle, schoolReviewCue } from "@/lib/catalog/minor-context.js";
 import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import { withSavedEdit } from "@/lib/catalog/owner-edit-merge.js";
 import { readOwnerEditState, setOwnerEdit } from "@/lib/catalog/owner-edit-store";
 import { uploadRejectReason } from "@/lib/bot/title-guard.js";
 import { HOLD_REASON, canPublishTitle, titleHold } from "@/lib/bot/title-hold.js";
@@ -28,27 +29,47 @@ function hardOk(t: string): boolean {
 }
 
 /**
- * Publishes a held upload draft (hidden_reason "title-rename") under a clean title: owner edit
- * title (+ category) and Unhide, same stores as /pemilik Edit + Tayangkan. Used by a bot resend.
+ * Saves a new title for a held upload draft and publishes it when the title is clean. Used by a bot
+ * resend (and /pemilik). Owner rule 2026-11-02: the title is ALWAYS saved (a held video is never
+ * locked against editing); the checks only decide whether it goes live:
+ *  - strict REVIEW_PENDING (Andini Permata set, anime/hentai) stays withheld until Tayangkan + proof;
+ *  - a title that still fails the hold/hard checks stays held ("title_needs_rename");
+ *  - otherwise owner-hide off + Unhide, same stores as /pemilik Edit + Tayangkan.
  */
-export async function publishHeldDraft(id: string, title: string, category?: string): Promise<{ ok: boolean; error?: string }> {
-  if (!canPublishTitle(title, hardOk)) return { ok: false, error: "title_needs_rename" };
-  // A new title never clears REVIEW_PENDING (age is not a title question): approve with proof instead.
-  if (titleReviewReason(title)) return { ok: false, error: "review_pending_needs_proof" };
-  const cache = (await loadItemsRaw()) as unknown as { raw?: AnyItem[]; items: AnyItem[] };
-  const held = (cache.raw || cache.items).find((x) => x?.id === id);
-  if (held && isReviewPendingItem({ ...held, title: title })) return { ok: false, error: "review_pending_needs_proof" };
+export async function publishHeldDraft(
+  id: string,
+  title: string,
+  category?: string,
+): Promise<{ ok: boolean; error?: string; saved?: boolean; reason?: string }> {
+  let saved;
   try {
-    await setOwnerEdit(id, { title, ...(category ? { category } : {}) });
+    saved = await setOwnerEdit(id, { title, ...(category ? { category } : {}) });
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "kv_error" };
+  }
+  try {
+    const [unhide0, hide0, edits0] = await Promise.all([
+      readUnhideState(),
+      readOwnerHideState().catch(() => null),
+      readOwnerEditState(),
+    ]);
+    applyUnhidden(Object.keys(unhide0.ids), hide0 ? Object.keys(hide0.ids) : null, withSavedEdit(edits0.ids, id, saved));
+    const cache = (await loadItemsRaw()) as unknown as { raw?: AnyItem[]; items: AnyItem[] };
+    const held = (cache.raw || cache.items).find((x) => x?.id === id);
+    const still = held ? hiddenReasonRaw(held as never) : "";
+    if (isReviewPendingReason(still)) return { ok: false, saved: true, error: "review_pending_needs_proof", reason: still };
+    if (!canPublishTitle(title, hardOk) || titleReviewReason(title)) {
+      return { ok: false, saved: true, error: "title_needs_rename", reason: titleReviewReason(title) || String(titleHold(title, hardOk)?.term || "") };
+    }
     const hideIds = Object.keys((await setOwnerHidden(id, false)).ids);
     const unhideIds = Object.keys((await setUnhidden(id, true)).ids);
-    applyUnhidden(unhideIds, hideIds, (await readOwnerEditState()).ids);
+    applyUnhidden(unhideIds, hideIds, withSavedEdit((await readOwnerEditState()).ids, id, saved));
     const state = await readReviewState(true);
     state.checked[`det:${id}`] = Date.now();
     await writeReviewState(state);
-    return { ok: true };
+    return { ok: true, saved: true };
   } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : "kv_error" };
+    return { ok: false, saved: true, error: e instanceof Error ? e.message : "kv_error" };
   }
 }
 
@@ -68,6 +89,8 @@ export type DetectorReviewRow = {
   decidedAt: number | null;
   /** REVIEW_PENDING row: approve needs a proof note; "keep" leaves it withheld. */
   pending?: boolean;
+  /** Strict REVIEW_PENDING (Andini Permata set, anime/hentai): a new title is saved but only "Setujui" releases it. */
+  strict?: boolean;
 };
 
 /** Glosarium kata Mandarin yang sering muncul di judul (terjemahan kata kunci, bukan mesin). */
@@ -113,7 +136,8 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
     seen.add(it.id);
     // Upload held because the title needs renaming (title-hold.js): editable draft, never locked here.
     const renameTag = it.hidden === true && it.hidden_reason === HOLD_REASON;
-    const title = String((renameTag && edits.ids[it.id]?.title) || it.title || "");
+    // The owner's edited title wins everywhere (owner rule 2026-11-02), not only on rename drafts.
+    const title = String(edits.ids[it.id]?.title || it.title || "");
     if (renameTag) {
       if (unhide.ids[it.id]) continue;
       const hold = titleHold(title);
@@ -129,7 +153,7 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
           : hold
             ? `Judul perlu diganti: kata "${hold.term}" = ${hold.meaning}. Tap Edit, ganti judulnya${hold.suggestions.length ? ` (saran: ${hold.suggestions.join(" / ")})` : ""}, lalu Tayangkan.`
             : "Judul perlu diganti: masih kena cek judul. Tap Edit, ganti judulnya, lalu Tayangkan.",
-        signals: hold ? [hold.term] : [],
+        signals: hold ? [String(hold.term)] : [],
         held: true,
         status: ownerHide.ids[it.id] ? "Disembunyiin pemilik" : "Ditahan (judul perlu diganti), belum tayang",
         thumbUrl: `/thumb/${it.id}`,
@@ -168,6 +192,7 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
         watchUrl: approved ? `/watch/${it.id}` : http(it.embed) || http(it.direct) || `/watch/${it.id}`,
         decidedAt: state.checked[`det:${it.id}`] || null,
         pending: true,
+        strict: Boolean(strictPendingReason(it.id, [title, String(it.title || "")], String((it as { category?: unknown }).category || ""))),
       });
       continue;
     }
@@ -205,7 +230,10 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
 
 /** True when the item is REVIEW_PENDING (catalog rule or upload record). */
 export function isReviewPendingItem(it: AnyItem): boolean {
-  return isReviewPendingReason(hiddenReasonRaw(it as never)) || isReviewPendingReason(String(it.hidden_reason || ""));
+  // Judged on the current hidden reason: a clean owner title has already released a non-strict hold,
+  // so the stored upload reason alone no longer keeps it in "Perlu dicek".
+  const r = hiddenReasonRaw(it as never);
+  return isReviewPendingReason(r) || (Boolean(r) && isReviewPendingReason(String(it.hidden_reason || "")));
 }
 
 export async function decideDetectorReview(body: { id?: unknown; decision?: unknown; proof?: unknown }): Promise<{ ok: boolean; error?: string; status?: number; held?: boolean }> {

@@ -16,11 +16,17 @@ import { indexNowAfterBatch } from "@/lib/bot/indexnow";
 import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
 import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
 import { uploadModeration } from "@/lib/catalog/moderation.js";
-import { uploadRejectReason, uploadWarnReason } from "@/lib/bot/title-guard.js";
-import { HOLD_REASON, explainTerm, holdReplyLines, titleHold, uploadAction } from "@/lib/bot/title-hold.js";
+import { hasJavCode, uploadRejectReason, uploadWarnReason } from "@/lib/bot/title-guard.js";
+import { HOLD_REASON, explainTerm, holdReplyLines, isHeldDraftReason, titleHold, uploadAction } from "@/lib/bot/title-hold.js";
 import { isGenericTitle } from "@/lib/catalog/generic-title.js";
 
 /** Title is clean for the hard checks too (reject list + minor-lock). Used for hold suggestions. */
+/** The word/reason behind an upload moderation hold, for the bot reply. */
+/** @param {{ review?: string, hide?: string } | null | undefined} mod */
+function moderationWord(mod) {
+  return String(mod?.review || mod?.hide || "").replace(/^review-pending:\s*/, "") || "cek judul";
+}
+
 function hardOk(t) {
   return !uploadRejectReason(t) && !lockedMinorReason(t);
 }
@@ -337,7 +343,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
       if (!/^(?:lu|dd|by)-/.test(id)) continue;
       const prev = knownDrp.get(id);
       const real = isGenericTitle(it.title, it) ? "" : String(it.title || "");
-      const held = it.hidden === true && it.hidden_reason === HOLD_REASON;
+      const held = it.hidden === true && isHeldDraftReason(it.hidden_reason);
       knownDrp.set(id, { title: prev?.title || real, held: Boolean(prev?.held || held) });
     }
     for (let i = queue.length - 1; i >= 0; i--) {
@@ -491,7 +497,9 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     // one ambiguous/translated word is not proof; a title signal that leaves the performers' age
     // unconfirmed is REVIEW_PENDING (withheld, data kept, /pemilik "Perlu dicek" with the reason).
     const typedTitle = String(video.title || parsedMsg.title || "");
-    const mod = uploadModeration(minorText);
+    // JAV (category or studio code): genre wording never holds; only explicit minors / age < 18.
+    const isJav = String(category || "").toLowerCase() === "jav" || hasJavCode(minorText);
+    const mod = uploadModeration(minorText, { category });
     const hiddenReason = mod.hide;
     const reviewReason = mod.review;
     const flaggedBase = autoTitled.has(i) ? { ...baseRecord, titleAuto: true } : baseRecord;
@@ -503,12 +511,21 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
         : flagged;
     // Upload-time title check (title-hold.js, NEW uploads only): school/minor-implying words hold the
     // upload as an editable hidden draft; a resend of a held draft with a clean title publishes it.
-    const hold = titleHold(baseTitle, hardOk) || titleHold(typedTitle, hardOk) || titleHold(String(meta.title || ""), hardOk);
+    const hold = isJav
+      ? null
+      : titleHold(baseTitle, hardOk) || titleHold(typedTitle, hardOk) || titleHold(String(meta.title || ""), hardOk);
     if (catalogRaw === null) catalogRaw = await rawCatalogItems();
-    const act = uploadAction(catalogRaw, record, title, (t) => !hold && hardOk(t));
+    // A resend of a held draft is judged on the NEW title (the owner's title wins over the old one).
+    const resendMod = uploadModeration(typedTitle || baseTitle, { category });
+    const act = uploadAction(catalogRaw, record, title, (t) => !hold && hardOk(t) && !resendMod.hide);
     if (act.action === "hold-again") {
       heldTotal += 1;
-      for (const l of holdReplyLines(act.draft.id, hold || { term: "", meaning: "", suggestions: [] })) lines.push(l);
+      if (hold) {
+        for (const l of holdReplyLines(act.draft.id, hold)) lines.push(l);
+      } else {
+        lines.push(`⛔ ${act.draft.id}: Masih ditahan, judul baru masih kena cek: ${moderationWord(resendMod)}.`);
+        lines.push("✏️ Ganti kata itu di /pemilik (Perlu dicek → Simpan judul) atau kirim ulang link-nya pakai judul lain. Judul yang lolos cek langsung tayang.");
+      }
       continue;
     }
     if (act.action === "publish") {
@@ -519,6 +536,13 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
           createdTotal += 1;
           createdRecords.push({ id: String(act.draft.id), title, poster: "", hidden: false });
           lines.push(`✅ ${act.draft.id} — ${title} · judul baru, video yang tadinya ditahan sekarang tayang`);
+        } else if (res.saved) {
+          heldTotal += 1;
+          lines.push(
+            res.error === "review_pending_needs_proof"
+              ? `🔒 ${act.draft.id}: judul baru tersimpan, tapi video ini perlu persetujuan pemilik (${String(res.reason || "").replace(/^review-pending:\s*/, "")}). Tayangkan di /pemilik → Perlu dicek dengan catatan bukti 18+.`
+              : `⛔ ${act.draft.id}: judul baru tersimpan, tapi masih kena cek judul${res.reason ? ` (kata "${res.reason}")` : ""}. Ganti lagi di /pemilik atau kirim ulang link-nya pakai judul lain.`,
+          );
         } else {
           failedTotal += 1;
           lines.push(`⚠️ ${act.draft.id}: gagal nayangin draft (${res.error || "unknown"}). Coba Tayangkan di /pemilik.`);
@@ -643,7 +667,10 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
             `✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}${it.record.hidden_reason === DEAD_VIDEY_REASON ? " · disembunyikan: video mati" : it.record.hidden_reason === "detector-review" ? " · 🔎 ditahan, perlu dicek di /pemilik (konteks sekolah/keluarga + umur)" : String(it.record.hidden_reason || "").startsWith("review-pending") ? " · 🔎 ditahan (REVIEW_PENDING)" : it.record.hidden ? " · 🙈 disembunyikan (judul menyiratkan minor/sekolah)" : ""}`,
           );
           if (it.record.review_reason) {
-            lines.push(`🔎 Belum tayang (REVIEW_PENDING), cek di /pemilik → Perlu dicek: ${it.record.review_reason}. Setujui hanya dengan bukti semua pemeran 18+ saat produksi.`);
+            lines.push(`🔎 Belum tayang (REVIEW_PENDING) karena ${it.record.review_reason}.`);
+            lines.push("✏️ Kalau pemerannya dewasa dan cuma judulnya yang bikin ketahan: benerin judulnya di /pemilik (Perlu dicek → Simpan judul) atau kirim ulang link-nya pakai judul baru. Judul yang lolos cek langsung tayang.");
+          } else if (it.record.hidden_reason === "detector-review") {
+            lines.push("✏️ Judulnya bisa dibenerin di /pemilik (Perlu dicek → Simpan judul) atau kirim ulang link-nya pakai judul baru. Judul yang lolos cek langsung tayang.");
           }
           if (it.warn && !it.record.hidden) {
             lines.push(

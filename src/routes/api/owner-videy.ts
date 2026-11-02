@@ -6,6 +6,7 @@ import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
 import { readOwnerEditState, setOwnerEdit } from "@/lib/catalog/owner-edit-store";
+import { withSavedEdit } from "@/lib/catalog/owner-edit-merge.js";
 import { isOwnerRequest } from "@/lib/owner-auth";
 import { brandUploadTitle, BRAND_SUFFIX } from "@/lib/bot/title-brand.js";
 
@@ -102,12 +103,9 @@ async function saveTitle(body: { id?: unknown; title?: unknown }) {
 
   const item = (await rawItems()).find((it) => it?.id === id);
   if (!item || !isVidey(item)) return json({ ok: false, error: "Video tidak ditemukan di katalog." }, 404);
-  // Minor-lock, same rules as owner-tools.ts handleEditVideo.
-  if (isLockedItem(item)) return json({ ok: false, error: "Video ini terkunci (minor-lock), tidak bisa diedit." }, 403);
-  if (hiddenReasonRaw(item)) return json({ ok: false, error: "Video ini ditandai/tersembunyi, tidak bisa diedit." }, 403);
-  if (ownerEditBlockReason(typed) || ownerEditBlockReason(title)) {
-    return json({ ok: false, error: "Judul ditolak: bertema sekolah/di bawah umur." }, 403);
-  }
+  // Owner rule 2026-11-02: held/locked videos stay editable; the checks only decide visibility
+  // (local-cache.ts). The reply says when the video stays hidden.
+  const stillHidden = isLockedItem(item) || Boolean(ownerEditBlockReason(typed) || ownerEditBlockReason(title));
 
   let saved;
   try {
@@ -125,11 +123,16 @@ async function saveTitle(body: { id?: unknown; title?: unknown }) {
       readOwnerHideState().catch(() => null),
       readOwnerEditState(),
     ]);
-    applyUnhidden(Object.keys(unhide.ids), hiddenState ? Object.keys(hiddenState.ids) : null, edits.ids);
+    applyUnhidden(Object.keys(unhide.ids), hiddenState ? Object.keys(hiddenState.ids) : null, withSavedEdit(edits.ids, id, saved));
   } catch {
     /* the regular 30 s sync applies it */
   }
-  return json({ ok: true, id, title: saved?.title || null });
+  return json({
+    ok: true,
+    id,
+    title: saved?.title || null,
+    ...(stillHidden ? { note: "Judul tersimpan, tapi video tetap tidak tayang (kunci/tema di bawah umur)." } : {}),
+  });
 }
 
 export const Route = createFileRoute("/api/owner-videy")({

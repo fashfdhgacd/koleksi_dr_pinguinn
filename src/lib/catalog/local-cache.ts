@@ -36,6 +36,7 @@ import { softenMinorTerms } from "./minor-title-guard";
 import { HIDDEN_IDS as HIDDEN_ID_REASONS, RESTORED_TITLES, minorContentReason } from "./hidden-ids.js";
 import { isLockedMinorId, lockedMinorReason, schoolReason } from "./minor-lock.js";
 import { reviewPendingReason } from "./review-pending.js";
+import { ownerTitleReleases } from "./moderation.js";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
 // Telegram bot uploads (IndoAV/Streamtape/Putarin) land in these feeds; bundle so every batch stays live.
@@ -277,15 +278,19 @@ function adultReviewOnly(_it: RawItem): boolean {
 }
 
 const pendingMemo = new Map<string, string>();
-/** REVIEW_PENDING (review-pending.js): age unconfirmed, withheld until the owner approves (Unhide). */
+/**
+ * REVIEW_PENDING (review-pending.js): age unconfirmed, withheld. The owner's title (EDITS, else
+ * overrides.json) wins over the stored one, so a clean owner edit releases it on the next build;
+ * the strict set (Andini Permata, anime/hentai) needs the owner's Tayangkan with proof (Unhide).
+ */
 function reviewPendingMemo(it: RawItem): string {
-  const titles = [it.title, overrideTitle(it.id), RESTORED[it.id], EDITS[it.id]?.title, AUTO_META[it.id]?.title]
-    .map((t) => String(t || ""))
-    .filter(Boolean);
-  const key = `${it.id}\u0000${titles.join("\u0000")}`;
+  const titles = [it.title, RESTORED[it.id], AUTO_META[it.id]?.title].map((t) => String(t || "")).filter(Boolean);
+  const ownerTitle = overrideTitle(it.id);
+  const category = String(EDITS[it.id]?.category || OVERRIDES[it.id]?.category || it.category || "");
+  const key = `${it.id}\u0000${category}\u0000${ownerTitle}\u0000${titles.join("\u0000")}`;
   let r = pendingMemo.get(key);
   if (r === undefined) {
-    r = reviewPendingReason(it.id, titles);
+    r = reviewPendingReason(it.id, titles, { ownerTitle, category });
     if (pendingMemo.size > MEMO_MAX) pendingMemo.clear();
     pendingMemo.set(key, r);
   }
@@ -295,12 +300,18 @@ function reviewPendingMemo(it: RawItem): string {
 /** Why an item is hidden by default ("" = not hidden). Ignores owner Unhide overrides. */
 export function hiddenReasonRaw(it: RawItem): string {
   if (AUTO_META[it.id]?.hidden) return String(AUTO_META[it.id].hidden);
-  // An owner title edit never clears REVIEW_PENDING (age is not a title question); approval does.
+  // REVIEW_PENDING is judged on the owner's title when there is one (owner rule 2026-11-02).
   const pending = reviewPendingMemo(it);
   if (pending) return pending;
   if (hasCleanEdit(it.id)) {
+    // The owner's clean title wins over an automatic upload hold (review-pending / title-rename /
+    // detector-review): before this, the stored bot flag kept the video hidden after every edit.
     const rec = it as { hidden?: unknown; hidden_reason?: unknown };
-    if (rec.hidden === true && !adultReviewOnly(it)) return String(rec.hidden_reason || "bot-flag");
+    const editCategory = String(EDITS[it.id]?.category || OVERRIDES[it.id]?.category || it.category || "");
+    const released = ownerTitleReleases(String(rec.hidden_reason || ""), String(EDITS[it.id]?.title || ""), editCategory);
+    if (rec.hidden === true && !adultReviewOnly(it) && !released) {
+      return String(rec.hidden_reason || "bot-flag");
+    }
     return String(OVERRIDES[it.id]?.hidden || "");
   }
   const listed = HIDDEN_REASONS[it.id];

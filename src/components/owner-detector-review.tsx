@@ -16,6 +16,7 @@ type Row = {
   watchUrl: string;
   decidedAt: number | null;
   pending?: boolean;
+  strict?: boolean;
 };
 
 async function post<T>(secret: string, body: Record<string, unknown>): Promise<T & { ok?: boolean; error?: string }> {
@@ -44,6 +45,34 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
   const [editing, setEditing] = useState<Row | null>(null);
   const [verdicts, setVerdicts] = useState<Record<string, EditVerdict>>({});
   const [proofs, setProofs] = useState<Record<string, string>>({});
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
+
+  // Inline title edit (owner rule 2026-11-02): always saves; a clean title releases an automatic
+  // hold at once, the strict set (Andini Permata / anime) still needs "Setujui".
+  const saveTitle = async (r: Row) => {
+    const title = (drafts[r.id] ?? r.title).replace(/\s+/g, " ").trim();
+    if (!title || title === r.title) return;
+    setBusy(r.id);
+    const d = await post<{ live?: boolean | null; note?: string }>(secret, { action: "edit-video", id: r.id, title });
+    setBusy("");
+    if (!d.ok) {
+      setNotes((n) => ({ ...n, [r.id]: `Gagal menyimpan: ${d.error || "?"}` }));
+      return;
+    }
+    setNotes((n) => ({
+      ...n,
+      [r.id]: d.live
+        ? "Judul tersimpan dan lolos cek: video sudah tayang."
+        : d.note || (r.strict ? "Judul tersimpan. Video ini tetap perlu Setujui dengan bukti 18+." : "Judul tersimpan, tapi masih kena cek judul. Lihat alasan di atas setelah dimuat ulang."),
+    }));
+    setDrafts((x) => {
+      const next = { ...x };
+      delete next[r.id];
+      return next;
+    });
+    await load();
+  };
 
   const load = useCallback(async () => {
     setErr("");
@@ -67,9 +96,9 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
           : d.error === "proof_required"
             ? "Tulis bukti dulu (min. 10 huruf): sumber/rilis resmi yang menunjukkan semua pemeran 18+ saat produksi."
             : d.error === "review_pending_needs_proof"
-              ? "Video ini REVIEW_PENDING: setujui di kotak ini dengan bukti umur, bukan lewat Unhide/Edit."
+              ? "Video ini perlu Setujui dengan bukti umur (judul tetap bisa diedit)."
           : d.error === "title_needs_rename"
-            ? "Judul masih perlu diganti. Tap Edit, ganti judulnya, lalu Tayangkan lagi."
+            ? "Judul masih kena cek. Ganti judulnya lalu Simpan judul; yang lolos cek langsung tayang."
             : d.error || "Gagal.");
       return;
     }
@@ -121,9 +150,9 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
   return (
     <div className="flex flex-col gap-2.5">
       <p className="text-[12px] leading-relaxed text-zinc-400">
-        {pending.length} perlu dicek · {rows.length - pending.length} sudah diputuskan. Upload baru yang ditahan belum tayang sampai kamu tap
-        Tayangkan; katalog lama tetap tayang sampai kamu putuskan. Judul "minor" langsung terkunci dan tidak muncul di sini. REVIEW_PENDING (umur pemeran belum terkonfirmasi) tidak tayang
-        sampai kamu setujui dengan bukti semua pemeran 18+ saat produksi.
+        {pending.length} perlu dicek · {rows.length - pending.length} sudah diputuskan. Semua video di sini bisa diedit. Kalau cuma judulnya yang bikin ketahan, ganti judulnya lalu
+        Simpan judul: judul yang lolos cek langsung tayang. Video Andini Permata dan anime/hentai yang umurnya tidak jelas tetap perlu Setujui dengan bukti semua pemeran
+        18+ saat produksi.
       </p>
       {err ? <p role="alert" className="text-[13px] text-red-300">{err}</p> : null}
       <label className="flex items-center gap-2 text-[12px] text-zinc-400">
@@ -144,6 +173,32 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
                 {r.held ? "Pratinjau (khusus pemilik)" : "Tonton"}
               </a>
             </p>
+            <form
+              className="mt-2 flex flex-col gap-1 text-[12px] text-zinc-400 sm:flex-row sm:items-end"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void saveTitle(r);
+              }}
+            >
+              <label className="flex min-w-0 flex-1 flex-col gap-1">
+                Judul (simpan = cek ulang; lolos cek langsung tayang{r.strict ? ", kecuali video ini: tetap perlu Setujui" : ""})
+                <input
+                  type="text"
+                  value={drafts[r.id] ?? r.title}
+                  maxLength={200}
+                  onChange={(e) => setDrafts((x) => ({ ...x, [r.id]: e.target.value }))}
+                  className="rounded-lg border border-white/[0.1] bg-black/40 px-2.5 py-1.5 text-[13px] text-zinc-100"
+                />
+              </label>
+              <button
+                type="submit"
+                disabled={busy === r.id || !(drafts[r.id] ?? "").trim() || (drafts[r.id] ?? "").trim() === r.title}
+                className={`${btn} border border-[#2dd4bf]/40 text-[#5eead4]`}
+              >
+                Simpan judul
+              </button>
+            </form>
+            {notes[r.id] ? <p className="mt-1 text-[12px] text-amber-200">{notes[r.id]}</p> : null}
             {r.pending ? (
               <label className="mt-2 flex flex-col gap-1 text-[12px] text-zinc-400">
                 Bukti semua pemeran 18+ saat produksi (wajib untuk Tayangkan)
