@@ -647,14 +647,7 @@ export function buildIndexes(
   }
   const popular = popularIds(items);
   for (const it of items) {
-    // Multi-category (title-tags.ts): the video joins its primary category and every tag category.
-    const slugs = titleTags(it.title, slugOf(it), tagOptions(it, popular));
-    // Owner-chosen extra categories (/pemilik > Edit): the video also shows up in each of them.
-    const extra = Array.isArray(it.ownerExtraCategories) ? (it.ownerExtraCategories as unknown[]) : [];
-    for (const x of extra) {
-      const cat = typeof x === "string" ? findCategory(x) : undefined;
-      if (cat && !slugs.includes(cat.slug)) slugs.push(cat.slug);
-    }
+    const slugs = catalogSlugs(it, popular, multi);
     for (const slug of slugs) {
       const bucket = bySlug.get(slug);
       if (bucket) bucket.push(it);
@@ -695,6 +688,34 @@ export function buildIndexes(
     videyNoThumbNextAt,
     multi,
   };
+}
+
+/**
+ * Every category a video is listed in: its primary category, every title tag (title-tags.ts) and
+ * the owner-chosen extra categories (/pemilik > Edit). A multi-server main page also keeps the
+ * categories of its merged-away copies, so merging copies never drops a video out of a category
+ * one of its copies was in (e.g. a Jav copy merged into an Amatir main stays in /kategori/jav).
+ */
+export function catalogSlugs(it: RawItem, popular: ReadonlySet<string>, multi?: MultiServer): string[] {
+  const slugs = ownSlugs(it, popular);
+  for (const id of multi?.servers.get(it.id) || []) {
+    const copy = id === it.id ? undefined : multi?.away.get(id);
+    if (!copy) continue;
+    for (const s of ownSlugs(copy as RawItem, popular)) if (!slugs.includes(s)) slugs.push(s);
+  }
+  return slugs;
+}
+
+function ownSlugs(it: RawItem, popular: ReadonlySet<string>): string[] {
+  // Multi-category (title-tags.ts): the video joins its primary category and every tag category.
+  const slugs = titleTags(it.title, slugOf(it), tagOptions(it, popular));
+  // Owner-chosen extra categories (/pemilik > Edit): the video also shows up in each of them.
+  const extra = Array.isArray(it.ownerExtraCategories) ? (it.ownerExtraCategories as unknown[]) : [];
+  for (const x of extra) {
+    const cat = typeof x === "string" ? findCategory(x) : undefined;
+    if (cat && !slugs.includes(cat.slug)) slugs.push(cat.slug);
+  }
+  return slugs;
 }
 
 /** Multi-server lookup of a built catalog (empty for a cache built without it). */
