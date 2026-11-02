@@ -1,8 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  MAX_PER_DAY, PROFILE_BIO, PROFILE_NAME, baseTitle, blockReason, buildPost, pickNext, postsLast24h, profilePatch, watchUrl,
+  MAX_PER_DAY, PROFILE_BIO, PROFILE_NAME, baseTitle, blockReason, buildPost, englishBlockReason, englishTitle, pickNext,
+  postsLast24h, profilePatch, watchUrl,
 } from "./lib/bluesky-post-lib.mjs";
+import { fallbackTitle, toEnglishTitle } from "./lib/bluesky-english.mjs";
 
 const NOW = Date.parse("2026-11-03T05:00:00Z");
 const ok = (over = {}) => ({ id: "abc123", title: "Cici Cantik Jago Nyepong - koleksidrpinguin.com", category: "lainnya", date: "2026-11-03", ...over });
@@ -50,7 +52,38 @@ test("postsLast24h counts the daily cap", () => {
   assert.equal(MAX_PER_DAY, 6);
 });
 
-test("buildPost: UTM link facet with byte offsets, card without image, adult self-label", () => {
+test("toEnglishTitle: deterministic word map, unknown words dropped, generic fallback", () => {
+  assert.equal(toEnglishTitle("Cici Cantik Jago Nyepong Hyper Pengen Ngentot Terus").title, "Babe pretty blowjob horny sex");
+  assert.equal(toEnglishTitle("tobrut gemoy kena GB pria bertato").title, "Busty chubby gangbang guy tattooed");
+  const fb = toEnglishTitle("Berkata Kali Ini Sangat Enak", "abc");
+  assert.equal(fb.fallback, true);
+  assert.equal(fb.title, fallbackTitle("abc"));
+  assert.equal(toEnglishTitle("Berkata Kali Ini Sangat Enak", "abc").title, fb.title);
+  // Words outside the map never reach the post.
+  assert.ok(!/xyzname/i.test(toEnglishTitle("Tobrut xyzname montok ngentot hotel").title));
+});
+
+test("englishBlockReason applies the same rules to the English text", () => {
+  for (const t of ["Leaked tape", "Hidden camera", "Teen babe", "Young wife", "Stepmom", "Drunk girl", "Forced", "School uniform", "AI babe", "19 yo"])
+    assert.notEqual(englishBlockReason(t), "", t);
+  assert.equal(englishBlockReason("Busty chubby gangbang guy tattooed"), "");
+  // English titles that would only be blocked in English are skipped by pickNext too.
+  const live = new Set(["e1"]);
+  const r = pickNext([ok({ id: "e1", title: "Petite teen babe hotel" })], live, { posted: [] }, NOW);
+  assert.equal(r.item, null);
+});
+
+test("buildPost: English text, UTM link facet, brand-image card, adult self-label", () => {
+  const thumb = { $type: "blob", ref: { $link: "bafk" }, mimeType: "image/jpeg", size: 68681 };
+  const rec = buildPost(ok({ id: "Ab_1", title: "Tobrut montok ngentot di hotel - koleksidrpinguin.com" }), new Date(NOW), thumb);
+  assert.equal(rec.text, "Busty curvy sex hotel\n🔞 18+ · Watch: koleksidrpinguin.com/watch/Ab_1");
+  assert.deepEqual(rec.langs, ["en"]);
+  assert.deepEqual(rec.embed.external.thumb, thumb);
+  assert.equal(englishTitle(ok({ title: "pamer body" })), "Showing off body");
+  assert.equal(buildPost(ok()).embed.external.thumb, undefined);
+});
+
+test("buildPost: UTM link facet with byte offsets, adult self-label", () => {
   const rec = buildPost(ok({ id: "Ab_1" }), new Date(NOW));
   const url = watchUrl("Ab_1");
   assert.equal(url, "https://koleksidrpinguin.com/watch/Ab_1?utm_source=bluesky&utm_medium=social&utm_campaign=organic&utm_content=Ab_1");
@@ -59,7 +92,6 @@ test("buildPost: UTM link facet with byte offsets, card without image, adult sel
   assert.equal(new TextDecoder().decode(bytes.slice(byteStart, byteEnd)), "koleksidrpinguin.com/watch/Ab_1");
   assert.equal(rec.facets[0].features[0].uri, url);
   assert.equal(rec.embed.external.uri, url);
-  assert.equal(rec.embed.external.thumb, undefined);
   assert.deepEqual(rec.labels.values, [{ val: "porn" }]);
   assert.ok(rec.text.includes("18+"));
   assert.ok([...rec.text].length <= 300);
@@ -77,4 +109,11 @@ test("profilePatch fills only empty fields", () => {
   assert.equal(kept.displayName, "Nama Lama");
   assert.deepEqual(kept.avatar, { x: 1 });
   assert.equal(profilePatch({ displayName: "a", description: "b", labels: { values: [{ val: "porn" }] } }), null);
+  // Bio text changed: overwrite the old (Indonesian) bio, keep everything else.
+  const old = { displayName: "Koleksi Dr. Pinguin", description: "Koleksi video dewasa Indonesia", labels: { values: [{ val: "bot" }] } };
+  const upd = profilePatch(old, { forceBio: true });
+  assert.equal(upd.description, PROFILE_BIO);
+  assert.deepEqual(upd.labels, old.labels);
+  assert.equal(profilePatch({ ...old, description: PROFILE_BIO }, { forceBio: true }), null);
+  assert.equal(PROFILE_BIO, "Hot adult videos, updated daily. 🔞 18+ only, leave if you are under 18. https://koleksidrpinguin.com");
 });
