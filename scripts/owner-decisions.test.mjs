@@ -57,3 +57,17 @@ test("the public catalog filter uses the same owner-wins rule", async () => {
   assert.match(fn, /effectiveHidden\(\{/);
   assert.match(fn, /unhidden: UNHIDDEN\.has\(it\.id\)/);
 });
+
+test("one-tap Tayangkan: only hard minor content and the strict set are refused (source guard)", async () => {
+  const fs = await import("node:fs");
+  const src = fs.readFileSync(new URL("../src/lib/owner-detector-review.ts", import.meta.url), "utf8");
+  const fn = src.slice(src.indexOf("function approvalBlock("), src.indexOf("export async function approveDetectorReviewBulk"));
+  assert.doesNotMatch(fn, /title_needs_rename/); // a rename-held draft is approved by the owner's tap
+  assert.match(fn, /locked_minor/);
+  assert.match(fn, /proof_required/);
+  // JAV with "19 year old ... college student" is adult by default: not strict, so no proof needed.
+  const { strictPendingReason: strict } = await import("../src/lib/catalog/review-pending.js");
+  const jav = "START 005 A sparkling 19 year old active female college student with dazzling baby faced G cup big breasts Nanase Aoi AV DEBUT";
+  assert.equal(strict("4kemWbJHGt", [jav], "jav"), "");
+  assert.equal(reviewPendingReason("4kemWbJHGt", [jav], { category: "jav" }), "");
+});

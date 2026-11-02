@@ -13,8 +13,8 @@
 import { applyUnhidden, hiddenReasonRaw, isLockedMinor, isPublicHidden, loadItemsRaw } from "@/lib/catalog/local-cache";
 import { healDecisions, recordDecision, reviewGroup, triggerText } from "@/lib/owner-decisions.js";
 import { isReviewPendingReason, strictPendingReason, titleReviewReason } from "@/lib/catalog/review-pending.js";
-import { readUnhideState, setUnhidden } from "@/lib/catalog/unhide-store";
-import { readOwnerHideState, setOwnerHidden } from "@/lib/catalog/owner-hide-store";
+import { readUnhideState, setUnhidden, setUnhiddenMany } from "@/lib/catalog/unhide-store";
+import { readOwnerHideState, setOwnerHidden, unhideOwnerHiddenMany } from "@/lib/catalog/owner-hide-store";
 import { readReviewState, writeReviewState } from "@/lib/owner-review-store";
 import { minorContentReason } from "@/lib/catalog/minor-detector.js";
 import { explainTitle, schoolReviewCue } from "@/lib/catalog/minor-context.js";
@@ -223,6 +223,57 @@ export function isReviewPendingItem(it: AnyItem): boolean {
 }
 
 /**
+ * Why Tayangkan is refused, or null. Owner decision wins over the automatic title checks (owner
+ * rule 2026-11-02): only hard minor content (reject list, minor lock, detector "minor") is refused,
+ * and the strict REVIEW_PENDING set (Andini Permata, strong youth signal, anime/hentai) needs a
+ * proof note. A rename-held draft is approved as is: the owner's tap is the decision.
+ */
+function approvalBlock(it: AnyItem, title: string, proof: string): { error: string; status: number } | null {
+  if (minorContentReason(title) === "minor" || lockedMinorReason(title) || isLockedMinor(it as never)) return { error: "locked_minor", status: 403 };
+  if (isReviewPendingItem(it) && strictPendingReason(it.id, [title, String(it.title || "")], String((it as { category?: unknown }).category || "")) && proof.length < 10) {
+    return { error: "proof_required", status: 400 };
+  }
+  return null;
+}
+
+/**
+ * "Tayangkan semua": approves many non-sensitive videos in one go (one KV write per store).
+ * Strict items (need proof) and hard minor content are skipped and reported, never approved.
+ */
+export async function approveDetectorReviewBulk(body: { ids?: unknown }): Promise<{ ok: boolean; error?: string; status?: number; approved?: string[]; skipped?: string[] }> {
+  if (!Array.isArray(body.ids) || !body.ids.length) return { ok: false, error: "no_ids", status: 400 };
+  if (body.ids.length > 500) return { ok: false, error: "too_many_ids", status: 400 };
+  const ids = [...new Set(body.ids.map((x) => String(x || "").trim()))].filter((id) => /^[A-Za-z0-9_-]{3,64}$/.test(id));
+  const cache = (await loadItemsRaw()) as unknown as { raw?: AnyItem[]; items: AnyItem[] };
+  const byId = new Map<string, AnyItem>();
+  for (const it of cache.raw || cache.items) if (it?.id && !byId.has(it.id)) byId.set(it.id, it);
+  const edits = await readOwnerEditState().catch(() => ({ ids: {} as Record<string, { title?: string }> }));
+  const approved: string[] = [];
+  const skipped: string[] = [];
+  for (const id of ids) {
+    const it = byId.get(id);
+    if (!it || approvalBlock(it, String(edits.ids[id]?.title || it.title || ""), "")) skipped.push(id);
+    else approved.push(id);
+  }
+  if (!approved.length) return { ok: true, approved, skipped };
+  try {
+    const hideIds = Object.keys((await unhideOwnerHiddenMany(approved)).ids);
+    const unhideIds = Object.keys((await setUnhiddenMany(approved)).ids);
+    applyUnhidden(unhideIds, hideIds);
+    const state = await readReviewState(true);
+    const now = Date.now();
+    for (const id of approved) {
+      state.checked[`det:${id}`] = now;
+      state.decisions = recordDecision(state.decisions, id, "show", { title: String(edits.ids[id]?.title || byId.get(id)?.title || ""), now });
+    }
+    await writeReviewState(state);
+    return { ok: true, approved, skipped };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "kv_error", status: 503 };
+  }
+}
+
+/**
  * Tayangkan ("show") / Tetap tahan ("keep"; "hide" = same) from "Perlu dicek". The decision is
  * durable (owner-decisions.js): "show" = Unhide + no owner hide, so automatic checks never hide it
  * again; "keep" = owner hide, so a later clean title does not release it. Both are also written to
@@ -238,14 +289,10 @@ export async function decideDetectorReview(body: { id?: unknown; decision?: unkn
   if (!it) return { ok: false, error: "not_found", status: 404 };
   const edits = await readOwnerEditState().catch(() => ({ ids: {} as Record<string, { title?: string }> }));
   const title = String(edits.ids[id]?.title || it.title || "");
-  if (show && (minorContentReason(title) === "minor" || isLockedMinor(it as never))) return { ok: false, error: "locked_minor", status: 403 };
   const proof = String(body.proof ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
-  if (show && isReviewPendingItem(it)) {
-    const strict = strictPendingReason(id, [title, String(it.title || "")], String((it as { category?: unknown }).category || ""));
-    if (strict && proof.length < 10) return { ok: false, error: "proof_required", status: 400 };
-  }
-  if (show && it.hidden === true && it.hidden_reason === HOLD_REASON && !canPublishTitle(title, hardOk)) {
-    return { ok: false, error: "title_needs_rename", status: 409 };
+  if (show) {
+    const block = approvalBlock(it, title, proof);
+    if (block) return { ok: false, ...block };
   }
   try {
     let hideIds: string[];

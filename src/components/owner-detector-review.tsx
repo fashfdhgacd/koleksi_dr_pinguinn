@@ -42,6 +42,7 @@ function errText(e?: string): string {
   if (e === "locked_minor") return "Video ini terkunci (minor), tidak bisa ditayangkan.";
   if (e === "proof_required") return "Tulis bukti dulu (min. 10 huruf) bahwa semua pemeran 18+.";
   if (e === "title_needs_rename") return "Judul masih kena cek. Ganti judulnya dulu, lalu Simpan judul.";
+  if (e === "review_pending_needs_proof") return "Video ini sensitif: tulis bukti 18+ dulu.";
   return e || "Gagal.";
 }
 
@@ -109,6 +110,23 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
     await load();
   };
 
+  // "Tayangkan semua": one tap for every non-sensitive waiting video (strict ones need a proof note).
+  const approveAll = async (ids: string[]) => {
+    if (!ids.length || !window.confirm(`Tayangkan ${ids.length} video sekaligus? Video yang perlu bukti 18+ tidak ikut.`)) return;
+    setBusy("all");
+    setErr("");
+    const d = await post<{ approved?: string[]; skipped?: string[] }>(secret, { action: "detector-review-approve-all", ids });
+    setBusy("");
+    if (!d.ok) {
+      setErr(errText(d.error));
+      return;
+    }
+    const done = new Set(d.approved || []);
+    setRows((rs) => (rs || []).map((x) => (done.has(x.id) ? { ...x, group: "approved", decidedAt: Date.now(), live: true } : x)));
+    if (d.skipped?.length) setErr(`${d.skipped.length} video tidak ikut (perlu bukti atau terkunci).`);
+    void load();
+  };
+
   const pending = (rows || []).filter((r) => r.group === "pending");
   const approved = (rows || []).filter((r) => r.group === "approved");
   const held = (rows || []).filter((r) => r.group === "held");
@@ -136,7 +154,19 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold text-zinc-100">Perlu dicek ({pending.length})</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-zinc-100">Perlu dicek ({pending.length})</h2>
+        {pending.some((r) => !r.strict) ? (
+          <button
+            type="button"
+            disabled={busy !== ""}
+            onClick={() => void approveAll(pending.filter((r) => !r.strict).map((r) => r.id))}
+            className={`${btn} bg-[#2dd4bf] font-medium text-zinc-950`}
+          >
+            Tayangkan semua ({pending.filter((r) => !r.strict).length})
+          </button>
+        ) : null}
+      </div>
       {err ? <p role="alert" className="text-[13px] text-red-300">{err}</p> : null}
       {pending.map((r) => (
         <div key={r.id} className="flex flex-col gap-3 rounded-lg border border-amber-400/15 bg-[#0c0e0f] p-3 sm:flex-row">
@@ -147,6 +177,7 @@ export function DetectorReviewSection({ secret, onCount }: { secret: string; onC
             <p className="break-words font-medium leading-snug text-zinc-100">{r.title}</p>
             {r.translation ? <p className="text-[12px] text-zinc-500">🇮🇩 {r.translation}</p> : null}
             {r.trigger ? <p className="mt-1 text-[13px] text-amber-300">Kena: {r.trigger}</p> : null}
+            {r.strict ? <p className="text-[12px] text-red-300">Sensitif: perlu bukti 18+ sebelum tayang.</p> : null}
             <form
               className="mt-2 flex gap-1.5"
               onSubmit={(e) => {
