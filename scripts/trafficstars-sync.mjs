@@ -49,7 +49,8 @@ const auth = await fetchJson(
   },
   "auth/token",
 );
-if (!auth?.access_token) throw new Error("auth/token: tidak ada access_token (API key salah/kedaluwarsa?)");
+if (!auth?.access_token)
+  throw new Error("auth/token: tidak ada access_token (API key salah/kedaluwarsa?)");
 
 const now = new Date();
 const to = ymd(now);
@@ -59,7 +60,11 @@ const report = await fetchJson(
   { headers: { Authorization: `Bearer ${auth.access_token}`, Accept: "application/json" } },
   "publisher/custom/report/by-day",
 );
-const rows = Array.isArray(report?.response) ? report.response : Array.isArray(report) ? report : null;
+const rows = Array.isArray(report?.response)
+  ? report.response
+  : Array.isArray(report)
+    ? report
+    : null;
 if (!rows) throw new Error(`report: format tak dikenal: ${JSON.stringify(report).slice(0, 300)}`);
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
@@ -86,7 +91,16 @@ let old = null;
 try {
   old = JSON.parse(await readFile(FILE, "utf8"));
 } catch {}
-if (old && JSON.stringify(old.days) === JSON.stringify(days)) {
+// Per spot per hari (UTC): by-spot dengan date_from = date_to per hari (filter spot_id[] di by-day
+// tidak dipakai API), jadi 14 panggilan. Disimpan di file yang sama sebagai "spotNames" + "spots"
+// (field tambahan; "days" tetap formatnya, pembaca lama tidak terpengaruh).
+const { names, spotDays } = await fetchSpots();
+const spotNames = { ...(old?.spotNames || {}), ...names };
+if (
+  old &&
+  JSON.stringify(old.days) === JSON.stringify(days) &&
+  JSON.stringify(old.spots || null) === JSON.stringify(spotDays)
+) {
   console.log(`Tidak ada perubahan (${from}..${to}, ${days.length} hari).`);
   process.exit(0);
 }
@@ -97,7 +111,7 @@ const out = {
   source: old?.source || "TrafficStars publisher report (UTC days)",
   days,
 };
-// Format sama dengan file yang ada: satu hari per baris.
+// Format sama dengan file yang ada: satu hari per baris (juga untuk "spots").
 const body =
   "{\n" +
   `  "updatedAt": ${JSON.stringify(out.updatedAt)},\n` +
@@ -110,7 +124,41 @@ const body =
         `    { "date": ${JSON.stringify(d.date)}, "impressions": ${d.impressions}, "clicks": ${d.clicks}, "earnings": ${d.earnings} }`,
     )
     .join(",\n") +
+  "\n  ],\n" +
+  `  "spotNames": ${JSON.stringify(spotNames)},\n` +
+  '  "spots": [\n' +
+  spotDays.map((d) => `    ${JSON.stringify(d)}`).join(",\n") +
   "\n  ]\n}\n";
 await writeFile(FILE, body);
 const sum = days.reduce((s, d) => s + d.earnings, 0);
-console.log(`Ditulis ${FILE}: ${from}..${to}, ${days.length} hari, total $${sum.toFixed(2)}.`);
+console.log(
+  `Ditulis ${FILE}: ${from}..${to}, ${days.length} hari, ${Object.keys(names).length} spot, total $${sum.toFixed(2)}.`,
+);
+
+async function fetchSpots() {
+  const names = {};
+  const spotDays = [];
+  for (const date of days.map((d) => d.date)) {
+    const res = await fetchJson(
+      `${API}/v1.1/publisher/custom/report/by-spot?${new URLSearchParams({ date_from: date, date_to: date })}`,
+      { headers: { Authorization: `Bearer ${auth.access_token}`, Accept: "application/json" } },
+      `publisher/custom/report/by-spot ${date}`,
+    );
+    const list = Array.isArray(res?.response) ? res.response : Array.isArray(res) ? res : null;
+    if (!list)
+      throw new Error(`by-spot ${date}: format tak dikenal: ${JSON.stringify(res).slice(0, 300)}`);
+    const spots = [];
+    for (const r of list) {
+      const id = String(r.spot_id ?? "").trim();
+      if (!id) continue;
+      if (r.spot_name) names[id] = String(r.spot_name).replace(/^(koleksidrpinguin\.com\s+)+/i, "");
+      const imp = Math.round(num(r.impressions));
+      const clk = Math.round(num(r.clicks));
+      const earn = Math.round(num(r.amount ?? r.earnings ?? r.revenue) * 100) / 100;
+      if (imp || clk || earn) spots.push({ id, impressions: imp, clicks: clk, earnings: earn });
+    }
+    spots.sort((a, b) => b.impressions - a.impressions || a.id.localeCompare(b.id));
+    spotDays.push({ date, spots });
+  }
+  return { names, spotDays };
+}
