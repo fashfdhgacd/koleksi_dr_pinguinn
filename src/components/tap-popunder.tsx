@@ -67,7 +67,7 @@ export function PopTapLayer({
           return;
         }
         sendPlayerLog(videoId, lh, "pop_fire");
-        const r = firePop(videoId, max);
+        const r = firePop(videoId, max, lh);
         if (r === "ok") {
           sendPlayerLog(videoId, lh, "pop_ok");
           setArmed(false);
