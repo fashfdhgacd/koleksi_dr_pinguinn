@@ -96,8 +96,9 @@ export function withoutDomainSuffix(raw?: string | null): string {
  */
 function videoTextLabel(category?: string | null): string {
   const key = (category || "").trim().toLowerCase();
-  if (!key || key === "bokep" || key === "lainnya" || /pinguin/i.test(categoryLabel(category))) return "Indo";
+  // Videy first: its label is "drpinguin videy", which the /pinguin/ brand check would turn into "Indo".
   if (key === "videy") return "Videy";
+  if (!key || key === "bokep" || key === "lainnya" || /pinguin/i.test(categoryLabel(category))) return "Indo";
   return safeSeoLabel(category);
 }
 

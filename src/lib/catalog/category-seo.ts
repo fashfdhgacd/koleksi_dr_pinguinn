@@ -120,7 +120,9 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     h1: "Bokep Malaysia & Melayu Viral",
     intro: "Video Malaysia dan melayu yang lagi viral, termasuk rekaman bertudung dan amatir dari negeri jiran. Bahasanya dekat dengan bahasa kita, jadi tetap enak ditonton.",
     title: `Bokep Malaysia Viral Terbaru ${YEAR} - Video Melayu & Tudung | ${TITLE_SUFFIX}`,
-    description: `Bokep Malaysia viral terbaru ${YEAR}: video melayu, bertudung dan amatir dari negeri jiran yang lagi ramai, langsung putar di HP.`,
+    // Description only (title/h1 FROZEN). CTR experiment 2026-11-02: GSC queries "bokep cewek malaysia",
+    // "bokep malay rempit", "tudung mesum" (pos 8-14, CTR <5%); all three exist in this category's titles.
+    description: `Bokep Malaysia viral terbaru ${YEAR}: cewek Malaysia dan awek melayu, video tudung mesum sampai awek rempit, amatir asli negeri jiran. Langsung putar di HP.`,
   },
   chindo: {
     h1: "Bokep Chindo Viral Terbaru",
@@ -288,7 +290,9 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     h1: "Video Viral Videy Terbaru",
     intro: "Kumpulan link videy viral dan bokep videy indo terbaru, langsung diputar di sini tanpa buka link satu-satu. Selalu nambah tiap ada video videy baru yang lagi rame.",
     title: `Bokep Videy Indo Viral Terbaru ${YEAR} - Link Videy | ${TITLE_SUFFIX}`,
-    description: `Video viral videy terbaru ${YEAR}: kumpulan link videy dan bokep videy indo yang lagi rame, bisa langsung ditonton di HP tanpa buka link satu-satu.`,
+    // CTR experiment 2026-11-02: GSC "bokep videy indo" / "videy indo bokep" (pos 10-15). Title already
+    // leads with the query, so only the snippet changes: query wording first, then what the page does.
+    description: `Bokep videy indo terbaru ${YEAR}: video videy viral yang langsung diputar di sini, tanpa buka link videy satu-satu. Nambah tiap ada video videy baru.`,
   },
   bokep: {
     h1: "Koleksi Dr. Pinguin Bokep",

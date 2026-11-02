@@ -1,10 +1,16 @@
-// Title text helpers shared by title-tags.ts and the AI Indo category (dependency-free so the
-// node --test runner can load them).
+// Title text helpers shared by title-tags.ts and the AI Indo category (plain .js imports only so
+// the node --test runner can load them).
 import { normCategoryText } from "./title-category.js";
+import { uploadModeration } from "./moderation.js";
+import { titleHold } from "../bot/title-hold.js";
 
-/** Child / school wording: blocks every age-flavoured tag (teen-18, college-18). */
+/**
+ * Child / school wording: blocks every age-flavoured tag (teen-18, college-18). Tags only; it never
+ * hides a video. Bare "anak" is not here (owner rule 2026-11-02: "anak kos", "anak tiri" are adult
+ * genre words); "anak sd/smp/sma/kecil" still hit through the grade words / "bocah".
+ */
 export const MINOR_WORDS =
-  /\b(?:sd|smp|sma|smk|mts|bocil|bocah|anak|pelajar|sekolah|siswi|siswa|seragam sekolah|abg|remaja|di ?bawah umur|loli|lolita|underage|child|kid|kids|schoolgirl)\b/;
+  /\b(?:sd|smp|sma|smk|mts|bocil|bocah|anak kecil|pelajar|sekolah|siswi|siswa|seragam sekolah|abg|remaja|di ?bawah umur|loli|lolita|underage|child|kid|kids|schoolgirl)\b/;
 
 /** Auto-generated / branding text that says nothing about the video (bot and import templates). */
 export function stripTemplate(title: string): string {
@@ -18,17 +24,14 @@ export function stripTemplate(title: string): string {
 /** Indonesian wording in a title (template/brand text removed): "indo", "indonesia", "bokep indo". */
 const INDO_RE = /\b(?:indo|indonesia|indonesian)\b/;
 /**
- * Kept off the AI Indo landing page out of caution (they stay in AI+): wording that can imply a young
- * character ("your mom ...", "budak" = kid, classroom, private tutoring, nephew).
- */
-const AI_INDO_SKIP =
-  /\b(?:mamahmu|mamamu|mamahku|ibumu|mamah kamu|mama kamu|ibu kamu|budak|di kelas|les privat|keponakan)\b/;
-
-/**
  * AI Indo (2026-11-02): an AI+ video whose own title says it is Indonesian. Additive only (the caller
- * adds "ai-indo" next to "ai-plus"); never for a title with child/school wording.
+ * adds "ai-indo" next to "ai-plus"). Owner rule 2026-11-02: AI titles are often bad translations of
+ * adult content, so one translated word ("budak", "di kelas", "mamahmu", "keponakan") is not a
+ * reason to leave a video out. Same judgement as uploads (catalog/moderation.js): left out only when
+ * that check would hide/hold it (explicit minor signal, school grade, age unclear such as bare "ABG").
  */
 export function isIndoAiTitle(title: string | undefined): boolean {
   const t = normCategoryText(stripTemplate(title || ""));
-  return Boolean(t) && INDO_RE.test(t) && !MINOR_WORDS.test(t) && !AI_INDO_SKIP.test(t);
+  if (!t || !INDO_RE.test(t)) return false;
+  return !uploadModeration(title || "").hide && !titleHold(title || "");
 }

@@ -14,9 +14,8 @@ import { postNewVideosToChannelReport, channelReportLine } from "@/lib/bot/chann
 import { pushNewVideos, pushReportLine } from "@/lib/web-push";
 import { indexNowAfterBatch } from "@/lib/bot/indexnow";
 import { mergeLatestPosters, isHttpPoster } from "@/lib/bot/posters.js";
-import { lockedMinorReason, schoolReason, youthCampusReason } from "@/lib/catalog/minor-lock.js";
-import { reviewPriority as detectorPriority } from "@/lib/catalog/minor-detector.js";
-import { ownerChecked18 } from "@/lib/catalog/minor-context.js";
+import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import { uploadModeration } from "@/lib/catalog/moderation.js";
 import { uploadRejectReason, uploadWarnReason } from "@/lib/bot/title-guard.js";
 import { HOLD_REASON, explainTerm, holdReplyLines, titleHold, uploadAction } from "@/lib/bot/title-hold.js";
 import { isGenericTitle } from "@/lib/catalog/generic-title.js";
@@ -488,14 +487,15 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
       : recordBase;
     // School/minor-themed titles are stored but flagged hidden (the catalog never shows them).
     const minorText = `${baseTitle} ${String(video.title || parsedMsg.title || "")} ${String(meta.title || "")}`;
-    // minor-detector.js: "block" is already locked via lockedMinorReason; "review" is held hidden
-    // until the owner checks it (Unhide in /pemilik = Tayangkan). Additive to the rules above.
-    const hiddenReason =
-      schoolReason(minorText) ||
-      lockedMinorReason(minorText) ||
-      youthCampusReason(minorText) ||
-      (detectorPriority("", minorText) === "review" && !ownerChecked18(minorText) ? "detector-review" : "");
-    const flagged = autoTitled.has(i) ? { ...baseRecord, titleAuto: true } : baseRecord;
+    // Owner rules 2026-11-02 (catalog/moderation.js): explicit minor signals stay hidden/locked;
+    // one ambiguous/translated word is not proof; a title signal that leaves the performers' age
+    // unconfirmed is REVIEW_PENDING (withheld, data kept, /pemilik "Perlu dicek" with the reason).
+    const typedTitle = String(video.title || parsedMsg.title || "");
+    const mod = uploadModeration(minorText);
+    const hiddenReason = mod.hide;
+    const reviewReason = mod.review;
+    const flaggedBase = autoTitled.has(i) ? { ...baseRecord, titleAuto: true } : baseRecord;
+    const flagged = reviewReason ? { ...flaggedBase, review_reason: reviewReason } : flaggedBase;
     let record = hiddenReason
       ? { ...flagged, hidden: true, hidden_reason: hiddenReason }
       : deadVidey.has(i)
@@ -503,7 +503,6 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
         : flagged;
     // Upload-time title check (title-hold.js, NEW uploads only): school/minor-implying words hold the
     // upload as an editable hidden draft; a resend of a held draft with a clean title publishes it.
-    const typedTitle = String(video.title || parsedMsg.title || "");
     const hold = titleHold(baseTitle, hardOk) || titleHold(typedTitle, hardOk) || titleHold(String(meta.title || ""), hardOk);
     if (catalogRaw === null) catalogRaw = await rawCatalogItems();
     const act = uploadAction(catalogRaw, record, title, (t) => !hold && hardOk(t));
@@ -575,6 +574,9 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
                 ? `🕒 ${it.record.id} — ${it.title} · disembunyikan: video mati`
                 : `🕒 ${it.record.id} — ${it.title} (antre, tayang saat flush berikutnya)`,
             );
+            if (it.record.review_reason) {
+              lines.push(`🔎 Belum tayang (REVIEW_PENDING), cek di /pemilik → Perlu dicek: ${it.record.review_reason}.`);
+            }
             if (it.warn && !it.record.hidden) {
               lines.push(
                 `⚠️ Masuk, tapi judulnya nyebut "${it.warn}". Cek dulu ya, kalau kesannya di bawah umur, nggak sadar, atau dipaksa, mending disembunyiin.`,
@@ -638,8 +640,11 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
             hidden: Boolean(it.record.hidden),
           });
           lines.push(
-            `✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}${it.record.hidden_reason === DEAD_VIDEY_REASON ? " · disembunyikan: video mati" : it.record.hidden_reason === "detector-review" ? " · 🔎 ditahan, perlu dicek di /pemilik (konteks sekolah/keluarga + umur)" : it.record.hidden ? " · 🙈 disembunyikan (judul menyiratkan minor/sekolah)" : ""}`,
+            `✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}${it.record.hidden_reason === DEAD_VIDEY_REASON ? " · disembunyikan: video mati" : it.record.hidden_reason === "detector-review" ? " · 🔎 ditahan, perlu dicek di /pemilik (konteks sekolah/keluarga + umur)" : String(it.record.hidden_reason || "").startsWith("review-pending") ? " · 🔎 ditahan (REVIEW_PENDING)" : it.record.hidden ? " · 🙈 disembunyikan (judul menyiratkan minor/sekolah)" : ""}`,
           );
+          if (it.record.review_reason) {
+            lines.push(`🔎 Belum tayang (REVIEW_PENDING), cek di /pemilik → Perlu dicek: ${it.record.review_reason}. Setujui hanya dengan bukti semua pemeran 18+ saat produksi.`);
+          }
           if (it.warn && !it.record.hidden) {
             lines.push(
               `⚠️ Masuk, tapi judulnya nyebut "${it.warn}". Cek dulu ya, kalau kesannya di bawah umur, nggak sadar, atau dipaksa, mending disembunyiin.`,

@@ -35,7 +35,7 @@ import itemOverrides from "./overrides.json";
 import { softenMinorTerms } from "./minor-title-guard";
 import { HIDDEN_IDS as HIDDEN_ID_REASONS, RESTORED_TITLES, minorContentReason } from "./hidden-ids.js";
 import { isLockedMinorId, lockedMinorReason, schoolReason } from "./minor-lock.js";
-import { ownerChecked18 } from "./minor-context.js";
+import { reviewPendingReason } from "./review-pending.js";
 import postersMap from "./posters.json";
 import javPosters from "./jav-posters.json";
 // Telegram bot uploads (IndoAV/Streamtape/Putarin) land in these feeds; bundle so every batch stays live.
@@ -268,20 +268,36 @@ function hasCleanEdit(id: string): boolean {
 }
 
 /**
- * Owner rule 2026-10-26: an item held ONLY by the review layer (bot flag "detector-review") whose
- * title carries an adult age marker (18yo/18+, ownerChecked18) is published. Locks, HIDDEN_IDS and
- * every other hidden reason still apply (checked after this by the normal path).
+ * Owner rule 2026-10-26 used to publish a "detector-review" hold whose title said 18yo/18+.
+ * Owner decision 2026-11-02 (REVIEW_PENDING): a title's own age claim is not verification, so such
+ * a hold stays withheld until the owner approves it in /pemilik. Kept as a named no-op for callers.
  */
-function adultReviewOnly(it: RawItem): boolean {
-  const rec = it as { hidden?: unknown; hidden_reason?: unknown };
-  if (rec.hidden !== true || rec.hidden_reason !== "detector-review") return false;
-  const title = String(overrideTitle(it.id) || RESTORED[it.id] || it.title || "");
-  return ownerChecked18(title) && !lockedReasonMemo(title) && !minorReasonMemo(title);
+function adultReviewOnly(_it: RawItem): boolean {
+  return false;
+}
+
+const pendingMemo = new Map<string, string>();
+/** REVIEW_PENDING (review-pending.js): age unconfirmed, withheld until the owner approves (Unhide). */
+function reviewPendingMemo(it: RawItem): string {
+  const titles = [it.title, overrideTitle(it.id), RESTORED[it.id], EDITS[it.id]?.title, AUTO_META[it.id]?.title]
+    .map((t) => String(t || ""))
+    .filter(Boolean);
+  const key = `${it.id}\u0000${titles.join("\u0000")}`;
+  let r = pendingMemo.get(key);
+  if (r === undefined) {
+    r = reviewPendingReason(it.id, titles);
+    if (pendingMemo.size > MEMO_MAX) pendingMemo.clear();
+    pendingMemo.set(key, r);
+  }
+  return r;
 }
 
 /** Why an item is hidden by default ("" = not hidden). Ignores owner Unhide overrides. */
 export function hiddenReasonRaw(it: RawItem): string {
   if (AUTO_META[it.id]?.hidden) return String(AUTO_META[it.id].hidden);
+  // An owner title edit never clears REVIEW_PENDING (age is not a title question); approval does.
+  const pending = reviewPendingMemo(it);
+  if (pending) return pending;
   if (hasCleanEdit(it.id)) {
     const rec = it as { hidden?: unknown; hidden_reason?: unknown };
     if (rec.hidden === true && !adultReviewOnly(it)) return String(rec.hidden_reason || "bot-flag");

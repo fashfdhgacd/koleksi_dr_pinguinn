@@ -1,4 +1,4 @@
-import { curatedDescription } from "@/lib/catalog/video-descriptions";
+import { curatedDescription, curatedSeoTitle } from "@/lib/catalog/video-descriptions";
 import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { queryCatalog } from "@/lib/catalog/service";
@@ -87,7 +87,10 @@ export const Route = createFileRoute("/watch/$id")({
     const item = ok ? loaderData.item : null;
     // Placeholder / non-Latin titles get a search-friendly generated title (head only; H1 unchanged).
     const gen = item ? generatedVideoSeo(item) : null;
-    const title = gen
+    const curatedTitle = item ? curatedSeoTitle(item.id) : "";
+    const title = curatedTitle
+      ? curatedTitle
+      : gen
       ? gen.title
       : item
         ? videoSeoTitle(item.title, item.category)
