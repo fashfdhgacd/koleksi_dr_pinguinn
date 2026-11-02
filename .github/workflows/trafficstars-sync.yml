@@ -1,0 +1,48 @@
+# Sinkron statistik TrafficStars 2x sehari (07:30 & 19:30 WIB), gratis di GitHub Actions, tanpa Grok Bot.
+# scripts/trafficstars-sync.mjs ambil 14 hari UTC terakhir (impressions, clicks, earnings) lewat REST API
+# TrafficStars dan tulis public/data/trafficstars.json. Commit cuma kalau angkanya berubah.
+# Butuh secret repo TRAFFICSTARS_API_KEY (Settings > Secrets and variables > Actions).
+# Tanpa env Worker baru; tidak ada request ke Cloudflare selain push biasa.
+name: TrafficStars sync
+
+on:
+  schedule:
+    - cron: "30 0 * * *"
+    - cron: "30 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: trafficstars-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Fetch TrafficStars stats
+        env:
+          TRAFFICSTARS_API_KEY: ${{ secrets.TRAFFICSTARS_API_KEY }}
+        run: node scripts/trafficstars-sync.mjs
+
+      - name: Commit (only if changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898299+github-actions[bot]@users.noreply.github.com"
+          git add public/data/trafficstars.json
+          git diff --cached --quiet && { echo "Tidak ada perubahan."; exit 0; }
+          git commit -m "chore: sync TrafficStars stats ($(date -u '+%Y-%m-%d %H:%M') UTC)"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push origin HEAD:main && exit 0
+            sleep 10
+          done
+          exit 1

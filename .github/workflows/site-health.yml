@@ -1,0 +1,37 @@
+# Cek kesehatan situs tiap hari 08:00 WIB (gratis, GitHub Actions; tanpa cron Cloudflare).
+# scripts/site-health.mjs: beranda, /kategori, sitemap (jumlah watch URL >= batas), 10 /watch acak,
+# beberapa /thumb, domain redirect videqsss.icu & videyy.icu harus 301. ~20 GET per hari.
+# Kalau ada masalah job gagal -> GitHub kirim email ke pemilik. Tanpa secret/env baru, tanpa commit.
+name: Site health
+
+on:
+  schedule:
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+    inputs:
+      min_watch_urls:
+        description: "Batas bawah jumlah /watch di sitemap"
+        default: "9000"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-health
+  cancel-in-progress: true
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check live site
+        env:
+          MIN_WATCH_URLS: ${{ github.event.inputs.min_watch_urls || '9000' }}
+        run: node scripts/site-health.mjs
