@@ -1,4 +1,4 @@
-# IndexNow tiap 6 jam (07:45, 13:45, 19:45, 01:45 WIB; yang 01:45 = 45 menit sesudah Daily video sync).
+# IndexNow tiap 6 jam (07:45, 13:45, 19:45, 01:45 WIB) + otomatis ~8 menit sesudah Daily video sync selesai.
 # scripts/indexnow-sync.mjs baca sitemap LIVE, kirim cuma URL baru/berubah/hilang ke api.indexnow.org
 # (Bing, Yandex, Seznam, Naver; DuckDuckGo pakai index Bing), lalu commit data/indexnow-urls.txt.
 # Gratis di GitHub Actions: tanpa secret, tanpa env Worker, tanpa KV. Commit pakai [skip ci] supaya
@@ -8,6 +8,10 @@ name: IndexNow sync
 on:
   schedule:
     - cron: "45 0,6,12,18 * * *"
+  # Right after the daily upload sync, so new videos reach Bing/Yandex the same night.
+  workflow_run:
+    workflows: ["Daily video sync"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       all:
@@ -24,9 +28,16 @@ concurrency:
 
 jobs:
   sync:
+    # workflow_run: only after a successful sync.
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
+      # The sync commit triggers a Workers Builds deploy; wait for it so the live sitemap has the new videos.
+      - name: Wait for the deploy of the synced data
+        if: github.event_name == 'workflow_run'
+        run: sleep 480
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
