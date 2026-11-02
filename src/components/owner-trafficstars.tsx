@@ -3,11 +3,23 @@
 import { useEffect, useState } from "react";
 
 type TsDay = { date: string; impressions: number; clicks?: number; earnings: number };
-type TsData = { updatedAt?: string; currency?: string; days?: TsDay[]; unpaid?: number };
+type TsData = {
+  updatedAt?: string;
+  currency?: string;
+  days?: TsDay[];
+  unpaid?: number;
+  /** Per spot per UTC day (scripts/trafficstars-sync.mjs); optional. */
+  spotNames?: Record<string, string>;
+  spots?: { date: string; spots?: TsSpot[] }[];
+};
+type TsSpot = { id: string; impressions: number; clicks?: number; earnings: number };
 
 const nf = new Intl.NumberFormat("id-ID");
 const usd = (n: number) =>
-  "$" + new Intl.NumberFormat("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0);
+  "$" +
+  new Intl.NumberFormat("id-ID", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(
+    n || 0,
+  );
 
 function utcDay(offset: number): string {
   const d = new Date(Date.now() - offset * 86400000);
@@ -39,7 +51,6 @@ function shortDate(date: string): string {
 export function OwnerTrafficStars({ reloadKey }: { reloadKey?: number }) {
   const [data, setData] = useState<TsData | null>(null);
   const [failed, setFailed] = useState(false);
-
   useEffect(() => {
     let alive = true;
     fetch("/data/trafficstars.json", { cache: "no-cache" })
@@ -103,10 +114,13 @@ export function OwnerTrafficStars({ reloadKey }: { reloadKey?: number }) {
                     />
                   </span>
                   <span className="w-14 shrink-0 text-right font-medium">{usd(d.earnings)}</span>
-                  <span className="w-20 shrink-0 text-right text-zinc-400">{nf.format(d.impressions || 0)}</span>
+                  <span className="w-20 shrink-0 text-right text-zinc-400">
+                    {nf.format(d.impressions || 0)}
+                  </span>
                 </li>
               ))}
           </ul>
+          <SpotTable data={data} yesterday={utcDay(1)} />
           {typeof data.unpaid === "number" ? (
             <p className="mt-3 text-[13px] text-zinc-400">Belum dibayar: {usd(data.unpaid)}</p>
           ) : null}
@@ -122,8 +136,81 @@ function Stat({ label, earn, imp }: { label: string; earn?: number; imp?: number
   return (
     <div className="rounded-md border border-white/[0.06] bg-[#16161a] px-3 py-2">
       <p className="text-[12px] text-zinc-400">{label}</p>
-      <p className="mt-0.5 text-lg font-semibold text-[#2dd4bf]">{earn == null ? "-" : usd(earn)}</p>
+      <p className="mt-0.5 text-lg font-semibold text-[#2dd4bf]">
+        {earn == null ? "-" : usd(earn)}
+      </p>
       <p className="text-[12px] text-zinc-400">{imp == null ? "-" : `${nf.format(imp)} impresi`}</p>
+    </div>
+  );
+}
+
+type SpotRow = {
+  id: string;
+  name: string;
+  yImp: number;
+  imp: number;
+  clicks: number;
+  earn: number;
+};
+
+/** Per spot: yesterday's impressions and the last 7 UTC days. A spot at 0 yesterday stopped serving. */
+function SpotTable({ data, yesterday }: { data: TsData; yesterday: string }) {
+  const days = (Array.isArray(data.spots) ? data.spots : [])
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-7);
+  if (!days.length) return null;
+  const rows = new Map<string, SpotRow>();
+  for (const d of days) {
+    for (const s of d.spots ?? []) {
+      const r = rows.get(s.id) ?? {
+        id: s.id,
+        name: data.spotNames?.[s.id] || s.id,
+        yImp: 0,
+        imp: 0,
+        clicks: 0,
+        earn: 0,
+      };
+      r.imp += s.impressions || 0;
+      r.clicks += s.clicks || 0;
+      r.earn += s.earnings || 0;
+      if (d.date === yesterday) r.yImp += s.impressions || 0;
+      rows.set(s.id, r);
+    }
+  }
+  const list = [...rows.values()].sort((a, b) => b.earn - a.earn || b.imp - a.imp);
+  if (!list.length) return null;
+  return (
+    <div className="mt-4 overflow-x-auto">
+      <p className="mb-1.5 text-[12px] text-zinc-400">
+        Per spot ({days.length} hari terakhir, UTC)
+      </p>
+      <table className="w-full text-[12px]">
+        <thead className="text-zinc-400">
+          <tr>
+            <th className="py-1 pr-2 text-left font-normal">Spot</th>
+            <th className="px-2 py-1 text-right font-normal">Kemarin</th>
+            <th className="px-2 py-1 text-right font-normal">Impresi</th>
+            <th className="px-2 py-1 text-right font-normal">Klik</th>
+            <th className="py-1 pl-2 text-right font-normal">Pendapatan</th>
+          </tr>
+        </thead>
+        <tbody>
+          {list.map((r) => (
+            <tr key={r.id} className="border-t border-white/[0.05]">
+              <td className="max-w-[12rem] truncate py-1 pr-2" title={`${r.name} (${r.id})`}>
+                {r.name}
+              </td>
+              <td className={`px-2 py-1 text-right ${r.yImp ? "" : "text-rose-400"}`}>
+                {nf.format(r.yImp)}
+              </td>
+              <td className="px-2 py-1 text-right text-zinc-300">{nf.format(r.imp)}</td>
+              <td className="px-2 py-1 text-right text-zinc-300">{nf.format(r.clicks)}</td>
+              <td className="py-1 pl-2 text-right font-medium">{usd(r.earn)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
