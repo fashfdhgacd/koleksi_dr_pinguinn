@@ -412,10 +412,51 @@ function videoCategories(cache: CatalogCache, item: RawItem): CategoryInfo[] {
   return out;
 }
 
+/** "Tonton juga": at least half the grid comes from the watched video's own category. */
+const RELATED_SAME_CATEGORY_SHARE = 0.5;
+/** Mixed/hidden buckets where "same category" says nothing about the video. */
+const RELATED_NO_CATEGORY_MATCH = new Set(["lainnya", "bokep", ...NOINDEX_CATEGORY_SLUGS]);
+
+/**
+ * Same-category picks for "Tonton juga" (in-memory catalog only, no writes). IndoAV members come
+ * first, as in mixIndoHeavy, so the category share never pushes IndoAV out of the grid.
+ */
+function sameCategoryPicks(cache: CatalogCache, id: string, k: number, seed: number): RawItem[] {
+  const self = cache.byId.get(id);
+  const slug = self ? slugOf(self) : "";
+  if (!slug || RELATED_NO_CATEGORY_MATCH.has(slug) || !cache.bySlug.get(slug)?.length) return [];
+  const members = categoryPool(cache, slug);
+  const indo = members.filter((x) => isIndoAv(x));
+  const rest = members.filter((x) => !isIndoAv(x));
+  const picked = pickShuffled(indo, seed + 101, k, id);
+  if (picked.length < k) picked.push(...pickShuffled(rest, seed + 103, k - picked.length, id));
+  return picked;
+}
+
 export async function listRelated(id: string, limit = 12, _signal?: AbortSignal): Promise<PagedVideos> {
-  const { items, posters, videyNo } = await loadItems();
+  const cache = await loadItems();
+  const { items, posters, videyNo } = cache;
   const seed = slotIndex(hashId(id) % 997);
-  const pool = mixIndoHeavy(items, id, limit, seed);
+  const base = mixIndoHeavy(items, id, limit, seed);
+  const same = sameCategoryPicks(cache, id, Math.ceil(limit * RELATED_SAME_CATEGORY_SHARE), seed);
+  let pool = base;
+  if (same.length) {
+    // IndoAV is never hurt: the grid keeps at least as many IndoAV videos as the plain mix had.
+    // Where the category itself has few IndoAV videos (JAV, Videy, ...), non-IndoAV category picks
+    // give their slot back to IndoAV, so those pages get fewer than half from the category.
+    const baseIndo = base.filter((x) => isIndoAv(x)).length;
+    const seen = new Set(same.map((x) => x.id));
+    const fill = mixIndoHeavy(items, id, limit + same.length, seed).filter((x) => !seen.has(x.id));
+    const picked = [...same, ...fill.slice(0, limit - same.length)];
+    const spareIndo = fill.slice(limit - same.length).filter((x) => isIndoAv(x));
+    let indoNow = picked.filter((x) => isIndoAv(x)).length;
+    for (let i = same.length - 1; i >= 0 && indoNow < baseIndo && spareIndo.length; i--) {
+      if (isIndoAv(picked[i]!)) continue;
+      picked[i] = spareIndo.shift()!;
+      indoNow++;
+    }
+    pool = shuffleSlot(picked, seed + 107);
+  }
   return {
     page: 1,
     limit,
