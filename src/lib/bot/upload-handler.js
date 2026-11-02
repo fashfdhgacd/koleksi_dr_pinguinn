@@ -19,6 +19,7 @@ import { uploadModeration } from "@/lib/catalog/moderation.js";
 import { hasJavCode, uploadRejectReason, uploadWarnReason } from "@/lib/bot/title-guard.js";
 import { HOLD_REASON, explainTerm, holdReplyLines, isHeldDraftReason, titleHold, uploadAction } from "@/lib/bot/title-hold.js";
 import { isGenericTitle } from "@/lib/catalog/generic-title.js";
+import { guardGivenCategory } from "@/lib/bot/category-guard.js";
 
 /** Title is clean for the hard checks too (reject list + minor-lock). Used for hold suggestions. */
 /** The word/reason behind an upload moderation hold, for the bot reply. */
@@ -288,6 +289,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   let createdTotal = 0;
   let skippedTotal = 0;
   let failedTotal = 0;
+  let aiGayDropped = 0;
   let rejectedTotal = 0;
   let heldTotal = 0;
   let catalogRaw = null;
@@ -465,7 +467,13 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const title = brandTitle(baseTitle === "Video" ? `Video ${video.id}` : baseTitle);
     // A specific category from the message wins; a generic one ("amatir"/"umum"/"lainnya",
     // e.g. pasted from the source page) only applies when title detection finds nothing better.
-    const given = String(parsedMsg.category || "").toLowerCase().trim();
+    // AI GAY from the message only sticks to a video whose own title is gay (or a one-link upload):
+    // a batch-wide "kategori: ai gay" / #aigay / BoyFriendTV once sent 32 straight videos there.
+    const given = guardGivenCategory(parsedMsg.category, {
+      title: `${String(video.title || "")} ${String(meta.title || "")} ${baseTitle}`,
+      batchSize: queue.length,
+    });
+    if (/^ai[- ]?gay$/.test(String(parsedMsg.category || "").toLowerCase().trim()) && given !== "ai-gay") aiGayDropped += 1;
     const generic = !given || ["amatir", "umum", "lainnya", "bokep"].includes(given);
     const detected = detectCategory(baseTitle);
     const category =
@@ -474,9 +482,9 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
         : video.host === "videy"
         ? "videy"
         : video.host === "putarin" || video.host === "putarin-folder"
-        ? parsedMsg.category || "jav"
+        ? given || "jav"
         : video.host === "streamtape"
-          ? parsedMsg.category || "ai-plus"
+          ? given || "ai-plus"
           : !generic
             ? given
             : detected !== "lainnya"
@@ -741,6 +749,9 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     /* never break uploads */
   }
 
+  if (aiGayDropped) {
+    lines.push(`ℹ️ ${aiGayDropped} video tidak masuk AI GAY (judulnya bukan gay); kategori diambil dari judul.`);
+  }
   const summary = `✅ ${createdTotal} dibuat · ⏭️ ${skippedTotal} skip · ⚠️ ${failedTotal} gagal${queuedTotal ? ` · 🕒 ${queuedTotal} antre` : ""}${heldTotal ? ` · ⛔ ${heldTotal} ditahan (judul perlu diganti)` : ""}${rejectedTotal ? ` · ⛔ ${rejectedTotal} ditolak` : ""}`;
   await tgSendChunks(
     token,
