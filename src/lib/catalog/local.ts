@@ -18,7 +18,7 @@ import { runtime } from "./local-shared";
 import { popularIds, tagOptions, titleTags } from "./title-tags";
 import { parseSearchQuery, scoreSearch, searchHayText } from "./search-rank";
 import { episodeLabel, parseSeries, seriesIndex } from "./series";
-import { isPublicHidden, isVideyNoThumbHidden, loadItems, multiServerOf, pageOf, sortByNewest } from "./local-cache";
+import { catalogSlugs, isPublicHidden, isVideyNoThumbHidden, loadItems, multiServerOf, pageOf, sortByNewest } from "./local-cache";
 import { serverHostOf } from "./multi-server";
 import { aiPlusFrontOrder } from "./ai-plus-order";
 import type { CatalogCache } from "./local-shared";
@@ -404,7 +404,7 @@ function videoCategories(cache: CatalogCache, item: RawItem): CategoryInfo[] {
   // Same tags that put the video into the category pages (buildIndexes), primary first.
   const listed = listedSlugs(cache);
   const out: CategoryInfo[] = [];
-  for (const slug of titleTags(item.title, slugOf(item), tagOptions(item, popularIds(cache.items)))) {
+  for (const slug of catalogSlugs(item, popularIds(cache.items), multiServerOf(cache))) {
     if (out.length >= MAX_WATCH_CATEGORIES) break;
     const cat = listed.has(slug) ? findCategory(slug) : undefined;
     if (cat) out.push({ slug: cat.slug, label: cat.label });
