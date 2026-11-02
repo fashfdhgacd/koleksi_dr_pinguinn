@@ -9,6 +9,7 @@ import cost from "@/lib/owner-cost.json";
 import tsStats from "../../public/data/trafficstars.json";
 import { AD_ZONES } from "@/components/ad-slot";
 import { fmt, ownerToast, wibDateTime } from "@/components/owner-dashboard-shared";
+import { tsDayWindowWib, tsPopunderSummary, type TsJson } from "@/lib/ts-popunder";
 
 export type PlayerLogHost = {
   host: string;
@@ -32,7 +33,7 @@ export type PlayerLogRow = {
   hidden: boolean;
 };
 
-type PopCounts = { fire: number; ok: number; block: number; cardFire?: number; cardOk?: number; cardBlock?: number; preReq?: number; preFill?: number; preDone?: number; preSkip?: number };
+type PopCounts = { fire: number; ok: number; block: number; cardFire?: number; cardOk?: number; cardBlock?: number; preReq?: number; preFill?: number; preDone?: number; preSkip?: number; n1?: number; n2?: number; n3?: number };
 
 export type PlayerLogData = {
   ok?: boolean;
@@ -459,6 +460,28 @@ export function ThumbMissingCard({ secret, reloadKey }: { secret: string; reload
 
 /* ---------- Status sistem ---------- */
 
+/**
+ * TrafficStars popunder numbers from the synced static JSON. Starts from the copy bundled at build
+ * time, then re-reads /data/trafficstars.json once (static file, no API call, no KV/D1 write) so an
+ * open panel shows the latest sync.
+ */
+function useTsPopunder() {
+  const [data, setData] = useState<TsJson>(tsStats as TsJson);
+  useEffect(() => {
+    let alive = true;
+    fetch("/data/trafficstars.json", { cache: "no-cache" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: TsJson | null) => {
+        if (alive && j && Array.isArray(j.spots)) setData(j);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return tsPopunderSummary(data);
+}
+
 export function StatusCard(props: {
   botOk: boolean | null;
   status: OverviewStatus | null;
@@ -467,7 +490,12 @@ export function StatusCard(props: {
 }) {
   const { botOk, status, playerLog } = props;
   const pop = playerLog?.popunder;
-  const rows: { name: string; tone: "ok" | "warn" | "bad" | "idle"; value: string; sub?: string }[] = [
+  const tsPop = useTsPopunder();
+  const siteOk = pop ? (pop.today.ok || 0) + (pop.today.cardOk || 0) : 0;
+  const siteBlock = pop ? (pop.today.block || 0) + (pop.today.cardBlock || 0) : 0;
+  // Every opened tab by position (pop_n1..3); 0 until the deploy that logs them has run a while.
+  const siteAll = pop ? (pop.today.n1 || 0) + (pop.today.n2 || 0) + (pop.today.n3 || 0) : 0;
+  const rows: { name: string; tone: "ok" | "warn" | "bad" | "idle"; value: string; sub?: string; note?: string }[] = [
     { name: "Bot Telegram", tone: botOk == null ? "idle" : botOk ? "ok" : "warn", value: botOk == null ? "…" : botOk ? "tersambung" : "perlu dicek" },
     {
       name: "Katalog dimuat",
@@ -485,16 +513,30 @@ export function StatusCard(props: {
       value: status ? (status.statsUpdated ? dayText(status.statsUpdated) : "belum ada data") : "…",
     },
     {
-      name: "Popunder Videy hari ini",
-      tone: !pop ? "idle" : pop.today.ok > 0 ? "ok" : pop.today.fire > 0 ? "warn" : "idle",
-      value: pop ? `${fmt(pop.today.ok)} terbuka dari ${fmt(pop.today.fire)} tap, ${fmt(pop.today.block)} diblok` : "…",
-      sub: pop ? `kemarin ${fmt(pop.yesterday.ok)} terbuka` : undefined,
-    },
-    {
-      name: "Popunder kartu hari ini",
-      tone: !pop ? "idle" : (pop.today.cardOk || 0) > 0 ? "ok" : (pop.today.cardFire || 0) > 0 ? "warn" : "idle",
-      value: pop ? `${fmt(pop.today.cardOk || 0)} terbuka dari ${fmt(pop.today.cardFire || 0)} klik, ${fmt(pop.today.cardBlock || 0)} diblok` : "…",
-      sub: pop ? `kemarin ${fmt(pop.yesterday.cardOk || 0)} terbuka` : undefined,
+      // Main figure = TrafficStars' own report for the popunder spot (what is paid), on TrafficStars'
+      // UTC day (07:00 WIB -> 07:00 WIB). Our own beacons are only a small side note: they start at
+      // 00:00 WIB and count the first ad tab per video per session, so they never match 1:1.
+      name: "Popunder (TrafficStars)",
+      tone: tsPop.today ? "ok" : tsPop.yesterday ? "idle" : "warn",
+      value: tsPop.today
+        ? `${fmt(tsPop.today.impressions)} tayangan, ${usd(tsPop.today.earnings)}`
+        : tsPop.yesterday
+          ? "hari ini belum tersinkron"
+          : "data TrafficStars belum ada",
+      sub: [
+        tsPop.today ? `hari TrafficStars ${tsDayWindowWib(tsPop.today.date)}` : null,
+        tsPop.updatedAt ? `data per ${wibDateTime(tsPop.updatedAt)} (sinkron 07.30 & 19.30 WIB)` : null,
+        tsPop.yesterday ? `kemarin ${fmt(tsPop.yesterday.impressions)} tayangan, ${usd(tsPop.yesterday.earnings)}` : null,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      note: pop
+        ? `Hitungan web sendiri (Videy + kartu, mulai 00.00 WIB): ${
+            siteAll > 0
+              ? `${fmt(siteAll)} tab iklan terbuka (ke-1 ${fmt(pop.today.n1 || 0)}, ke-2 ${fmt(pop.today.n2 || 0)}, ke-3 ${fmt(pop.today.n3 || 0)})`
+              : `${fmt(siteOk)} tab iklan terbuka`
+          }, ${fmt(siteBlock)} diblok browser. Ini bukan angka bayaran: jam mulainya beda 7 jam (TrafficStars mulai 07.00 WIB) dan data TrafficStars baru masuk 2x sehari. Yang dibayar angka TrafficStars di atas.`
+        : undefined,
     },
     {
       name: "Iklan pembuka Videy hari ini",
@@ -535,6 +577,7 @@ export function StatusCard(props: {
             <span className={value}>
               {r.value}
               {r.sub ? <span className="block text-zinc-500">{r.sub}</span> : null}
+              {r.note ? <span className="mt-1 block text-[12px] leading-snug text-zinc-500">{r.note}</span> : null}
             </span>
           </li>
         ))}
