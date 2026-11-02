@@ -5,10 +5,13 @@
  * about a minute without a commit or rebuild. Stored data is never rewritten; removing an entry
  * restores the original title/category.
  *
- * The minor-lock still applies: owner-tools.ts rejects locked/flagged items and minor-themed titles,
- * and local-cache.ts checks the edited title too, so an edit can only ever hide more, never less.
+ * Every video is editable (owner rule 2026-11-02): an edit always saves. local-cache.ts checks the
+ * edited title: a clean one releases an automatic hold; the minor locks still keep a video hidden.
+ * KV reads are edge-cached, so this isolate keeps the edits it wrote (`lastWritten`) and merges them
+ * over every read by `at`: a read right after a save never brings an old title back.
  */
 import { resolveAnalyticsKV } from "@/lib/analytics-kv";
+import { newerEdits } from "./owner-edit-merge.js";
 
 /** `extra`: additional category slugs the video also appears in (besides its main `category`). */
 export type OwnerEdit = { title?: string; category?: string; extra?: string[]; at: number };
@@ -25,6 +28,8 @@ const MAX_MERGE_GROUPS = 1000;
 export const MAX_MERGE_IDS = 20;
 
 const KEY = "owner:edit:v1";
+/** Edits this isolate wrote (newest state it put); merged over cached reads. Owner saves only. */
+let lastWritten: Record<string, OwnerEdit> | null = null;
 const ID_RE = /^[A-Za-z0-9_-]{3,64}$/;
 const SLUG_RE = /^[A-Za-z0-9_-]{1,60}$/;
 
@@ -81,12 +86,13 @@ export async function readOwnerEditState(): Promise<OwnerEditState> {
   const r = await resolveAnalyticsKV();
   if (!r) throw new Error("kv_unavailable");
   const raw = await r.kv.get(KEY);
-  if (!raw) return { ids: {} };
+  let state: OwnerEditState = { ids: {} };
   try {
-    return clean(JSON.parse(raw));
+    if (raw) state = clean(JSON.parse(raw));
   } catch {
-    return { ids: {} };
+    state = { ids: {} };
   }
+  return { ...state, ids: newerEdits(state.ids, lastWritten) as Record<string, OwnerEdit> };
 }
 
 /**
@@ -96,12 +102,13 @@ export async function readOwnerEditState(): Promise<OwnerEditState> {
  */
 async function readForWrite(kv: { get: (k: string, o?: { cacheTtl?: number }) => Promise<string | null> }): Promise<OwnerEditState> {
   const raw = await kv.get(KEY, { cacheTtl: 30 });
-  if (!raw) return { ids: {} };
+  let state: OwnerEditState = { ids: {} };
   try {
-    return clean(JSON.parse(raw));
+    if (raw) state = clean(JSON.parse(raw));
   } catch {
-    return { ids: {} };
+    state = { ids: {} };
   }
+  return { ...state, ids: newerEdits(state.ids, lastWritten) as Record<string, OwnerEdit> };
 }
 
 /**
@@ -136,6 +143,7 @@ export async function setOwnerEdit(
   };
   const next = clean(state);
   await r.kv.put(KEY, JSON.stringify(next));
+  lastWritten = next.ids;
   // null = the edit only cleared the last extra category, nothing is stored for this id any more.
   return next.ids[id] || null;
 }
@@ -183,7 +191,10 @@ export async function bulkEditOwnerExtra(
     changed.push(id);
   }
   const cleaned = clean(state);
-  if (changed.length) await r.kv.put(KEY, JSON.stringify(cleaned));
+  if (changed.length) {
+    await r.kv.put(KEY, JSON.stringify(cleaned));
+    lastWritten = cleaned.ids;
+  }
   const extra: Record<string, string[]> = {};
   for (const id of changed) extra[id] = cleaned.ids[id]?.extra || [];
   return { changed, unchanged, full, extra };
@@ -225,5 +236,6 @@ export async function setOwnerMerges(
   }
   const next = clean({ ...state, merges, splits });
   await r.kv.put(KEY, JSON.stringify(next));
+  lastWritten = next.ids;
   return { merges: next.merges || [], splits: next.splits || [] };
 }

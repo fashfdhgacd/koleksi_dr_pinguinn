@@ -19,20 +19,33 @@
 import { lockedMinorReason, schoolReason, youthCampusReason } from "./minor-lock.js";
 import { reviewPriority as detectorPriority } from "./minor-detector.js";
 import { detectMinor } from "./minor-context.js";
-import { REVIEW_PENDING, titleReviewReason } from "./review-pending.js";
+import { REVIEW_PENDING, isJavItem, releasedByOwnerTitle, titleReviewReason } from "./review-pending.js";
+import { minorContentReason } from "./hidden-ids.js";
+import { titleHold } from "../bot/title-hold.js";
 
 /** An explicit age under 18 ("16 tahun", "15yo", "17 y.o"); episode/part numbers excluded. */
 const UNDER_18_AGE =
   /(?<!\b(?:eps?|episode|part|pt|vol|volume|chapter|ch|no|bagian|seri|umur\s+\d+\s*-)\s?)\b1[0-7]\s?(?:yo|y\.?\s?o\.?|years?\s?old|tahun|thn|th)(?![\p{L}\p{N}])/iu;
 
 /**
+ *  5. JAV (category "jav" or a studio product code, owner rule 2026-11-02): studio productions with
+ *     age-verified performers. "student", "teen", "di kelas", "guru" are roleplay/genre labels there,
+ *     so only the hard bans (1: lock list, detector "block") and an explicit age under 18 hold it.
  * @param {string} text every title we have for the upload (typed + source/original + metadata)
+ * @param {{ category?: string }} [opts]
  * @returns {{ hide: string, review: string }} hide = hidden_reason to store ("" = publish);
  *   review = the REVIEW_PENDING reason shown in /pemilik ("" = none).
  */
-export function uploadModeration(text = "") {
+export function uploadModeration(text = "", opts = {}) {
   const t = String(text || "");
   if (!t.trim()) return { hide: "", review: "" };
+  if (isJavItem(opts.category, [t])) {
+    const locked = lockedMinorReason(t);
+    if (locked) return { hide: locked, review: "" };
+    if (detectorPriority("", t) === "block") return { hide: "detector-minor", review: "" };
+    if (UNDER_18_AGE.test(t)) return { hide: "detector-review", review: "" };
+    return { hide: "", review: "" };
+  }
 
   // 1) Banned: hard lock / explicit minor terms.
   const locked = lockedMinorReason(t);
@@ -59,4 +72,19 @@ export function uploadModeration(text = "") {
   if (ctx.verdict === "review") return { hide: "detector-review", review: "" };
   // Family / step-family / boarding-house wording alone is adult genre: publish.
   return { hide: "", review: "" };
+}
+
+/**
+ * Owner title priority (owner rule 2026-11-02): does the owner's edited title release an automatic
+ * upload hold? Only automatic holds (review-pending / title-rename / detector-review) are released,
+ * and only when the edited title passes the same upload check again. Hard minor locks never are.
+ * @param {string} reason stored hidden_reason
+ * @param {string} title the owner's edited title
+ * @param {string} [category]
+ */
+export function ownerTitleReleases(reason, title, category = "") {
+  if (!releasedByOwnerTitle(reason) || !String(title || "").trim()) return false;
+  if (uploadModeration(title, { category }).hide) return false;
+  if (isJavItem(category, [title])) return true;
+  return minorContentReason(title) === "" && !titleHold(title);
 }

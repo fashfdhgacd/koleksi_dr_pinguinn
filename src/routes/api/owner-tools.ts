@@ -16,6 +16,7 @@ import {
   listHiddenCandidates,
   applyUnhidden,
   isLockedMinor,
+  isPublicHidden,
   loadItemsRaw,
   multiServerOf,
   type HiddenCandidate,
@@ -34,6 +35,7 @@ import itemOverrides from "@/lib/catalog/overrides.json";
 import { readUnhideState, setUnhidden, writeUnhideState } from "@/lib/catalog/unhide-store";
 import { isReviewPendingReason } from "@/lib/catalog/review-pending.js";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
+import { withSavedEdit } from "@/lib/catalog/owner-edit-merge.js";
 import {
   MAX_EXTRA_CATEGORIES,
   MAX_MERGE_IDS,
@@ -723,20 +725,11 @@ async function handleEditVideo(body: {
   const { raw } = await catalogBase();
   const item = raw.find((it) => it?.id === id);
   if (!item) return json({ ok: false, error: "Video tidak ditemukan di katalog." }, 404);
-  // Locked/hidden items may be edited (metadata correction), but an edit never unhides: local-cache.ts
-  // checks the stored title as well as the edit, so the item stays hidden. A new title must not carry
-  // a school/minor theme.
-  if (title && ownerEditBlockReason(title)) {
-    return json({ ok: false, error: "Judul ditolak: bertema sekolah/di bawah umur." }, 403);
-  }
-
-  // Ids on the reviewed lock list stay locked whatever the title says, so a title edit would be a silent no-op.
-  if (title && isLockedMinorId(id)) {
-    return json(
-      { ok: false, error: "Video ini dikunci per-ID (hasil review: indikasi di bawah umur). Ganti judul tidak membukanya." },
-      403,
-    );
-  }
+  // Owner rule 2026-11-02: every video stays editable (held, REVIEW_PENDING, locked). The checks only
+  // decide whether it is shown: a clean title releases an automatic hold; a minor-locked id or a
+  // school/minor title is saved but stays hidden (reported back in `live` / `moderation`).
+  const editBlock = title ? ownerEditBlockReason(title) : "";
+  const lockedId = isLockedMinorId(id);
 
   // Stored in KV (owner:edit:v1) and applied by the catalog at load time: no commit, no rebuild,
   // no GitHub token needed in the Worker.
@@ -761,13 +754,28 @@ async function handleEditVideo(body: {
       readOwnerHideState().catch(() => null),
       readOwnerEditState(),
     ]);
-    applyUnhidden(Object.keys(unhide.ids), hiddenState ? Object.keys(hiddenState.ids) : null, edits.ids);
+    // KV reads are edge-cached (up to 60 s), so the read right after the put can still miss this
+    // edit; applying that stale state reverted the edit in this isolate (the "edit won't save" bug).
+    applyUnhidden(
+      Object.keys(unhide.ids),
+      hiddenState ? Object.keys(hiddenState.ids) : null,
+      withSavedEdit(edits.ids, id, saved),
+    );
   } catch {
     /* the regular 30 s sync applies it */
+  }
+  let live: boolean | null = null;
+  try {
+    live = !(await isPublicHidden(id));
+  } catch {
+    live = null;
   }
   return json({
     ok: true,
     id,
+    live,
+    ...(lockedId ? { note: "Video ini dikunci per-ID (indikasi di bawah umur): judul tersimpan, video tetap tidak tayang." } : {}),
+    ...(editBlock ? { note: `Judul tersimpan, tapi bertema sekolah/di bawah umur (${editBlock}): video tetap tidak tayang.` } : {}),
     title: saved?.title || null,
     category: saved?.category || null,
     // minor-detector.js verdict for the new title ("review" = owner should double-check it).
@@ -993,7 +1001,7 @@ export const Route = createFileRoute("/api/owner-tools")({
         }
         if (body.action === "detector-review-list") {
           const items = await listDetectorReview();
-          return json({ ok: true, count: items.length, pending: items.filter((r) => !r.decidedAt).length, items });
+          return json({ ok: true, count: items.length, pending: items.filter((r) => r.group === "pending").length, items });
         }
         if (body.action === "detector-review-decide") {
           const r = await decideDetectorReview(body as never);

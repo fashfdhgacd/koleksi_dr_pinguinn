@@ -15,6 +15,7 @@ import { minorContentReason } from "./minor-detector.js";
 import { lockedMinorReason, schoolReason } from "./minor-lock.js";
 import { detectMinor, ownerChecked18 } from "./minor-context.js";
 import { waivedHoldTerm } from "../bot/title-hold.js";
+import { hasJavCode } from "../bot/title-guard.js";
 
 export const REVIEW_PENDING = "review-pending";
 
@@ -50,7 +51,8 @@ export function titleReviewReason(title = "") {
   if (lockedMinorReason(raw) || minorContentReason(raw) === "minor") return "";
   const t = norm(raw);
   if (NAME_RE.test(t)) return "nama dikaitkan berita dengan dugaan anak di bawah umur (Andini Permata)";
-  if (UNCLEAR_RE.test(t)) return "kata yang umurnya tidak jelas (anak ***/anak jaman sekarang/si kecil)";
+  const unclear = t.match(UNCLEAR_RE);
+  if (unclear) return `kata "${unclear[0].replace(/\s+/g, " ").trim()}" (umurnya tidak jelas)`;
   const claim = ownerChecked18(raw);
   const school = schoolReason(raw);
   if (claim && (school === "classroom" || school === "teacher-student")) {
@@ -61,26 +63,126 @@ export function titleReviewReason(title = "") {
   if (claim && /\banak\b/.test(t)) return "kata \"anak\" + klaim umur 18 di judul (klaim judul bukan bukti)";
   const ctx = detectMinor(raw);
   if (ctx.verdict === "review" && claim) return "sinyal merah + klaim umur 18 di judul (klaim judul bukan bukti)";
-  if (minorContentReason(raw) === "review" && PARENT_RE.test(t) && !ADULT_ANAK_RE.test(t)) {
-    return "\"anak\" bersama kata orang tua: umur pemeran tidak bisa dipastikan dari judul";
+  const parent = t.match(PARENT_RE);
+  if (minorContentReason(raw) === "review" && parent && !ADULT_ANAK_RE.test(t)) {
+    return `kata "anak" bersama "${parent[0]}": umur pemeran tidak bisa dipastikan dari judul`;
   }
   return "";
 }
 
 /**
- * REVIEW_PENDING reason for a catalog item ("" = not pending). `titles` = every title we have for
- * it (stored, owner edit, override); an owner title edit never clears it, only approval does.
- * @param {string} [id]
+ * JAV (owner rule 2026-11-02): category "jav" or a studio product code ("SSIS-123"). Japanese studio
+ * productions with age-verified performers: "student", "teen", "di kelas" etc. are genre/roleplay
+ * labels there, so title signals never route a JAV video to REVIEW_PENDING. Explicit minors (child
+ * grade levels, an age under 18, the hard reject list) are still locked/banned by the other checks.
+ * @param {string} [category]
  * @param {string[]} [titles]
  */
-export function reviewPendingReason(id = "", titles = []) {
-  const listed = REVIEW_PENDING_IDS[String(id || "").trim()];
-  if (listed) return `${REVIEW_PENDING}: ${listed}`;
+export function isJavItem(category = "", titles = []) {
+  return String(category || "").trim().toLowerCase() === "jav" || titles.some((t) => hasJavCode(String(t || "")));
+}
+
+/** Anime/hentai: drawn characters have no production age to verify, so the strict path applies. */
+export function isAnimeItem(category = "") {
+  return /^(?:hentai|anime|kartun|3d)$/.test(String(category || "").trim().toLowerCase());
+}
+
+/**
+ * Strong minor signals in the STORED title (not just one ambiguous word). A new title would only hide
+ * them, not answer them, so these need proof (strict), whatever the owner title says:
+ *  - "anak ***": a censored word after "anak", usually a school grade (SD/SMP/SMA);
+ *  - "anak jaman sekarang" ("kids these days"), usually said about teenagers;
+ *  - a father with a child ("ayah ... anak", "anak perempuan dan ayah");
+ *  - ABG/anak/teen/remaja in a school setting (seragam, di kelas, guru, UKS, tugas, sekolah).
+ */
+const STRONG_SIGNALS = [
+  ["kata \"anak ***\" (sensor, biasanya jenjang sekolah)", /\banak\s*\*{2,}/],
+  ["\"anak jaman sekarang\" (biasanya soal remaja)", /\banak\s+(?:jaman|zaman)\s+sekarang\b/],
+  ["ayah + anak", /\b(?:ayah|bapak|papa|bokap|daddy|father)\b.*\banak\b|\banak\b(?:\s+\w+){0,3}\s+(?:dan|sama|&)\s+(?:ayah|bapak|papa|bokap)\b/],
+  [
+    "ABG/anak + konteks sekolah",
+    /(?=.*\b(?:abg|anak|teen|remaja)\b).*\b(?:seragam|di\s+kelas|guru\w*|uks|tugas|sekolah)\b/,
+  ],
+];
+
+/** @param {string[]} titles @returns {string} the strong signal label, or "" */
+export function strongMinorSignal(titles = []) {
   for (const t of titles) {
+    const n = norm(t);
+    for (const [label, re] of STRONG_SIGNALS) if (/** @type {RegExp} */ (re).test(n)) return String(label);
+  }
+  return "";
+}
+
+/**
+ * Strict REVIEW_PENDING: an owner title edit does not release it; only the owner's explicit
+ * "Tayangkan" with a proof note does. The Andini Permata set (by id or name), a strong minor signal
+ * in the stored title (strongMinorSignal, not for JAV) and anime/hentai with an age-unclear signal.
+ * @param {string} [id]
+ * @param {string[]} [titles]
+ * @param {string} [category]
+ */
+export function strictPendingReason(id = "", titles = [], category = "") {
+  const listed = REVIEW_PENDING_IDS[String(id || "").trim()];
+  if (listed) return listed;
+  for (const t of titles) if (NAME_RE.test(norm(t))) return "nama dikaitkan berita dengan dugaan anak di bawah umur (Andini Permata)";
+  if (!isJavItem(category, titles)) {
+    const strong = strongMinorSignal(titles);
+    if (strong) return `${strong}: umur pemeran perlu bukti, judul baru tidak cukup`;
+  }
+  if (isAnimeItem(category)) {
+    for (const t of titles) {
+      const r = titleReviewReason(t);
+      if (r) return `anime/hentai: ${r}`;
+    }
+  }
+  return "";
+}
+
+/**
+ * REVIEW_PENDING reason for a catalog item ("" = not pending).
+ * - Listed ids and the Andini name: always pending; only owner approval releases them.
+ * - JAV: never from title signals.
+ * - Otherwise an item is pending only when the title check flags one of its titles. Then:
+ *   - a strong signal in any title, or an anime/hentai item, keeps it pending (strict, owner approval);
+ *   - else the OWNER title wins (owner rule 2026-11-02): with an owner title (/pemilik edit or
+ *     overrides.json) only that title is checked, so a clean edit releases the video at once.
+ * Strong signals never make an item pending by themselves, so they cannot downgrade a harder hide
+ * (school/uniform reasons in hidden-ids) to a reviewable status.
+ * @param {string} [id]
+ * @param {string[]} [titles] stored titles (stored, restored, auto-meta), not the owner title
+ * @param {{ ownerTitle?: string, category?: string }} [opts]
+ */
+export function reviewPendingReason(id = "", titles = [], opts = {}) {
+  const ownerTitle = String(opts.ownerTitle || "").trim();
+  const all = ownerTitle ? [...titles, ownerTitle] : titles;
+  const key = String(id || "").trim();
+  if (REVIEW_PENDING_IDS[key]) return `${REVIEW_PENDING}: ${REVIEW_PENDING_IDS[key]}`;
+  for (const t of all) if (NAME_RE.test(norm(t))) return `${REVIEW_PENDING}: nama dikaitkan berita dengan dugaan anak di bawah umur (Andini Permata)`;
+  if (isJavItem(opts.category, all)) return "";
+  let flagged = "";
+  for (const t of all) {
+    flagged = titleReviewReason(t);
+    if (flagged) break;
+  }
+  if (!flagged) return "";
+  const strict = strictPendingReason(id, all, opts.category);
+  if (strict) return `${REVIEW_PENDING}: ${strict}`;
+  for (const t of ownerTitle ? [ownerTitle] : titles) {
     const r = titleReviewReason(t);
     if (r) return `${REVIEW_PENDING}: ${r}`;
   }
   return "";
+}
+
+/**
+ * Automatic holds that a clean owner title edit releases (the owner's title wins over the automatic
+ * check). Hard minor locks ("detector-minor", school/minor reasons, minor-lock ids) are not here.
+ * @param {string} [reason]
+ */
+export function releasedByOwnerTitle(reason = "") {
+  const r = String(reason || "");
+  return r.startsWith(REVIEW_PENDING) || r === "title-rename" || r === "detector-review";
 }
 
 export function isReviewPendingReason(reason = "") {
