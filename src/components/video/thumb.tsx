@@ -7,6 +7,13 @@ export const BRAND_POSTER = "/brand-poster-v2.jpg";
 export const FALLBACK_POSTER = "/brand-poster-6x5.jpg";
 
 const FALLBACK_CLASS = "media-thumb size-full object-contain bg-[#0e0d12]";
+const PLACEHOLDER_STYLE = {
+  backgroundColor: "#0e0d12",
+  backgroundImage: `url(${FALLBACK_POSTER})`,
+  backgroundPosition: "center",
+  backgroundRepeat: "no-repeat",
+  backgroundSize: "contain",
+} as const;
 
 /**
  * Posters straight from the R2 bucket `posters` (custom domain, no Worker): same key the /thumb route
@@ -66,7 +73,11 @@ export function VideoThumb({
   // No .jpg suffix: old /thumb/{id}.jpg responses are cached as the brand penguin (immutable).
   // Our own static files (e.g. /videy-thumbs/{id}.jpg) are used as they are.
   const local = posterId && real && /^https?:\/\//i.test(real) ? `/thumb/${posterId}` : "";
-  const r2 = local ? r2PosterUrl(posterId) : "";
+  // R2 first also when the card has no poster link yet (new IndoAV/UserBokep uploads): /pemilik
+  // "Isi poster" and the daily thumb-health repair store the image in R2 right away, so the card
+  // shows it without waiting for the poster map commit + deploy. A 404 there goes straight on to
+  // the DMM cover / penguin (no /thumb Worker request when there is no source link).
+  const r2 = posterId && (local || !real) ? r2PosterUrl(posterId) : "";
   const first = r2 || local || real || dmm || FALLBACK_POSTER;
   const [current, setCurrent] = useState(first);
   const [step, setStep] = useState(0);
@@ -129,6 +140,9 @@ export function VideoThumb({
   }
 
   const poster = isPosterSrc(current);
+  // Penguin painted under the image while it loads (slow /thumb resolve, stalled host, blocked
+  // domain): a card is never an empty box; the real poster covers it as soon as it arrives.
+  const placeholder = poster ? undefined : PLACEHOLDER_STYLE;
 
   return (
     <img
@@ -141,6 +155,7 @@ export function VideoThumb({
       decoding="async"
       fetchPriority={eager ? "high" : "low"}
       className={cn(poster ? FALLBACK_CLASS : "media-thumb size-full object-cover", className)}
+      style={placeholder}
       onError={handleError}
       onLoad={(e) => {
         const img = e.currentTarget;
