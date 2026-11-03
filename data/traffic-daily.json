@@ -1,6 +1,6 @@
 {
   "description": "Pengunjung harian per sumber (AKTUAL dari D1 koleksi-analytics, hari WIB). sources = visitor_id unik per hari menurut referrer kunjungan pertama hari itu; 'internal' = referrer domain sendiri. Bukan request Cloudflare. Data mulai 2026-10-05 11:03 WIB (sebelumnya tidak tercatat). Diisi .github/workflows/traffic-monitor.yml.",
-  "updatedAt": "2026-11-02T14:55:00Z",
+  "updatedAt": "2026-11-03T04:51:49Z",
   "timezone": "Asia/Jakarta (WIB)",
   "days": {
     "2026-10-05": {
@@ -599,22 +599,44 @@
     },
     "2026-11-02": {
       "sources": {
-        "brave": 40,
-        "direct": 8,
-        "duckduckgo": 10,
-        "google": 159,
-        "internal": 452,
-        "justpaste": 662,
+        "bing": 1,
+        "brave": 45,
+        "direct": 10,
+        "duckduckgo": 14,
+        "google": 194,
+        "internal": 529,
+        "justpaste": 762,
         "other": 5,
-        "tube_ref": 53,
+        "tube_ref": 58,
         "x": 12,
-        "yandex": 9
+        "yandex": 12
       },
-      "unique_visitors": 1199,
-      "pageviews": 17217,
-      "new": 998,
-      "returning": 414,
-      "landing_visitors": 1410,
+      "unique_visitors": 1642,
+      "pageviews": 23410,
+      "new": 1166,
+      "returning": 476,
+      "landing_visitors": 1642
+    },
+    "2026-11-03": {
+      "sources": {
+        "bluesky": 1,
+        "brave": 19,
+        "direct": 2,
+        "duckduckgo": 11,
+        "google": 76,
+        "internal": 284,
+        "justpaste": 389,
+        "other": 3,
+        "telegram": 1,
+        "tube_ref": 23,
+        "x": 6,
+        "yandex": 7
+      },
+      "unique_visitors": 819,
+      "pageviews": 11052,
+      "new": 542,
+      "returning": 280,
+      "landing_visitors": 822,
       "partial": true
     }
   }
