@@ -13,6 +13,14 @@ export const AD_ZONES = ["6053864"] as const;
 const SCRIPT_ID = "exo-ad-provider";
 const SCRIPT_SRC = "https://a.magsrv.com/ad-provider.js";
 
+const UNFILLED_STYLE = {
+  backgroundColor: "#0e0d12",
+  backgroundImage: "url(/brand-poster-6x5.jpg)",
+  backgroundPosition: "center",
+  backgroundRepeat: "no-repeat",
+  backgroundSize: "contain",
+} as const;
+
 type AdWindow = Window & { AdProvider?: Array<Record<string, unknown>> };
 
 function ensureScript() {
@@ -79,6 +87,9 @@ export function AdSlot({ className = "", zoneId = AD_ZONES[0] }: { className?: s
       <div
         ref={ref}
         className="relative flex aspect-[300/250] items-center justify-center overflow-hidden rounded-xl bg-surface-2"
+        // No-fill (ExoClick often returns nothing, ad blockers): the penguin card shows instead of an
+        // empty dark box that looks like a broken poster. A served banner is drawn on top of it.
+        style={UNFILLED_STYLE}
       >
         <div
           className="flex h-[250px] w-[300px] shrink-0 items-center justify-center"
