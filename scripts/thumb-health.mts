@@ -91,27 +91,37 @@ async function checkR2(id: string): Promise<Verdict> {
   const v = await checkR2Once(id);
   return v === "error" ? checkR2Once(id) : v;
 }
+// Why a check errored (first few only), so an all-"error" run is diagnosable instead of silent.
+const errorSamples: Array<{ id: string; why: string }> = [];
+const UA = { "user-agent": "koleksidrpinguin-thumb-health/1.0 (+https://github.com/fashfdhgacd/koleksi_dr_pinguinn)" };
+function noteError(id: string, why: string) {
+  if (errorSamples.length < 20) errorSamples.push({ id, why });
+}
 async function checkR2Once(id: string): Promise<Verdict> {
   try {
-    const h = await fetch(R2 + id, { method: "HEAD", signal: AbortSignal.timeout(15000) });
+    const h = await fetch(R2 + id, { method: "HEAD", headers: UA, signal: AbortSignal.timeout(15000) });
     if (h.status === 404) return "absent";
-    if (!h.ok) return "error";
+    if (!h.ok) {
+      noteError(id, `HTTP ${h.status} ${h.headers.get("server") || ""} ${h.headers.get("cf-mitigated") || ""}`.trim());
+      return "error";
+    }
     if (isPlaceholderMd5(h.headers.get("etag"))) return "placeholder";
     if (!/^image\//i.test(h.headers.get("content-type") || "")) return "notimage";
     const len = Number(h.headers.get("content-length") || 0);
     if (len && len < MIN_IMAGE_BYTES) return "small";
     if (len && len < 20000) {
-      const buf = await (await fetch(R2 + id, { signal: AbortSignal.timeout(15000) })).arrayBuffer();
+      const buf = await (await fetch(R2 + id, { headers: UA, signal: AbortSignal.timeout(15000) })).arrayBuffer();
       if (nearSingleColour(buf)) return "blank";
     }
     return "ok";
-  } catch {
+  } catch (e) {
+    noteError(id, `exception ${(e as Error)?.name || ""}: ${(e as Error)?.message || String(e)}`);
     return "error";
   }
 }
 async function repairViaThumb(id: string): Promise<boolean> {
   try {
-    const r = await fetch(`${SITE}/thumb/${id}?h=${DAY}`, { redirect: "manual", signal: AbortSignal.timeout(25000) });
+    const r = await fetch(`${SITE}/thumb/${id}?h=${DAY}`, { redirect: "manual", headers: UA, signal: AbortSignal.timeout(25000) });
     return r.status === 200;
   } catch {
     return false;
@@ -183,7 +193,9 @@ const report = {
   sources: Object.fromEntries(Object.entries(stats).filter(([, s]) => s.total)),
   latestPostersAdded: Object.keys(added).length,
   bad: badIds.slice(0, 300),
+  errorSamples,
 };
+console.log(JSON.stringify({ errorSamples }, null, 1));
 console.log(JSON.stringify({ totals, latestPostersAdded: report.latestPostersAdded, sources: report.sources }, null, 1));
 if (!DRY) {
   if (Object.keys(added).length) {
@@ -191,4 +203,9 @@ if (!DRY) {
     fs.writeFileSync(latestPath, JSON.stringify({ ...fresh, ...added }, null, 2) + "\n");
   }
   fs.writeFileSync("data/thumb-health.json", JSON.stringify(report, null, 1) + "\n");
+}
+// A run where most checks errored is a broken check, not a healthy site: fail the job so it shows red.
+if ((totals.total || 0) > 0 && (totals.error || 0) > totals.total / 2) {
+  console.error(`thumb-health: ${totals.error}/${totals.total} checks errored; see errorSamples above`);
+  process.exitCode = 1;
 }
