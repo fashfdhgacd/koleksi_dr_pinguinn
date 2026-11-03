@@ -53,7 +53,7 @@ export function VideoGrid({
   ads?: boolean;
 }) {
   const shown = visibleCards(items);
-  // Up to 4 slots, every 8th card; each lazy-loads (an unfilled slot stays a blank card footprint).
+  // Up to 4 slots, every 8th card; each lazy-loads (an unfilled slot keeps its footprint, showing the penguin card).
   const slots = ads
     ? AD_POSITIONS.map((at, slot) => ({ at, slot })).filter((x) => x.at < shown.length)
     : [];
