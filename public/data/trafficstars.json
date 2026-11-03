@@ -1,9 +1,8 @@
 {
-  "updatedAt": "2026-11-02T21:52:36Z",
+  "updatedAt": "2026-11-03T00:34:42Z",
   "currency": "USD",
   "source": "TrafficStars publisher report (UTC days)",
   "days": [
-    { "date": "2026-10-20", "impressions": 81767, "clicks": 121, "earnings": 2.21 },
     { "date": "2026-10-21", "impressions": 78227, "clicks": 86, "earnings": 1.88 },
     { "date": "2026-10-22", "impressions": 74641, "clicks": 105, "earnings": 1.72 },
     { "date": "2026-10-23", "impressions": 50296, "clicks": 199, "earnings": 1.29 },
@@ -16,7 +15,8 @@
     { "date": "2026-10-30", "impressions": 20218, "clicks": 34, "earnings": 4.87 },
     { "date": "2026-10-31", "impressions": 14307, "clicks": 23, "earnings": 3.48 },
     { "date": "2026-11-01", "impressions": 12910, "clicks": 14, "earnings": 2.73 },
-    { "date": "2026-11-02", "impressions": 10042, "clicks": 19, "earnings": 2.3 }
+    { "date": "2026-11-02", "impressions": 10764, "clicks": 20, "earnings": 2.42 },
+    { "date": "2026-11-03", "impressions": 194, "clicks": 0, "earnings": 0.05 }
   ],
   "spotNames": {"5210853":"kdp grid 300x250 (300x100 A)","5210854":"kdp grid 300x250 (300x100 B)","5210855":"kdp grid 300x250 (Native)","5210856":"kdp grid 300x250 (300x250)","5210859":"kdp videy popunder","5210886":"kdp videy preroll","5211537":"kdp watch inpage push","5211538":"kdp watch video slider"},
   "spots": [
