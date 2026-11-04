@@ -12,6 +12,8 @@ export type ReviewState = {
   proof?: Record<string, { note: string; at: number }>;
   /** Owner decisions in "Perlu dicek" (owner-decisions.js): "show" = approved for good, "keep" = held. */
   decisions?: DecisionMap;
+  /** Verification ledger for restricted titles (owner-verification.js), with change history. */
+  verification?: Record<string, import("@/lib/owner-verification.js").VerificationEntry>;
 };
 
 const KEY = "owner:review-state:v1";

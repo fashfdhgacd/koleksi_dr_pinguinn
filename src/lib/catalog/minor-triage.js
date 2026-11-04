@@ -1,36 +1,79 @@
 /**
- * Triage for titles the lock pipeline already restricts. It never unlocks anything: it only says
- * whether the lock rests on explicit youth evidence or on a school/uniform keyword alone, so the
- * owner can verify the second kind one by one. Age is never inferred from appearance.
+ * Four separate facts about a restricted title. Nothing here proves a performer's real age, and
+ * nothing here changes publication: the lock pipeline (minor-lock.js) decides visibility.
+ *
+ *  1. contextKeywords      school / uniform / youth words found in the title (context only).
+ *  2. fictionalCharacter   anime/hentai framing and any age the title states for the character.
+ *  3. performerAge         what the title CLAIMS about a real performer's age. "claims_minor" is a
+ *                          hard block (stated under-18 age, "di bawah umur", SD/SMP, loli/bocil);
+ *                          "claims_adult" is a stated 18+; "unknown" is the default.
+ *                          Age is never inferred from appearance and a title is not proof.
+ *  4. verification         owner-recorded state; "unverified" until the owner records otherwise.
  */
 
-/** Evidence of a student/youth subject: a hard block that stays restricted. */
-const EXPLICIT = [
-  [/\b(?:siswi|siswa|murid|murit|pelajar|student|schoolgirl|school\s?girl|abg\s+sma|anak\s+(?:sd|smp|sma|sekolah)|sd|smp|smu|smk|esema|jk)\b/, "kata murid/pelajar/jenjang sekolah"],
-  [/\bhigh\s?school\b|\bkakak\s+kelas\b|\bteman\s+kelas\b|\bdi\s?bawah\s+umur\b|\bbocil\b|\bloli\b|\btocil\b/, "isyarat anak/umur muda"],
-  [/\b(?:[1-9]|1[0-7])\s?(?:yo|y\.o|tahun|thn)\b/, "usia di bawah 18 disebut"],
-  [/\bshoujo\b|\bgakuen\b|\bkyoushitsu\b|\bj\s?class\s+girl\b|\bmikoto\b|\bmisaka\b/, "tokoh/istilah anak sekolah"],
+const CONTEXT = [
+  /\b(?:siswi|siswa|murid|murit|pelajar|schoolgirl|school\s?girl|high\s?school|esema|smu|smk|jk|pramuka|seragam|kakak\s+kelas|teman\s+kelas|sekolah|cikgu|kelas|j\s?class\s+girl|abg\s+sma|ibu\s+guru|pak\s+guru|guru)\b/g,
+  /\bgakuen\b|\bkyoushitsu\b|\bshoujo\b/g,
 ];
 
-/** Setting / adult-role words that alone do not show a minor. */
-const SETTING = /\b(?:guru|cikgu|ibu\s+guru|pak\s+guru|pramuka|sekolah|seragam|kelas|toilet)\b/;
+const FICTION = /\b(?:eps?|episode|gakuen|shoujo|kyoushitsu|hentai|anime|mikoto|misaka|jutai)\b/;
+
+const MINOR_CLAIM = [
+  [/\bdi\s?bawah\s+umur\b|\bunder\s?age\b/, "judul menyebut di bawah umur"],
+  [/\b(?:loli|lolicon|bocil|tocil|shota)\b/, "judul memakai istilah anak"],
+  [/\banak\s+(?:sd|smp|sma)\b|\b(?:sd|smp)\b/, "judul menyebut jenjang SD/SMP"],
+  [/\b(?:[1-9]|1[0-7])\s?(?:yo|y\.o|tahun|thn|years?\s?old)\b/, "judul menyebut usia di bawah 18"],
+];
+
+const ADULT_CLAIM = /\b(?:1[89]|[2-9]\d)\s?(?:yo|y\.o|tahun|thn|years?\s?old)\b|\b(?:1[89]|[2-9]\d)\s?\+/;
 
 /**
  * @param {string} title
- * @param {string} [lockReason] e.g. "locked:school" or "hidden" for the detector
- * @returns {{tier: "explicit"|"verification", evidence: string[]}}
+ * @param {{ detector?: boolean, verification?: string }} [opts] detector = the owner detector marked "minor"
  */
-export function triageLockedTitle(title = "", lockReason = "") {
+export function classifyRestriction(title = "", { detector = false, verification = "unverified" } = {}) {
   const t = String(title || "")
     .toLowerCase()
     .replace(/\*{2,}/g, " ");
-  const evidence = [];
-  for (const [re, label] of EXPLICIT) {
+  /** @type {string[]} */
+  const contextKeywords = [];
+  for (const re of CONTEXT) for (const m of t.matchAll(re)) if (!contextKeywords.includes(m[0])) contextKeywords.push(m[0]);
+
+  const isFictional = FICTION.test(t);
+  const stated = t.match(/\b(\d{1,2})\s?(?:yo|y\.o|tahun|thn|years?\s?old)\b/);
+  const fictionalCharacter = {
+    framing: isFictional ? "fiksi/anime" : "tidak terdeteksi",
+    statedAge: isFictional && stated ? Number(stated[1]) : null,
+  };
+
+  const minorEvidence = [];
+  for (const [re, label] of MINOR_CLAIM) {
     const m = t.match(re);
-    if (m) evidence.push(`${label}: "${m[0].trim()}"`);
+    if (m) minorEvidence.push(`${label}: "${m[0].trim()}"`);
   }
-  if (/minor-detector|^hidden$/.test(lockReason)) evidence.push("detektor menandai anak di bawah umur");
-  if (evidence.length) return { tier: "explicit", evidence };
-  const s = t.match(SETTING);
-  return { tier: "verification", evidence: s ? [`hanya kata latar/peran: "${s[0]}"`] : ["kunci kata kunci tanpa bukti usia"] };
+  if (detector) minorEvidence.push("detektor menandai anak di bawah umur");
+  const performerAge = minorEvidence.length
+    ? { claim: "claims_minor", evidence: minorEvidence }
+    : ADULT_CLAIM.test(t)
+      ? { claim: "claims_adult", evidence: ["judul menyebut usia 18+ (bukan bukti)"] }
+      : { claim: "unknown", evidence: [] };
+
+  return {
+    contextKeywords,
+    fictionalCharacter,
+    performerAge,
+    verification,
+    hardBlock: performerAge.claim === "claims_minor",
+  };
+}
+
+/** Panel summary: "explicit" only for a minor claim; everything else needs verification. */
+export function triageLockedTitle(title = "", lockReason = "") {
+  const c = classifyRestriction(title, { detector: /minor-detector|^hidden$/.test(lockReason) });
+  const evidence = c.hardBlock
+    ? c.performerAge.evidence
+    : [c.contextKeywords.length ? `hanya konteks: ${c.contextKeywords.slice(0, 4).join(", ")}` : "kunci kata kunci tanpa bukti usia"];
+  /** @type {"explicit" | "verification"} */
+  const tier = c.hardBlock ? "explicit" : "verification";
+  return { tier, evidence, ...c };
 }

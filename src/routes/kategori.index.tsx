@@ -5,7 +5,8 @@ import { RANKINGS } from "@/lib/catalog/rankings";
 import { LANDINGS } from "@/lib/catalog/landing";
 import { queryCatalog } from "@/lib/catalog/service";
 import type { CategoryInfo } from "@/lib/catalog/types";
-import { SITE_ORIGIN } from "@/lib/seo";
+import { HOME_CANONICAL, SITE_NAME, SITE_ORIGIN, breadcrumbJsonLd, collectionPageJsonLd } from "@/lib/seo";
+import { jsonLdString } from "@/lib/json-ld";
 import { PixelSparkle } from "@/components/pixel-icons";
 import { VideoThumb } from "@/components/video/thumb";
 
@@ -48,6 +49,21 @@ export const Route = createFileRoute("/kategori/")({
         { name: "robots", content: "index,follow" },
       ],
       links: [{ rel: "canonical", href: url }],
+      scripts: [
+        {
+          type: "application/ld+json",
+          children: jsonLdString(collectionPageJsonLd({ name: title, url, description })),
+        },
+        {
+          type: "application/ld+json",
+          children: jsonLdString(
+            breadcrumbJsonLd([
+              { name: SITE_NAME, url: HOME_CANONICAL },
+              { name: "Kategori", url },
+            ]),
+          ),
+        },
+      ],
     };
   },
   component: CategoriesPage,
