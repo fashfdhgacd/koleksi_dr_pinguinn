@@ -33,6 +33,7 @@ import { Route as ApiLikeRouteImport } from './routes/api/like'
 import { Route as ApiOgRouteImport } from './routes/api/og'
 import { Route as ApiOnlineRouteImport } from './routes/api/online'
 import { Route as ApiOwnerHeroRouteImport } from './routes/api/owner-hero'
+import { Route as ApiOwnerPushRouteImport } from './routes/api/owner-push'
 import { Route as ApiOwnerRecentRouteImport } from './routes/api/owner-recent'
 import { Route as ApiOwnerStats14RouteImport } from './routes/api/owner-stats14'
 import { Route as ApiOwnerToolsRouteImport } from './routes/api/owner-tools'
@@ -172,6 +173,11 @@ const ApiOwnerHeroRoute = ApiOwnerHeroRouteImport.update({
   path: '/api/owner-hero',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOwnerPushRoute = ApiOwnerPushRouteImport.update({
+  id: '/api/owner-push',
+  path: '/api/owner-push',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOwnerRecentRoute = ApiOwnerRecentRouteImport.update({
   id: '/api/owner-recent',
   path: '/api/owner-recent',
@@ -288,6 +294,7 @@ export interface FileRoutesByFullPath {
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
   '/api/owner-hero': typeof ApiOwnerHeroRoute
+  '/api/owner-push': typeof ApiOwnerPushRoute
   '/api/owner-recent': typeof ApiOwnerRecentRoute
   '/api/owner-stats14': typeof ApiOwnerStats14Route
   '/api/owner-tools': typeof ApiOwnerToolsRoute
@@ -331,6 +338,7 @@ export interface FileRoutesByTo {
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
   '/api/owner-hero': typeof ApiOwnerHeroRoute
+  '/api/owner-push': typeof ApiOwnerPushRoute
   '/api/owner-recent': typeof ApiOwnerRecentRoute
   '/api/owner-stats14': typeof ApiOwnerStats14Route
   '/api/owner-tools': typeof ApiOwnerToolsRoute
@@ -376,6 +384,7 @@ export interface FileRoutesById {
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
   '/api/owner-hero': typeof ApiOwnerHeroRoute
+  '/api/owner-push': typeof ApiOwnerPushRoute
   '/api/owner-recent': typeof ApiOwnerRecentRoute
   '/api/owner-stats14': typeof ApiOwnerStats14Route
   '/api/owner-tools': typeof ApiOwnerToolsRoute
@@ -422,6 +431,7 @@ export interface FileRouteTypes {
     | '/api/og'
     | '/api/online'
     | '/api/owner-hero'
+    | '/api/owner-push'
     | '/api/owner-recent'
     | '/api/owner-stats14'
     | '/api/owner-tools'
@@ -465,6 +475,7 @@ export interface FileRouteTypes {
     | '/api/og'
     | '/api/online'
     | '/api/owner-hero'
+    | '/api/owner-push'
     | '/api/owner-recent'
     | '/api/owner-stats14'
     | '/api/owner-tools'
@@ -509,6 +520,7 @@ export interface FileRouteTypes {
     | '/api/og'
     | '/api/online'
     | '/api/owner-hero'
+    | '/api/owner-push'
     | '/api/owner-recent'
     | '/api/owner-stats14'
     | '/api/owner-tools'
@@ -554,6 +566,7 @@ export interface RootRouteChildren {
   ApiOgRoute: typeof ApiOgRoute
   ApiOnlineRoute: typeof ApiOnlineRoute
   ApiOwnerHeroRoute: typeof ApiOwnerHeroRoute
+  ApiOwnerPushRoute: typeof ApiOwnerPushRoute
   ApiOwnerRecentRoute: typeof ApiOwnerRecentRoute
   ApiOwnerStats14Route: typeof ApiOwnerStats14Route
   ApiOwnerToolsRoute: typeof ApiOwnerToolsRoute
@@ -742,6 +755,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOwnerHeroRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/owner-push': {
+      id: '/api/owner-push'
+      path: '/api/owner-push'
+      fullPath: '/api/owner-push'
+      preLoaderRoute: typeof ApiOwnerPushRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/owner-recent': {
       id: '/api/owner-recent'
       path: '/api/owner-recent'
@@ -910,6 +930,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOgRoute: ApiOgRoute,
   ApiOnlineRoute: ApiOnlineRoute,
   ApiOwnerHeroRoute: ApiOwnerHeroRoute,
+  ApiOwnerPushRoute: ApiOwnerPushRoute,
   ApiOwnerRecentRoute: ApiOwnerRecentRoute,
   ApiOwnerStats14Route: ApiOwnerStats14Route,
   ApiOwnerToolsRoute: ApiOwnerToolsRoute,

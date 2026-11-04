@@ -24,6 +24,7 @@ import { DEFAULT_PAGE_SIZE, type VideoCard } from "@/lib/catalog/types";
 import { useCatalogFeed } from "../hooks/use-catalog";
 import { jsonLdString } from "@/lib/json-ld";
 import { DEFAULT_OG, HOME_CANONICAL, SITE_NAME, SITE_ORIGIN, breadcrumbJsonLd, collectionPageJsonLd, homeSeo } from "@/lib/seo";
+import { ReturnVisitor } from "@/components/return-visitor";
 
 function parsePage(value: unknown): number | undefined {
   const n = Math.floor(Number(value));
@@ -436,6 +437,9 @@ function PlainCategoryPage({ slug }: { slug: string }) {
           hasMore={feed.hasMore}
           onPage={setPage}
         />
+        <SafeBoundary>
+          <ReturnVisitor key={page} />
+        </SafeBoundary>
       </section>
     </Shell>
   );
