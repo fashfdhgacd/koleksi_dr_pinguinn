@@ -33,7 +33,8 @@ import { readReviewState, writeReviewState } from "@/lib/owner-review-store";
 import { minorContentReason } from "@/lib/catalog/minor-detector.js";
 import { explainTitle, schoolReviewCue } from "@/lib/catalog/minor-context.js";
 import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
-import { triageLockedTitle } from "@/lib/catalog/minor-triage.js";
+import { triageLockedTitle, classifyRestriction } from "@/lib/catalog/minor-triage.js";
+import { recordVerification, releaseBlock, VERIFICATION_STATUSES } from "@/lib/owner-verification.js";
 import { withSavedEdit } from "@/lib/catalog/owner-edit-merge.js";
 import { readOwnerEditState, setOwnerEdit } from "@/lib/catalog/owner-edit-store";
 import { uploadRejectReason } from "@/lib/bot/title-guard.js";
@@ -121,6 +122,23 @@ export type DetectorReviewRow = {
   evidence: string[];
   /** When the owner decided (approved / held rows). */
   decidedAt: number | null;
+  /** Detection source shown to the owner (keyword lock, context detector, review list, upload hold). */
+  source: string;
+  /** Separate facts about the title: keyword context, fictional character, claimed performer age. */
+  classification: {
+    contextKeywords: string[];
+    fictionalCharacter: { framing: string; statedAge: number | null };
+    performerAge: { claim: string; evidence: string[] };
+    hardBlock: boolean;
+  };
+  /** Owner verification state ("unverified" until recorded) and its change history. */
+  verification: {
+    status: string;
+    note: string;
+    at: number | null;
+    history: Array<{ status: string; at: number; note: string }>;
+    canRelease: boolean;
+  };
   /** Approved rows: true while the video is public. */
   live: boolean | null;
 };
@@ -215,6 +233,7 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
   const byId = new Map<string, AnyItem>();
   for (const it of items) if (it?.id && !byId.has(it.id)) byId.set(it.id, it);
   const decisions = state.decisions || {};
+  const verification = state.verification || {};
   // Owner decision wins: put back an approval/hold a stale KV write dropped (owner-only, rare write).
   const heal = healDecisions(decisions, {
     unhide: unhide.ids,
@@ -248,7 +267,9 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
     let trigger = "";
     let flagged = false;
     let strict = false;
+    let source = "";
     if (it.hidden === true && it.hidden_reason === HOLD_REASON) {
+      source = "judul upload perlu diganti (title-hold)";
       // Upload held because the title needs renaming (title-hold.js).
       flagged = true;
       trigger = canPublishTitle(title, hardOk)
@@ -264,6 +285,7 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
       if (pendingReason) {
         // REVIEW_PENDING: performers' age unconfirmed (review-pending.js).
         flagged = true;
+        source = "daftar tinjau (usia pemeran belum dikonfirmasi)";
         trigger = triggerText(pendingReason);
         strict = Boolean(
           strictPendingReason(
@@ -279,14 +301,25 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
       ) {
         // New upload held by the context detector.
         flagged = true;
+        source = "detektor konteks (upload baru)";
         const ex = explainTitle(title, minorContentReason(title));
         trigger = ex.signals[0] || schoolReviewCue(title) || "isyarat umur";
       }
     }
-    if (!flagged && !decision) continue;
+    const verif = verification[id] || null;
+    const keywordLock = !flagged && !decision && !verif ? lockReason(it, title) : "";
+    if (!flagged && !decision && !verif && !keywordLock) continue;
+    if (keywordLock && !trigger) {
+      source = "kunci kata kunci (minor-lock)";
+      trigger = keywordLock;
+    }
+    const released = verif?.status === "false_positive";
     // Hard minor lock: listed under "Ditahan" with its reason (title still editable), never approvable.
-    const locked = lockReason(it, title);
-    const triage = triageLockedTitle(title, String(lockedMinorReason(title) || ""));
+    const locked = lockReason(it, title, released);
+    if (!source) source = locked ? "kunci kata kunci (minor-lock)" : "keputusan pemilik";
+    const lockName = String(lockedMinorReason(title) || "");
+    const cls = classifyRestriction(title, { detector: lockName === "locked:minor-detector" });
+    const triage = triageLockedTitle(title, lockName);
     // Sensitive set is judged on the title itself (also for held rows, whose hidden reason is the owner hide).
     if (!strict)
       strict = Boolean(
@@ -302,7 +335,7 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
     const group = locked
       ? "held"
       : reviewGroup({ decision, unhidden, ownerHidden, legacyDecidedAt: legacy });
-    if (group === "pending" && (!flagged || !(await isPublicHidden(id)))) continue; // already public: nothing to decide
+    if (group === "pending" && (!(flagged || released) || !(await isPublicHidden(id)))) continue; // already public: nothing to decide
     const live = group === "approved" ? !(await isPublicHidden(id)) : null;
     out.push({
       id,
@@ -316,6 +349,20 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
       locked,
       triage: locked ? triage.tier : "",
       evidence: locked ? triage.evidence : [],
+      source,
+      classification: {
+        contextKeywords: cls.contextKeywords,
+        fictionalCharacter: cls.fictionalCharacter,
+        performerAge: cls.performerAge,
+        hardBlock: cls.hardBlock,
+      },
+      verification: {
+        status: verif?.status || "unverified",
+        note: verif?.note || "",
+        at: verif?.at || null,
+        history: verif?.history || [],
+        canRelease: !releaseBlock(title),
+      },
       decidedAt:
         decision?.at ||
         legacy ||
@@ -348,7 +395,8 @@ export function isReviewPendingItem(it: AnyItem): boolean {
  * and the strict REVIEW_PENDING set (Andini Permata, strong youth signal, anime/hentai) needs a
  * proof note. A rename-held draft is approved as is: the owner's tap is the decision.
  */
-function lockReason(it: AnyItem, title: string): string {
+function lockReason(it: AnyItem, title: string, released = false): string {
+  if (released && !releaseBlock(title)) return "";
   const r = String(lockedMinorReason(title) || "").replace(/^locked:/, "");
   if (r === "minor-detector") return "judul menyebut anak di bawah umur";
   if (r) return `judul jelas soal anak sekolah / di bawah umur (${r.replace(/-/g, " ")})`;
@@ -360,8 +408,9 @@ function approvalBlock(
   it: AnyItem,
   title: string,
   proof: string,
+  released = false,
 ): { error: string; status: number; reason?: string } | null {
-  const locked = lockReason(it, title);
+  const locked = lockReason(it, title, released);
   if (locked) return { error: "locked_minor", status: 403, reason: locked };
   // Sensitive set (Andini Permata, strong youth signal, anime/hentai): a short owner note is enough.
   if (
@@ -459,7 +508,8 @@ export async function decideDetectorReview(body: {
     .trim()
     .slice(0, 500);
   if (show) {
-    const block = approvalBlock(it, title, proof);
+    const verif = (await readReviewState(true)).verification?.[id];
+    const block = approvalBlock(it, title, proof, verif?.status === "false_positive");
     if (block) return { ok: false, ...block };
   }
   try {
@@ -485,3 +535,44 @@ export async function decideDetectorReview(body: {
     return { ok: false, error: e instanceof Error ? e.message : "kv_error", status: 503 };
   }
 }
+
+/**
+ * Records the owner's verification status for one restricted video (false positive / awaiting
+ * verification / keep restricted) with a change history. Never publishes: a false positive only
+ * lifts the keyword lock, and only when the title carries no under-18 claim; Tayangkan stays separate.
+ */
+export async function verifyDetectorReview(body: {
+  id?: unknown;
+  status?: unknown;
+  note?: unknown;
+}): Promise<{ ok: boolean; error?: string; status?: number; reason?: string }> {
+  const id = String(body.id || "").trim();
+  if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return { ok: false, error: "bad_id", status: 400 };
+  const status = String(body.status || "");
+  if (!VERIFICATION_STATUSES.includes(status)) return { ok: false, error: "bad_status", status: 400 };
+  const cache = (await loadItemsRaw()) as unknown as { raw?: AnyItem[]; items: AnyItem[] };
+  const it = (cache.raw || cache.items).find((x) => x?.id === id);
+  if (!it) return { ok: false, error: "not_found", status: 404 };
+  const edits = await readOwnerEditState().catch(() => ({ ids: {} as Record<string, { title?: string }> }));
+  const title = String(edits.ids[id]?.title || it.title || "");
+  const note = String(body.note ?? "");
+  if (status === "false_positive") {
+    const block = releaseBlock(title);
+    if (block) return { ok: false, error: "hard_block", status: 403, reason: block };
+    if (note.replace(/\s+/g, " ").trim().length < 5)
+      return { ok: false, error: "note_required", status: 400 };
+  }
+  try {
+    const state = await readReviewState(true);
+    state.verification = recordVerification(state.verification, id, status, { note, title });
+    await writeReviewState(state);
+    const released = Object.entries(state.verification)
+      .filter(([, e]) => e.status === "false_positive")
+      .map(([k]) => k);
+    applyUnhidden(Object.keys((await readUnhideState()).ids), null, null, null, released);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "kv_error", status: 503 };
+  }
+}
+

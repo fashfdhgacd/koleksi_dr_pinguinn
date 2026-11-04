@@ -35,6 +35,7 @@ import itemOverrides from "./overrides.json";
 import { softenMinorTerms } from "./minor-title-guard";
 import { HIDDEN_IDS as HIDDEN_ID_REASONS, RESTORED_TITLES, minorContentReason } from "./hidden-ids.js";
 import { isLockedMinorId, lockedMinorReason, schoolReason } from "./minor-lock.js";
+import { releaseBlock, releasedIds } from "../owner-verification.js";
 import { reviewPendingReason } from "./review-pending.js";
 import { effectiveHidden } from "../owner-decisions.js";
 import { ownerTitleReleases } from "./moderation.js";
@@ -190,6 +191,8 @@ let editsKey = "";
 export type ManualMergesLite = { merges: string[][]; splits: string[] };
 let MERGES: ManualMergesLite = { merges: [], splits: [] };
 let mergesKey = "";
+/** Ids the owner marked false positive (owner-verification.js): keyword lock lifted, never a hard minor claim. */
+let RELEASED = new Set<string>();
 
 function overrideTitle(id: string): string {
   return String(EDITS[id]?.title || OVERRIDES[id]?.title || "");
@@ -343,6 +346,10 @@ export function hiddenReasonRaw(it: RawItem): string {
 /** Clear school/minor theme (minor-lock.js): hidden even when the owner pressed Unhide. */
 export function isLockedMinor(it: RawItem): boolean {
   if (isLockedMinorId(it.id)) return true;
+  if (RELEASED.has(it.id)) {
+    const current = String(EDITS[it.id]?.title || OVERRIDES[it.id]?.title || RESTORED[it.id] || it.title || "");
+    if (!releaseBlock(current)) return false;
+  }
   if (hasCleanEdit(it.id)) return false;
   if (EDITS[it.id]?.title && lockedReasonMemo(String(EDITS[it.id]?.title)) !== "") return true;
   if (AUTO_META[it.id]?.title && lockedReasonMemo(String(AUTO_META[it.id].title)) !== "") return true;
@@ -374,6 +381,8 @@ type HideLists = {
   edits: Record<string, OwnerEditLite> | null;
   /** Owner merges (null = could not read them; keep the previous ones). */
   merges?: ManualMergesLite | null;
+  /** Ids released from the keyword lock by the owner (undefined = keep the previous ones). */
+  released?: string[];
 };
 
 async function fetchUnhiddenIds(): Promise<HideLists | null> {
@@ -398,14 +407,22 @@ async function fetchUnhiddenIds(): Promise<HideLists | null> {
       } catch {
         edits = null;
       }
-      return { unhidden: Object.keys(state.ids), ownerHidden, edits, merges };
+      let released: string[] | undefined;
+      try {
+        const rs = await import("../owner-review-store");
+        released = releasedIds((await rs.readReviewState()).verification);
+      } catch {
+        released = undefined;
+      }
+      return { unhidden: Object.keys(state.ids), ownerHidden, edits, merges, released };
     }
     const res = await fetch("/api/hidden-ids");
     if (!res.ok) return null;
-    const data = (await res.json()) as { unhidden?: unknown; ownerHidden?: unknown; edits?: unknown };
+    const data = (await res.json()) as { unhidden?: unknown; ownerHidden?: unknown;     edits?: unknown; released?: unknown };
     if (!Array.isArray(data?.unhidden)) return null;
     return {
-      unhidden: data.unhidden.map(String),
+          released: Array.isArray(data.released) ? data.released.map(String) : undefined,
+          unhidden: data.unhidden.map(String),
       ownerHidden: Array.isArray(data.ownerHidden) ? data.ownerHidden.map(String) : null,
       edits:
         data.edits && typeof data.edits === "object" && !Array.isArray(data.edits)
@@ -426,8 +443,10 @@ export function applyUnhidden(
   ownerHidden?: Iterable<string> | null,
   edits?: Record<string, OwnerEditLite> | null,
   merges?: ManualMergesLite | null,
+  released?: Iterable<string> | null,
 ): void {
   const next = new Set<string>(ids);
+  const nextReleased = released ? new Set<string>(released) : RELEASED;
   const nextHidden = ownerHidden ? new Set<string>(ownerHidden) : OWNER_HIDDEN;
   const nextEdits = edits || EDITS;
   const nextEditsKey = edits ? JSON.stringify(edits) : editsKey;
@@ -437,10 +456,12 @@ export function applyUnhidden(
     keyOf(next) +
     (nextHidden.size ? `|hide:${keyOf(nextHidden)}` : "") +
     (nextEditsKey ? `|edit:${nextEditsKey}` : "") +
-    (nextMergesKey ? `|merge:${nextMergesKey}` : "");
+    (nextMergesKey ? `|merge:${nextMergesKey}` : "") +
+    (nextReleased.size ? `|rel:${keyOf(nextReleased)}` : "");
   unhideCheckedAt = Date.now();
   if (key === unhideKey) return;
   UNHIDDEN = next;
+  RELEASED = nextReleased;
   OWNER_HIDDEN = nextHidden;
   EDITS = nextEdits;
   editsKey = nextEditsKey;
@@ -472,7 +493,7 @@ async function syncUnhidden(force = false): Promise<void> {
   unhideReadAt = startedAt;
   try {
     const lists = await fetchUnhiddenIds();
-    if (lists) applyUnhidden(lists.unhidden, lists.ownerHidden, lists.edits, lists.merges);
+    if (lists) applyUnhidden(lists.unhidden, lists.ownerHidden, lists.edits, lists.merges, lists.released);
     else unhideCheckedAt = Date.now(); // keep the previous list; retry after the TTL
   } finally {
     if (unhideReadAt === startedAt) unhideReadAt = 0;

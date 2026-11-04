@@ -15,6 +15,20 @@ type Row = {
   locked: string;
   triage?: "explicit" | "verification" | "";
   evidence?: string[];
+  source?: string;
+  classification?: {
+    contextKeywords: string[];
+    fictionalCharacter: { framing: string; statedAge: number | null };
+    performerAge: { claim: string; evidence: string[] };
+    hardBlock: boolean;
+  };
+  verification?: {
+    status: string;
+    note: string;
+    at: number | null;
+    history: Array<{ status: string; at: number; note: string }>;
+    canRelease: boolean;
+  };
   decidedAt: number | null;
   live: boolean | null;
 };
@@ -56,6 +70,9 @@ function when(at: number | null): string {
 }
 
 function errText(e?: string): string {
+  if (e === "hard_block")
+    return "Judul memuat klaim usia di bawah 18 / ditandai detektor minor. Tidak bisa ditandai false positive.";
+  if (e === "note_required") return "Tulis dasar verifikasi (mis. sumber yang memastikan pemeran dewasa).";
   if (e === "locked_minor")
     return "Video ini terkunci (di bawah umur), tidak bisa ditayangkan. Judul tetap bisa diganti.";
   if (e === "proof_required")
@@ -193,6 +210,30 @@ export function DetectorReviewSection({
     void load();
   };
 
+  // Verification record only: never publishes. False positive lifts the keyword lock for this id.
+  const verify = async (r: Row, status: string) => {
+    setBusy(r.id);
+    const d = await post(secret, {
+      action: "detector-review-verify",
+      id: r.id,
+      status,
+      note: proofs[r.id] || "",
+    });
+    setBusy("");
+    if (!d.ok) {
+      setNotes((n) => ({ ...n, [r.id]: errText(d.error) }));
+      return;
+    }
+    setNotes((n) => ({
+      ...n,
+      [r.id]:
+        status === "false_positive"
+          ? "Dicatat false positive. Kunci kata kunci dilepas; video baru tampil setelah Tayangkan."
+          : "Status verifikasi dicatat.",
+    }));
+    await load();
+  };
+
   // One card for "Perlu dicek" and "Ditahan": thumbnail preview, inline title edit, Tayangkan
   // (sensitive: short owner note; hard minor lock: reason shown, no Tayangkan).
   const card = (r: Row, held: boolean) => (
@@ -218,13 +259,48 @@ export function DetectorReviewSection({
         <p className="break-words font-medium leading-snug text-zinc-100">{r.title}</p>
         {r.translation ? <p className="text-[12px] text-zinc-500">🇮🇩 {r.translation}</p> : null}
         {r.trigger ? <p className="mt-1 text-[13px] text-amber-300">Kena: {r.trigger}</p> : null}
+        {r.source ? <p className="text-[12px] text-zinc-400">Sumber deteksi: {r.source}</p> : null}
+        {r.classification ? (
+          <ul className="mt-1 space-y-0.5 text-[12px] text-zinc-400">
+            <li>
+              Kata kunci/konteks sekolah:{" "}
+              {r.classification.contextKeywords.length
+                ? r.classification.contextKeywords.join(", ")
+                : "tidak ada"}
+            </li>
+            <li>
+              Karakter fiksi: {r.classification.fictionalCharacter.framing}
+              {r.classification.fictionalCharacter.statedAge != null
+                ? `, usia di judul ${r.classification.fictionalCharacter.statedAge}`
+                : ", usia tidak disebut"}
+            </li>
+            <li>
+              Usia pemeran (klaim judul, bukan bukti):{" "}
+              {r.classification.performerAge.claim === "claims_minor"
+                ? `klaim di bawah 18 (${r.classification.performerAge.evidence.join("; ")})`
+                : r.classification.performerAge.claim === "claims_adult"
+                  ? "klaim 18+ (belum terverifikasi)"
+                  : "tidak diketahui"}
+            </li>
+            <li>
+              Status verifikasi:{" "}
+              {{
+                unverified: "belum diverifikasi",
+                awaiting_verification: "menunggu verifikasi",
+                false_positive: "false positive",
+                keep_restricted: "tetap dibatasi",
+              }[r.verification?.status || "unverified"] || r.verification?.status}
+              {r.verification?.note ? ` — ${r.verification.note}` : ""}
+            </li>
+          </ul>
+        ) : null}
         {r.locked ? (
           <p className="mt-1 text-[12px] text-red-300">
             Terkunci, tidak bisa ditayangkan: {r.locked}. Judul tetap bisa diganti.
             {r.triage === "verification"
-              ? " Status: perlu verifikasi (hanya kata kunci, tetap ditahan)."
+              ? " Status: perlu verifikasi (hanya konteks/kata kunci, tetap ditahan)."
               : r.triage === "explicit"
-                ? " Status: ada bukti usia muda."
+                ? " Status: judul mengklaim usia di bawah 18."
                 : ""}
             {r.evidence?.length ? ` Bukti: ${r.evidence.join("; ")}.` : ""}
           </p>
@@ -272,6 +348,56 @@ export function DetectorReviewSection({
           />
         ) : null}
         {notes[r.id] ? <p className="mt-1 text-[12px] text-amber-200">{notes[r.id]}</p> : null}
+        {r.verification && (r.locked || r.verification.status !== "unverified") ? (
+          <div className="mt-2 rounded-lg border border-white/[0.08] p-2">
+            <input
+              type="text"
+              aria-label="Dasar verifikasi"
+              value={proofs[r.id] || ""}
+              maxLength={300}
+              onChange={(e) => setProofs((p) => ({ ...p, [r.id]: e.target.value }))}
+              placeholder="Dasar verifikasi (wajib untuk false positive)"
+              className="w-full rounded-lg border border-white/[0.1] bg-black/40 px-2.5 py-1.5 text-[13px] text-zinc-100"
+            />
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                disabled={busy === r.id || !r.verification.canRelease}
+                title={r.verification.canRelease ? "" : "Judul memuat klaim di bawah 18"}
+                onClick={() => verify(r, "false_positive")}
+                className={`${btn} border border-[#2dd4bf]/40 text-[#5eead4]`}
+              >
+                False positive
+              </button>
+              <button
+                type="button"
+                disabled={busy === r.id}
+                onClick={() => verify(r, "awaiting_verification")}
+                className={`${btn} border border-white/[0.1] text-zinc-200`}
+              >
+                Menunggu verifikasi
+              </button>
+              <button
+                type="button"
+                disabled={busy === r.id}
+                onClick={() => verify(r, "keep_restricted")}
+                className={`${btn} border border-white/[0.1] text-zinc-200`}
+              >
+                Tetap dibatasi
+              </button>
+            </div>
+            {r.verification.history.length ? (
+              <ul className="mt-1.5 space-y-0.5 text-[11px] text-zinc-500">
+                {[...r.verification.history].reverse().map((h, i) => (
+                  <li key={`${h.at}-${i}`}>
+                    {when(h.at)}: {h.status}
+                    {h.note ? ` — ${h.note}` : ""}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
         <div className="mt-2 flex flex-wrap gap-1.5">
           {r.locked ? null : (
             <button

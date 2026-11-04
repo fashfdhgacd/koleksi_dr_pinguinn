@@ -11,7 +11,7 @@ import {
 } from "@/lib/bot/posters.js";
 
 import { listHiddenForReview, setReviewMark } from "@/lib/owner-hidden-review";
-import { approveDetectorReviewBulk, decideDetectorReview, listDetectorReview } from "@/lib/owner-detector-review";
+import { approveDetectorReviewBulk, decideDetectorReview, listDetectorReview, verifyDetectorReview } from "@/lib/owner-detector-review";
 import {
   listHiddenCandidates,
   applyUnhidden,
@@ -1034,6 +1034,10 @@ export const Route = createFileRoute("/api/owner-tools")({
         }
         if (body.action === "detector-review-decide") {
           const r = await decideDetectorReview(body as never);
+          return json(r, r.status || 200);
+        }
+        if (body.action === "detector-review-verify") {
+          const r = await verifyDetectorReview(body as never);
           return json(r, r.status || 200);
         }
         if (body.action === "review-mark") {

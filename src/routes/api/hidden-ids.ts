@@ -3,6 +3,8 @@ import { unpublishedIds } from "@/lib/owner-review-store";
 import { readUnhideState } from "@/lib/catalog/unhide-store";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
 import { readOwnerEditState } from "@/lib/catalog/owner-edit-store";
+import { readReviewState } from "@/lib/owner-review-store";
+import { releasedIds } from "@/lib/owner-verification.js";
 
 /**
  * Publik, hanya id (tanpa judul/alasan/data review):
@@ -45,10 +47,17 @@ export const Route = createFileRoute("/api/hidden-ids")({
         } catch {
           edits = undefined;
         }
+        let released: string[] | undefined;
+        try {
+          released = releasedIds((await readReviewState()).verification);
+        } catch {
+          released = undefined;
+        }
         return Response.json(
           {
             ids,
             unhidden,
+            ...(released ? { released } : {}),
             ...(ownerHidden ? { ownerHidden } : {}),
             ...(edits ? { edits } : {}),
           },
