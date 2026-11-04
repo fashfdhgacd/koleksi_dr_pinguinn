@@ -4,7 +4,9 @@
  * Includes Google video sitemap extension (video:video) for /watch entries.
  */
 import { DEFAULT_PAGE_SIZE, type CategoryInfo } from "../../src/lib/catalog/types";
-import { listListedCategories } from "../../src/lib/catalog/local";
+import { listCategory, listListedCategories } from "../../src/lib/catalog/local";
+import { LANDINGS, LANDING_MIN_VIDEOS, LANDING_POOL, hasBannedWord } from "../../src/lib/catalog/landing";
+import { isMinorContentTitle } from "../../src/lib/catalog/minor-detector.js";
 import { listSitemapWatchEntries } from "../../src/lib/catalog/sitemap-entries";
 import { RANKINGS, RANK_PERIODS, rankPeriodAvailable } from "../../src/lib/catalog/rankings";
 import { SITE_ORIGIN, cleanDisplayTitle, seoVideoThumbnail, videoSeoDescription } from "../../src/lib/seo";
@@ -58,7 +60,28 @@ function listingLastmods(entries: Array<{ category?: string; lastmod?: string }>
 /** Landing pages whose ?page=2..5 go in the sitemap (only listed categories; ai-plus as before). */
 const PAGED_SITEMAP_SLUGS = ["ai-plus", "ai-indo", "videy", "malaysia", "bokep", "jav"];
 
-function pageEntries(categories: CategoryInfo[], mods: { all?: string; bySlug: Map<string, string> }): string[] {
+/** /cari/<slug> landing pages that are indexable (same clean-title rule as the "landing" catalog query). */
+async function indexableLandings(): Promise<string[]> {
+  const out: string[] = [];
+  for (const l of LANDINGS) {
+    try {
+      const pool = await listCategory(l.category, 1, LANDING_POOL);
+      const clean = pool.items.filter(
+        (c) => !hasBannedWord(c.title) && !isMinorContentTitle(c.title) && (!l.match || l.match.test(c.title)),
+      );
+      if (clean.length >= LANDING_MIN_VIDEOS) out.push(l.slug);
+    } catch {
+      /* skip this landing */
+    }
+  }
+  return out;
+}
+
+function pageEntries(
+  categories: CategoryInfo[],
+  mods: { all?: string; bySlug: Map<string, string> },
+  landings: string[] = [],
+): string[] {
   const out: string[] = [
     urlEntry(`${SITE_ORIGIN}/`, { changefreq: "hourly", priority: "1.0", lastmod: mods.all }),
     urlEntry(`${SITE_ORIGIN}/kategori`, { changefreq: "daily", priority: "0.8", lastmod: mods.all }),
@@ -91,6 +114,9 @@ function pageEntries(categories: CategoryInfo[], mods: { all?: string; bySlug: M
     for (let n = 2; n <= pages; n++) {
       out.push(urlEntry(`${SITE_ORIGIN}/kategori/${slug}?page=${n}`, { changefreq: "daily", priority: "0.5", lastmod: mods.bySlug.get(slug) }));
     }
+  }
+  for (const slug of landings) {
+    out.push(urlEntry(`${SITE_ORIGIN}/cari/${slug}`, { changefreq: "daily", priority: "0.6" }));
   }
   for (const path of LEGAL_PATHS) {
     out.push(urlEntry(`${SITE_ORIGIN}${path}`, { changefreq: "monthly", priority: "0.3" }));
@@ -172,8 +198,12 @@ function errorXml(method: string, message: string): Response {
 }
 
 async function buildPagesXml(): Promise<string> {
-  const [categories, entries] = await Promise.all([listListedCategories({ sitemap: true }), listSitemapWatchEntries()]);
-  return wrapUrlset(pageEntries(categories, listingLastmods(entries)));
+  const [categories, entries, landings] = await Promise.all([
+    listListedCategories({ sitemap: true }),
+    listSitemapWatchEntries(),
+    indexableLandings(),
+  ]);
+  return wrapUrlset(pageEntries(categories, listingLastmods(entries), landings));
 }
 
 async function buildWatchXml(chunkIndex?: number): Promise<{ xml: string; total: number; chunks: number }> {

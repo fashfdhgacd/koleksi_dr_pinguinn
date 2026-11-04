@@ -43,6 +43,7 @@ import { Route as ApiPushRouteImport } from './routes/api/push'
 import { Route as ApiPuterinThumbRouteImport } from './routes/api/puterin-thumb'
 import { Route as ApiTapeThumbRouteImport } from './routes/api/tape-thumb'
 import { Route as ApiTelegramRouteImport } from './routes/api/telegram'
+import { Route as CariSlugRouteImport } from './routes/cari.$slug'
 import { Route as KategoriIndexRouteImport } from './routes/kategori.index'
 import { Route as KategoriSlugRouteImport } from './routes/kategori.$slug'
 import { Route as ThumbIdRouteImport } from './routes/thumb.$id'
@@ -223,6 +224,11 @@ const ApiTelegramRoute = ApiTelegramRouteImport.update({
   path: '/api/telegram',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CariSlugRoute = CariSlugRouteImport.update({
+  id: '/cari/$slug',
+  path: '/cari/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KategoriIndexRoute = KategoriIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -304,6 +310,7 @@ export interface FileRoutesByFullPath {
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/cari/$slug': typeof CariSlugRoute
   '/kategori/$slug': typeof KategoriSlugRoute
   '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
@@ -348,6 +355,7 @@ export interface FileRoutesByTo {
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/cari/$slug': typeof CariSlugRoute
   '/kategori/$slug': typeof KategoriSlugRoute
   '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
@@ -394,6 +402,7 @@ export interface FileRoutesById {
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/cari/$slug': typeof CariSlugRoute
   '/kategori/$slug': typeof KategoriSlugRoute
   '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
@@ -441,6 +450,7 @@ export interface FileRouteTypes {
     | '/api/puterin-thumb'
     | '/api/tape-thumb'
     | '/api/telegram'
+    | '/cari/$slug'
     | '/kategori/$slug'
     | '/thumb/$id'
     | '/v/$id'
@@ -485,6 +495,7 @@ export interface FileRouteTypes {
     | '/api/puterin-thumb'
     | '/api/tape-thumb'
     | '/api/telegram'
+    | '/cari/$slug'
     | '/kategori/$slug'
     | '/thumb/$id'
     | '/v/$id'
@@ -530,6 +541,7 @@ export interface FileRouteTypes {
     | '/api/puterin-thumb'
     | '/api/tape-thumb'
     | '/api/telegram'
+    | '/cari/$slug'
     | '/kategori/$slug'
     | '/thumb/$id'
     | '/v/$id'
@@ -576,6 +588,7 @@ export interface RootRouteChildren {
   ApiPuterinThumbRoute: typeof ApiPuterinThumbRoute
   ApiTapeThumbRoute: typeof ApiTapeThumbRoute
   ApiTelegramRoute: typeof ApiTelegramRoute
+  CariSlugRoute: typeof CariSlugRoute
   ThumbIdRoute: typeof ThumbIdRoute
   VIdRoute: typeof VIdRoute
   WatchIdRoute: typeof WatchIdRoute
@@ -825,6 +838,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelegramRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cari/$slug': {
+      id: '/cari/$slug'
+      path: '/cari/$slug'
+      fullPath: '/cari/$slug'
+      preLoaderRoute: typeof CariSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kategori/': {
       id: '/kategori/'
       path: '/'
@@ -940,6 +960,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPuterinThumbRoute: ApiPuterinThumbRoute,
   ApiTapeThumbRoute: ApiTapeThumbRoute,
   ApiTelegramRoute: ApiTelegramRoute,
+  CariSlugRoute: CariSlugRoute,
   ThumbIdRoute: ThumbIdRoute,
   VIdRoute: VIdRoute,
   WatchIdRoute: WatchIdRoute,

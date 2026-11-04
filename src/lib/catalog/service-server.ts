@@ -13,6 +13,8 @@ import { fetchCatalog } from "./client";
 import { uploadDateOf } from "./sitemap-entries";
 import { listRanking, rankedAllTime, withVideyViews } from "./ranking-list";
 import { parseRankingKey } from "./rankings";
+import { LANDING_LIMIT, LANDING_POOL, findLanding, hasBannedWord } from "./landing";
+import { isMinorContentTitle } from "./minor-detector.js";
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./types";
 import type { CatalogError, CatalogResponse, CatalogType, CategoryInfo, VideoCard } from "./types";
 
@@ -86,6 +88,7 @@ function parseType(raw: string | null | undefined): CatalogType {
     case "detail":
     case "related":
     case "categories":
+    case "landing":
       return type;
     default:
       throw Object.assign(new Error("Tipe permintaan tidak dikenal"), { code: "bad_request" as const });
@@ -161,6 +164,23 @@ export async function queryCatalogServer(query: CatalogQuery, signal?: AbortSign
         if (!q) return { ok: false, error: "Kata kunci wajib diisi.", code: "bad_request" };
         const data = await listSearch(q, page, limit, signal);
         return { ok: true, type, ...data, items: await withVideyViews(data.items) };
+      }
+      case "landing": {
+        // /cari/<slug>: one page, the category's first LANDING_POOL videos with clean titles,
+        // most viewed first (stable: equal views keep the category order).
+        const def = findLanding(query.q);
+        if (!def || !findCategory(def.category)) return { ok: false, error: "Halaman tidak dikenal.", code: "not_found" };
+        const pool = await listCategory(def.category, 1, LANDING_POOL, signal);
+        const clean = pool.items.filter(
+          (c) => !hasBannedWord(c.title) && !isMinorContentTitle(c.title) && (!def.match || def.match.test(c.title)),
+        );
+        const withViews = await withVideyViews(clean);
+        const items = withViews
+          .map((c, i) => ({ c, i }))
+          .sort((a, b) => (b.c.views || 0) - (a.c.views || 0) || a.i - b.i)
+          .slice(0, LANDING_LIMIT)
+          .map((x) => x.c);
+        return { ok: true, type, items, total: items.length, page: 1, limit: LANDING_LIMIT, hasMore: false };
       }
       case "related": {
         const id = (query.id || "").trim();

@@ -10,7 +10,8 @@ export type CatalogType =
   | "search"
   | "detail"
   | "related"
-  | "categories";
+  | "categories"
+  | "landing";
 
 export type VideoQuality = {
   label: string;
@@ -90,7 +91,7 @@ export type CatalogSuccess =
   | ({ ok: true; type: "home"; featured: VideoCard[]; categories: CategoryInfo[] } & {
       latest: PagedVideos;
     })
-  | ({ ok: true; type: "latest" | "featured" | "category" | "search" | "related" } & PagedVideos)
+  | ({ ok: true; type: "latest" | "featured" | "category" | "search" | "related" | "landing" } & PagedVideos)
   | { ok: true; type: "detail"; item: VideoDetail; related: VideoCard[] }
   | { ok: true; type: "categories"; categories: CategoryInfo[]; specials?: CategoryInfo[] };
 

@@ -2,6 +2,7 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { PUBLIC_CATEGORY_LIST } from "@/lib/catalog/categories";
 import { RANKINGS } from "@/lib/catalog/rankings";
+import { LANDINGS } from "@/lib/catalog/landing";
 import { queryCatalog } from "@/lib/catalog/service";
 import type { CategoryInfo } from "@/lib/catalog/types";
 import { SITE_ORIGIN } from "@/lib/seo";
@@ -109,6 +110,21 @@ function CategoriesPage() {
             <CoverCard key={cat.slug} {...cat} />
           ))}
         </ul>
+
+        <nav aria-label="Pencarian populer">
+          <h2 className="mb-2 text-sm font-semibold text-zinc-300">Pencarian populer</h2>
+          <div className="flex flex-wrap gap-2">
+            {LANDINGS.map((l) => (
+              <a
+                key={l.slug}
+                href={`/cari/${l.slug}`}
+                className="inline-flex h-8 items-center rounded-full border border-white/10 px-3 text-sm text-zinc-300 hover:border-teal-400/60 hover:text-teal-200"
+              >
+                {l.h1}
+              </a>
+            ))}
+          </div>
+        </nav>
       </section>
     </Shell>
   );
