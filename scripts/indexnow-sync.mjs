@@ -16,7 +16,8 @@
  *
  * Google does not use IndexNow; it reads the sitemap from robots.txt / Search Console.
  */
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, rename, writeFile } from "node:fs/promises";
+import { parseIndexNowState, planIndexNowSync } from "./lib/indexnow-sync-lib.mjs";
 
 const ORIGIN = "https://koleksidrpinguin.com";
 const HOST = new URL(ORIGIN).host;
@@ -85,14 +86,10 @@ async function liveUrls() {
 
 async function readState() {
   try {
-    const map = new Map();
-    for (const line of (await readFile(STATE, "utf8")).split("\n")) {
-      const sp = line.lastIndexOf(" ");
-      if (sp > 0 && line.startsWith("/")) map.set(line.slice(0, sp), line.slice(sp + 1));
-    }
-    return map;
-  } catch {
-    return null;
+    return parseIndexNowState(await readFile(STATE, "utf8"));
+  } catch (e) {
+    if (e?.code === "ENOENT") return null;
+    throw e;
   }
 }
 
@@ -120,18 +117,14 @@ if (prev && prev.size > 100 && live.size < prev.size * 0.5) {
   );
 }
 
-let send;
-if (ALL || !prev) {
-  // First run without --all only records the state (the sitemap already covers old URLs).
-  send = ALL ? [...live.keys()] : [];
-  if (!prev && !ALL) console.log("state belum ada: dicatat saja, tidak ada yang dikirim");
-} else {
-  const changed = [...live].filter(([p, m]) => prev.get(p) !== m).map(([p]) => p);
-  const removed = [...prev.keys()].filter((p) => !live.has(p)).slice(0, MAX_REMOVED);
-  console.log(`baru/berubah: ${changed.length}; hilang dari sitemap: ${removed.length}`);
-  send = [...changed, ...removed];
+if (!prev && !ALL) console.log("state belum ada: dicatat saja, tidak ada yang dikirim");
+const { send, next } = planIndexNowSync(live, prev, { all: ALL, maxRemoved: MAX_REMOVED });
+if (prev && !ALL) {
+  const removedCount = send.filter((path) => !live.has(path)).length;
+  console.log(`baru/berubah: ${send.length - removedCount}; hilang dari sitemap: ${removedCount}`);
+  if (next.size > live.size) console.log(`sisa URL hilang dalam antrean: ${next.size - live.size}`);
 }
-const urls = send.map((p) => ORIGIN + p);
+const urls = [...new Set(send)].map((p) => ORIGIN + p);
 if (DRY) {
   console.log(`[dry-run] akan dikirim ${urls.length} URL`, urls.slice(0, 10));
   process.exit(0);
@@ -139,8 +132,10 @@ if (DRY) {
 if (urls.length) await submit(urls);
 else console.log("tidak ada URL baru");
 
-const lines = [...live]
+const lines = [...next]
   .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
   .map(([p, m]) => `${p} ${m}`);
-await writeFile(STATE, lines.join("\n") + "\n");
+const tempState = new URL(`../data/indexnow-urls.txt.${process.pid}.tmp`, import.meta.url);
+await writeFile(tempState, lines.join("\n") + "\n");
+await rename(tempState, STATE);
 console.log(`state ditulis: ${lines.length} baris`);
