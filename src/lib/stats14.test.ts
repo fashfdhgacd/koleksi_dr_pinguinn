@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildStats14, changeWords, classifySource, foldDayRows, foldUtmRows, wibDayList } from "./stats14.ts";
+import { type BreakdownRow, buildRefPeriods, buildStats14, changeWords, classifySource, foldDayRows, foldUtmRows, refGroup, wibDayList } from "./stats14.ts";
 
 test("classifySource maps real referrers from the site", () => {
   const cases: [string, string][] = [
@@ -45,7 +45,9 @@ test("foldDayRows counts views and distinct visitors per key", () => {
   assert.equal(get("src", "duckduckgo")?.uniq, 1);
   assert.equal(get("src", "other")?.uniq, 2);
   assert.equal(get("ref", "search.brave.com")?.uniq, 2);
-  assert.equal(get("ref", "duckduckgo.com"), undefined);
+  assert.equal(get("ref", "duckduckgo.com")?.views, 1);
+  assert.equal(get("ref", "koleksidrpinguin.com"), undefined);
+  assert.equal(get("ref", "(direct)"), undefined);
   assert.equal(get("country", "ID")?.uniq, 3);
 });
 
@@ -101,4 +103,44 @@ test("foldUtmRows + buildStats14 give the Kampanye (UTM) list", () => {
   assert.equal(s.campaigns[0].label, "justpaste / paste · organic");
   assert.equal(s.campaigns[0].uniq, 3);
   assert.equal(s.campaigns.length, 2);
+});
+
+test("refGroup puts hosts in Pencarian / Sosial / Tempel / Langsung / Lainnya", () => {
+  const cases: [string, string][] = [
+    ["google.com", "search"], ["search.brave.com", "search"], ["yandex.ru", "search"], ["bing.com", "search"],
+    ["t.co", "social"], ["bsky.app", "social"], ["t.me", "social"], ["m.facebook.com", "social"], ["www.reddit.com", "social"],
+    ["justpaste.it", "paste"], ["telegra.ph", "paste"], ["(direct)", "direct"], ["example.org", "other"],
+  ];
+  for (const [h, g] of cases) assert.equal(refGroup(h), g, h);
+});
+
+test("buildRefPeriods: hari ini vs kemarin, old days topped up from src, internal separate", () => {
+  const today = "2026-11-04";
+  const rows: BreakdownRow[] = [
+    // today (new fold: every external host stored)
+    { day: today, kind: "src", key: "google", views: 30, uniq: 20 },
+    { day: today, kind: "ref", key: "google.com", views: 30, uniq: 20 },
+    { day: today, kind: "src", key: "internal", views: 500, uniq: 90 },
+    { day: today, kind: "src", key: "direct", views: 7, uniq: 5 },
+    { day: today, kind: "src", key: "other", views: 4, uniq: 3 },
+    { day: today, kind: "ref", key: "t.co", views: 4, uniq: 3 },
+    { day: today, kind: "utm", key: "bluesky|social|organic|", views: 2, uniq: 2 },
+    // yesterday (old fold: only "other" hosts stored)
+    { day: "2026-11-03", kind: "src", key: "google", views: 12, uniq: 9 },
+    { day: "2026-11-03", kind: "src", key: "justpaste", views: 40, uniq: 30 },
+    { day: "2026-11-03", kind: "src", key: "internal", views: 300, uniq: 70 },
+  ];
+  const [t, y, w] = buildRefPeriods(today, rows);
+  assert.equal(t.key, "today");
+  const g = t.sources.find((s) => s.key === "google.com");
+  assert.deepEqual([g?.views, g?.prev], [30, 12]);
+  assert.equal(t.sources.find((s) => s.key === "justpaste.it")?.prev, 40);
+  assert.equal(t.sources.some((s) => s.key.includes("koleksidrpinguin")), false);
+  assert.deepEqual(t.internal, { views: 500, prev: 300 });
+  assert.equal(t.groups.find((x) => x.key === "search")?.views, 30);
+  assert.equal(t.groups.find((x) => x.key === "social")?.views, 4);
+  assert.equal(t.groups.find((x) => x.key === "direct")?.views, 7);
+  assert.equal(t.campaigns[0]?.uniq, 2);
+  assert.equal(y.sources.find((s) => s.key === "justpaste.it")?.views, 40);
+  assert.equal(w.sources.find((s) => s.key === "google.com")?.views, 42);
 });

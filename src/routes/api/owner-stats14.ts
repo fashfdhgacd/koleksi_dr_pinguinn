@@ -14,7 +14,7 @@ import { toTopVideos, watchIdFromPath, withVideoTitles } from "@/lib/owner-top-v
  * cache, so it can't leak publicly. Loaded only when the owner opens the section; no polling.
  */
 const CACHE_SEC = Math.round(STATS14_TODAY_MS / 1000);
-const CACHE_PATH = "/api/owner-stats14-cache-v1";
+const CACHE_PATH = "/api/owner-stats14-cache-v2";
 
 function json(data: unknown, status = 200): Response {
   return Response.json(data, { status, headers: { "cache-control": "no-store", "x-robots-tag": "noindex" } });

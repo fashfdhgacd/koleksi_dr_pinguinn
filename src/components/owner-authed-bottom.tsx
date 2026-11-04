@@ -110,19 +110,7 @@ export function OwnerAuthedBottom(props: {
               </section>
             ) : null}
 
-            {stats?.topRefs?.length ? (
-              <section className="rounded-xl border border-white/[0.05] bg-[#0c0e0f] p-4">
-                <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">Sumber hari ini (WIB)</h2>
-                <ul className="mt-3 space-y-2 text-sm">
-                  {stats.topRefs.slice(0, 6).map((row) => (
-                    <li key={row.ref} className="flex justify-between gap-3">
-                      <span className="truncate text-zinc-300">{row.ref}</span>
-                      <span className="tabular-nums text-zinc-400">{fmt(row.views)}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
+
 
           </div>
         ) : null}

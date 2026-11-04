@@ -7,7 +7,8 @@
  * `uniq` = distinct visitors that day (weighted). Kinds:
  *   device  — mobile / desktop / tablet / bot / other
  *   src     — classified referrer (SOURCE_KEYS); "internal" = moving between pages of the site
- *   ref     — raw referrer host for the "other" source (top REF_PER_DAY per day)
+ *   ref     — raw external referrer host (top REF_PER_DAY per day; days folded before Nov 2026 only
+ *             kept hosts of the "other" source — refPeriods fills named sources from "src")
  *   country — two-letter code ("" = unknown)
  *   browser — chrome / safari / ...
  *   path    — top PATHS_PER_DAY pages per day
@@ -18,7 +19,7 @@ import { normalizeUtmKey, utmLabel } from "./utm.ts";
 
 export const STATS14_DAYS = 14;
 export const PATHS_PER_DAY = 150;
-export const REF_PER_DAY = 20;
+export const REF_PER_DAY = 40;
 export const UTM_PER_DAY = 50;
 export const BREAKDOWN_KINDS = ["device", "src", "ref", "country", "browser", "path", "utm"] as const;
 export type BreakdownKind = (typeof BREAKDOWN_KINDS)[number];
@@ -98,7 +99,7 @@ export function foldDayRows(day: string, rows: DimVisitorRow[]): BreakdownRow[] 
     add("device", r.device || "other", r);
     const src = classifySource(r.ref);
     add("src", src, r);
-    if (src === "other") add("ref", String(r.ref || "").toLowerCase().replace(/\.$/, "").slice(0, 80), r);
+    if (src !== "direct" && src !== "internal") add("ref", String(r.ref || "").toLowerCase().replace(/\.$/, "").slice(0, 80), r);
     add("country", (r.country || "").toUpperCase().slice(0, 2), r);
     add("browser", r.browser || "other", r);
   }
@@ -169,8 +170,155 @@ export type Stats14 = {
   browsers: TopItem[];
   /** "Kampanye (UTM)": landings per utm key (label = readable form), most visitors first. */
   campaigns: TopItem[];
+  /** "Sumber" card: per period (hari ini / kemarin / 7 / 14 hari) every source host + groups. */
+  refPeriods: RefPeriod[];
   updatedAt: string;
 };
+
+export type RefGroupKey = "search" | "social" | "paste" | "direct" | "other";
+export const REF_GROUP_LABELS: Record<RefGroupKey, string> = {
+  search: "Pencarian",
+  social: "Sosial",
+  paste: "Tempel / link",
+  direct: "Langsung",
+  other: "Lainnya",
+};
+export type RefSource = { key: string; group: RefGroupKey; views: number; prev: number };
+export type RefPeriod = {
+  key: "today" | "yesterday" | "7d" | "14d";
+  label: string;
+  prevLabel: string;
+  /** External sources (incl. "(direct)"), most views first. */
+  sources: RefSource[];
+  groups: { key: RefGroupKey; label: string; views: number; prev: number }[];
+  /** Pageviews from moving between pages of the site (referrer = own domain). */
+  internal: { views: number; prev: number };
+  campaigns: (TopItem & { prev: number })[];
+};
+
+/** Group a referrer host into Pencarian / Sosial / Tempel / Langsung / Lainnya. */
+export function refGroup(host: string): RefGroupKey {
+  const r = String(host || "").trim().toLowerCase().replace(/\.$/, "");
+  if (!r || r === "(direct)") return "direct";
+  const src = classifySource(r);
+  if (src === "google" || src === "bing" || src === "duckduckgo" || src === "yahoo") return "search";
+  if (src === "justpaste") return "paste";
+  if (src === "telegram") return "social";
+  if (/(^|\.)(yandex|ecosia|baidu|naver|startpage|qwant|seznam|sogou|so|mojeek|presearch|petalsearch|ask|aol|you)\.[a-z.]+$/.test(r)) return "search";
+  if (/(^|\.)search\.brave\.com$/.test(r) || /(^|\.)brave\.com$/.test(r) || r.startsWith("search.")) return "search";
+  if (/^(t\.co|x\.com|twitter\.com|bsky\.app|threads\.net|lnkd\.in|fb\.me|wa\.me)$/.test(r)) return "social";
+  if (/(^|\.)(facebook|instagram|reddit|tiktok|whatsapp|discord|discordapp|linkedin|youtube|pinterest|tumblr|vk|line|quora|mastodon|kaskus|bsky)\.[a-z.]+$/.test(r)) return "social";
+  if (r.startsWith("com.facebook") || r.startsWith("com.twitter") || r.startsWith("com.instagram") || r.startsWith("com.whatsapp") || r.startsWith("com.reddit") || r.startsWith("com.zhiliaoapp") || r.startsWith("xyz.blueskyweb")) return "social";
+  if (/(^|\.)(pastebin\.com|telegra\.ph|rentry\.(co|org)|controlc\.com|paste\.ee|ghostbin\.[a-z]+|privatebin\.[a-z.]+|linktr\.ee|bit\.ly|s\.id|tinyurl\.com|cutt\.ly|linkr\.bio|bio\.link|carrd\.co|notion\.site|blogspot\.com|wordpress\.com|medium\.com)$/.test(r)) return "paste";
+  return "other";
+}
+
+/** Host shown for a named source on days that stored only its "src" total (canonical host). */
+const SRC_HOST: Partial<Record<SourceKey, string>> = {
+  google: "google.com",
+  bing: "bing.com",
+  duckduckgo: "duckduckgo.com",
+  yahoo: "yahoo.com",
+  justpaste: "justpaste.it",
+  telegram: "t.me",
+  direct: "(direct)",
+};
+
+/** Pageviews per external source host for one day: "ref" rows, topped up from "src" totals. */
+function dayHosts(rows: BreakdownRow[]): Map<string, number> {
+  const hosts = new Map<string, number>();
+  const covered = new Map<string, number>();
+  for (const r of rows) {
+    if (r.kind !== "ref") continue;
+    hosts.set(r.key, (hosts.get(r.key) || 0) + (Number(r.views) || 0));
+    const src = classifySource(r.key);
+    covered.set(src, (covered.get(src) || 0) + (Number(r.views) || 0));
+  }
+  for (const r of rows) {
+    if (r.kind !== "src") continue;
+    const host = SRC_HOST[r.key as SourceKey];
+    if (!host) continue;
+    const rest = (Number(r.views) || 0) - (covered.get(r.key) || 0);
+    if (rest > 0) hosts.set(host, (hosts.get(host) || 0) + rest);
+  }
+  return hosts;
+}
+
+/** Build the per-period "Sumber" data from the 28 days of breakdown rows. */
+export function buildRefPeriods(today: string, rows: BreakdownRow[]): RefPeriod[] {
+  const all = wibDayList(today, STATS14_DAYS * 2);
+  const byDay = new Map<string, BreakdownRow[]>();
+  for (const r of rows) {
+    const l = byDay.get(r.day);
+    if (l) l.push(r);
+    else byDay.set(r.day, [r]);
+  }
+  const hostCache = new Map<string, Map<string, number>>();
+  const hostsOf = (d: string) => {
+    let m = hostCache.get(d);
+    if (!m) hostCache.set(d, (m = dayHosts(byDay.get(d) || [])));
+    return m;
+  };
+  const sumHosts = (days: string[]) => {
+    const m = new Map<string, number>();
+    for (const d of days) for (const [k, v] of hostsOf(d)) m.set(k, (m.get(k) || 0) + v);
+    return m;
+  };
+  const sumKind = (days: string[], kind: BreakdownKind, key?: string) => {
+    const m = new Map<string, { views: number; uniq: number }>();
+    for (const d of days)
+      for (const r of byDay.get(d) || []) {
+        if (r.kind !== kind || (key !== undefined && r.key !== key)) continue;
+        const e = m.get(r.key) || { views: 0, uniq: 0 };
+        e.views += Number(r.views) || 0;
+        e.uniq += Number(r.uniq) || 0;
+        m.set(r.key, e);
+      }
+    return m;
+  };
+  const n = all.length;
+  const defs: { key: RefPeriod["key"]; label: string; prevLabel: string; len: number }[] = [
+    { key: "today", label: "Hari ini", prevLabel: "kemarin", len: 1 },
+    { key: "yesterday", label: "Kemarin", prevLabel: "2 hari lalu", len: 1 },
+    { key: "7d", label: "7 hari", prevLabel: "7 hari sebelumnya", len: 7 },
+    { key: "14d", label: "14 hari", prevLabel: "14 hari sebelumnya", len: 14 },
+  ];
+  return defs.map((def) => {
+    const end = def.key === "yesterday" ? n - 1 : n;
+    const cur = all.slice(end - def.len, end);
+    const prev = all.slice(Math.max(0, end - 2 * def.len), end - def.len);
+    const c = sumHosts(cur);
+    const p = sumHosts(prev);
+    const keys = new Set([...c.keys(), ...p.keys()]);
+    const sources: RefSource[] = [...keys]
+      .map((k) => ({ key: k, group: refGroup(k), views: Math.round(c.get(k) || 0), prev: Math.round(p.get(k) || 0) }))
+      .filter((s) => s.views > 0 || s.prev > 0)
+      .sort((a, b) => b.views - a.views || b.prev - a.prev);
+    const groups = (Object.keys(REF_GROUP_LABELS) as RefGroupKey[]).map((g) => ({
+      key: g,
+      label: REF_GROUP_LABELS[g],
+      views: sources.filter((s) => s.group === g).reduce((a, s) => a + s.views, 0),
+      prev: sources.filter((s) => s.group === g).reduce((a, s) => a + s.prev, 0),
+    }));
+    const ic = sumKind(cur, "src", "internal").get("internal")?.views || 0;
+    const ip = sumKind(prev, "src", "internal").get("internal")?.views || 0;
+    const cc = sumKind(cur, "utm");
+    const cp = sumKind(prev, "utm");
+    const campaigns = [...cc.entries()]
+      .map(([key, e]) => ({ key, label: utmLabel(key), views: e.views, uniq: e.uniq, prev: cp.get(key)?.uniq || 0 }))
+      .sort((a, b) => b.uniq - a.uniq || b.views - a.views)
+      .slice(0, 20);
+    return {
+      key: def.key,
+      label: def.label,
+      prevLabel: def.prevLabel,
+      sources: sources.slice(0, 100),
+      groups,
+      internal: { views: Math.round(ic), prev: Math.round(ip) },
+      campaigns,
+    };
+  });
+}
 
 const DEVICE_ORDER: { key: string; label: string }[] = [
   { key: "mobile", label: "HP" },
@@ -262,11 +410,12 @@ export function buildStats14(
     devices,
     sources,
     internalViews: internal.perDay,
-    otherRefs: top(rows, "ref", cur, 10, "uniq"),
+    otherRefs: top(rows.filter((r) => r.kind !== "ref" || classifySource(r.key) === "other"), "ref", cur, 10, "uniq"),
     pages: top(rows, "path", cur, 20, "views"),
     countries: top(rows, "country", cur, 10, "uniq"),
     browsers: top(rows, "browser", cur, 8, "uniq"),
     campaigns: top(rows, "utm", cur, 20, "uniq").map((c) => ({ ...c, label: utmLabel(c.key) })),
+    refPeriods: buildRefPeriods(today, rows),
     updatedAt: new Date(now).toISOString(),
   };
 }
