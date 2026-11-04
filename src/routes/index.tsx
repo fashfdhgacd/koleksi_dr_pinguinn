@@ -13,6 +13,7 @@ import { DEFAULT_PAGE_SIZE, type VideoCard } from "@/lib/catalog/types";
 import { useCatalogFeed } from "../hooks/use-catalog";
 import { jsonLdString } from "@/lib/json-ld";
 import { BRAND_NAME, DEFAULT_OG, HOME_CANONICAL, HOME_INTRO, homeJsonLd, homeSeo } from "@/lib/seo";
+import { ReturnVisitor } from "@/components/return-visitor";
 
 type HomeSearch = {
   q?: string;
@@ -292,6 +293,9 @@ function HomePage() {
             hasMore={feed.hasMore}
             onPage={setPage}
           />
+          <SafeBoundary>
+            <ReturnVisitor key={page} />
+          </SafeBoundary>
         </section>
       </div>
     </Shell>

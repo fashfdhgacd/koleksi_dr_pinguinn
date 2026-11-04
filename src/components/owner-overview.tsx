@@ -6,6 +6,7 @@
 // enforced on the server (owner-tools.ts). Nothing here polls: data loads when the panel opens,
 // on Refresh, and when the tab comes back (owner-panel.tsx, at most once a minute).
 import { OwnerHeroCard } from "@/components/owner-hero";
+import { OwnerPushCard } from "@/components/owner-push";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CATEGORY_LIST } from "@/lib/catalog/categories";
 import { EXTRA_CHOICES, MAX_EXTRA } from "@/components/owner-edit-sheet";
@@ -1240,6 +1241,10 @@ export function OwnerOverview(props: {
 
       <div className="mt-4">
         <OwnerHeroCard secret={secret} />
+      </div>
+
+      <div className="mt-4">
+        <OwnerPushCard secret={secret} />
       </div>
 
       <ThumbMissingCard secret={secret} reloadKey={reloadKey} />
