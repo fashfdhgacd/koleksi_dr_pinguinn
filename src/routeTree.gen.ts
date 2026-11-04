@@ -20,6 +20,7 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PrivasiRouteImport } from './routes/privasi'
 import { Route as PutarinRouteImport } from './routes/putarin'
 import { Route as SyaratRouteImport } from './routes/syarat'
+import { Route as TemanRouteImport } from './routes/teman'
 import { Route as TentangRouteImport } from './routes/tentang'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as ApiAdLogRouteImport } from './routes/api/ad-log'
@@ -104,6 +105,11 @@ const PutarinRoute = PutarinRouteImport.update({
 const SyaratRoute = SyaratRouteImport.update({
   id: '/syarat',
   path: '/syarat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemanRoute = TemanRouteImport.update({
+  id: '/teman',
+  path: '/teman',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TentangRoute = TentangRouteImport.update({
@@ -269,6 +275,7 @@ export interface FileRoutesByFullPath {
   '/privasi': typeof PrivasiRoute
   '/putarin': typeof PutarinRoute
   '/syarat': typeof SyaratRoute
+  '/teman': typeof TemanRoute
   '/tentang': typeof TentangRoute
   '/terms': typeof TermsRoute
   '/api/ad-log': typeof ApiAdLogRoute
@@ -311,6 +318,7 @@ export interface FileRoutesByTo {
   '/privasi': typeof PrivasiRoute
   '/putarin': typeof PutarinRoute
   '/syarat': typeof SyaratRoute
+  '/teman': typeof TemanRoute
   '/tentang': typeof TentangRoute
   '/terms': typeof TermsRoute
   '/api/ad-log': typeof ApiAdLogRoute
@@ -355,6 +363,7 @@ export interface FileRoutesById {
   '/privasi': typeof PrivasiRoute
   '/putarin': typeof PutarinRoute
   '/syarat': typeof SyaratRoute
+  '/teman': typeof TemanRoute
   '/tentang': typeof TentangRoute
   '/terms': typeof TermsRoute
   '/api/ad-log': typeof ApiAdLogRoute
@@ -400,6 +409,7 @@ export interface FileRouteTypes {
     | '/privasi'
     | '/putarin'
     | '/syarat'
+    | '/teman'
     | '/tentang'
     | '/terms'
     | '/api/ad-log'
@@ -442,6 +452,7 @@ export interface FileRouteTypes {
     | '/privasi'
     | '/putarin'
     | '/syarat'
+    | '/teman'
     | '/tentang'
     | '/terms'
     | '/api/ad-log'
@@ -485,6 +496,7 @@ export interface FileRouteTypes {
     | '/privasi'
     | '/putarin'
     | '/syarat'
+    | '/teman'
     | '/tentang'
     | '/terms'
     | '/api/ad-log'
@@ -529,6 +541,7 @@ export interface RootRouteChildren {
   PrivasiRoute: typeof PrivasiRoute
   PutarinRoute: typeof PutarinRoute
   SyaratRoute: typeof SyaratRoute
+  TemanRoute: typeof TemanRoute
   TentangRoute: typeof TentangRoute
   TermsRoute: typeof TermsRoute
   ApiAdLogRoute: typeof ApiAdLogRoute
@@ -636,6 +649,13 @@ declare module '@tanstack/react-router' {
       path: '/syarat'
       fullPath: '/syarat'
       preLoaderRoute: typeof SyaratRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/teman': {
+      id: '/teman'
+      path: '/teman'
+      fullPath: '/teman'
+      preLoaderRoute: typeof TemanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/tentang': {
@@ -877,6 +897,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivasiRoute: PrivasiRoute,
   PutarinRoute: PutarinRoute,
   SyaratRoute: SyaratRoute,
+  TemanRoute: TemanRoute,
   TentangRoute: TentangRoute,
   TermsRoute: TermsRoute,
   ApiAdLogRoute: ApiAdLogRoute,

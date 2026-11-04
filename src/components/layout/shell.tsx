@@ -61,6 +61,9 @@ export function Shell({
                 <Link to="/kontak" className="hover:text-white hover:underline">
                   Kontak
                 </Link>
+                <Link to="/teman" className="hover:text-white hover:underline">
+                  Teman
+                </Link>
               </nav>
               <a
                 href="https://www.rtalabel.org/"
