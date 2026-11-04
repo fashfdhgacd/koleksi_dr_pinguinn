@@ -1,0 +1,36 @@
+name: traffic-landing
+
+# Laporan manual (read-only D1): halaman masuk yang kehilangan pengunjung DDG/Bing. Hasil di Job Summary + artifact.
+on:
+  workflow_dispatch:
+    inputs:
+      before_from: { description: "Sebelum: dari (WIB)", default: "2026-10-23" }
+      before_to: { description: "Sebelum: sampai", default: "2026-10-30" }
+      after_from: { description: "Sesudah: dari", default: "2026-11-01" }
+      after_to: { description: "Sesudah: sampai", default: "2026-11-04" }
+
+permissions:
+  contents: read
+
+jobs:
+  landing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Landing report
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          BEFORE_FROM: ${{ inputs.before_from }}
+          BEFORE_TO: ${{ inputs.before_to }}
+          AFTER_FROM: ${{ inputs.after_from }}
+          AFTER_TO: ${{ inputs.after_to }}
+        run: node scripts/traffic-landing.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: traffic-landing
+          path: data/traffic-landing.json
