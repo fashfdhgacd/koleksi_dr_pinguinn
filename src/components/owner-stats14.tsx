@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fmt } from "@/components/owner-dashboard-shared";
-import { type Series, type Stats14, type TopItem, changeWords } from "@/lib/stats14";
+import { type RefPeriod, type Series, type Stats14, type TopItem, changeWords } from "@/lib/stats14";
 
 /**
  * "Statistik 14 hari" body for /pemilik: loaded once when the owner opens the section (and on
@@ -90,6 +90,106 @@ function Bar(props: { value: number; max: number }) {
 
 function Change(props: { cur: number; prev: number }) {
   return <span className="text-[12px] text-zinc-500">{changeWords(props.cur, props.prev, fmt)}</span>;
+}
+
+const GROUP_DOT: Record<string, string> = {
+  search: "Pencarian",
+  social: "Sosial",
+  paste: "Tempel",
+  direct: "Langsung",
+  other: "Lainnya",
+};
+
+/** "Sumber pengunjung" with a period toggle; every source host, its group, and the previous period. */
+function SourcesCard(props: { periods: RefPeriod[]; clock: string }) {
+  const [pk, setPk] = useState<RefPeriod["key"]>("today");
+  const [all, setAll] = useState(false);
+  const p = props.periods.find((x) => x.key === pk) || props.periods[0];
+  if (!p) return null;
+  const ext = p.sources.reduce((a, s) => a + s.views, 0);
+  const extPrev = p.sources.reduce((a, s) => a + s.prev, 0);
+  const max = Math.max(1, ...p.sources.map((s) => s.views));
+  const shown = all ? p.sources : p.sources.slice(0, 20);
+  const vs = (n: number) => `${p.prevLabel} ${fmt(n)}`;
+  return (
+    <Card title={`Sumber pengunjung · ${p.label} (WIB)`}>
+      <div className="flex flex-wrap gap-1.5">
+        {props.periods.map((x) => (
+          <button
+            key={x.key}
+            type="button"
+            onClick={() => {
+              setPk(x.key);
+              setAll(false);
+            }}
+            className="rounded-full border px-3 py-1 text-[12px]"
+            style={x.key === p.key ? { borderColor: TEAL, color: TEAL } : { borderColor: "rgba(255,255,255,0.1)", color: "#a1a1aa" }}
+          >
+            {x.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-3 text-sm text-zinc-200">
+        Dari luar situs: <b className="tabular-nums">{fmt(ext)}</b> kunjungan halaman{" "}
+        <span className="text-[12px] text-zinc-500">({vs(extPrev)})</span>
+      </p>
+      <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-3">
+        {p.groups.map((g) => (
+          <li key={g.key} className="flex justify-between gap-2">
+            <span className="text-zinc-400">{g.label}</span>
+            <span className="tabular-nums text-zinc-200">
+              {fmt(g.views)} <span className="text-[11px] text-zinc-500">({fmt(g.prev)})</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <ul className="mt-4 space-y-2 text-sm">
+        {shown.map((s) => (
+          <li key={s.key} className="flex flex-col gap-1">
+            <div className="flex justify-between gap-3">
+              <span className="min-w-0 truncate text-zinc-200">
+                {s.key === "(direct)" ? "Langsung (ketik alamat / bookmark)" : s.key}{" "}
+                <span className="text-[11px] text-zinc-500">· {GROUP_DOT[s.group] || s.group}</span>
+              </span>
+              <span className="shrink-0 tabular-nums text-zinc-200">
+                {fmt(s.views)} <span className="text-[11px] text-zinc-500">{vs(s.prev)}</span>
+              </span>
+            </div>
+            <Bar value={s.views} max={max} />
+          </li>
+        ))}
+      </ul>
+      {p.sources.length > 20 ? (
+        <button type="button" onClick={() => setAll((v) => !v)} className="mt-3 text-[12px] underline" style={{ color: TEAL }}>
+          {all ? "Tampilkan 20 saja" : `Lihat semua (${fmt(p.sources.length)})`}
+        </button>
+      ) : null}
+      {!p.sources.length ? <p className="text-sm text-zinc-400">Belum ada data.</p> : null}
+      <p className="mt-3 text-sm text-zinc-300">
+        Pindah halaman di dalam situs (koleksidrpinguin.com): <b className="tabular-nums">{fmt(p.internal.views)}</b>{" "}
+        <span className="text-[12px] text-zinc-500">({vs(p.internal.prev)})</span>
+      </p>
+      {p.campaigns.length ? (
+        <div className="mt-3">
+          <p className="text-[12px] uppercase tracking-wide text-zinc-500">Kampanye (UTM)</p>
+          <ul className="mt-1 space-y-1 text-sm">
+            {p.campaigns.map((c) => (
+              <li key={c.key} className="flex justify-between gap-3">
+                <span className="min-w-0 truncate text-zinc-300">{c.label || c.key}</span>
+                <span className="shrink-0 tabular-nums text-zinc-200">
+                  {fmt(c.uniq)} orang <span className="text-[11px] text-zinc-500">{vs(c.prev)}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <p className="mt-3 text-[12px] text-zinc-500">
+        Angka = kunjungan halaman. Angka abu-abu = periode sebelumnya. Diperbarui paling lama tiap 10 menit
+        {props.clock ? ` (${props.clock} WIB)` : ""}.
+      </p>
+    </Card>
+  );
 }
 
 /** Per-day table: one column per series (HP / Desktop / …), newest day first. */
@@ -195,6 +295,7 @@ export function OwnerStats14(props: { secret: string }) {
 
   return (
     <>
+      {data.refPeriods?.length ? <SourcesCard periods={data.refPeriods} clock={clock} /> : null}
       <Card title="Pengunjung per hari (14 hari, WIB)">
         <p className="text-sm text-zinc-200">
           14 hari: <b className="tabular-nums">{fmt(data.totals.uniq)}</b> orang ·{" "}
