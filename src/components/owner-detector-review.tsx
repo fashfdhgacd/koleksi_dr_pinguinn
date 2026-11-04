@@ -13,6 +13,8 @@ type Row = {
   trigger: string;
   strict: boolean;
   locked: string;
+  triage?: "explicit" | "verification" | "";
+  evidence?: string[];
   decidedAt: number | null;
   live: boolean | null;
 };
@@ -219,6 +221,12 @@ export function DetectorReviewSection({
         {r.locked ? (
           <p className="mt-1 text-[12px] text-red-300">
             Terkunci, tidak bisa ditayangkan: {r.locked}. Judul tetap bisa diganti.
+            {r.triage === "verification"
+              ? " Status: perlu verifikasi (hanya kata kunci, tetap ditahan)."
+              : r.triage === "explicit"
+                ? " Status: ada bukti usia muda."
+                : ""}
+            {r.evidence?.length ? ` Bukti: ${r.evidence.join("; ")}.` : ""}
           </p>
         ) : r.strict ? (
           <p className="text-[12px] text-red-300">
