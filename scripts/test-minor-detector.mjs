@@ -60,9 +60,11 @@ test("clear never unlocks existing rules (additive)", () => {
 });
 test("locked tidak bisa ditayangkan lewat Tayangkan (guard di server)", () => {
   const src = readFileSync(new URL("../src/lib/owner-detector-review.ts", import.meta.url), "utf8");
-  assert.match(src, /minorContentReason\(title\) === "minor" \|\| isLockedMinor\(it as never\)\) return \{ ok: false, error: "locked_minor", status: 403 \}/);
-  // dan item locked tidak masuk kotak Perlu dicek
-  assert.match(src, /if \(owner === "minor" \|\| isLockedMinor\(it as never\)\) continue;/);
+  // approvalBlock(): any minor lock / detector "minor" -> 403 locked_minor, used by Tayangkan + Tayangkan semua.
+  assert.match(src, /if \(minorContentReason\(title\) === "minor"\) return "judul menyebut anak di bawah umur";/);
+  assert.match(src, /isLockedMinor\(it as never\) \? "dikunci sebagai konten di bawah umur"/);
+  assert.match(src, /if \(locked\) return \{ error: "locked_minor", status: 403, reason: locked \};/);
+  assert.match(src, /const block = approvalBlock\(it, title, proof\);/);
 });
 
 test("label penilaian sesuai sinyal + konsisten dengan penanda dewasa", async () => {
