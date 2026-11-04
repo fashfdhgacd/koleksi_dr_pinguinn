@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OpenSearchDescription xmlns="http://a9.com/-/spec/opensearch/1.1/">
+  <ShortName>Koleksi Dr. Pinguin</ShortName>
+  <Description>Cari video di Koleksi Dr. Pinguin (18+)</Description>
+  <InputEncoding>UTF-8</InputEncoding>
+  <Image width="48" height="48" type="image/png">https://koleksidrpinguin.com/logo-penguin.png</Image>
+  <Url type="text/html" method="get" template="https://koleksidrpinguin.com/?q={searchTerms}"/>
+</OpenSearchDescription>

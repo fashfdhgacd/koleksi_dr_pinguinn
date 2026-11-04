@@ -1,5 +1,7 @@
 import { loadItems } from "./local";
 import { slugOf } from "./local-shared";
+import { significantLastmod } from "./lastmod.js";
+import { readOwnerEditState } from "./owner-edit-store";
 
 export type SitemapWatchEntry = {
   id: string;
@@ -41,6 +43,24 @@ function toSitemapLastmod(raw: unknown): string | undefined {
 const memo = new WeakMap<object, SitemapWatchEntry[]>();
 
 export async function listSitemapWatchEntries(): Promise<SitemapWatchEntry[]> {
+  const base = await listBaseEntries();
+  // Owner edits (title/category) are a significant change: lastmod moves to the edit date.
+  let edits: Record<string, { at: number }> = {};
+  try {
+    edits = (await readOwnerEditState()).ids;
+  } catch {
+    /* KV unavailable: fall back to upload dates */
+  }
+  const now = Date.now();
+  return base.map((e) => {
+    const at = edits[e.id]?.at;
+    if (!at) return e;
+    const lastmod = significantLastmod(undefined, at, now);
+    return lastmod && (!e.lastmod || lastmod > e.lastmod) ? { ...e, lastmod } : e;
+  });
+}
+
+async function listBaseEntries(): Promise<SitemapWatchEntry[]> {
   const { items } = await loadItems();
   const hit = memo.get(items);
   if (hit) return hit;
@@ -49,7 +69,7 @@ export async function listSitemapWatchEntries(): Promise<SitemapWatchEntry[]> {
   for (const it of items) {
     if (!it?.id || seen.has(it.id)) continue;
     seen.add(it.id);
-    const lastmod = toSitemapLastmod(it.createdAt ?? it.date);
+    const lastmod = significantLastmod(it.createdAt ?? it.date, undefined) ?? toSitemapLastmod(it.createdAt ?? it.date);
     const entry: SitemapWatchEntry = { id: it.id };
     if (lastmod) entry.lastmod = lastmod;
     const title = str(it.title);

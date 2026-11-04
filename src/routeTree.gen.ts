@@ -43,6 +43,7 @@ import { Route as ApiPushRouteImport } from './routes/api/push'
 import { Route as ApiPuterinThumbRouteImport } from './routes/api/puterin-thumb'
 import { Route as ApiTapeThumbRouteImport } from './routes/api/tape-thumb'
 import { Route as ApiTelegramRouteImport } from './routes/api/telegram'
+import { Route as CariIndexRouteImport } from './routes/cari.index'
 import { Route as CariSlugRouteImport } from './routes/cari.$slug'
 import { Route as KategoriIndexRouteImport } from './routes/kategori.index'
 import { Route as KategoriSlugRouteImport } from './routes/kategori.$slug'
@@ -224,6 +225,11 @@ const ApiTelegramRoute = ApiTelegramRouteImport.update({
   path: '/api/telegram',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CariIndexRoute = CariIndexRouteImport.update({
+  id: '/cari/',
+  path: '/cari/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CariSlugRoute = CariSlugRouteImport.update({
   id: '/cari/$slug',
   path: '/cari/$slug',
@@ -315,6 +321,7 @@ export interface FileRoutesByFullPath {
   '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
+  '/cari/': typeof CariIndexRoute
   '/kategori/': typeof KategoriIndexRoute
   '/api/analytics/health': typeof ApiAnalyticsHealthRoute
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
@@ -360,6 +367,7 @@ export interface FileRoutesByTo {
   '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
+  '/cari': typeof CariIndexRoute
   '/kategori': typeof KategoriIndexRoute
   '/api/analytics/health': typeof ApiAnalyticsHealthRoute
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
@@ -407,6 +415,7 @@ export interface FileRoutesById {
   '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
+  '/cari/': typeof CariIndexRoute
   '/kategori/': typeof KategoriIndexRoute
   '/api/analytics/health': typeof ApiAnalyticsHealthRoute
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
@@ -455,6 +464,7 @@ export interface FileRouteTypes {
     | '/thumb/$id'
     | '/v/$id'
     | '/watch/$id'
+    | '/cari/'
     | '/kategori/'
     | '/api/analytics/health'
     | '/api/analytics/hourly'
@@ -500,6 +510,7 @@ export interface FileRouteTypes {
     | '/thumb/$id'
     | '/v/$id'
     | '/watch/$id'
+    | '/cari'
     | '/kategori'
     | '/api/analytics/health'
     | '/api/analytics/hourly'
@@ -546,6 +557,7 @@ export interface FileRouteTypes {
     | '/thumb/$id'
     | '/v/$id'
     | '/watch/$id'
+    | '/cari/'
     | '/kategori/'
     | '/api/analytics/health'
     | '/api/analytics/hourly'
@@ -592,6 +604,7 @@ export interface RootRouteChildren {
   ThumbIdRoute: typeof ThumbIdRoute
   VIdRoute: typeof VIdRoute
   WatchIdRoute: typeof WatchIdRoute
+  CariIndexRoute: typeof CariIndexRoute
   ApiAnalyticsHealthRoute: typeof ApiAnalyticsHealthRoute
   ApiAnalyticsHourlyRoute: typeof ApiAnalyticsHourlyRoute
   ApiAnalyticsOverviewRoute: typeof ApiAnalyticsOverviewRoute
@@ -838,6 +851,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelegramRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cari/': {
+      id: '/cari/'
+      path: '/cari'
+      fullPath: '/cari/'
+      preLoaderRoute: typeof CariIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cari/$slug': {
       id: '/cari/$slug'
       path: '/cari/$slug'
@@ -964,6 +984,7 @@ const rootRouteChildren: RootRouteChildren = {
   ThumbIdRoute: ThumbIdRoute,
   VIdRoute: VIdRoute,
   WatchIdRoute: WatchIdRoute,
+  CariIndexRoute: CariIndexRoute,
   ApiAnalyticsHealthRoute: ApiAnalyticsHealthRoute,
   ApiAnalyticsHourlyRoute: ApiAnalyticsHourlyRoute,
   ApiAnalyticsOverviewRoute: ApiAnalyticsOverviewRoute,
