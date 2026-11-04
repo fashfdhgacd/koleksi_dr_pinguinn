@@ -7,6 +7,7 @@ import { DEFAULT_PAGE_SIZE, type CategoryInfo } from "../../src/lib/catalog/type
 import { listCategory, listListedCategories } from "../../src/lib/catalog/local";
 import { LANDINGS, LANDING_MIN_VIDEOS, LANDING_POOL, hasBannedWord } from "../../src/lib/catalog/landing";
 import { isMinorContentTitle } from "../../src/lib/catalog/minor-detector.js";
+import { STATIC_PAGE_LASTMOD } from "../../src/lib/catalog/lastmod.js";
 import { listSitemapWatchEntries } from "../../src/lib/catalog/sitemap-entries";
 import { RANKINGS, RANK_PERIODS, rankPeriodAvailable } from "../../src/lib/catalog/rankings";
 import { SITE_ORIGIN, cleanDisplayTitle, seoVideoThumbnail, videoSeoDescription } from "../../src/lib/seo";
@@ -115,11 +116,12 @@ function pageEntries(
       out.push(urlEntry(`${SITE_ORIGIN}/kategori/${slug}?page=${n}`, { changefreq: "daily", priority: "0.5", lastmod: mods.bySlug.get(slug) }));
     }
   }
+  out.push(urlEntry(`${SITE_ORIGIN}/cari`, { changefreq: "weekly", priority: "0.6", lastmod: "2026-11-05" }));
   for (const slug of landings) {
     out.push(urlEntry(`${SITE_ORIGIN}/cari/${slug}`, { changefreq: "daily", priority: "0.6" }));
   }
   for (const path of LEGAL_PATHS) {
-    out.push(urlEntry(`${SITE_ORIGIN}${path}`, { changefreq: "monthly", priority: "0.3" }));
+    out.push(urlEntry(`${SITE_ORIGIN}${path}`, { changefreq: "monthly", priority: "0.3", lastmod: STATIC_PAGE_LASTMOD[path] }));
   }
   return out;
 }

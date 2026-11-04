@@ -424,12 +424,27 @@ export function DetectorReviewSection({
     </div>
   );
 
-  const pending = (rows || []).filter((r) => r.group === "pending");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [query, setQuery] = useState("");
+  const matches = (r: Row) => {
+    const st = r.verification?.status || "unverified";
+    if (statusFilter !== "all" && st !== statusFilter) return false;
+    const q = query.trim().toLowerCase();
+    return !q || r.id.toLowerCase().includes(q) || r.title.toLowerCase().includes(q);
+  };
+  // Bulk publish only covers items that were never locked, classified as school context, or verified.
+  const bulkSafe = (r: Row) =>
+    !r.strict &&
+    !r.locked &&
+    !(r.classification && r.classification.contextKeywords.length) &&
+    (r.verification?.status || "unverified") === "unverified";
+  const pending = (rows || []).filter((r) => r.group === "pending" && matches(r));
   const approved = (rows || []).filter((r) => r.group === "approved");
-  const held = (rows || []).filter((r) => r.group === "held");
+  const held = (rows || []).filter((r) => r.group === "held" && matches(r));
+  const pendingTotal = (rows || []).filter((r) => r.group === "pending").length;
   useEffect(() => {
-    if (rows) onCount?.(pending.length);
-  }, [rows, pending.length, onCount]);
+    if (rows) onCount?.(pendingTotal);
+  }, [rows, pendingTotal, onCount]);
 
   if (err && !rows)
     return (
@@ -457,16 +472,38 @@ export function DetectorReviewSection({
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-zinc-100">Perlu dicek ({pending.length})</h2>
-        {pending.some((r) => !r.strict) ? (
+        {pending.some(bulkSafe) ? (
           <button
             type="button"
             disabled={busy !== ""}
-            onClick={() => void approveAll(pending.filter((r) => !r.strict).map((r) => r.id))}
+            onClick={() => void approveAll(pending.filter(bulkSafe).map((r) => r.id))}
             className={`${btn} bg-[#2dd4bf] font-medium text-zinc-950`}
           >
-            Tayangkan semua ({pending.filter((r) => !r.strict).length})
+            Tayangkan semua ({pending.filter(bulkSafe).length})
           </button>
         ) : null}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <input
+          type="search"
+          aria-label="Cari ID atau judul"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Cari ID / judul"
+          className="min-w-0 flex-1 rounded-lg border border-white/[0.1] bg-black/40 px-2.5 py-1.5 text-[13px] text-zinc-100"
+        />
+        <select
+          aria-label="Filter status verifikasi"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="rounded-lg border border-white/[0.1] bg-black/40 px-2 py-1.5 text-[13px] text-zinc-100"
+        >
+          <option value="all">Semua status</option>
+          <option value="unverified">Belum diverifikasi</option>
+          <option value="awaiting_verification">Menunggu verifikasi</option>
+          <option value="false_positive">False positive</option>
+          <option value="keep_restricted">Tetap dibatasi</option>
+        </select>
       </div>
       {err ? (
         <p role="alert" className="text-[13px] text-red-300">
