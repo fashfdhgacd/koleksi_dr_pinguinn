@@ -42,6 +42,15 @@ export function sourceSql(fromMs) {
 select d, ${SOURCE_CASE} src, count(*) v from f group by d, src order by d, src`;
 }
 
+/** Visitor first-touch per hari/sumber yang negaranya Indonesia (ID). Memisahkan trafik yang masuk akal untuk situs berbahasa Indonesia. */
+export function idSourceSql(fromMs) {
+  const from = Math.floor(Number(fromMs));
+  if (!Number.isFinite(from)) throw new Error("fromMs tidak valid");
+  return `with f as (select visitor_id, date((created_at+25200000)/1000,'unixepoch') d, lower(coalesce(referrer,'')) r, coalesce(country,'') c, min(created_at) t
+ from analytics_events where created_at >= ${from} and visitor_id is not null group by visitor_id, d)
+select d, ${SOURCE_CASE} src, count(*) v from f where c='ID' group by d, src order by d, src`;
+}
+
 export function summarySql(fromDay) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDay)) throw new Error("fromDay tidak valid");
   return `select day_wib d, views, unique_visitors from analytics_daily_summary where day_wib >= '${fromDay}' order by day_wib`;
@@ -58,7 +67,7 @@ from dv join fs on fs.visitor_id=dv.visitor_id group by dv.d order by dv.d`;
 }
 
 /** Gabungkan hasil query ke peta hari. Hari yang dihitung ulang ditimpa utuh; hari lain tidak disentuh. */
-export function mergeDays(existing, { sources = [], summary = [], newReturning = [] }, todayWib) {
+export function mergeDays(existing, { sources = [], summary = [], newReturning = [], idSources = [] }, todayWib) {
   const days = { ...(existing || {}) };
   const touched = new Set([
     ...sources.map((r) => r.d),
@@ -67,6 +76,10 @@ export function mergeDays(existing, { sources = [], summary = [], newReturning =
   ]);
   for (const d of touched) days[d] = { sources: {} };
   for (const r of sources) days[r.d].sources[r.src] = Number(r.v) || 0;
+  for (const r of idSources) {
+    if (!days[r.d]) continue;
+    (days[r.d].sources_id ||= {})[r.src] = Number(r.v) || 0;
+  }
   for (const r of summary)
     Object.assign(days[r.d], {
       unique_visitors: Number(r.unique_visitors) || 0,
@@ -183,12 +196,13 @@ export async function main(env = process.env, now = Date.now()) {
     const fromDay = wibDay(now - 2 * DAY_MS);
     const fromMs = wibDayStartMs(fromDay);
     const creds = { token, accountId };
-    const [sources, summary, newReturning] = [
+    const [sources, summary, newReturning, idSources] = [
       await d1(sourceSql(fromMs), creds),
       await d1(summarySql(fromDay), creds),
       await d1(newReturningSql(fromMs), creds),
+      await d1(idSourceSql(fromMs), creds),
     ];
-    const merged = mergeDays(doc.days, { sources, summary, newReturning }, today);
+    const merged = mergeDays(doc.days, { sources, summary, newReturning, idSources }, today);
     const next = { ...doc, days: merged };
     if (JSON.stringify(next.days) !== JSON.stringify(doc.days)) {
       next.updatedAt = new Date(now).toISOString().replace(/\.\d+Z$/, "Z");

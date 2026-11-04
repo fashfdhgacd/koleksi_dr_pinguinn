@@ -7,6 +7,7 @@ import {
   wibDay,
   wibDayStartMs,
   sourceSql,
+  idSourceSql,
   summarySql,
   main,
 } from "./traffic-monitor.mjs";
@@ -22,6 +23,13 @@ test("SQL cuma SELECT/with dan menolak input aneh", () => {
   assert.doesNotMatch(sourceSql(1) + summarySql("2026-11-01"), /\b(insert|update|delete|drop)\b/i);
   assert.throws(() => summarySql("2026-11-01'; drop table x"));
   assert.throws(() => sourceSql("abc"));
+});
+
+test("idSourceSql: SELECT saja dan mengisi sources_id", () => {
+  assert.match(idSourceSql(1792429200000), /c='ID'/);
+  assert.doesNotMatch(idSourceSql(1), /\b(insert|update|delete|drop)\b/i);
+  const out = mergeDays({}, { sources: [{ d: "2026-11-01", src: "bing", v: 3 }], idSources: [{ d: "2026-11-01", src: "bing", v: 2 }] }, "2026-11-05");
+  assert.equal(out["2026-11-01"].sources_id.bing, 2);
 });
 
 test("mergeDays menimpa hari yang dihitung ulang, hari lama tetap", () => {
