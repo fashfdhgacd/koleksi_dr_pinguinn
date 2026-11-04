@@ -1,6 +1,6 @@
 {
   "description": "Pengunjung harian per sumber (AKTUAL dari D1 koleksi-analytics, hari WIB). sources = visitor_id unik per hari menurut referrer kunjungan pertama hari itu; 'internal' = referrer domain sendiri. Bukan request Cloudflare. Data mulai 2026-10-05 11:03 WIB (sebelumnya tidak tercatat). Diisi .github/workflows/traffic-monitor.yml.",
-  "updatedAt": "2026-11-03T23:16:31Z",
+  "updatedAt": "2026-11-04T23:37:30Z",
   "timezone": "Asia/Jakarta (WIB)",
   "days": {
     "2026-10-05": {
@@ -632,6 +632,19 @@
         "x": 16,
         "yandex": 15
       },
+      "sources_id": {
+        "bluesky": 1,
+        "brave": 31,
+        "direct": 1,
+        "duckduckgo": 17,
+        "google": 45,
+        "internal": 351,
+        "justpaste": 549,
+        "other": 3,
+        "telegram": 1,
+        "x": 13,
+        "yandex": 6
+      },
       "unique_visitors": 1561,
       "pageviews": 21494,
       "new": 1075,
@@ -640,22 +653,65 @@
     },
     "2026-11-04": {
       "sources": {
-        "brave": 13,
+        "bing": 1,
+        "brave": 36,
+        "direct": 6,
+        "duckduckgo": 12,
+        "google": 171,
+        "internal": 598,
+        "justpaste": 612,
+        "other": 2,
+        "tube_ref": 23,
+        "x": 20,
+        "yandex": 13
+      },
+      "sources_id": {
+        "bing": 1,
+        "brave": 30,
+        "direct": 3,
+        "duckduckgo": 8,
+        "google": 41,
+        "internal": 403,
+        "justpaste": 468,
+        "other": 2,
+        "tube_ref": 2,
+        "x": 19,
+        "yandex": 8
+      },
+      "unique_visitors": 1494,
+      "pageviews": 18833,
+      "new": 996,
+      "returning": 498,
+      "landing_visitors": 1494
+    },
+    "2026-11-05": {
+      "sources": {
+        "brave": 16,
         "direct": 3,
         "duckduckgo": 4,
-        "google": 52,
-        "internal": 203,
-        "justpaste": 209,
+        "google": 66,
+        "internal": 186,
+        "justpaste": 189,
         "other": 1,
-        "tube_ref": 5,
-        "x": 7,
-        "yandex": 4
+        "tube_ref": 3,
+        "x": 2,
+        "yandex": 1
       },
-      "unique_visitors": 482,
-      "pageviews": 6719,
-      "new": 310,
-      "returning": 191,
-      "landing_visitors": 501,
+      "sources_id": {
+        "brave": 14,
+        "direct": 1,
+        "duckduckgo": 4,
+        "google": 16,
+        "internal": 130,
+        "justpaste": 149,
+        "x": 1,
+        "yandex": 1
+      },
+      "unique_visitors": 390,
+      "pageviews": 4912,
+      "new": 291,
+      "returning": 180,
+      "landing_visitors": 471,
       "partial": true
     }
   }
