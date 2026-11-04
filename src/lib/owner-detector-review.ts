@@ -33,6 +33,7 @@ import { readReviewState, writeReviewState } from "@/lib/owner-review-store";
 import { minorContentReason } from "@/lib/catalog/minor-detector.js";
 import { explainTitle, schoolReviewCue } from "@/lib/catalog/minor-context.js";
 import { lockedMinorReason } from "@/lib/catalog/minor-lock.js";
+import { triageLockedTitle } from "@/lib/catalog/minor-triage.js";
 import { withSavedEdit } from "@/lib/catalog/owner-edit-merge.js";
 import { readOwnerEditState, setOwnerEdit } from "@/lib/catalog/owner-edit-store";
 import { uploadRejectReason } from "@/lib/bot/title-guard.js";
@@ -114,6 +115,10 @@ export type DetectorReviewRow = {
   strict: boolean;
   /** Hard minor lock reason (explicit SD/SMP/SMA, age under 18, "di bawah umur"): never approvable, title still editable. */
   locked: string;
+  /** Locked rows: "explicit" = youth evidence in the title; "verification" = keyword-only lock, still restricted. */
+  triage: "explicit" | "verification" | "";
+  /** Why the triage tier was chosen (detection evidence shown to the owner). */
+  evidence: string[];
   /** When the owner decided (approved / held rows). */
   decidedAt: number | null;
   /** Approved rows: true while the video is public. */
@@ -281,6 +286,7 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
     if (!flagged && !decision) continue;
     // Hard minor lock: listed under "Ditahan" with its reason (title still editable), never approvable.
     const locked = lockReason(it, title);
+    const triage = triageLockedTitle(title, String(lockedMinorReason(title) || ""));
     // Sensitive set is judged on the title itself (also for held rows, whose hidden reason is the owner hide).
     if (!strict)
       strict = Boolean(
@@ -308,6 +314,8 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
       trigger,
       strict,
       locked,
+      triage: locked ? triage.tier : "",
+      evidence: locked ? triage.evidence : [],
       decidedAt:
         decision?.at ||
         legacy ||

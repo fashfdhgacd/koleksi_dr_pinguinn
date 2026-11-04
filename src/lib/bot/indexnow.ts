@@ -90,7 +90,7 @@ export function buildIndexNow(
     if (hit && submittedIds.length < MAX_URLS - 40) {
       submittedIds.push(p.id);
       if (hit.category) cats.add(hit.category);
-    } else if (!hit) pending.push(p);
+    } else pending.push(p);
   }
   const urls: string[] = [];
   if (submittedIds.length) {

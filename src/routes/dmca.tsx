@@ -5,8 +5,15 @@ import { SITE_ORIGIN } from "@/lib/seo";
 export const Route = createFileRoute("/dmca")({
   head: () => ({
     meta: [
-      { title: "DMCA | koleksidrpinguin.com" },
-      { name: "description", content: "Prosedur DMCA Dr. Pinguin." },
+      { title: "Prosedur DMCA dan Penghapusan Konten | Koleksi Dr. Pinguin" },
+      {
+        name: "description",
+        content:
+          "Cara pemegang hak mengajukan pemberitahuan DMCA ke Koleksi Dr. Pinguin: URL halaman, bukti kepemilikan, dan pernyataan itikad baik.",
+      },
+      { property: "og:title", content: "Prosedur DMCA dan Penghapusan Konten | Koleksi Dr. Pinguin" },
+      { property: "og:url", content: `${SITE_ORIGIN}/dmca` },
+      { property: "og:type", content: "website" },
       { name: "robots", content: "index,follow" },
     ],
     links: [{ rel: "canonical", href: `${SITE_ORIGIN}/dmca` }],

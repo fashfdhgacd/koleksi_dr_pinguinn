@@ -22,6 +22,30 @@ Allow: /
 Disallow: /api/
 Disallow: /pemilik
 
+User-agent: Slurp
+Allow: /api/og
+Allow: /
+Disallow: /api/
+Disallow: /pemilik
+
+User-agent: DuckDuckBot
+Allow: /api/og
+Allow: /
+Disallow: /api/
+Disallow: /pemilik
+
+User-agent: Yandex
+Allow: /api/og
+Allow: /
+Disallow: /api/
+Disallow: /pemilik
+
+User-agent: Bravebot
+Allow: /api/og
+Allow: /
+Disallow: /api/
+Disallow: /pemilik
+
 User-agent: *
 Allow: /
 Allow: /api/og

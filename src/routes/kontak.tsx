@@ -5,8 +5,15 @@ import { SITE_ORIGIN } from "@/lib/seo";
 export const Route = createFileRoute("/kontak")({
   head: () => ({
     meta: [
-      { title: "Kontak | koleksidrpinguin.com" },
-      { name: "description", content: "Hubungi pengelola Dr. Pinguin." },
+      { title: "Kontak Pengelola | Koleksi Dr. Pinguin" },
+      {
+        name: "description",
+        content:
+          "Hubungi pengelola Koleksi Dr. Pinguin untuk laporan DMCA, permintaan penghapusan, pertanyaan privasi, atau tautan video yang rusak.",
+      },
+      { property: "og:title", content: "Kontak Pengelola | Koleksi Dr. Pinguin" },
+      { property: "og:url", content: `${SITE_ORIGIN}/kontak` },
+      { property: "og:type", content: "website" },
       { name: "robots", content: "index,follow" },
     ],
     links: [{ rel: "canonical", href: `${SITE_ORIGIN}/kontak` }],
