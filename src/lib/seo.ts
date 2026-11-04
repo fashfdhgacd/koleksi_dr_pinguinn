@@ -397,15 +397,6 @@ function realUploadDate(raw?: string | number | null): string | undefined {
   return new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
 }
 
-function uploadDateFromId(id: string): string {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-  const day = (Math.abs(h) % 28) + 1;
-  const month = (Math.abs(h >> 5) % 12) + 1;
-  const year = 2025 + (Math.abs(h >> 9) % 2);
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T00:00:00+07:00`;
-}
-
 export function videoJsonLd(input: {
   id: string;
   title: string;
@@ -415,7 +406,7 @@ export function videoJsonLd(input: {
   embedUrl?: string | null;
   contentUrl?: string | null;
   durationSec?: number | null;
-  /** Tanggal unggah asli (createdAt/date katalog). Bukti originalitas: tanggal kita lebih awal dari situs penyalin. */
+  /** Tanggal unggah dari katalog, jika tersedia. */
   uploadDate?: string | number | null;
 }) {
   const embed = (input.embedUrl || "").trim();
@@ -423,6 +414,7 @@ export function videoJsonLd(input: {
   const thumb = seoVideoThumbnail(input.id, input.thumbnail);
   const pageUrl = `${SITE_ORIGIN}/watch/${input.id}`;
   const label = videoTextLabel(input.category);
+  const uploadDate = realUploadDate(input.uploadDate);
 
   return {
     "@context": "https://schema.org",
@@ -430,7 +422,7 @@ export function videoJsonLd(input: {
     name: String(input.title || "Video").trim(),
     description: (input.description || "").trim().slice(0, 300),
     thumbnailUrl: thumb,
-    uploadDate: realUploadDate(input.uploadDate) || uploadDateFromId(input.id),
+    ...(uploadDate ? { uploadDate } : {}),
     inLanguage: "id",
     isPartOf: { "@id": `${HOME_CANONICAL}#website` },
     copyrightHolder: { "@id": `${HOME_CANONICAL}#organization` },
