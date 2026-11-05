@@ -19,10 +19,17 @@ export const REMOVAL_SURFACES = ["data-files", "categories", "listings", "search
 
 /**
  * @param {unknown} raw file JSON `{ ids: { [id]: { at } } }` or a loose map
- * @returns {{ ids: Record<string, { at: number }> }}
+ * @returns {{ ids: Record<string, { at: number, title?: string }> }}
  */
+export function cleanRemovedTitle(title) {
+  return String(title || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 200);
+}
+
 export function normalizeBlockState(raw) {
-  /** @type {Record<string, { at: number }>} */
+  /** @type {Record<string, { at: number, title?: string }>} */
   const ids = {};
   const rec = raw && typeof raw === "object" && !Array.isArray(raw) ? /** @type {Record<string, unknown>} */ (raw) : {};
   const nested = rec.ids && typeof rec.ids === "object" && !Array.isArray(rec.ids) ? /** @type {Record<string, unknown>} */ (rec.ids) : null;
@@ -30,9 +37,33 @@ export function normalizeBlockState(raw) {
   for (const [id, v] of Object.entries(src)) {
     if (!BLOCK_ID_RE.test(id)) continue;
     const at = v && typeof v === "object" && "at" in v ? Number(/** @type {{ at?: unknown }} */ (v).at) : Number(v);
-    ids[id] = { at: Number.isFinite(at) ? at : 0 };
+    const title = v && typeof v === "object" && "title" in v ? cleanRemovedTitle(/** @type {{ title?: unknown }} */ (v).title) : "";
+    ids[id] = { at: Number.isFinite(at) ? at : 0, ...(title ? { title } : {}) };
   }
   return { ids };
+}
+
+/**
+ * Owner report of removed videos, newest first. KV wins on time; a title already
+ * stored in either copy is kept when the other side has none.
+ * @param {unknown} fileRaw
+ * @param {unknown} kvRaw
+ * @returns {{ id: string, title: string, at: number }[]}
+ */
+export function removedReport(fileRaw, kvRaw) {
+  const file = normalizeBlockState(fileRaw).ids;
+  const kv = normalizeBlockState(kvRaw).ids;
+  /** @type {Record<string, { at: number, title?: string }>} */
+  const ids = { ...file };
+  for (const [id, v] of Object.entries(kv)) {
+    const prev = ids[id];
+    const title = v.title || prev?.title || "";
+    const at = Math.max(v.at || 0, prev?.at || 0);
+    ids[id] = { at, ...(title ? { title } : {}) };
+  }
+  return Object.entries(ids)
+    .map(([id, v]) => ({ id, title: v.title || "", at: v.at || 0 }))
+    .sort((a, b) => b.at - a.at || a.id.localeCompare(b.id));
 }
 
 /** @param {unknown} raw @returns {Set<string>} */

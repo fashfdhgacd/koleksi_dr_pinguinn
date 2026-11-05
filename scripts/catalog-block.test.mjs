@@ -6,6 +6,7 @@ import {
   isBlockedId,
   normalizeBlockState,
   removalPlan,
+  removedReport,
   singleRemoveId,
   titleSlug,
   withoutBlocked,
@@ -39,6 +40,39 @@ test("removal plan is 410 when the video exists and 404 when it does not", () =>
   assert.equal(removalPlan("video1", false).watch, 404);
   assert.ok(removalPlan("video1", true).surfaces.includes("sitemap"));
   assert.ok(removalPlan("video1", true).surfaces.includes("data-files"));
+});
+
+test("removed report keeps title and lists newest first", () => {
+  const state = normalizeBlockState({
+    ids: {
+      older01: { at: 10, title: "  Judul   lama  " },
+      newer01: { at: 20, title: "Baru" },
+      notitle: { at: 15 },
+    },
+  });
+  assert.equal(state.ids.older01.title, "Judul lama");
+  const rows = removedReport(
+    { ids: { file001: { at: 5, title: "Dari berkas" }, newer01: { at: 1 } } },
+    state,
+  );
+  assert.deepEqual(
+    rows.map((r) => r.id),
+    ["newer01", "notitle", "older01", "file001"],
+  );
+  assert.equal(rows[0].title, "Baru");
+  assert.equal(rows.find((r) => r.id === "newer01")?.at, 20);
+  assert.equal(rows.find((r) => r.id === "file001")?.title, "Dari berkas");
+});
+
+test("removed list is an owner read and does not write KV", () => {
+  const tools = fs.readFileSync(new URL("../src/routes/api/owner-tools.ts", import.meta.url), "utf8");
+  const auth = tools.indexOf("isOwnerRequest");
+  const action = tools.indexOf('body.action === "catalog-removed"');
+  const fn = tools.slice(tools.indexOf("async function handleCatalogRemoved"), tools.indexOf("type OwnerBody"));
+  assert.ok(auth > 0 && action > auth);
+  assert.match(fn, /readCatalogBlockState/);
+  assert.match(fn, /removedReport/);
+  assert.doesNotMatch(fn, /kv\.put|addCatalogBlocked/);
 });
 
 test("title slug is searchable", () => {

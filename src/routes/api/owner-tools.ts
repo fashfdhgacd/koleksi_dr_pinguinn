@@ -22,8 +22,9 @@ import {
   multiServerOf,
   type HiddenCandidate,
 } from "@/lib/catalog/local-cache";
-import { removalPlan, singleRemoveId, titleSlug } from "@/lib/catalog/catalog-block.js";
-import { addCatalogBlocked, commitCatalogBlock } from "@/lib/catalog/catalog-block-store";
+import blockFile from "@/lib/catalog/catalog-blocklist.json";
+import { removalPlan, removedReport, singleRemoveId, titleSlug } from "@/lib/catalog/catalog-block.js";
+import { addCatalogBlocked, commitCatalogBlock, readCatalogBlockState } from "@/lib/catalog/catalog-block-store";
 import { isDrpBokep, isPutarin, javCoverFromTitle, PLACEHOLDER_IMAGE_RE, slugOf, sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
 import deadSources from "@/lib/catalog/dead-sources.json";
 import rankMeta from "@/lib/catalog/rank-periods-meta.json";
@@ -977,7 +978,7 @@ async function handleCatalogRemove(body: { id?: unknown; ids?: unknown; dryRun?:
   if (!it) return json({ ok: false, error: "not_found", message: "Video tidak ada di katalog.", ...detail }, 404);
   let state;
   try {
-    state = await addCatalogBlocked(id);
+    state = await addCatalogBlocked(id, detail.title);
   } catch {
     return json({ ok: false, error: "kv_unavailable", message: "Penyimpanan moderasi tidak tersedia." }, 503);
   }
@@ -991,6 +992,20 @@ async function handleCatalogRemove(body: { id?: unknown; ids?: unknown; dryRun?:
     blocked: true,
     repo: repo.skipped ? "skipped" : repo.ok ? "committed" : "error",
   });
+}
+
+/** Owner report of videos removed from the catalog. Read only: no KV write. */
+async function handleCatalogRemoved(body: { limit?: unknown; offset?: unknown }) {
+  const limit = Math.min(100, Math.max(1, Math.floor(Number(body.limit) || 30)));
+  const offset = Math.max(0, Math.floor(Number(body.offset) || 0));
+  let kv;
+  try {
+    kv = await readCatalogBlockState();
+  } catch {
+    return json({ ok: false, error: "kv_unavailable", message: "Daftar pengeluaran belum bisa dibaca." }, 503);
+  }
+  const items = removedReport(blockFile, kv);
+  return json({ ok: true, total: items.length, offset, limit, items: items.slice(offset, offset + limit) });
 }
 
 type OwnerBody = {
@@ -1101,6 +1116,14 @@ export const Route = createFileRoute("/api/owner-tools")({
         if (body.action === "review-mark") {
           const r = await setReviewMark(body as never);
           return json(r, r.status || 200);
+        }
+        if (body.action === "catalog-removed") {
+          try {
+            return await handleCatalogRemoved(body);
+          } catch (err) {
+            console.error("[owner-tools] catalog-removed", err);
+            return json({ ok: false, error: `Gagal membaca daftar: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
+          }
         }
         if (body.action === "catalog-remove") {
           try {
