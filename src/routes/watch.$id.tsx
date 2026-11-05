@@ -1,4 +1,4 @@
-import { curatedDescription, curatedSeoTitle } from "@/lib/catalog/video-descriptions";
+import { curatedSeoTitle } from "@/lib/catalog/video-descriptions";
 import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { queryCatalog } from "@/lib/catalog/service";
@@ -10,7 +10,7 @@ import {
   categoryKeywords,
   cleanDisplayTitle,
   generatedVideoSeo,
-  resolveVideoSeoDescription,
+  publicWatchDescription,
   videoJsonLd,
   videoSeoTitle,
 } from "@/lib/seo";
@@ -96,14 +96,17 @@ export const Route = createFileRoute("/watch/$id")({
         ? videoSeoTitle(item.title, item.category)
         : "Video tidak ditemukan | koleksidrpinguin.com";
     const ogTitle = gen ? gen.ogTitle : item ? cleanDisplayTitle(item.title) : title;
-    const curated = item ? curatedDescription(item.id) : "";
-    const description = curated
-      ? curated
-      : gen
-      ? gen.description
-      : item
-        ? resolveVideoSeoDescription(item)
-        : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
+    const description = item
+      ? publicWatchDescription(
+          {
+            id: item.id,
+            title: cleanDisplayTitle(item.title),
+            category: item.category,
+            duration: item.duration,
+          },
+          160,
+        )
+      : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
     const image = item ? shareCardImage(item.thumbnail) : DEFAULT_OG;
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
     const embedUrl = item

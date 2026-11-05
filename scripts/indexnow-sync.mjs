@@ -23,7 +23,7 @@ const ORIGIN = "https://koleksidrpinguin.com";
 const HOST = new URL(ORIGIN).host;
 /** Same public key as src/lib/bot/indexnow.ts; the file public/<key>.txt is already live. */
 const KEY = "73356680884e9de90f845b0907eb4053";
-const ENDPOINT = "https://api.indexnow.org/indexnow";
+const ENDPOINTS = ["https://api.indexnow.org/indexnow", "https://yandex.com/indexnow"];
 const STATE = new URL("../data/indexnow-urls.txt", import.meta.url);
 const MAX_PER_POST = 10000;
 /** Cap on removed URLs per run, so a broken sitemap can never flood the engines. */
@@ -96,15 +96,20 @@ async function readState() {
 async function submit(urls) {
   for (let i = 0; i < urls.length; i += MAX_PER_POST) {
     const urlList = urls.slice(i, i + MAX_PER_POST);
-    const r = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: { "content-type": "application/json; charset=utf-8" },
-      body: JSON.stringify({ host: HOST, key: KEY, keyLocation: `${ORIGIN}/${KEY}.txt`, urlList }),
-    });
-    const body = (await r.text()).slice(0, 300);
-    console.log(`IndexNow POST ${urlList.length} URL -> HTTP ${r.status} ${body}`);
-    // 200 OK, 202 Accepted (key check pending). 400/403/422/429 = nothing accepted.
-    if (r.status !== 200 && r.status !== 202) throw new Error(`IndexNow HTTP ${r.status}`);
+    const payload = JSON.stringify({ host: HOST, key: KEY, keyLocation: `${ORIGIN}/${KEY}.txt`, urlList });
+    for (const [i, endpoint] of ENDPOINTS.entries()) {
+      const r = await fetch(endpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json; charset=utf-8" },
+        body: payload,
+      });
+      const body = (await r.text()).slice(0, 300);
+      console.log(`IndexNow ${new URL(endpoint).host} POST ${urlList.length} URL -> HTTP ${r.status} ${body}`);
+      // Shared endpoint must accept (200/202). Yandex is the same body; a Yandex blip does not
+      // fail the run because the shared endpoint already fans out, but we still call Yandex directly.
+      if (i === 0 && r.status !== 200 && r.status !== 202) throw new Error(`IndexNow HTTP ${r.status}`);
+      if (i > 0 && r.status !== 200 && r.status !== 202) console.warn(`Yandex IndexNow HTTP ${r.status}`);
+    }
   }
 }
 

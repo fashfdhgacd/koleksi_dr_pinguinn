@@ -3,7 +3,7 @@ import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PresencePing } from "@/components/presence-ping";
 import { SwCleanup } from "@/components/sw-cleanup";
-import { DEFAULT_OG, HOME_TITLE, OG_SITE_NAME } from "@/lib/seo";
+import { DEFAULT_OG, HOME_DESCRIPTION, HOME_TITLE, OG_SITE_NAME } from "@/lib/seo";
 import appCss from "../styles.css?url";
 import figtreeFont from "../assets/fonts/figtree-latin.woff2?url";
 
@@ -35,8 +35,7 @@ export const Route = createRootRoute({
       { title: HOME_TITLE },
       {
         name: "description",
-        content:
-          "Koleksi Dr. Pinguin Bokep, M.S.B., katalog video dewasa 18+ di koleksidrpinguin.com.",
+        content: HOME_DESCRIPTION,
       },
       { name: "theme-color", content: "#09090b" },
       // TrafficStars Client Hints (blog "Boost Earnings with Existing Ad Formats"): delegate UA hints

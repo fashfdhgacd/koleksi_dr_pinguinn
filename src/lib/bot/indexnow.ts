@@ -14,10 +14,13 @@
  * Every failure is caught and only reported as a line in the bot's batch summary.
  */
 import { SITE_ORIGIN } from "@/lib/seo";
+import { isBlockedId } from "@/lib/catalog/catalog-block.js";
 
 /** Key file served from /public (already verified by Bing). Not a secret: IndexNow keys are public. */
 export const INDEXNOW_KEY = "73356680884e9de90f845b0907eb4053";
-const INDEXNOW_ENDPOINT = "https://api.indexnow.org/indexnow";
+/** Shared IndexNow endpoint, plus Yandex's own endpoint (same public key, no new Worker env). */
+export const INDEXNOW_ENDPOINTS = ["https://api.indexnow.org/indexnow", "https://yandex.com/indexnow"] as const;
+const INDEXNOW_ENDPOINT = INDEXNOW_ENDPOINTS[0];
 const PENDING_KEY = "seo:indexnow:pending";
 /** Pending ids older than this are dropped (sitemap still covers them). */
 const PENDING_TTL_SEC = 14 * 24 * 3600;
@@ -68,17 +71,19 @@ export function buildIndexNow(
   pendingIn: Pending[],
   created: Created[],
   now: number,
+  blocked?: Set<string> | null,
 ): IndexNowBuild {
   const seen = new Set<string>();
   const queue: Pending[] = [];
+  const blockedId = (id: string) => Boolean(blocked && isBlockedId(id, blocked));
   for (const p of pendingIn) {
-    if (seen.has(p.id)) continue;
+    if (seen.has(p.id) || blockedId(p.id)) continue;
     seen.add(p.id);
     queue.push(p);
   }
   for (const c of created) {
     const id = String(c?.id || "").trim();
-    if (!id || c?.hidden || seen.has(id)) continue;
+    if (!id || c?.hidden || blockedId(id) || seen.has(id)) continue;
     seen.add(id);
     queue.push({ id, at: now });
   }
@@ -86,6 +91,7 @@ export function buildIndexNow(
   const pending: Pending[] = [];
   const cats = new Set<string>();
   for (const p of queue) {
+    if (blockedId(p.id)) continue;
     const hit = live.get(p.id);
     if (hit && submittedIds.length < MAX_URLS - 40) {
       submittedIds.push(p.id);
@@ -112,18 +118,31 @@ export async function indexNowAfterBatch(created: Created[]): Promise<string> {
     const live = new Map<string, { category?: string }>();
     for (const e of await listSitemapWatchEntries()) live.set(e.id, { category: e.category });
     const pendingIn = parsePending(await kv.optionalKvGet(PENDING_KEY), now);
-    const plan = buildIndexNow(live, pendingIn, created, now);
+    const { seoBlockedIdSet } = await import("@/lib/catalog/seo-block");
+    const plan = buildIndexNow(live, pendingIn, created, now, seoBlockedIdSet());
 
     let status = "";
     if (plan.urls.length) {
-      const res = await fetch(INDEXNOW_ENDPOINT, {
-        method: "POST",
-        headers: { "content-type": "application/json; charset=utf-8" },
-        body: JSON.stringify(indexNowBody(plan.urls)),
-      });
-      status = String(res.status);
-      // 200/202 = accepted. On anything else keep the ids queued so the next batch retries them.
-      if (res.status !== 200 && res.status !== 202) {
+      const body = JSON.stringify(indexNowBody(plan.urls));
+      const statuses: string[] = [];
+      let primaryOk = false;
+      for (const endpoint of INDEXNOW_ENDPOINTS) {
+        try {
+          const res = await fetch(endpoint, {
+            method: "POST",
+            headers: { "content-type": "application/json; charset=utf-8" },
+            body,
+          });
+          statuses.push(`${new URL(endpoint).host} ${res.status}`);
+          if (endpoint === INDEXNOW_ENDPOINT && (res.status === 200 || res.status === 202)) primaryOk = true;
+        } catch {
+          statuses.push(`${new URL(endpoint).host} gagal`);
+        }
+      }
+      status = statuses.join(", ");
+      // 200/202 on the shared endpoint = accepted. Yandex is best-effort in the same POST body.
+      // On a shared-endpoint failure keep the ids queued so the next batch retries them.
+      if (!primaryOk) {
         plan.pending = [...plan.submittedIds.map((id) => ({ id, at: now })), ...plan.pending].slice(-MAX_PENDING);
       }
     }

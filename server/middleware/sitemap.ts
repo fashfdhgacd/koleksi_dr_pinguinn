@@ -4,13 +4,14 @@
  * Includes Google video sitemap extension (video:video) for /watch entries.
  */
 import { DEFAULT_PAGE_SIZE, type CategoryInfo } from "../../src/lib/catalog/types";
-import { listCategory, listListedCategories } from "../../src/lib/catalog/local";
-import { LANDINGS, LANDING_MIN_VIDEOS, LANDING_POOL, hasBannedWord } from "../../src/lib/catalog/landing";
+import { listCategory, listLatest, listListedCategories } from "../../src/lib/catalog/local";
+import { LANDINGS, LANDING_INDEX_PAGES, LANDING_MIN_VIDEOS, LANDING_PAGE_SIZE, LANDING_POOL, acceptLandingCard } from "../../src/lib/catalog/landing";
 import { isMinorContentTitle } from "../../src/lib/catalog/minor-detector.js";
+import { isSeoBlockedId } from "../../src/lib/catalog/seo-block";
 import { STATIC_PAGE_LASTMOD } from "../../src/lib/catalog/lastmod.js";
 import { listSitemapWatchEntries } from "../../src/lib/catalog/sitemap-entries";
 import { RANKINGS, RANK_PERIODS, rankPeriodAvailable } from "../../src/lib/catalog/rankings";
-import { SITE_ORIGIN, cleanDisplayTitle, seoVideoThumbnail, videoSeoDescription } from "../../src/lib/seo";
+import { SITE_ORIGIN, cleanDisplayTitle, publicWatchDescription, seoVideoThumbnail } from "../../src/lib/seo";
 
 interface SitemapEvent {
   url: URL;
@@ -61,16 +62,18 @@ function listingLastmods(entries: Array<{ category?: string; lastmod?: string }>
 /** Landing pages whose ?page=2..5 go in the sitemap (only listed categories; ai-plus as before). */
 const PAGED_SITEMAP_SLUGS = ["ai-plus", "ai-indo", "videy", "malaysia", "bokep", "jav"];
 
-/** /cari/<slug> landing pages that are indexable (same clean-title rule as the "landing" catalog query). */
-async function indexableLandings(): Promise<string[]> {
-  const out: string[] = [];
+/** /cari/<slug> landings that are indexable, plus how many /halaman pages stay in the sitemap. */
+async function indexableLandings(): Promise<Array<{ slug: string; pages: number }>> {
+  const out: Array<{ slug: string; pages: number }> = [];
   for (const l of LANDINGS) {
     try {
       const pool = await listCategory(l.category, 1, LANDING_POOL);
       const clean = pool.items.filter(
-        (c) => !hasBannedWord(c.title) && !isMinorContentTitle(c.title) && (!l.match || l.match.test(c.title)),
+        (c) => acceptLandingCard(c, l) && !isMinorContentTitle(c.title) && !isSeoBlockedId(c.id),
       );
-      if (clean.length >= LANDING_MIN_VIDEOS) out.push(l.slug);
+      if (clean.length < LANDING_MIN_VIDEOS) continue;
+      const pages = Math.min(LANDING_INDEX_PAGES, Math.max(1, Math.ceil(clean.length / LANDING_PAGE_SIZE)));
+      out.push({ slug: l.slug, pages });
     } catch {
       /* skip this landing */
     }
@@ -81,10 +84,14 @@ async function indexableLandings(): Promise<string[]> {
 function pageEntries(
   categories: CategoryInfo[],
   mods: { all?: string; bySlug: Map<string, string> },
-  landings: string[] = [],
+  landings: Array<{ slug: string; pages: number }> = [],
+  homePages = 1,
 ): string[] {
   const out: string[] = [
     urlEntry(`${SITE_ORIGIN}/`, { changefreq: "hourly", priority: "1.0", lastmod: mods.all }),
+    ...Array.from({ length: Math.max(0, homePages - 1) }, (_, i) =>
+      urlEntry(`${SITE_ORIGIN}/halaman/${i + 2}`, { changefreq: "hourly", priority: "0.8", lastmod: mods.all }),
+    ),
     urlEntry(`${SITE_ORIGIN}/kategori`, { changefreq: "daily", priority: "0.8", lastmod: mods.all }),
     // Ranking pages (src/lib/catalog/rankings.ts), refreshed with the 12-hourly stats.
     urlEntry(`${SITE_ORIGIN}/kategori/paling-ditonton`, { changefreq: "daily", priority: "0.8" }),
@@ -113,12 +120,15 @@ function pageEntries(
     const cat = categories.find((c) => c.slug === slug);
     const pages = cat && typeof cat.count === "number" ? Math.min(5, Math.ceil(cat.count / DEFAULT_PAGE_SIZE)) : 1;
     for (let n = 2; n <= pages; n++) {
-      out.push(urlEntry(`${SITE_ORIGIN}/kategori/${slug}?page=${n}`, { changefreq: "daily", priority: "0.5", lastmod: mods.bySlug.get(slug) }));
+      out.push(urlEntry(`${SITE_ORIGIN}/kategori/${slug}/halaman/${n}`, { changefreq: "daily", priority: "0.5", lastmod: mods.bySlug.get(slug) }));
     }
   }
   out.push(urlEntry(`${SITE_ORIGIN}/cari`, { changefreq: "weekly", priority: "0.6", lastmod: "2026-11-05" }));
-  for (const slug of landings) {
-    out.push(urlEntry(`${SITE_ORIGIN}/cari/${slug}`, { changefreq: "daily", priority: "0.6" }));
+  for (const landing of landings) {
+    out.push(urlEntry(`${SITE_ORIGIN}/cari/${landing.slug}`, { changefreq: "daily", priority: "0.6" }));
+    for (let n = 2; n <= landing.pages; n++) {
+      out.push(urlEntry(`${SITE_ORIGIN}/cari/${landing.slug}/halaman/${n}`, { changefreq: "daily", priority: "0.5" }));
+    }
   }
   for (const path of LEGAL_PATHS) {
     out.push(urlEntry(`${SITE_ORIGIN}${path}`, { changefreq: "monthly", priority: "0.3", lastmod: STATIC_PAGE_LASTMOD[path] }));
@@ -130,12 +140,11 @@ function videoBlock(item: Awaited<ReturnType<typeof listSitemapWatchEntries>>[nu
   const pageUrl = `${SITE_ORIGIN}/watch/${encodeURIComponent(item.id)}`;
   const title = cleanDisplayTitle(item.title || "") || "Video";
   // id/duration/year make each description its own (seeded variants + real facts), not one template.
-  const desc = videoSeoDescription({
+  const desc = publicWatchDescription({
     id: item.id,
     title,
     category: item.category || null,
     duration: item.duration ?? null,
-    year: item.lastmod ? item.lastmod.slice(0, 4) : null,
   });
   const thumb = seoVideoThumbnail(item.id, item.thumbnail);
   const player = item.embed || pageUrl;
@@ -200,12 +209,14 @@ function errorXml(method: string, message: string): Response {
 }
 
 async function buildPagesXml(): Promise<string> {
-  const [categories, entries, landings] = await Promise.all([
+  const [categories, entries, landings, latest] = await Promise.all([
     listListedCategories({ sitemap: true }),
     listSitemapWatchEntries(),
     indexableLandings(),
+    listLatest(1, 1).catch(() => ({ total: 0 })),
   ]);
-  return wrapUrlset(pageEntries(categories, listingLastmods(entries), landings));
+  const homePages = Math.min(5, Math.max(1, Math.ceil((latest.total || 0) / DEFAULT_PAGE_SIZE)));
+  return wrapUrlset(pageEntries(categories, listingLastmods(entries), landings, homePages));
 }
 
 async function buildWatchXml(chunkIndex?: number): Promise<{ xml: string; total: number; chunks: number }> {

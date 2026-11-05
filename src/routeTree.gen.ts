@@ -45,6 +45,7 @@ import { Route as ApiTapeThumbRouteImport } from './routes/api/tape-thumb'
 import { Route as ApiTelegramRouteImport } from './routes/api/telegram'
 import { Route as CariIndexRouteImport } from './routes/cari.index'
 import { Route as CariSlugRouteImport } from './routes/cari.$slug'
+import { Route as HalamanPageRouteImport } from './routes/halaman.$page'
 import { Route as KategoriIndexRouteImport } from './routes/kategori.index'
 import { Route as KategoriSlugRouteImport } from './routes/kategori.$slug'
 import { Route as ThumbIdRouteImport } from './routes/thumb.$id'
@@ -54,6 +55,8 @@ import { Route as ApiAnalyticsHealthRouteImport } from './routes/api/analytics.h
 import { Route as ApiAnalyticsHourlyRouteImport } from './routes/api/analytics.hourly'
 import { Route as ApiAnalyticsOverviewRouteImport } from './routes/api/analytics.overview'
 import { Route as ApiAnalyticsTrackRouteImport } from './routes/api/analytics.track'
+import { Route as CariSlugHalamanPageRouteImport } from './routes/cari.$slug.halaman.$page'
+import { Route as KategoriSlugHalamanPageRouteImport } from './routes/kategori.$slug.halaman.$page'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -235,6 +238,11 @@ const CariSlugRoute = CariSlugRouteImport.update({
   path: '/cari/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HalamanPageRoute = HalamanPageRouteImport.update({
+  id: '/halaman/$page',
+  path: '/halaman/$page',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KategoriIndexRoute = KategoriIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -280,6 +288,16 @@ const ApiAnalyticsTrackRoute = ApiAnalyticsTrackRouteImport.update({
   path: '/api/analytics/track',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CariSlugHalamanPageRoute = CariSlugHalamanPageRouteImport.update({
+  id: '/halaman/$page',
+  path: '/halaman/$page',
+  getParentRoute: () => CariSlugRoute,
+} as any)
+const KategoriSlugHalamanPageRoute = KategoriSlugHalamanPageRouteImport.update({
+  id: '/halaman/$page',
+  path: '/halaman/$page',
+  getParentRoute: () => KategoriSlugRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -316,8 +334,9 @@ export interface FileRoutesByFullPath {
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
-  '/cari/$slug': typeof CariSlugRoute
-  '/kategori/$slug': typeof KategoriSlugRoute
+  '/cari/$slug': typeof CariSlugRouteWithChildren
+  '/halaman/$page': typeof HalamanPageRoute
+  '/kategori/$slug': typeof KategoriSlugRouteWithChildren
   '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
@@ -327,6 +346,8 @@ export interface FileRoutesByFullPath {
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
   '/api/analytics/overview': typeof ApiAnalyticsOverviewRoute
   '/api/analytics/track': typeof ApiAnalyticsTrackRoute
+  '/cari/$slug/halaman/$page': typeof CariSlugHalamanPageRoute
+  '/kategori/$slug/halaman/$page': typeof KategoriSlugHalamanPageRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -362,8 +383,9 @@ export interface FileRoutesByTo {
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
-  '/cari/$slug': typeof CariSlugRoute
-  '/kategori/$slug': typeof KategoriSlugRoute
+  '/cari/$slug': typeof CariSlugRouteWithChildren
+  '/halaman/$page': typeof HalamanPageRoute
+  '/kategori/$slug': typeof KategoriSlugRouteWithChildren
   '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
@@ -373,6 +395,8 @@ export interface FileRoutesByTo {
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
   '/api/analytics/overview': typeof ApiAnalyticsOverviewRoute
   '/api/analytics/track': typeof ApiAnalyticsTrackRoute
+  '/cari/$slug/halaman/$page': typeof CariSlugHalamanPageRoute
+  '/kategori/$slug/halaman/$page': typeof KategoriSlugHalamanPageRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -410,8 +434,9 @@ export interface FileRoutesById {
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
-  '/cari/$slug': typeof CariSlugRoute
-  '/kategori/$slug': typeof KategoriSlugRoute
+  '/cari/$slug': typeof CariSlugRouteWithChildren
+  '/halaman/$page': typeof HalamanPageRoute
+  '/kategori/$slug': typeof KategoriSlugRouteWithChildren
   '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
@@ -421,6 +446,8 @@ export interface FileRoutesById {
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
   '/api/analytics/overview': typeof ApiAnalyticsOverviewRoute
   '/api/analytics/track': typeof ApiAnalyticsTrackRoute
+  '/cari/$slug/halaman/$page': typeof CariSlugHalamanPageRoute
+  '/kategori/$slug/halaman/$page': typeof KategoriSlugHalamanPageRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -460,6 +487,7 @@ export interface FileRouteTypes {
     | '/api/tape-thumb'
     | '/api/telegram'
     | '/cari/$slug'
+    | '/halaman/$page'
     | '/kategori/$slug'
     | '/thumb/$id'
     | '/v/$id'
@@ -470,6 +498,8 @@ export interface FileRouteTypes {
     | '/api/analytics/hourly'
     | '/api/analytics/overview'
     | '/api/analytics/track'
+    | '/cari/$slug/halaman/$page'
+    | '/kategori/$slug/halaman/$page'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -506,6 +536,7 @@ export interface FileRouteTypes {
     | '/api/tape-thumb'
     | '/api/telegram'
     | '/cari/$slug'
+    | '/halaman/$page'
     | '/kategori/$slug'
     | '/thumb/$id'
     | '/v/$id'
@@ -516,6 +547,8 @@ export interface FileRouteTypes {
     | '/api/analytics/hourly'
     | '/api/analytics/overview'
     | '/api/analytics/track'
+    | '/cari/$slug/halaman/$page'
+    | '/kategori/$slug/halaman/$page'
   id:
     | '__root__'
     | '/'
@@ -553,6 +586,7 @@ export interface FileRouteTypes {
     | '/api/tape-thumb'
     | '/api/telegram'
     | '/cari/$slug'
+    | '/halaman/$page'
     | '/kategori/$slug'
     | '/thumb/$id'
     | '/v/$id'
@@ -563,6 +597,8 @@ export interface FileRouteTypes {
     | '/api/analytics/hourly'
     | '/api/analytics/overview'
     | '/api/analytics/track'
+    | '/cari/$slug/halaman/$page'
+    | '/kategori/$slug/halaman/$page'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -600,7 +636,8 @@ export interface RootRouteChildren {
   ApiPuterinThumbRoute: typeof ApiPuterinThumbRoute
   ApiTapeThumbRoute: typeof ApiTapeThumbRoute
   ApiTelegramRoute: typeof ApiTelegramRoute
-  CariSlugRoute: typeof CariSlugRoute
+  CariSlugRoute: typeof CariSlugRouteWithChildren
+  HalamanPageRoute: typeof HalamanPageRoute
   ThumbIdRoute: typeof ThumbIdRoute
   VIdRoute: typeof VIdRoute
   WatchIdRoute: typeof WatchIdRoute
@@ -865,6 +902,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CariSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/halaman/$page': {
+      id: '/halaman/$page'
+      path: '/halaman/$page'
+      fullPath: '/halaman/$page'
+      preLoaderRoute: typeof HalamanPageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/kategori/': {
       id: '/kategori/'
       path: '/'
@@ -928,21 +972,59 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAnalyticsTrackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/cari/$slug/halaman/$page': {
+      id: '/cari/$slug/halaman/$page'
+      path: '/halaman/$page'
+      fullPath: '/cari/$slug/halaman/$page'
+      preLoaderRoute: typeof CariSlugHalamanPageRouteImport
+      parentRoute: typeof CariSlugRoute
+    }
+    '/kategori/$slug/halaman/$page': {
+      id: '/kategori/$slug/halaman/$page'
+      path: '/halaman/$page'
+      fullPath: '/kategori/$slug/halaman/$page'
+      preLoaderRoute: typeof KategoriSlugHalamanPageRouteImport
+      parentRoute: typeof KategoriSlugRoute
+    }
   }
 }
 
+interface KategoriSlugRouteChildren {
+  KategoriSlugHalamanPageRoute: typeof KategoriSlugHalamanPageRoute
+}
+
+const KategoriSlugRouteChildren: KategoriSlugRouteChildren = {
+  KategoriSlugHalamanPageRoute: KategoriSlugHalamanPageRoute,
+}
+
+const KategoriSlugRouteWithChildren = KategoriSlugRoute._addFileChildren(
+  KategoriSlugRouteChildren,
+)
+
 interface KategoriRouteChildren {
-  KategoriSlugRoute: typeof KategoriSlugRoute
+  KategoriSlugRoute: typeof KategoriSlugRouteWithChildren
   KategoriIndexRoute: typeof KategoriIndexRoute
 }
 
 const KategoriRouteChildren: KategoriRouteChildren = {
-  KategoriSlugRoute: KategoriSlugRoute,
+  KategoriSlugRoute: KategoriSlugRouteWithChildren,
   KategoriIndexRoute: KategoriIndexRoute,
 }
 
 const KategoriRouteWithChildren = KategoriRoute._addFileChildren(
   KategoriRouteChildren,
+)
+
+interface CariSlugRouteChildren {
+  CariSlugHalamanPageRoute: typeof CariSlugHalamanPageRoute
+}
+
+const CariSlugRouteChildren: CariSlugRouteChildren = {
+  CariSlugHalamanPageRoute: CariSlugHalamanPageRoute,
+}
+
+const CariSlugRouteWithChildren = CariSlugRoute._addFileChildren(
+  CariSlugRouteChildren,
 )
 
 const rootRouteChildren: RootRouteChildren = {
@@ -980,7 +1062,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPuterinThumbRoute: ApiPuterinThumbRoute,
   ApiTapeThumbRoute: ApiTapeThumbRoute,
   ApiTelegramRoute: ApiTelegramRoute,
-  CariSlugRoute: CariSlugRoute,
+  CariSlugRoute: CariSlugRouteWithChildren,
+  HalamanPageRoute: HalamanPageRoute,
   ThumbIdRoute: ThumbIdRoute,
   VIdRoute: VIdRoute,
   WatchIdRoute: WatchIdRoute,

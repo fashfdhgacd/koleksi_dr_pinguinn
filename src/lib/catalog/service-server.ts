@@ -13,7 +13,8 @@ import { fetchCatalog } from "./client";
 import { uploadDateOf } from "./sitemap-entries";
 import { listRanking, rankedAllTime, withVideyViews } from "./ranking-list";
 import { parseRankingKey } from "./rankings";
-import { LANDING_LIMIT, LANDING_POOL, findLanding, hasBannedWord } from "./landing";
+import { LANDING_PAGE_SIZE, LANDING_POOL, acceptLandingCard, findLanding } from "./landing";
+import { isSeoBlockedId } from "./seo-block";
 import { isMinorContentTitle } from "./minor-detector.js";
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./types";
 import type { CatalogError, CatalogResponse, CatalogType, CategoryInfo, VideoCard } from "./types";
@@ -166,21 +167,27 @@ export async function queryCatalogServer(query: CatalogQuery, signal?: AbortSign
         return { ok: true, type, ...data, items: await withVideyViews(data.items) };
       }
       case "landing": {
-        // /cari/<slug>: one page, the category's first LANDING_POOL videos with clean titles,
-        // most viewed first (stable: equal views keep the category order).
+        // /cari/<slug>: own catalog (IndoAV + UserBokep), clean titles, most viewed first,
+        // then /halaman/N. Blocklist ids never appear. School-word JAV is not a title block.
         const def = findLanding(query.q);
         if (!def || !findCategory(def.category)) return { ok: false, error: "Halaman tidak dikenal.", code: "not_found" };
+        const requested = Math.max(1, page ?? 1);
+        const limit = LANDING_PAGE_SIZE;
         const pool = await listCategory(def.category, 1, LANDING_POOL, signal);
         const clean = pool.items.filter(
-          (c) => !hasBannedWord(c.title) && !isMinorContentTitle(c.title) && (!def.match || def.match.test(c.title)),
+          (c) => acceptLandingCard(c, def) && !isMinorContentTitle(c.title) && !isSeoBlockedId(c.id),
         );
         const withViews = await withVideyViews(clean);
-        const items = withViews
+        const sorted = withViews
           .map((c, i) => ({ c, i }))
           .sort((a, b) => (b.c.views || 0) - (a.c.views || 0) || a.i - b.i)
-          .slice(0, LANDING_LIMIT)
           .map((x) => x.c);
-        return { ok: true, type, items, total: items.length, page: 1, limit: LANDING_LIMIT, hasMore: false };
+        const total = sorted.length;
+        const last = Math.max(1, Math.ceil(total / limit) || 1);
+        const safePage = Math.min(requested, last);
+        const start = (safePage - 1) * limit;
+        const items = sorted.slice(start, start + limit);
+        return { ok: true, type, items, total, page: safePage, limit, hasMore: start + items.length < total };
       }
       case "related": {
         const id = (query.id || "").trim();
