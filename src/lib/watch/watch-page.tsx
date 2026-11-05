@@ -6,7 +6,6 @@ import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
 import { VideoPlayer } from "@/components/video/player";
 import { PosterIdContext } from "@/components/video/thumb";
 import { VideyPlayer } from "@/components/video/videy-player";
-import { WatchSeoSection } from "@/components/video/watch-seo-section";
 import { PopTapLayer } from "@/components/tap-popunder";
 import { AdblockGate } from "@/components/adblock-gate";
 import { hostLabel } from "@/lib/catalog/embed";
@@ -14,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
 import { SITE_ORIGIN } from "@/lib/seo";
+import { watchDescription } from "@/lib/catalog/watch-description";
 import { cleanDisplayTitle } from "@/lib/seo";
 import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { CatalogBackLink } from "@/components/video/catalog-back-link";
@@ -488,7 +488,7 @@ export function WatchPage() {
             </p>
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{cleanDisplayTitle(item.title)}</h1>
             {item.episodes && item.episodes.length > 1 ? <EpisodeStrip episodes={item.episodes} currentId={item.id} /> : null}
-            <WatchSeoSection item={item} />
+            <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>
             <PushButton />
             {item.categories && item.categories.length ? (
               <nav aria-label="Kategori" className="space-y-2">
