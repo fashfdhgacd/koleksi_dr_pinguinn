@@ -77,9 +77,11 @@ describe("watch page", () => {
     assert.match(html, /Judul Contoh/);
     assert.match(html, /href="\/cari"/);
     assert.match(html, /durasi 1 menit/);
+    assert.equal(html.split("ada di kategori").length - 1, 1);
+    assert.equal(html.split("Judul Contoh").length - 1, 2);
     assert.match(html, /Bagikan/);
     assert.match(html, /1m 0s/);
-    assert.ok(html.includes(video.description));
+    assert.equal(html.includes(video.description), false);
     assert.doesNotMatch(html, /Pertanyaan Umum/);
     assert.doesNotMatch(html, /Video ini berjudul/);
   });
