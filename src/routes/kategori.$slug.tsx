@@ -1,6 +1,7 @@
+import { categoryHref } from "@/lib/catalog/halaman";
 import { categoryRelated, categorySeo } from "@/lib/catalog/category-seo";
 import { useEffect } from "react";
-import { Link, createFileRoute, notFound, redirect, useNavigate } from "@tanstack/react-router";
+import { Link, Outlet, createFileRoute, notFound, redirect, useMatches, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { CatalogPager } from "@/components/video/catalog-pager";
@@ -80,16 +81,15 @@ export const Route = createFileRoute("/kategori/$slug")({
       const last = Math.max(1, Math.ceil(res.total / (res.limit || DEFAULT_PAGE_SIZE)));
       if (page > last) {
         throw redirect({
-          to: "/kategori/$slug",
-          params: { slug: cat.slug },
-          search: { page: last > 1 ? last : undefined, periode: undefined },
+          href: `${SITE_ORIGIN}${categoryHref(cat.slug, last)}`,
           statusCode: 302,
         });
       }
     }
     return res;
   },
-  head: ({ params, match, loaderData }) => {
+  head: ({ params, match, loaderData, matches }) => {
+    if (matches?.some((m) => String(m.routeId).includes("halaman"))) return { meta: [], links: [] };
     const rank = findRanking(params.slug);
     const cat = rank ? undefined : findCategory(params.slug);
     if (!rank && !cat) {
@@ -119,17 +119,14 @@ export const Route = createFileRoute("/kategori/$slug")({
     );
     // Owner decision 2026-10-27: these stay reachable but out of search (no sitemap, noindex,follow).
     const hiddenFromSearch = Boolean(cat && NOINDEX_CATEGORY_SLUGS.has(cat.slug));
-    const qs = new URLSearchParams();
-    if (periode && !emptyPeriod) qs.set("periode", periode);
-    if (page > 1 && !emptyPeriod) qs.set("page", String(page));
-    const url = `${SITE_ORIGIN}/kategori/${params.slug}${qs.toString() ? `?${qs.toString()}` : ""}`;
+    const url = `${SITE_ORIGIN}${categoryHref(params.slug, emptyPeriod ? 1 : page, emptyPeriod ? undefined : periode)}`;
     // Halaman 2+: judul & deskripsi unik per halaman (hindari duplikat judul di GSC).
     const pageTitle = page > 1 && !emptyPeriod ? seo.title.replace(/ \| koleksidrpinguin\.com$/, ` – Halaman ${page} | koleksidrpinguin.com`) : seo.title;
     const pageDesc = page > 1 && !emptyPeriod ? `Halaman ${page}: ${seo.description}` : seo.description;
     const crumbName = (cat?.label || rank?.label || params.slug).trim();
     const indexable = !(emptyPeriod || emptyCategory || hiddenFromSearch || page > DEEP_PAGE_NOINDEX);
     // rel prev/next between pagination pages of a plain category (each page keeps its own canonical).
-    const pageUrl = (n: number) => `${SITE_ORIGIN}/kategori/${params.slug}${n > 1 ? `?page=${n}` : ""}`;
+    const pageUrl = (n: number) => `${SITE_ORIGIN}${categoryHref(params.slug, n)}`;
     const lastPage =
       !rank && ld && ld.ok && ld.type === "category" && typeof ld.total === "number"
         ? Math.max(1, Math.ceil(ld.total / ((ld as { limit?: number }).limit || DEFAULT_PAGE_SIZE)))
@@ -150,12 +147,8 @@ export const Route = createFileRoute("/kategori/$slug")({
         { property: "og:type", content: "website" },
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
-        ...(!indexable
-          ? [
-              { name: "robots", content: "noindex,follow" },
-              { name: "googlebot", content: "noindex,follow" },
-            ]
-          : []),
+        { name: "robots", content: indexable ? "index,follow" : "noindex,follow" },
+        ...(!indexable ? [{ name: "googlebot", content: "noindex,follow" }] : []),
       ],
       links: [{ rel: "canonical", href: url }, ...pageLinks],
       scripts: indexable
@@ -186,11 +179,40 @@ function parsePeriode(value: unknown): "minggu" | "bulan" | undefined {
   return p.key === "minggu" || p.key === "bulan" ? p.key : undefined;
 }
 
-function CategoryPage() {
-  const { slug } = Route.useParams();
+type CatNav = {
+  slug: string;
+  page: number;
+  periode?: "minggu" | "bulan";
+  loaderData: unknown;
+  onPage: (next: number) => void;
+};
+
+export function CategoryExperience({ slug, page, periode, loaderData, onPage }: CatNav) {
   const rank = findRanking(slug);
-  if (rank) return <RankingPage rank={rank} />;
-  return <PlainCategoryPage slug={slug} />;
+  if (rank) return <RankingPage rank={rank} page={page} periode={periode} loaderData={loaderData} onPage={onPage} />;
+  return <PlainCategoryPage slug={slug} page={page} loaderData={loaderData} onPage={onPage} />;
+}
+
+function CategoryPage() {
+  const matches = useMatches();
+  if (matches.some((m) => String(m.routeId).includes("halaman"))) return <Outlet />;
+  const { slug } = Route.useParams();
+  const { page: pageSearch, periode } = Route.useSearch();
+  const loaderData = Route.useLoaderData();
+  const navigate = useNavigate({ from: "/kategori/$slug" });
+  const page = pageSearch || 1;
+  return (
+    <CategoryExperience
+      slug={slug}
+      page={page}
+      periode={periode}
+      loaderData={loaderData}
+      onPage={(next) => {
+        if (next <= 1) navigate({ to: "/kategori/$slug", params: { slug }, search: { page: undefined, periode } });
+        else navigate({ to: "/kategori/$slug/halaman/$page", params: { slug, page: String(next) }, search: { periode } });
+      }}
+    />
+  );
 }
 
 const dayFmt = new Intl.DateTimeFormat("id-ID", { day: "numeric", month: "long", timeZone: "UTC" });
@@ -201,11 +223,19 @@ function fmtDay(day: string | null): string {
 }
 
 /** /kategori/paling-ditonton | paling-disukai: pure ranking with period tabs (Minggu/Bulan/Sepanjang masa). */
-function RankingPage({ rank }: { rank: RankingDef }) {
-  const { page: pageSearch, periode } = Route.useSearch();
-  const page = pageSearch || 1;
-  const navigate = useNavigate({ from: "/kategori/$slug" });
-  const loaderData = Route.useLoaderData();
+function RankingPage({
+  rank,
+  page,
+  periode,
+  loaderData,
+  onPage,
+}: {
+  rank: RankingDef;
+  page: number;
+  periode?: "minggu" | "bulan";
+  loaderData: unknown;
+  onPage: (next: number) => void;
+}) {
   const period = periodFromKey(periode);
   const available = rankPeriodAvailable(rank.kind, period.period);
   const key = rankingKey(rank.slug, periode);
@@ -225,11 +255,11 @@ function RankingPage({ rank }: { rank: RankingDef }) {
   const feed = useCatalogFeed({ mode: "category", category: key, page }, seed || undefined);
 
   function setPage(next: number) {
-    if (next === (pageSearch || 1)) {
+    if (next === page) {
       feed.retry();
       return;
     }
-    navigate({ search: (prev) => ({ ...prev, page: next > 1 ? next : undefined }) });
+    onPage(next);
   }
 
   return (
@@ -298,7 +328,7 @@ function RankingPage({ rank }: { rank: RankingDef }) {
 
         {available ? (
           <CatalogPager
-            basePath={`/kategori/${rank.slug}`}
+            pageHref={(n) => categoryHref(rank.slug, n, periode)}
             page={page}
             total={feed.total}
             limit={feed.limit}
@@ -312,12 +342,18 @@ function RankingPage({ rank }: { rank: RankingDef }) {
   );
 }
 
-function PlainCategoryPage({ slug }: { slug: string }) {
-  const { page: pageSearch } = Route.useSearch();
-  const page = pageSearch || 1;
-  const navigate = useNavigate({ from: "/kategori/$slug" });
+function PlainCategoryPage({
+  slug,
+  page,
+  loaderData,
+  onPage,
+}: {
+  slug: string;
+  page: number;
+  loaderData: unknown;
+  onPage: (next: number) => void;
+}) {
   const cat = findCategory(slug);
-  const loaderData = Route.useLoaderData();
 
   const seed =
     loaderData && "ok" in loaderData && loaderData.ok && loaderData.type === "category"
@@ -340,17 +376,11 @@ function PlainCategoryPage({ slug }: { slug: string }) {
   }, [cat?.slug, feed.page]);
 
   function setPage(next: number) {
-    const current = pageSearch || 1;
-    if (next === current) {
+    if (next === page) {
       feed.retry();
       return;
     }
-    navigate({
-      search: (prev) => ({
-        ...prev,
-        page: next > 1 ? next : undefined,
-      }),
-    });
+    onPage(next);
   }
 
   if (!cat || UNLISTED_CATEGORY_SLUGS.has(cat.slug)) {
@@ -429,7 +459,7 @@ function PlainCategoryPage({ slug }: { slug: string }) {
         )}
 
         <CatalogPager
-          basePath={`/kategori/${cat.slug}`}
+          pageHref={(n) => categoryHref(cat.slug, n)}
           page={page}
           total={feed.total}
           limit={feed.limit}

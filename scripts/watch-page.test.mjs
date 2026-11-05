@@ -75,6 +75,8 @@ describe("watch page", () => {
 
     const html = renderToStaticMarkup(createElement(RouterProvider, { router }));
     assert.match(html, /Judul Contoh/);
+    assert.match(html, /href="\/cari"/);
+    assert.match(html, /durasi 1 menit/);
     assert.match(html, /Bagikan/);
     assert.match(html, /1m 0s/);
     assert.ok(html.includes(video.description));

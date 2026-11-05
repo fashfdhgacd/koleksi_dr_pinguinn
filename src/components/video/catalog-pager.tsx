@@ -17,6 +17,7 @@ export function CatalogPager({
   limit,
   onPage,
   basePath,
+  pageHref,
 }: {
   page: number;
   total: number;
@@ -27,6 +28,8 @@ export function CatalogPager({
   onPage: (page: number) => void;
   /** Path for SSR-rendered crawlable page links, e.g. "/kategori/jilbab". */
   basePath?: string;
+  /** Absolute path for page n, e.g. "/halaman/2". Wins over basePath so crawlers see /halaman links. */
+  pageHref?: (page: number) => string;
 }) {
   const totalPages = Math.max(1, Math.ceil((total || 0) / Math.max(1, limit)));
   if (totalPages <= 1) {
@@ -53,6 +56,7 @@ export function CatalogPager({
   }
 
   function hrefFor(n: number): string {
+    if (pageHref) return pageHref(n);
     let path = "/";
     let params = new URLSearchParams();
     if (typeof window !== "undefined") {

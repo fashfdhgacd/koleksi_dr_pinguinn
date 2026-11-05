@@ -39,6 +39,7 @@ Allow: /api/og
 Allow: /
 Disallow: /api/
 Disallow: /pemilik
+Clean-param: utm_*
 
 User-agent: Bravebot
 Allow: /api/og

@@ -12,9 +12,10 @@ import { hostLabel } from "@/lib/catalog/embed";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
-import { SITE_ORIGIN } from "@/lib/seo";
+import { SITE_ORIGIN, cleanDisplayTitle, publicWatchDescription } from "@/lib/seo";
+import { landingForCategory } from "@/lib/catalog/landing";
+import { isSeoBlockedId } from "@/lib/catalog/seo-block";
 import { watchDescription } from "@/lib/catalog/watch-description";
-import { cleanDisplayTitle } from "@/lib/seo";
 import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { CatalogBackLink } from "@/components/video/catalog-back-link";
 import { WatchStats } from "@/components/video/watch-stats";
@@ -294,7 +295,7 @@ export function WatchPage() {
   );
   const [related, setRelated] = useState<VideoCard[]>(() =>
     loaderData && loaderData.ok && loaderData.type === "detail"
-      ? loaderData.related.filter((v) => v.id !== loaderData.item.id)
+      ? loaderData.related.filter((v: VideoCard) => v.id !== loaderData.item.id && !isSeoBlockedId(v.id))
       : [],
   );
   const [status, setStatus] = useState<"loading" | "success" | "error" | "empty">(() => {
@@ -318,7 +319,7 @@ export function WatchPage() {
       if (loaderData.ok && loaderData.type === "detail") {
         if (loaderData.item.id === id) {
           setItem(loaderData.item);
-          setRelated(loaderData.related.filter((v) => v.id !== loaderData.item.id));
+          setRelated(loaderData.related.filter((v: VideoCard) => v.id !== loaderData.item.id && !isSeoBlockedId(v.id)));
           setStatus("success");
           setError(null);
           return;
@@ -352,7 +353,7 @@ export function WatchPage() {
           return;
         }
         setItem(res.item);
-        setRelated(res.related.filter((video) => video.id !== res.item.id));
+        setRelated(res.related.filter((video) => video.id !== res.item.id && !isSeoBlockedId(video.id)));
         setStatus("success");
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -381,7 +382,7 @@ export function WatchPage() {
           try {
             const res = await fetchCatalog({ type: "related", id, limit: 12 });
             if (cancelled || !res.ok || res.type !== "related") return;
-            setRelated(res.items.filter((v) => v.id !== id));
+            setRelated(res.items.filter((v) => v.id !== id && !isSeoBlockedId(v.id)));
           } catch {
             /* biarkan list lama */
           } finally {
@@ -488,7 +489,28 @@ export function WatchPage() {
             </p>
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{cleanDisplayTitle(item.title)}</h1>
             {item.episodes && item.episodes.length > 1 ? <EpisodeStrip episodes={item.episodes} currentId={item.id} /> : null}
-            <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>
+            <p className="text-sm leading-relaxed text-muted">{publicWatchDescription(item)}</p>
+            {watchDescription(item) !== publicWatchDescription(item) ? (
+              <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>
+            ) : null}
+            <nav aria-label="Kategori dan pencarian" className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+              {(() => {
+                const slug = categorySlugFor(item.category);
+                const landing = slug ? landingForCategory(slug) : undefined;
+                return (
+                  <>
+                    {slug ? (
+                      <a href={`/kategori/${slug}`} className="underline underline-offset-2 hover:text-foreground">
+                        Kategori {item.category}
+                      </a>
+                    ) : null}
+                    <a href={landing ? `/cari/${landing.slug}` : "/cari"} className="underline underline-offset-2 hover:text-foreground">
+                      {landing ? landing.h1 : "Pencarian populer"}
+                    </a>
+                  </>
+                );
+              })()}
+            </nav>
             <PushButton />
             {item.categories && item.categories.length ? (
               <nav aria-label="Kategori" className="space-y-2">
@@ -513,7 +535,7 @@ export function WatchPage() {
                   Lainnya di {item.category || "kategori ini"}
                 </p>
                 <ul className="space-y-1 text-sm">
-                  {item.sameCategory.map((v) => (
+                  {item.sameCategory.filter((v) => !isSeoBlockedId(v.id)).map((v) => (
                     <li key={v.id}>
                       <a href={`/watch/${v.id}`} className="text-foreground/80 underline-offset-2 hover:text-primary hover:underline">
                         {cleanDisplayTitle(v.title)}

@@ -13,16 +13,19 @@ export const DEFAULT_OG = `${SITE_ORIGIN}/og-v2.jpg?v=14`;
 /** Logo persegi (ikon pinguin pixel 512x512, dilayani middleware brand-icons). */
 export const SITE_LOGO = `${SITE_ORIGIN}/icon-512.png`;
 
-const HOME_DESCRIPTION =
-  "Koleksi Dr. Pinguin Bokep, M.S.B.: bokep indo viral terbaru, video viral videy, JAV dan AI+ yang lagi rame. Langsung tonton di HP, update terus.";
+/** Snippet beranda: update harian + streaming tanpa VPN (pola growth, teks sendiri). */
+export const HOME_DESCRIPTION =
+  "Nonton bokep indo terbaru, update setiap hari, di koleksidrpinguin.com. Streaming lancar di HP tanpa VPN dan tanpa daftar akun. Khusus dewasa 18+.";
 
-/** Judul beranda: frasa brand persis + domain. */
-// 60 chars (Bing "Title too long" at 88 with the domain suffix, 2026-11-02); brand kept in front.
-export const HOME_TITLE = `${BRAND_NAME} - Bokep Indo Viral Terbaru`;
+/** Judul beranda. Brand di depan, frasa update harian, tetap di bawah 60 karakter. */
+export const HOME_TITLE = "Koleksi Dr. Pinguin - Bokep Indo Update Setiap Hari";
+
+/** H1 beranda, selaras dengan judul tab. */
+export const HOME_H1 = "Bokep Indo Terbaru Update Setiap Hari";
 
 /** Kalimat pendek di bawah H1 beranda. */
 export const HOME_INTRO =
-  "Koleksi Dr. Pinguin (Koleksi Dr Pinguin) adalah situs resmi koleksidrpinguin.com. Bokep indo viral terbaru, video viral videy, JAV dan AI+ yang lagi rame, semua bisa langsung ditonton di HP.";
+  "Bokep indo terbaru di Koleksi Dr. Pinguin, ditambah setiap hari dari katalog sendiri. Putar langsung di HP tanpa VPN, tanpa aplikasi, dan tanpa login. Konten khusus 18+.";
 
 function categoryLabel(slugOrLabel?: string | null): string {
   const key = (slugOrLabel || "").trim().toLowerCase();
@@ -177,6 +180,20 @@ function durationPhrase(sec?: number | null): string {
   const h = Math.floor(m / 60);
   const r = m % 60;
   return r ? `${h} jam ${r} menit` : `${h} jam`;
+}
+
+/**
+ * Deskripsi publik halaman tonton: judul + kategori + durasi, unik per video.
+ * Dipakai meta, teks halaman, VideoObject, dan sitemap. Bukan catatan internal.
+ */
+export function publicWatchDescription(item: SeoVideoInput, max = 0): string {
+  const title = seoBaseTitle(item.title);
+  const label = videoTextLabel(item.category);
+  const dur = durationPhrase(item.duration);
+  const name = title ? `“${clipTitleText(title, 80)}”` : "Koleksi ini";
+  const durBit = dur ? `, durasi ${dur}` : "";
+  const text = `${name} ada di kategori ${label}${durBit}. Putar langsung di koleksidrpinguin.com tanpa daftar akun. Khusus 18+.`;
+  return max > 0 ? clipAtWord(text, max) : text;
 }
 
 export type SeoVideoInput = {

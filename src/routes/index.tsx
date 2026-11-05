@@ -12,7 +12,8 @@ import { queryCatalog } from "@/lib/catalog/service";
 import { DEFAULT_PAGE_SIZE, type VideoCard } from "@/lib/catalog/types";
 import { useCatalogFeed } from "../hooks/use-catalog";
 import { jsonLdString } from "@/lib/json-ld";
-import { BRAND_NAME, DEFAULT_OG, HOME_CANONICAL, HOME_INTRO, homeJsonLd, homeSeo } from "@/lib/seo";
+import { homeHref } from "@/lib/catalog/halaman";
+import { DEFAULT_OG, HOME_CANONICAL, HOME_H1, HOME_INTRO, SITE_ORIGIN, homeJsonLd, homeSeo } from "@/lib/seo";
 import { ReturnVisitor } from "@/components/return-visitor";
 
 type HomeSearch = {
@@ -34,7 +35,7 @@ function isSchemaPlaceholder(q?: string): boolean {
   return t === "{search_term_string}" || t === "search_term_string";
 }
 
-async function loadHome({ search }: { search: HomeSearch }) {
+export async function loadHome({ search }: { search: HomeSearch }) {
   const page = search.page || 1;
   if (search.q) {
     return queryCatalog({ type: "search", q: search.q, page, limit: DEFAULT_PAGE_SIZE });
@@ -119,8 +120,9 @@ export const Route = createFileRoute("/")({
       const last = Math.max(1, Math.ceil(total / limit));
       if (total > 0 && page > last) {
         throw redirect({
-          to: "/",
-          search: { q: search.q, page: last > 1 ? last : undefined },
+          href: search.q
+            ? `${HOME_CANONICAL}?${new URLSearchParams({ q: search.q, ...(last > 1 ? { page: String(last) } : {}) }).toString()}`
+            : `${SITE_ORIGIN}${homeHref(last)}`,
           statusCode: 302,
         });
       }
@@ -131,29 +133,22 @@ export const Route = createFileRoute("/")({
     const q = typeof match.search.q === "string" ? match.search.q : undefined;
     const page = typeof match.search.page === "number" ? match.search.page : 1;
     const seo = homeSeo(q);
-    const title = !q && page > 1 ? `Video Terbaru Halaman ${page} | ${BRAND_NAME}` : seo.title;
-    const description = !q && page > 1 ? `Halaman ${page} video terbaru ${BRAND_NAME}: bokep indo viral, videy, JAV dan AI+ terbaru.` : seo.description;
-    const url = q
-      ? HOME_CANONICAL
-      : page > 1
-        ? `${HOME_CANONICAL}?page=${page}`
-        : HOME_CANONICAL;
+    const title = !q && page > 1 ? `Bokep Indo Terbaru Halaman ${page} | Dr. Pinguin` : seo.title;
+    const description = !q && page > 1 ? `Halaman ${page}: bokep indo terbaru, update setiap hari, streaming tanpa VPN di koleksidrpinguin.com. Khusus 18+.` : seo.description;
+    const url = q ? HOME_CANONICAL : `${SITE_ORIGIN}${homeHref(page)}`;
+    const indexable = !q && page <= DEEP_PAGE_NOINDEX;
     return {
       meta: [
         { title },
         { name: "description", content: description },
+        { name: "robots", content: indexable ? "index,follow" : "noindex,follow" },
         { property: "og:title", content: title },
         { property: "og:description", content: description },
         { property: "og:url", content: url },
         { property: "og:type", content: "website" },
         { property: "og:image", content: DEFAULT_OG },
         { name: "twitter:card", content: "summary_large_image" },
-        ...(q || page > DEEP_PAGE_NOINDEX
-          ? [
-              { name: "robots", content: "noindex, follow" },
-              { name: "googlebot", content: "noindex, follow" },
-            ]
-          : []),
+        ...(!indexable ? [{ name: "googlebot", content: "noindex,follow" }] : []),
       ],
       links: [{ rel: "canonical", href: url }],
       scripts: q
@@ -164,20 +159,28 @@ export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
-function HomePage() {
-  const { q, category, page: pageSearch } = Route.useSearch();
-  const loaderData = Route.useLoaderData();
+export function HomeExperience({
+  q,
+  category,
+  page,
+  loaderData,
+  onPage,
+}: {
+  q?: string;
+  category?: string;
+  page: number;
+  loaderData: Awaited<ReturnType<typeof loadHome>>;
+  onPage: (next: number) => void;
+}) {
   const seed = seedFromLoader(loaderData);
-  const navigate = useNavigate({ from: "/" });
   const mode = q ? "search" : category ? "category" : "home";
-  const page = pageSearch || 1;
   const feed = useCatalogFeed({ mode, q, category, page }, seed);
   const cat = findCategory(category);
   const heroVideos = !q && !category && page === 1 ? feed.featured : [];
   const heroIds = new Set(heroVideos.map((v) => v.id));
   const gridItems = heroIds.size ? feed.items.filter((item) => !heroIds.has(item.id)) : feed.items;
 
-  const title = q ? `Hasil untuk “${q}”` : cat ? cat.label : BRAND_NAME;
+  const title = q ? `Hasil untuk “${q}”` : cat ? cat.label : HOME_H1;
   const subtitle = q
     ? feed.loading && !feed.items.length
       ? "Mencari…"
@@ -194,23 +197,15 @@ function HomePage() {
   // so the count and the grid always come from the same result array.
   const searchLastPage = q && feed.total > 0 ? Math.max(1, Math.ceil(feed.total / Math.max(1, feed.limit))) : 0;
   useEffect(() => {
-    if (q && searchLastPage && page > searchLastPage) {
-      navigate({ search: (prev) => ({ ...prev, page: undefined }), replace: true });
-    }
-  }, [q, page, searchLastPage, navigate]);
+    if (q && searchLastPage && page > searchLastPage) onPage(1);
+  }, [q, page, searchLastPage, onPage]);
 
   function setPage(next: number) {
-    const current = pageSearch || 1;
-    if (next === current) {
+    if (next === page) {
       feed.retry();
       return;
     }
-    navigate({
-      search: (prev) => ({
-        ...prev,
-        page: next > 1 ? next : undefined,
-      }),
-    });
+    onPage(next);
   }
 
   if (loaderData && !loaderData.ok) {
@@ -286,6 +281,11 @@ function HomePage() {
           )}
 
           <CatalogPager
+            pageHref={(n) =>
+              q
+                ? `/?${new URLSearchParams({ q, ...(n > 1 ? { page: String(n) } : {}) }).toString()}`
+                : homeHref(n)
+            }
             page={page}
             total={feed.total}
             limit={feed.limit}
@@ -299,5 +299,28 @@ function HomePage() {
         </section>
       </div>
     </Shell>
+  );
+}
+
+function HomePage() {
+  const { q, category, page: pageSearch } = Route.useSearch();
+  const loaderData = Route.useLoaderData();
+  const navigate = useNavigate({ from: "/" });
+  const page = pageSearch || 1;
+  return (
+    <HomeExperience
+      q={q}
+      category={category}
+      page={page}
+      loaderData={loaderData}
+      onPage={(next) => {
+        if (q) {
+          navigate({ search: (prev: HomeSearch) => ({ ...prev, page: next > 1 ? next : undefined }) });
+          return;
+        }
+        if (next <= 1) navigate({ to: "/", search: { q: undefined, category: undefined, page: undefined } });
+        else navigate({ to: "/halaman/$page", params: { page: String(next) } });
+      }}
+    />
   );
 }
