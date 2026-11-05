@@ -653,6 +653,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
       skippedTotal += result.skipped || 0;
 
       const createdIds = new Set((result.records || []).map((r) => String(r.id || "").toLowerCase()));
+      const blockedIds = new Set((result.blockedIds || []).map((id) => String(id || "").toLowerCase()));
 
       for (const it of items) {
         const idKey = String(it.record.id || "").toLowerCase();
@@ -662,6 +663,10 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
           createdTotal -= 1;
           heldTotal += 1;
           for (const l of holdReplyLines(it.record.id, it.record.title_hold || { term: "", meaning: "", suggestions: [] })) lines.push(l);
+          continue;
+        }
+        if (blockedIds.has(idKey)) {
+          lines.push(`⏭️ ${it.record.id} — dikeluarkan dari katalog, tidak dimasukkan lagi`);
           continue;
         }
         if (createdIds.has(idKey)) {

@@ -17,10 +17,13 @@ import {
   applyUnhidden,
   isLockedMinor,
   isPublicHidden,
+  applyCatalogBlock,
   loadItemsRaw,
   multiServerOf,
   type HiddenCandidate,
 } from "@/lib/catalog/local-cache";
+import { removalPlan, singleRemoveId, titleSlug } from "@/lib/catalog/catalog-block.js";
+import { addCatalogBlocked, commitCatalogBlock } from "@/lib/catalog/catalog-block-store";
 import { isDrpBokep, isPutarin, javCoverFromTitle, PLACEHOLDER_IMAGE_RE, slugOf, sourceLabel, type RawItem } from "@/lib/catalog/local-shared";
 import deadSources from "@/lib/catalog/dead-sources.json";
 import rankMeta from "@/lib/catalog/rank-periods-meta.json";
@@ -668,8 +671,11 @@ async function handleCatalogSearch(body: { q?: unknown; limit?: unknown; offset?
     const extra = Array.isArray(view.ownerExtraCategories) ? (view.ownerExtraCategories as unknown[]).map(String) : [];
     const tags = Array.isArray(view.tags) ? (view.tags as unknown[]).map(String) : [];
     const labels = [slug, ...extra, ...tags].map((s) => `${s} ${findCategory(s)?.label || ""}`).join(" ");
-    const hay = `${String(view.title || it.title || "")} ${it.id} ${labels} ${sourceLabel(it)}`.toLowerCase();
-    if (!words.every((w) => hay.includes(w))) continue;
+    const title = String(view.title || it.title || "");
+    const titleKey = titleSlug(title);
+    const hay = `${title} ${titleKey} ${titleKey.replace(/-/g, " ")} ${it.id} ${labels} ${sourceLabel(it)}`.toLowerCase();
+    const flat = hay.replace(/-/g, " ");
+    if (!words.every((w) => hay.includes(w) || flat.includes(w.replace(/-/g, " ")))) continue;
     hits.push({ it, shown });
   }
   return json({
@@ -939,6 +945,54 @@ async function handleBulkTags(body: { ids?: unknown; add?: unknown; remove?: unk
   });
 }
 
+/**
+ * Remove one catalog id from every public surface and put it on the blocklist.
+ * dryRun reports the plan and writes nothing. One id only (no bulk).
+ */
+async function handleCatalogRemove(body: { id?: unknown; ids?: unknown; dryRun?: unknown; dry?: unknown; all?: unknown; bulk?: unknown }) {
+  const parsed = singleRemoveId(body);
+  if ("error" in parsed) {
+    const message =
+      parsed.error === "no_bulk"
+        ? "Hapus satu video per kali. Penghapusan massal tidak tersedia."
+        : "ID video tidak valid.";
+    return json({ ok: false, error: parsed.error, message }, 400);
+  }
+  const id = parsed.id;
+  const dryRun = body.dryRun === true || body.dry === true;
+  const { raw, cache, hidden } = await catalogBase();
+  const it = raw.find((x) => x?.id === id);
+  const row = it ? toCatalogRow(it, cache.byId?.get(id), hidden.has(id), cache.posters, multiServerOf(cache as never)) : null;
+  const plan = removalPlan(id, Boolean(it));
+  const detail = {
+    ...plan,
+    title: row?.title || "",
+    slug: titleSlug(row?.title || it?.title || ""),
+    category: row?.category || "",
+    locked: Boolean(row?.locked),
+    hidden: Boolean(row?.hidden),
+    status: row?.locked ? "locked" : row?.hidden ? "hidden" : it ? "live" : "missing",
+  };
+  if (dryRun) return json({ ok: true, dryRun: true, ...detail });
+  if (!it) return json({ ok: false, error: "not_found", message: "Video tidak ada di katalog.", ...detail }, 404);
+  let state;
+  try {
+    state = await addCatalogBlocked(id);
+  } catch {
+    return json({ ok: false, error: "kv_unavailable", message: "Penyimpanan moderasi tidak tersedia." }, 503);
+  }
+  applyCatalogBlock(Object.keys(state.ids));
+  const repo = await commitCatalogBlock(state, id);
+  return json({
+    ok: true,
+    dryRun: false,
+    ...detail,
+    watch: 410,
+    blocked: true,
+    repo: repo.skipped ? "skipped" : repo.ok ? "committed" : "error",
+  });
+}
+
 type OwnerBody = {
   action?: string;
   count?: number;
@@ -950,6 +1004,10 @@ type OwnerBody = {
   limit?: number;
   unhide?: boolean;
   ids?: string[];
+  dryRun?: boolean;
+  dry?: boolean;
+  all?: boolean;
+  bulk?: boolean;
   key?: string;
   q?: string;
   title?: string;
@@ -1043,6 +1101,14 @@ export const Route = createFileRoute("/api/owner-tools")({
         if (body.action === "review-mark") {
           const r = await setReviewMark(body as never);
           return json(r, r.status || 200);
+        }
+        if (body.action === "catalog-remove") {
+          try {
+            return await handleCatalogRemove(body);
+          } catch (err) {
+            console.error("[owner-tools] catalog-remove", err);
+            return json({ ok: false, error: `Gagal mengeluarkan video: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
+          }
         }
         if (body.action === "catalog-overview" || body.action === "catalog-search" || body.action === "thumb-missing") {
           // Always answer JSON, so the panel can show what went wrong instead of staying empty.

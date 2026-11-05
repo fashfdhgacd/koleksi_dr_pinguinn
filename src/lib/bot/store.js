@@ -1,6 +1,10 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { titleTags } from "../catalog/title-tags";
+import blockFile from "../catalog/catalog-blocklist.json";
+import { blockedIdSet, isBlockedId } from "../catalog/catalog-block.js";
+
+const FILE_BLOCKED = blockedIdSet(blockFile);
 
 function today() {
   return new Date().toISOString().slice(0, 10);
@@ -60,6 +64,9 @@ function videoKey(item) {
 
 /** Upsert against a local file (for long-running / local bot). */
 export async function upsertVideo(filePath, record) {
+  if (isBlockedId(record?.id, FILE_BLOCKED)) {
+    return { action: "skipped", reason: "catalog-block", total: 0, record };
+  }
   const items = await readJsonArray(filePath);
   const key = videoKey(record);
   const idx = items.findIndex((it) => videoKey(it) === key);
@@ -78,6 +85,9 @@ export async function upsertVideo(filePath, record) {
 /** In-memory upsert (for serverless webhook). Returns new array + action. */
 export function upsertInMemory(items, record) {
   const list = Array.isArray(items) ? items.slice() : [];
+  if (isBlockedId(record?.id, FILE_BLOCKED)) {
+    return { action: "skipped", reason: "catalog-block", total: list.length, record, items: list };
+  }
   const key = videoKey(record);
   const idx = list.findIndex((it) => videoKey(it) === key);
 
