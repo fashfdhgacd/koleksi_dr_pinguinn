@@ -85,7 +85,13 @@ Pencatatan: kartu "Campaign (UTM)" di `/pemilik` dan `data/traffic-daily.json`. 
 
 ## Belum dikerjakan
 
-- Audit 135 thumbnail kosong dan 99 kegagalan dari 1.490 klik play. Sudah ada: `data/thumb-health.json` (4 Nov: 10.312 ok dari
-  10.896, 579 absen, 307 tanpa sumber untuk diperbaiki otomatis, 219 masih rusak setelah perbaikan). Kegagalan per server perlu
-  data `player_errors` dari panel `/pemilik` (tidak bisa dibaca dari repo).
+- Audit thumbnail dan kejadian gagal player. Laporan lama `data/thumb-health.json` mencatat 219 perbaikan yang tidak
+  berhasil, tetapi angka itu juga dapat mencakup error permintaan, bukan hanya gambar rusak. Pemeriksaan terbatas dari
+  GitHub Actions pada 5 Nov 04:59 UTC mendapat HTTP 403 dengan `cf-mitigated: challenge` untuk domain situs dan gambar;
+  ini membuktikan runner ditantang Cloudflare, bukan bahwa pengunjung atau semua gambar terdampak. Periksa Security
+  Events Cloudflare pada waktu itu sebelum mengubah aturan. Kegagalan player per server perlu data `player_errors`
+  dari panel `/pemilik` (tidak bisa dibaca dari repo).
+- `thumb-health` sekarang menghentikan pemeriksaan jika Cloudflare mengirim challenge, dan tidak menulis laporan parsial.
+  `repairError` menghitung perbaikan yang tidak dapat diperiksa, `repairDeferred` yang tertunda karena batas per run,
+  dan `stillBad` yang masih bermasalah setelah pemeriksaan/perbaikan; angka-angka ini bukan kepastian video gagal diputar.
 - Optimasi judul/deskripsi kategori berdasarkan data Bing: ditunda sampai hasil tindakan pemilik 1-3, agar tidak berubah massal tanpa bukti.

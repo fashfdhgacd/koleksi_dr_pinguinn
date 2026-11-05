@@ -15,6 +15,7 @@ import { createRequire } from "node:module";
 import { isPlaceholderMd5, isPlaceholderUrl, MIN_IMAGE_BYTES } from "../src/lib/image-guard";
 import { resolvePuterinImage } from "../src/lib/puterin-poster";
 import { javCoverFromTitle, isPutarin, isVidey } from "../src/lib/catalog/local-shared";
+import { attemptThumbRepair, isCloudflareChallenge, poolUntil } from "./lib/thumb-health-http.mjs";
 
 const require = createRequire(import.meta.url);
 const { loadAll } = require("./lib/latest-chunks.cjs");
@@ -79,27 +80,30 @@ function nearSingleColour(buf: ArrayBuffer): boolean {
   return Boolean(d && d[0] * d[1] > 40000 && buf.byteLength / (d[0] * d[1]) < 0.012);
 }
 
-async function pool<T>(xs: T[], n: number, fn: (x: T) => Promise<void>) {
-  let i = 0;
-  await Promise.all(Array.from({ length: n }, async () => {
-    while (i < xs.length) await fn(xs[i++]);
-  }));
-}
-
 type Verdict = "ok" | "placeholder" | "small" | "blank" | "notimage" | "absent" | "error";
+let blockedByCloudflare = false;
 async function checkR2(id: string): Promise<Verdict> {
+  if (blockedByCloudflare) return "error";
   const v = await checkR2Once(id);
-  return v === "error" ? checkR2Once(id) : v;
+  return v === "error" && !blockedByCloudflare ? checkR2Once(id) : v;
 }
 // Why a check errored (first few only), so an all-"error" run is diagnosable instead of silent.
 const errorSamples: Array<{ id: string; why: string }> = [];
+const repairErrorSamples: Array<{ id: string; why: string }> = [];
 const UA = { "user-agent": "koleksidrpinguin-thumb-health/1.0 (+https://github.com/fashfdhgacd/koleksi_dr_pinguinn)" };
 function noteError(id: string, why: string) {
   if (errorSamples.length < 20) errorSamples.push({ id, why });
 }
+function stopOnChallenge(id: string, response: Response): boolean {
+  if (!isCloudflareChallenge(response)) return false;
+  blockedByCloudflare = true;
+  noteError(id, `Cloudflare challenge (HTTP ${response.status})`);
+  return true;
+}
 async function checkR2Once(id: string): Promise<Verdict> {
   try {
     const h = await fetch(R2 + id, { method: "HEAD", headers: UA, signal: AbortSignal.timeout(15000) });
+    if (stopOnChallenge(id, h)) return "error";
     if (h.status === 404) return "absent";
     if (!h.ok) {
       noteError(id, `HTTP ${h.status} ${h.headers.get("server") || ""} ${h.headers.get("cf-mitigated") || ""}`.trim());
@@ -110,7 +114,15 @@ async function checkR2Once(id: string): Promise<Verdict> {
     const len = Number(h.headers.get("content-length") || 0);
     if (len && len < MIN_IMAGE_BYTES) return "small";
     if (len && len < 20000) {
-      const buf = await (await fetch(R2 + id, { headers: UA, signal: AbortSignal.timeout(15000) })).arrayBuffer();
+      const get = await fetch(R2 + id, { headers: UA, signal: AbortSignal.timeout(15000) });
+      if (stopOnChallenge(id, get)) return "error";
+      if (!get.ok) {
+        noteError(id, `GET HTTP ${get.status}`);
+        return "error";
+      }
+      if (!/^image\//i.test(get.headers.get("content-type") || "")) return "notimage";
+      const buf = await get.arrayBuffer();
+      if (buf.byteLength < MIN_IMAGE_BYTES) return "small";
       if (nearSingleColour(buf)) return "blank";
     }
     return "ok";
@@ -119,21 +131,12 @@ async function checkR2Once(id: string): Promise<Verdict> {
     return "error";
   }
 }
-async function repairViaThumb(id: string): Promise<boolean> {
-  try {
-    const r = await fetch(`${SITE}/thumb/${id}?h=${DAY}`, { redirect: "manual", headers: UA, signal: AbortSignal.timeout(25000) });
-    return r.status === 200;
-  } catch {
-    return false;
-  }
-}
-
 // ---- run ----
 const seen = new Set<string>();
 const stats: Record<string, Record<string, number>> = {};
 const work: Array<{ src: string; it: Item }> = [];
 for (const [src, items] of sources) {
-  stats[src] = { total: 0, ok: 0, placeholder: 0, small: 0, blank: 0, notimage: 0, absent: 0, error: 0, repaired: 0, stillBad: 0, noSource: 0, putarinResolved: 0 };
+  stats[src] = { total: 0, ok: 0, placeholder: 0, small: 0, blank: 0, notimage: 0, absent: 0, error: 0, repaired: 0, stillBad: 0, repairError: 0, repairDeferred: 0, noSource: 0, putarinResolved: 0 };
   for (const it of items) {
     if (!it.id || seen.has(it.id) || it.hidden || isVidey(it as never)) continue;
     seen.add(it.id);
@@ -146,7 +149,8 @@ let putarinBudget = PUTARIN_CAP;
 let repairsLeft = REPAIR_CAP;
 const added: Record<string, string> = {};
 const badIds: Array<{ id: string; src: string; verdict: string }> = [];
-await pool(work, 10, async ({ src, it }) => {
+let checked = 0;
+await poolUntil(work, 10, async ({ src, it }) => {
   const s = stats[src];
   let poster = knownPoster(it);
   const putarin = isPutarin(it as never);
@@ -160,6 +164,8 @@ await pool(work, 10, async ({ src, it }) => {
   }
   const has = Boolean(poster || (putarin && (javCoverFromTitle(String(it.title || "")) || /^[A-Za-z0-9]{6,20}$/.test(it.id!))));
   const v = await checkR2(it.id!);
+  if (blockedByCloudflare) return;
+  checked++;
   s[v]++;
   if (v === "ok") return;
   if (v === "absent" && !has) {
@@ -173,36 +179,62 @@ await pool(work, 10, async ({ src, it }) => {
   // Placeholder etag: the Worker deletes it itself. Small / blank / not-image copies are not on the
   // md5 list, so the Worker would keep serving them: report those for a manual look.
   if (v === "absent" || v === "placeholder") {
-    if (repairsLeft-- > 0 && (await repairViaThumb(it.id!)) && (await checkR2(it.id!)) === "ok") s.repaired++;
-    else {
+    if (repairsLeft <= 0) {
+      s.repairDeferred++;
+      badIds.push({ id: it.id!, src, verdict: v });
+      return;
+    }
+    repairsLeft--;
+    const repair = await attemptThumbRepair({
+      id: it.id!,
+      site: SITE,
+      day: DAY,
+      headers: UA,
+      verify: () => checkR2(it.id!),
+    });
+    if (repair.state === "repaired") s.repaired++;
+    else if (repair.state === "unresolved") {
       s.stillBad++;
       badIds.push({ id: it.id!, src, verdict: v });
+    } else {
+      if (repair.state === "challenge") blockedByCloudflare = true;
+      s.repairError++;
+      if (repairErrorSamples.length < 20) repairErrorSamples.push({ id: it.id!, why: repair.reason });
     }
   } else {
     s.stillBad++;
     badIds.push({ id: it.id!, src, verdict: v });
   }
-});
+}, () => blockedByCloudflare);
 
 const totals: Record<string, number> = {};
 for (const s of Object.values(stats)) for (const [k, n] of Object.entries(s)) totals[k] = (totals[k] || 0) + n;
 const report = {
   checkedAt: new Date().toISOString(),
   dryRun: DRY,
+  partial: blockedByCloudflare,
+  checked,
   totals,
   sources: Object.fromEntries(Object.entries(stats).filter(([, s]) => s.total)),
   latestPostersAdded: Object.keys(added).length,
   bad: badIds.slice(0, 300),
   errorSamples,
+  repairErrorSamples,
 };
-console.log(JSON.stringify({ errorSamples }, null, 1));
+console.log(JSON.stringify({ partial: report.partial, checked, errorSamples, repairErrorSamples }, null, 1));
 console.log(JSON.stringify({ totals, latestPostersAdded: report.latestPostersAdded, sources: report.sources }, null, 1));
-if (!DRY) {
+if (blockedByCloudflare) {
+  console.error("thumb-health: stopped by a Cloudflare challenge; no partial report or poster map was written");
+  process.exitCode = 1;
+} else if (!DRY) {
   if (Object.keys(added).length) {
     const fresh = readJson(latestPath) || {};
     fs.writeFileSync(latestPath, JSON.stringify({ ...fresh, ...added }, null, 2) + "\n");
   }
   fs.writeFileSync("data/thumb-health.json", JSON.stringify(report, null, 1) + "\n");
+}
+if (totals.repairError) {
+  console.warn(`thumb-health: ${totals.repairError} repairs could not be checked; see repairErrorSamples above`);
 }
 // A run where most checks errored is a broken check, not a healthy site: fail the job so it shows red.
 if ((totals.total || 0) > 0 && (totals.error || 0) > totals.total / 2) {
