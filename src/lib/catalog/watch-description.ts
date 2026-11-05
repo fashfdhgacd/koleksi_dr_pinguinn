@@ -9,3 +9,13 @@ export function watchDescription(item: SeoVideoInput & { id?: string }): string 
   if (raw) return raw.length > 220 ? `${raw.slice(0, 217).trimEnd()}…` : raw;
   return videoBodyDescription(item);
 }
+
+/** Versi lebih panjang untuk body (target ~180–280 kata). */
+export function longWatchDescription(item: SeoVideoInput & { id?: string }): string {
+  const base = watchDescription(item);
+  if (base.length > 280) return base;
+  const title = String(item.title || "").trim();
+  const cat = String(item.category || "video").trim();
+  const extra = ` Video ini berjudul “${title}” dan masuk kategori ${cat}. Streaming langsung tersedia tanpa daftar akun. Konten dewasa 18+ saja. Jika kamu suka kategori ini, cek juga video lain yang serupa di halaman kategori.`;
+  return (base + extra).replace(/\s+/g, " ").trim();
+}
