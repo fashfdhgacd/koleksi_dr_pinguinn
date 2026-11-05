@@ -171,8 +171,17 @@ jobs:
 
           // Every chunk (videos-latest.json + videos-latest-pNN.json), not just the first one.
           const latestLoaded = latestChunks.loadChunks("videos-latest");
-          const latest = latestLoaded.items;
-          console.log("videos-latest chunks:", latestLoaded.chunks.map((c) => `${c.file}=${c.items.length}`).join(" "), "total", latest.length);
+          const blockList = createRequire(process.cwd() + "/")("./scripts/lib/catalog-block.cjs");
+          const blockedIds = blockList.loadBlocked(process.cwd());
+          let blockDropped = 0;
+          for (const chunk of latestLoaded.chunks) {
+            const next = chunk.items.filter((v) => !blockList.isBlocked(v && v.id, blockedIds));
+            if (next.length === chunk.items.length) continue;
+            blockDropped += chunk.items.length - next.length;
+            chunk.items = next;
+          }
+          const latest = latestLoaded.items.filter((v) => !blockList.isBlocked(v && v.id, blockedIds));
+          console.log("videos-latest chunks:", latestLoaded.chunks.map((c) => `${c.file}=${c.items.length}`).join(" "), "total", latest.length, "blocked dropped", blockDropped);
 
           // Guard: if wiped, try restore from git history via empty skip (workflow separate)
           if (latest.length === 0) {
@@ -194,7 +203,7 @@ jobs:
           const enrichTargets = [...latest, ...loadJson(batchPath, [])];
           const seenEnrich = new Set();
           for (const v of enrichTargets) {
-            if (!v?.id || seenEnrich.has(v.id) || !isStreamtape(v)) continue;
+            if (!v?.id || seenEnrich.has(v.id) || !isStreamtape(v) || blockList.isBlocked(v.id, blockedIds)) continue;
             seenEnrich.add(v.id);
             const code = embedId(v.embed || v.direct || "") || v.id;
             const wantTitle = needsTitle(v);
@@ -222,7 +231,8 @@ jobs:
           // write back latest + batch
           // Each video goes back to the chunk it came from; unchanged chunks are not rewritten.
           if (latest.length) console.log("videos-latest chunks changed:", latestChunks.saveChunks(latestLoaded).join(" ") || "none");
-          const batch = loadJson(batchPath, []);
+          const batchAll = loadJson(batchPath, []);
+          const batch = Array.isArray(batchAll) ? batchAll.filter((v) => !blockList.isBlocked(v && v.id, blockedIds)) : [];
           if (Array.isArray(batch) && batch.length) {
             const byId = new Map(enrichTargets.map((x) => [x.id, x]));
             for (let i = 0; i < batch.length; i++) {
@@ -237,7 +247,7 @@ jobs:
           const seen = new Set();
           const need = [];
           for (const v of catalogVideos) {
-            if (!v?.id || seen.has(v.id)) continue;
+            if (!v?.id || seen.has(v.id) || blockList.isBlocked(v.id, blockedIds)) continue;
             seen.add(v.id);
             if (posters[v.id]?.startsWith?.("http")) continue;
             if (String(v.poster || "").startsWith("http")) {
@@ -313,7 +323,7 @@ jobs:
           const byseNeed = [];
           const byseSeen = new Set();
           for (const v of [...loadJson("data/drp-bokep.json", []), ...latest]) {
-            if (!v?.id || byseSeen.has(v.id) || !isByse(v)) continue;
+            if (!v?.id || byseSeen.has(v.id) || !isByse(v) || blockList.isBlocked(v.id, blockedIds)) continue;
             byseSeen.add(v.id);
             const ov = overrides && typeof overrides === "object" ? overrides[v.id] : null;
             if (realUrl(v.poster) || realUrl(v.thumbnail) || realUrl(posters[v.id]) || realUrl(latestPosters[v.id]) || realUrl(ov?.poster)) continue;

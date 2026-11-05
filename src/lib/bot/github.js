@@ -337,6 +337,14 @@ export async function fetchJsonFromGithub(t, e) {
   }
   return { ok: !0, items: l, sha: f, pathName: e, parts: c.parts };
 }
+async function blockedIdsForIngest() {
+  try {
+    const mod = await import("../catalog/catalog-block-runtime.ts");
+    return await mod.ingestBlockedIds();
+  } catch {
+    return new Set();
+  }
+}
 async function upsertVideosBatchOnce(t, e, n, opts) {
   const { token: s, owner: i, repo: c } = G(t);
   if (!s || !i || !c)
@@ -395,13 +403,21 @@ async function upsertVideosBatchOnce(t, e, n, opts) {
   }
   let b = 0,
     d = 0;
-  const _ = $.slice(),
-    x = [],
-    A = new Set(),
-    N = new Set();
+  const _ = $.slice();
+  const x = [];
+  const A = new Set();
+  const N = new Set();
+  const blockedList = [];
+  const blocked = await blockedIdsForIngest();
   for (const a of l) {
     const o = K(a),
-      h = F(a);
+      h = F(a),
+      rawId = String(a?.id || "").trim();
+    if ((rawId && blocked.has(rawId)) || (o && blocked.has(o))) {
+      d += 1;
+      blockedList.push(rawId || o);
+      continue;
+    }
     if ((o && (w.has(o) || A.has(o))) || (h && (y.has(h) || N.has(h)))) {
       d += 1;
       continue;
@@ -419,6 +435,7 @@ async function upsertVideosBatchOnce(t, e, n, opts) {
       file: a,
       total: o?.items?.length || 0,
       errors: _,
+      blockedIds: blockedList,
       results: l.map(() => ({ action: "skipped", reason: "duplicate" })),
     };
   }
@@ -484,6 +501,7 @@ async function upsertVideosBatchOnce(t, e, n, opts) {
       total: k.items.length,
       errors: [..._, o],
       rotated: R,
+      blockedIds: blockedList,
     };
   }
   return (
@@ -500,6 +518,7 @@ async function upsertVideosBatchOnce(t, e, n, opts) {
       records: U,
       commit: commit?.sha,
       posters: posterRes,
+      blockedIds: blockedList,
     }
   );
 }

@@ -135,11 +135,13 @@ const PAGE = 10;
 /** Upload list filter: "" = semua, a source label, or "nothumb". */
 type RecentFilter = string;
 
-const card = "min-w-0 rounded-2xl border border-white/[0.06] bg-[#111314] p-4 sm:p-5";
-const h2 = "flex items-center justify-between gap-2 text-sm font-medium text-zinc-100";
-const h2note = "text-[13px] font-normal normal-case tracking-normal text-zinc-400";
+const card = "min-w-0 rounded-2xl border border-white/[0.06] bg-[#101214] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-5";
+const h2 = "flex items-center justify-between gap-3 text-[15px] font-semibold tracking-tight text-zinc-50";
+const h2note = "text-[12px] font-normal text-zinc-500";
 const btn =
-  "shrink-0 whitespace-nowrap rounded-lg border border-white/[0.08] bg-white/[0.03] px-2.5 py-1 text-[13px] text-zinc-200 hover:border-[#2dd4bf]/40 hover:bg-white/[0.06] disabled:opacity-50";
+  "inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-lg border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-[13px] text-zinc-200 hover:border-[#2dd4bf]/40 hover:bg-white/[0.06] disabled:opacity-50";
+const btnDanger =
+  "inline-flex w-full items-center justify-center rounded-lg bg-red-600 px-3 py-2.5 text-[13px] font-semibold text-white hover:bg-red-500 disabled:opacity-50 sm:w-auto";
 // Separate classes per state so the active background never competes with the base bg in CSS order.
 function toggleCls(active: boolean): string {
   const base = "shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[13px]";
@@ -464,6 +466,131 @@ function EditRow({
   );
 }
 
+function StatusBadge({ row }: { row: CatalogRow }) {
+  if (row.locked) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-red-500/15 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-red-200 ring-1 ring-red-400/40">
+        Terkunci
+      </span>
+    );
+  }
+  if (row.hidden) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-amber-400/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-100 ring-1 ring-amber-300/30">
+        Tersembunyi
+      </span>
+    );
+  }
+  if (row.mergedInto) {
+    return (
+      <span className="inline-flex items-center rounded-full bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-zinc-300 ring-1 ring-white/10">
+        Digabung
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center rounded-full bg-[#2dd4bf]/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#5eead4] ring-1 ring-[#2dd4bf]/30">
+      Tayang
+    </span>
+  );
+}
+
+type RemovePlan = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  dryRun?: boolean;
+  found?: boolean;
+  title?: string;
+  watch?: number;
+  locked?: boolean;
+  hidden?: boolean;
+  status?: string;
+  surfaces?: string[];
+};
+
+/** Confirm step for "Keluarkan dari katalog". Dry-run first, then one real delete. */
+function RemoveDialog({
+  row,
+  secret,
+  onClose,
+  onRemoved,
+}: {
+  row: CatalogRow;
+  secret: string;
+  onClose: () => void;
+  onRemoved: () => void;
+}) {
+  const [plan, setPlan] = useState<RemovePlan | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const d = await ownerPost<RemovePlan>(secret, { action: "catalog-remove", id: row.id, dryRun: true });
+      if (!alive) return;
+      setPlan(d);
+      if (!d.ok) setErr(d.message || d.error || "Gagal memeriksa video.");
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [row.id, secret]);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  async function confirm() {
+    setBusy(true);
+    setErr("");
+    const d = await ownerPost<RemovePlan>(secret, { action: "catalog-remove", id: row.id, dryRun: false });
+    setBusy(false);
+    if (!d.ok) {
+      setErr(d.message || d.error || "Gagal mengeluarkan video.");
+      return;
+    }
+    onRemoved();
+    onClose();
+  }
+  const title = plan?.title || row.title || row.id;
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 p-0 sm:items-center sm:p-4" role="presentation" onClick={onClose}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="catalog-remove-title"
+        className="w-full max-w-md rounded-t-2xl border border-white/[0.08] bg-[#101214] p-5 shadow-2xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5eead4]">Katalog</p>
+        <h3 id="catalog-remove-title" className="mt-1 text-lg font-semibold tracking-tight text-zinc-50">
+          Keluarkan dari katalog?
+        </h3>
+        <p className="mt-3 line-clamp-3 text-sm font-medium text-zinc-100">{title}</p>
+        <p className="mt-1 font-mono text-[12px] text-zinc-500">{row.id}</p>
+        <p className="mt-3 text-sm leading-relaxed text-zinc-400">
+          Video ini akan hilang dari data katalog, kategori, daftar, pencarian, sitemap, dan video terkait.
+          Halaman tonton membalas {plan?.found === false ? "404" : "410"}. Ingest dan sync tidak akan memasukkan id ini lagi.
+        </p>
+        {plan?.locked ? <p className="mt-2 text-[13px] text-red-200">Status: terkunci. Tetap dikeluarkan satu per satu.</p> : null}
+        {err ? <p className="mt-3 text-sm text-red-300">{err}</p> : null}
+        {!plan ? <p className="mt-3 text-sm text-zinc-500">Memeriksa…</p> : null}
+        <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <button type="button" className={btn} onClick={onClose}>
+            Batal
+          </button>
+          <button type="button" className={btnDanger} disabled={busy || !plan?.ok || plan.found === false} onClick={() => void confirm()}>
+            {busy ? "Mengeluarkan…" : "Keluarkan dari katalog"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function VideoRows({
   rows,
   secret,
@@ -478,7 +605,6 @@ function VideoRows({
   const [editing, setEditing] = useState("");
   const [busy, setBusy] = useState("");
   const [note, setNote] = useState("");
-  const [menu, setMenu] = useState("");
   // Pilihan untuk edit tag massal (hanya di daftar ini; hilang kalau halaman di-refresh).
   const [sel, setSel] = useState<Set<string>>(() => new Set());
   const allOnPage = rows.length > 0 && rows.every((r) => sel.has(r.id));
@@ -495,6 +621,7 @@ function VideoRows({
     Record<string, { title?: string; categoryLabel?: string; category?: string; extra?: string[] }>
   >({});
   const [merging, setMerging] = useState(false);
+  const [removeRow, setRemoveRow] = useState<CatalogRow | null>(null);
   /** "Gabung jadi satu" / "Pisahkan": one owner action, one KV write (owner-tools merge-videos). */
   async function mergeSel(op: "merge" | "unmerge") {
     const ids = [...sel];
@@ -595,15 +722,15 @@ function VideoRows({
           setSel(new Set());
         }}
       />
-      <ul className="mt-2">
+      <ul className="mt-3">
         {rows.map((r0) => {
           const r = { ...r0, ...(patched[r0.id] || {}) };
           return (
-          <li key={r.id} className="border-t border-white/[0.05] py-2">
-            <div className="flex items-center gap-3">
+          <li key={r.id} className="border-t border-white/[0.06] py-3">
+            <div className="flex items-start gap-3">
               <input
                 type="checkbox"
-                className="h-4 w-4 shrink-0 accent-[#2dd4bf]"
+                className="mt-1 h-4 w-4 shrink-0 accent-[#2dd4bf]"
                 aria-label={`Pilih ${r.title || r.id}`}
                 checked={sel.has(r.id)}
                 onChange={() => toggleSel(r.id)}
@@ -613,77 +740,40 @@ function VideoRows({
                 alt=""
                 loading="lazy"
                 decoding="async"
-                className="h-9 w-16 shrink-0 rounded bg-zinc-900 object-cover"
+                className="h-16 w-[4.5rem] shrink-0 rounded-lg bg-zinc-900 object-cover sm:h-14 sm:w-24"
               />
-              <a href={`/watch/${r.id}`} target="_blank" rel="noopener" className="min-w-0 flex-1">
-                <span className="block truncate text-sm leading-snug text-zinc-100">{r.title || r.id}</span>
-                <span className={`mt-0.5 block text-[13px] leading-snug ${r.noThumb ? "text-amber-300" : "text-zinc-400"}`}>
-                  {r.categoryLabel}
-                  {r.extra?.length
-                    ? ` + ${r.extra.map((s) => CATEGORY_LIST.find((c) => c.slug === s)?.label || s).join(", ")}`
-                    : ""}{" "}
-                  · {r.source}
-                  {r.noThumb ? " · Gambar belum ketemu" : showTime && r.createdAt ? ` · ${timeWib(r.createdAt)}` : ""}
-                  {r.locked ? " · terkunci" : r.hidden ? " · tersembunyi" : ""}
-                  {r.mergedInto ? (
-                    <span className="text-[#2dd4bf]"> · digabung, jadi server dari {r.mergedInto}</span>
-                  ) : r.servers ? (
-                    <span className="text-[#2dd4bf]"> · halaman utama, {r.servers} server</span>
-                  ) : null}
-                </span>
-              </a>
-              {r.locked || r.hidden ? (
-                <button type="button" className={btn} onClick={() => setEditing((v) => (v === r.id ? "" : r.id))}>
-                  Edit
+              <div className="min-w-0 flex-1">
+                <a href={`/watch/${r.id}`} target="_blank" rel="noopener" className="block">
+                  <span className="line-clamp-2 text-[15px] font-medium leading-snug text-zinc-50">{r.title || r.id}</span>
+                </a>
+                <p className="mt-1 truncate font-mono text-[12px] text-zinc-500">{r.id}</p>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                  <StatusBadge row={r} />
+                  <span className={`text-[12px] leading-snug ${r.noThumb ? "text-amber-300" : "text-zinc-500"}`}>
+                    {r.categoryLabel}
+                    {r.extra?.length
+                      ? ` + ${r.extra.map((s) => CATEGORY_LIST.find((c) => c.slug === s)?.label || s).join(", ")}`
+                      : ""}
+                    {" · "}
+                    {r.source}
+                    {r.noThumb ? " · Gambar belum ketemu" : showTime && r.createdAt ? ` · ${timeWib(r.createdAt)}` : ""}
+                    {r.mergedInto ? ` · server dari ${r.mergedInto}` : r.servers ? ` · ${r.servers} server` : ""}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:pl-[7.6rem]">
+              <button type="button" className={btn} onClick={() => setEditing((v) => (v === r.id ? "" : r.id))}>
+                Edit
+              </button>
+              {r.locked || r.hidden ? null : (
+                <button type="button" className={btn} disabled={busy === r.id} onClick={() => void hide(r)}>
+                  Sembunyikan
                 </button>
-              ) : (
-                <>
-                  <span className="hidden shrink-0 gap-1 sm:flex">
-                    <button type="button" className={btn} onClick={() => setEditing((v) => (v === r.id ? "" : r.id))}>
-                      Edit
-                    </button>
-                    <button type="button" className={btn} disabled={busy === r.id} onClick={() => void hide(r)}>
-                      Sembunyikan
-                    </button>
-                  </span>
-                  <span className="relative shrink-0 sm:hidden">
-                    <button
-                      type="button"
-                      className={`${btn} px-2.5 text-sm leading-none`}
-                      aria-label="Menu video"
-                      aria-expanded={menu === r.id}
-                      onClick={() => setMenu((v) => (v === r.id ? "" : r.id))}
-                    >
-                      ⋯
-                    </button>
-                    {menu === r.id ? (
-                      <span className="absolute right-0 top-full z-20 mt-1 flex w-36 flex-col overflow-hidden rounded-md border border-white/[0.12] bg-[#18181c] shadow-xl shadow-black/50">
-                        <button
-                          type="button"
-                          className="px-3 py-2 text-left text-[13px] text-zinc-200 hover:bg-white/[0.06]"
-                          onClick={() => {
-                            setMenu("");
-                            setEditing((v) => (v === r.id ? "" : r.id));
-                          }}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="border-t border-white/[0.06] px-3 py-2 text-left text-[13px] text-zinc-200 hover:bg-white/[0.06] disabled:opacity-50"
-                          disabled={busy === r.id}
-                          onClick={() => {
-                            setMenu("");
-                            void hide(r);
-                          }}
-                        >
-                          Sembunyikan
-                        </button>
-                      </span>
-                    ) : null}
-                  </span>
-                </>
               )}
+              <button type="button" className={btnDanger} onClick={() => setRemoveRow(r)}>
+                Keluarkan dari katalog
+              </button>
             </div>
             {editing === r.id ? (
               <EditRow
@@ -711,6 +801,17 @@ function VideoRows({
           );
         })}
       </ul>
+      {removeRow ? (
+        <RemoveDialog
+          row={removeRow}
+          secret={secret}
+          onClose={() => setRemoveRow(null)}
+          onRemoved={() => {
+            setNote("Dikeluarkan dari katalog. Halaman tonton membalas 410.");
+            onChanged();
+          }}
+        />
+      ) : null}
     </>
   );
 }
@@ -754,8 +855,8 @@ function SearchResults({ secret, q }: { secret: string; q: string }) {
     <>
       <p className="mt-3 text-[13px] text-zinc-400">
         {searchNote ||
-          `${fmt(total)} hasil untuk "${q.trim()}" di seluruh katalog (judul, kategori, tag)${
-            pages > 1 ? ` · halaman ${fmt(page + 1)}/${fmt(pages)}` : ""
+          `${fmt(total)} hasil untuk "${q.trim()}" (id, judul, atau slug)${
+            pages > 1 ? ` · halaman ${fmt(page + 1)} dari ${fmt(pages)}` : ""
           }`}
       </p>
       {pages > 1 ? (
@@ -1115,7 +1216,7 @@ export function OwnerOverview(props: {
               className={`${input} min-w-0 flex-1`}
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Cari judul / id / kode JAV"
+              placeholder="Cari id, judul, atau slug"
               aria-label="Cari video"
               type="search"
             />

@@ -319,7 +319,7 @@ export function OwnerDashboard() {
         <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#08090a]/75 backdrop-blur-xl">
           <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
             <div className="min-w-0 leading-tight">
-              <h1 className="truncate text-lg font-semibold text-zinc-50">{tabs.find((t) => t.id === tab)?.label}</h1>
+              <h1 className="truncate text-xl font-semibold tracking-tight text-zinc-50">{tabs.find((t) => t.id === tab)?.label}</h1>
               <p className="text-[12px] text-zinc-500">
                 {lastText ? `Diperbarui ${lastText} WIB` : loading ? "Memuat…" : "Belum dimuat"},{" "}
                 <span className="text-[#5eead4]">● {fmt(online)} sedang online</span>
@@ -333,9 +333,9 @@ export function OwnerDashboard() {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-5xl px-3 pb-28 pt-4 sm:px-4 lg:pb-10">
+        <main className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 pb-28 pt-4 sm:px-4 lg:pb-10">
           {/* RINGKASAN */}
-          <section className={`${show("ringkasan")} flex-col gap-3 sm:gap-4`}>
+          <section className={`${show("ringkasan")} flex-col gap-4`}>
             <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
               {kpis.map((k) => (
                 <div key={k.label} className={glass + " relative overflow-hidden p-4"}>
@@ -456,7 +456,7 @@ export function OwnerDashboard() {
               type="button"
               onClick={() => goTab(t.id)}
               aria-current={tab === t.id ? "page" : undefined}
-              className={`relative flex flex-col items-center gap-0.5 py-2 text-[11px] ${focusRing} ${tab === t.id ? "text-[#5eead4]" : "text-zinc-500"}`}
+              className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] ${focusRing} ${tab === t.id ? "text-[#5eead4]" : "text-zinc-500"}`}
             >
               <span className="text-lg leading-none" aria-hidden="true">{t.icon}</span>
               {t.label}

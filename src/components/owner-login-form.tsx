@@ -13,9 +13,10 @@ export function OwnerLoginForm(props: {
 }) {
   const { draft, setDraft, error, loading, onSubmit } = props;
   return (
-<form onSubmit={onSubmit} className="rounded-2xl border border-white/[0.08] bg-[#141416] p-6">
-            <div className="mb-4 flex items-center gap-2 text-sm font-medium text-zinc-200">
-              <Shield className="size-4 text-emerald-400" />
+<form onSubmit={onSubmit} className="rounded-2xl border border-white/[0.08] bg-[#101214] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#5eead4]">Pemilik</div>
+            <div className="mb-4 flex items-center gap-2 text-lg font-semibold tracking-tight text-zinc-50">
+              <Shield className="size-4 text-[#2dd4bf]" />
               Masuk panel
             </div>
             <Input

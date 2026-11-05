@@ -34,6 +34,8 @@ import videoStats from "./video-stats.json";
 import itemOverrides from "./overrides.json";
 import { softenMinorTerms } from "./minor-title-guard";
 import { HIDDEN_IDS as HIDDEN_ID_REASONS, RESTORED_TITLES, minorContentReason } from "./hidden-ids.js";
+import blockFile from "./catalog-blocklist.json";
+import { blockedIdSet, isBlockedId, withoutBlocked } from "./catalog-block.js";
 import { isLockedMinorId, lockedMinorReason, schoolReason } from "./minor-lock.js";
 import { releaseBlock, releasedIds } from "../owner-verification.js";
 import { reviewPendingReason } from "./review-pending.js";
@@ -241,6 +243,23 @@ function lockedReasonMemo(title: string): string {
 }
 const HIDDEN_IDS = new Set<string>(Object.keys(HIDDEN_REASONS));
 
+/**
+ * Removed from the catalog (owner "Keluarkan dari katalog"). The repo file is the bundled
+ * baseline; KV ids are merged in by syncUnhidden (a read). Unhide cannot bring one back.
+ */
+const FILE_BLOCKED = blockedIdSet(blockFile);
+let KV_BLOCKED = new Set<string>();
+function recomputeBlocked(): Set<string> {
+  if (!KV_BLOCKED.size) return FILE_BLOCKED;
+  const out = new Set(FILE_BLOCKED);
+  for (const id of KV_BLOCKED) {
+    out.add(id);
+    out.add(id.toLowerCase());
+  }
+  return out;
+}
+let BLOCKED = recomputeBlocked();
+
 /** Cache plus the raw (pre-filter, pre-override) item list, so hidden items can be restored. */
 type BuiltCache = CatalogCache & {
   raw?: RawItem[];
@@ -361,6 +380,8 @@ export function isLockedMinor(it: RawItem): boolean {
  * Unhide (Tayangkan) > any automatic reason. An approved video is never hidden again by a re-run check.
  */
 function isHiddenRaw(it: RawItem): boolean {
+  // A removed id stays out even if the owner had Unhidden it. It is not a hide.
+  if (isBlockedId(it?.id, BLOCKED)) return true;
   return effectiveHidden({
     ownerHidden: OWNER_HIDDEN.has(it.id),
     locked: () => isLockedMinor(it),
@@ -383,6 +404,8 @@ type HideLists = {
   merges?: ManualMergesLite | null;
   /** Ids released from the keyword lock by the owner (undefined = keep the previous ones). */
   released?: string[];
+  /** Catalog blocklist (null = could not read it; keep the previous one). */
+  blocked?: string[] | null;
 };
 
 async function fetchUnhiddenIds(): Promise<HideLists | null> {
@@ -414,20 +437,34 @@ async function fetchUnhiddenIds(): Promise<HideLists | null> {
       } catch {
         released = undefined;
       }
-      return { unhidden: Object.keys(state.ids), ownerHidden, edits, merges, released };
+      let blocked: string[] | null = null;
+      try {
+        const blockMod = await import("./catalog-block-store");
+        blocked = Object.keys((await blockMod.readCatalogBlockState()).ids);
+      } catch {
+        blocked = null;
+      }
+      return { unhidden: Object.keys(state.ids), ownerHidden, edits, merges, released, blocked };
     }
     const res = await fetch("/api/hidden-ids");
     if (!res.ok) return null;
-    const data = (await res.json()) as { unhidden?: unknown; ownerHidden?: unknown;     edits?: unknown; released?: unknown };
+    const data = (await res.json()) as {
+      unhidden?: unknown;
+      ownerHidden?: unknown;
+      edits?: unknown;
+      released?: unknown;
+      blocked?: unknown;
+    };
     if (!Array.isArray(data?.unhidden)) return null;
     return {
-          released: Array.isArray(data.released) ? data.released.map(String) : undefined,
-          unhidden: data.unhidden.map(String),
+      released: Array.isArray(data.released) ? data.released.map(String) : undefined,
+      unhidden: data.unhidden.map(String),
       ownerHidden: Array.isArray(data.ownerHidden) ? data.ownerHidden.map(String) : null,
       edits:
         data.edits && typeof data.edits === "object" && !Array.isArray(data.edits)
           ? (data.edits as Record<string, OwnerEditLite>)
           : null,
+      blocked: Array.isArray(data.blocked) ? data.blocked.map(String) : null,
     };
   } catch {
     return null;
@@ -444,6 +481,7 @@ export function applyUnhidden(
   edits?: Record<string, OwnerEditLite> | null,
   merges?: ManualMergesLite | null,
   released?: Iterable<string> | null,
+  blocked?: Iterable<string> | null,
 ): void {
   const next = new Set<string>(ids);
   const nextReleased = released ? new Set<string>(released) : RELEASED;
@@ -452,12 +490,17 @@ export function applyUnhidden(
   const nextEditsKey = edits ? JSON.stringify(edits) : editsKey;
   const nextMerges = merges || MERGES;
   const nextMergesKey = merges ? (merges.merges.length || merges.splits.length ? JSON.stringify(merges) : "") : mergesKey;
+  if (blocked) {
+    KV_BLOCKED = new Set(blocked);
+    BLOCKED = recomputeBlocked();
+  }
   const key =
     keyOf(next) +
     (nextHidden.size ? `|hide:${keyOf(nextHidden)}` : "") +
     (nextEditsKey ? `|edit:${nextEditsKey}` : "") +
     (nextMergesKey ? `|merge:${nextMergesKey}` : "") +
-    (nextReleased.size ? `|rel:${keyOf(nextReleased)}` : "");
+    (nextReleased.size ? `|rel:${keyOf(nextReleased)}` : "") +
+    (BLOCKED.size ? `|block:${keyOf(BLOCKED)}` : "");
   unhideCheckedAt = Date.now();
   if (key === unhideKey) return;
   UNHIDDEN = next;
@@ -474,6 +517,11 @@ export function applyUnhidden(
     runtime.cache = buildIndexes(cur.raw, cur.posters, cur.videyNo, cur.at);
     rememberBuild(runtime.cache as BuiltCache);
   }
+}
+
+/** Owner delete: apply the KV blocklist on this isolate and rebuild so /watch 410s immediately. */
+export function applyCatalogBlock(ids: Iterable<string>): void {
+  applyUnhidden(UNHIDDEN, null, null, null, null, ids);
 }
 
 /**
@@ -493,7 +541,7 @@ async function syncUnhidden(force = false): Promise<void> {
   unhideReadAt = startedAt;
   try {
     const lists = await fetchUnhiddenIds();
-    if (lists) applyUnhidden(lists.unhidden, lists.ownerHidden, lists.edits, lists.merges, lists.released);
+    if (lists) applyUnhidden(lists.unhidden, lists.ownerHidden, lists.edits, lists.merges, lists.released, lists.blocked);
     else unhideCheckedAt = Date.now(); // keep the previous list; retry after the TTL
   } finally {
     if (unhideReadAt === startedAt) unhideReadAt = 0;
@@ -654,12 +702,13 @@ export function buildIndexes(
   videyNo: Map<string, number>,
   at: number,
 ): BuiltCache {
-  const raw = items;
+  // Removed ids leave the raw list too, so owner search and a later Unhide cannot surface them.
+  const raw = withoutBlocked(items, BLOCKED);
   const byId = new Map<string, RawItem>();
   const bySlug = new Map<string, RawItem[]>();
   const haystack: { item: RawItem; hay: string }[] = [];
   const hiddenIds = new Set<string>();
-  items = items
+  items = raw
     .filter((it) => {
       if (!isHiddenRaw(it)) return true;
       hiddenIds.add(it.id);
@@ -880,7 +929,7 @@ function cacheFromSnapshot(text: string, key: string): BuiltCache | null {
   Object.defineProperty(cache, "raw", {
     enumerable: true,
     configurable: true,
-    get: () => (raw ??= assembleLocal().items),
+    get: () => (raw ??= withoutBlocked(assembleLocal().items, BLOCKED)),
     set: (v: RawItem[] | undefined) => {
       raw = v;
     },
@@ -1040,6 +1089,7 @@ export async function publicIdBeforeBuild(id: string): Promise<boolean | null> {
   }
   const key = String(id || "").trim();
   if (!key) return false;
+  if (isBlockedId(key, BLOCKED)) return false;
   if (!rawById) {
     rawById = new Map<string, RawItem>();
     for (const it of assembleLocal().items) rawById.set(it.id, it);
@@ -1056,6 +1106,8 @@ export async function isPublicHidden(id: string): Promise<boolean> {
   const key = String(id || "").trim();
   if (!key) return false;
   const cache = (await loadItemsRaw()) as BuiltCache;
+  // Removed from the catalog: /watch answers 410 (middleware) even after Unhide.
+  if (isBlockedId(key, BLOCKED)) return true;
   if (OWNER_HIDDEN.has(key)) return true;
   // Built with isHiddenRaw: already honours Unhide, except for locked clear minor themes.
   if ((cache.hiddenIds || lastHiddenIds).has(key)) return true;

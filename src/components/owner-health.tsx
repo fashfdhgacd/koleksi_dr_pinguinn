@@ -127,8 +127,8 @@ function currentCycle(now = Date.now()): { from: string; to: string } {
   return { from: iso(from), to: iso(to) };
 }
 
-const card = "min-w-0 rounded-xl border border-white/[0.08] border-t-[#2dd4bf]/40 bg-[#131316] p-4 sm:p-5";
-const h2 = "flex items-center justify-between gap-2 text-[13px] font-semibold uppercase tracking-[0.14em] text-[#2dd4bf]";
+const card = "min-w-0 rounded-2xl border border-white/[0.06] bg-[#101214] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-5";
+const h2 = "flex items-center justify-between gap-3 text-[15px] font-semibold tracking-tight text-zinc-50";
 const btn =
   "shrink-0 whitespace-nowrap rounded-md border border-white/[0.12] bg-[#16161a] px-2 py-1 text-[13px] font-normal normal-case tracking-normal text-zinc-200 hover:bg-white/[0.06] disabled:opacity-50";
 const btnPrimary =
