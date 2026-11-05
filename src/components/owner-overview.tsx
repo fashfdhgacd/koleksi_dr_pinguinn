@@ -820,7 +820,7 @@ function VideoRows({
 const SEARCH_PAGE = 50;
 
 /** Results for the search box in the "Upload terbaru" header: whole catalog (title, category, tags), paginated. */
-function SearchResults({ secret, q }: { secret: string; q: string }) {
+function SearchResults({ secret, q, onRemoved }: { secret: string; q: string; onRemoved?: () => void }) {
   const [rows, setRows] = useState<CatalogRow[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -869,8 +869,105 @@ function SearchResults({ secret, q }: { secret: string; q: string }) {
           </button>
         </div>
       ) : null}
-      {rows.length ? <VideoRows rows={rows} secret={secret} onChanged={() => setTick((n) => n + 1)} /> : null}
+      {rows.length ? (
+        <VideoRows
+          rows={rows}
+          secret={secret}
+          onChanged={() => {
+            setTick((n) => n + 1);
+            onRemoved?.();
+          }}
+        />
+      ) : null}
     </>
+  );
+}
+
+type RemovedRow = { id: string; title: string; at: number };
+
+function removedWhen(ms: number): string {
+  if (!ms) return "Waktu tidak tersimpan";
+  try {
+    return (
+      new Date(ms).toLocaleString("id-ID", {
+        timeZone: "Asia/Jakarta",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }) + " WIB"
+    );
+  } catch {
+    return "";
+  }
+}
+
+const REMOVED_PAGE = 30;
+
+/** Videos taken out with "Keluarkan dari katalog": title, id, and when. Owner read only. */
+function RemovedCatalogList({ secret, reloadKey }: { secret: string; reloadKey: number }) {
+  const [rows, setRows] = useState<RemovedRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [note, setNote] = useState("Memuat…");
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(
+    async (offset: number) => {
+      if (!secret) return;
+      setBusy(true);
+      const d = await ownerPost<{ ok?: boolean; error?: string; message?: string; items?: RemovedRow[]; total?: number }>(secret, {
+        action: "catalog-removed",
+        limit: REMOVED_PAGE,
+        offset,
+      });
+      setBusy(false);
+      if (!d.ok) {
+        setNote(d.message || d.error || "Gagal memuat daftar.");
+        return;
+      }
+      const next = d.items || [];
+      setRows((cur) => (offset ? [...cur, ...next.filter((r) => !cur.some((c) => c.id === r.id))] : next));
+      setTotal(Number(d.total) || 0);
+      setNote("");
+    },
+    [secret],
+  );
+  useEffect(() => {
+    void load(0);
+  }, [load, reloadKey]);
+  return (
+    <section className={card} aria-labelledby="removed-catalog-heading">
+      <div className={h2}>
+        <span id="removed-catalog-heading">Dikeluarkan dari katalog</span>
+        <span className={h2note}>{total ? `${fmt(total)} video` : "judul, id, waktu"}</span>
+      </div>
+      <p className="mt-2 text-[13px] leading-relaxed text-zinc-400">
+        Video yang dikonfirmasi lewat Keluarkan dari katalog. Tidak termasuk yang hanya disembunyikan.
+      </p>
+      {note ? <p className="mt-3 text-sm text-zinc-400">{note}</p> : null}
+      {rows.length ? (
+        <ul className="mt-2">
+          {rows.map((r) => (
+            <li key={r.id} className="flex flex-col gap-1 border-t border-white/[0.06] py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div className="min-w-0">
+                <p className="line-clamp-2 text-[15px] font-medium leading-snug text-zinc-50">{r.title || "Tanpa judul"}</p>
+                <p className="mt-1 truncate font-mono text-[12px] text-zinc-500">{r.id}</p>
+              </div>
+              <time dateTime={r.at ? new Date(r.at).toISOString() : undefined} className="shrink-0 text-[12px] tabular-nums text-[#5eead4] sm:pt-0.5 sm:text-right">
+                {removedWhen(r.at)}
+              </time>
+            </li>
+          ))}
+        </ul>
+      ) : !note ? (
+        <p className="mt-3 text-sm text-zinc-400">Belum ada video yang dikeluarkan.</p>
+      ) : null}
+      {rows.length < total ? (
+        <button type="button" className={`${btn} mt-3 w-full py-2 sm:w-auto`} disabled={busy} onClick={() => void load(rows.length)}>
+          {busy ? "Memuat…" : `Muat lagi (${fmt(rows.length)} dari ${fmt(total)})`}
+        </button>
+      ) : null}
+    </section>
   );
 }
 
@@ -959,6 +1056,8 @@ export function OwnerOverview(props: {
   const [ovBusy, setOvBusy] = useState(false);
   const [q, setQ] = useState("");
   const [healthRange, setHealthRange] = useState<HealthRange>("today");
+  const [removedTick, setRemovedTick] = useState(0);
+  const noteRemoved = useCallback(() => setRemovedTick((n) => n + 1), []);
 
   const filterBody = useCallback(
     (f: RecentFilter) => (f === "nothumb" ? { noThumb: true } : f ? { source: f } : {}),
@@ -1232,7 +1331,7 @@ export function OwnerOverview(props: {
           </span>
         </div>
         {searching ? (
-          <SearchResults secret={secret} q={q} />
+          <SearchResults secret={secret} q={q} onRemoved={noteRemoved} />
         ) : (
           <>
             {sourceChips.length ? (
@@ -1294,7 +1393,15 @@ export function OwnerOverview(props: {
             ) : null}
             {ov?.recent?.length ? (
               <>
-                <VideoRows rows={ov.recent} secret={secret} showTime onChanged={() => void loadOverview()} />
+                <VideoRows
+                  rows={ov.recent}
+                  secret={secret}
+                  showTime
+                  onChanged={() => {
+                    noteRemoved();
+                    void loadOverview();
+                  }}
+                />
                 {ov.recentTotal != null && ov.recent.length < ov.recentTotal ? (
                   <button type="button" className={`${btn} mt-2 w-full py-2`} disabled={ovBusy} onClick={() => void loadMore()}>
                     {ovBusy ? "Memuat…" : `Muat lagi (${fmt(ov.recent.length)} dari ${fmt(ov.recentTotal)})`}
@@ -1309,6 +1416,8 @@ export function OwnerOverview(props: {
           </>
         )}
       </section>
+
+      <RemovedCatalogList secret={secret} reloadKey={reloadKey + removedTick} />
 
       <div className="grid items-stretch gap-4 lg:grid-cols-2">
         <section className={`${card} h-full`}>

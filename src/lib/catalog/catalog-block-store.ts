@@ -7,20 +7,24 @@
 import { resolveAnalyticsKV } from "@/lib/analytics-kv";
 import { BLOCK_ID_RE, normalizeBlockState } from "@/lib/catalog/catalog-block.js";
 
-export type CatalogBlockState = { ids: Record<string, { at: number }> };
+export type CatalogBlockEntry = { at: number; title?: string };
+export type CatalogBlockState = { ids: Record<string, CatalogBlockEntry> };
 
 const KEY = "owner:catalog-block:v1";
 const JOURNAL_MS = 120_000;
-const journal = new Map<string, number>();
+const journal = new Map<string, CatalogBlockEntry>();
 
 function withJournal(state: CatalogBlockState): CatalogBlockState {
   const now = Date.now();
-  for (const [id, at] of journal) {
-    if (now - at > JOURNAL_MS) {
+  for (const [id, j] of journal) {
+    if (now - j.at > JOURNAL_MS) {
       journal.delete(id);
       continue;
     }
-    if (!state.ids[id]) state.ids[id] = { at };
+    const cur = state.ids[id];
+    const title = j.title || cur?.title || "";
+    if (!cur || j.at >= (cur.at || 0)) state.ids[id] = { at: j.at, ...(title ? { title } : {}) };
+    else if (title && !cur.title) state.ids[id] = { ...cur, title };
   }
   return state;
 }
@@ -38,16 +42,21 @@ export async function readCatalogBlockState(): Promise<CatalogBlockState> {
   }
 }
 
-/** Adds one id. Returns the new state. Does not accept a list. */
-export async function addCatalogBlocked(id: string): Promise<CatalogBlockState> {
+/** Adds one id, with the title shown later in the owner removal report. Does not accept a list. */
+export async function addCatalogBlocked(id: string, title = ""): Promise<CatalogBlockState> {
   if (!BLOCK_ID_RE.test(id)) throw new Error("bad_id");
   const r = await resolveAnalyticsKV();
   if (!r) throw new Error("kv_unavailable");
   const state = await readCatalogBlockState();
   const at = Date.now();
-  state.ids[id] = { at };
+  const kept = String(title || state.ids[id]?.title || "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 200);
+  const entry: CatalogBlockEntry = { at, ...(kept ? { title: kept } : {}) };
+  state.ids[id] = entry;
   await r.kv.put(KEY, JSON.stringify(normalizeBlockState(state)));
-  journal.set(id, at);
+  journal.set(id, entry);
   return state;
 }
 
