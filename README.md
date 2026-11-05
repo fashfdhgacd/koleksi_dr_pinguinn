@@ -63,6 +63,14 @@ Build:
 npm run build
 ```
 
+### Pemeriksaan sebelum merge
+
+Workflow `.github/workflows/ci.yml` menjalankan tes dan build Cloudflare pada setiap pull request
+dan push ke `main`. CI mengosongkan `DATABASE_URL`, jadi tidak menjalankan migrasi database.
+Perubahan sebaiknya masuk lewat pull request dan menunggu **Tests and Cloudflare build** berhasil.
+Pemeriksaan ini tidak memblokir push langsung atau merge jika aturan proteksi cabang belum
+diaktifkan; bot pembaruan data tetap menggunakan alur yang ada.
+
 ## Env penting
 
 | Key | Wajib | Keterangan |
