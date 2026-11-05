@@ -19,6 +19,26 @@
 import { isJavGenreTitle, minorContentReason, reviewPriority } from "./hidden-ids.js";
 import { isMinorContentTitle, reviewPriority as detectorPriority } from "./minor-detector.js";
 
+/** School-word hits the owner reviews instead of auto-removing. */
+const SCHOOL_QUEUE = new Set(["school", "anime-school", "school-uniform", "teacher-student", "classroom"]);
+
+/** Explicit minor wording that stays a hard block (adek kecil / abege / anak + grade). */
+const HARD_MINOR_WORD = /\badek\s+kecil\b|\babe+ge\b|\banak\s+(?:kecil|sd|smp|sma)\b|\bdi\s?bawah\s+umur\b|\bunder\s?age\b|\bbocil\b|\bloli\b/;
+
+/** @param {string} title */
+export function isHardMinorWording(title = "") {
+  return isMinorContentTitle(title) || HARD_MINOR_WORD.test(lower(title));
+}
+
+/**
+ * JAV studio code whose only hit is school/genre wording (SSNI-559 and the same pattern).
+ * These were false-positive auto-blocks and are public again. A hard minor word still blocks.
+ * @param {string} title
+ */
+export function isJavStudioFalsePositive(title = "") {
+  return isJavGenreTitle(title) && !isHardMinorWording(title);
+}
+
 /**
  * Adult age marker (owner exception 2026-10-26): "18yo", "18 yo", "18+", "19yo", "19+", "20 tahun"...
  * A bare number after Eps/Episode/Part/Vol/Ep/Chapter is NOT an age.
@@ -130,6 +150,8 @@ export function lockedMinorReason(title = "") {
     const reason = schoolReason(text);
     if (reason && CLEAR_REASONS.has(reason) && reviewPriority(reason, text) === "clear") {
       if (reason === "incest-child" && ADULT_INCEST_ONLY.test(text) && !CHILD_CUE.test(text)) continue;
+      // Studio-code JAV: "siswa/guru/sekolah" is genre text, not a removal.
+      if (isJavGenreTitle(title) && SCHOOL_QUEUE.has(reason)) continue;
       return `locked:${reason}`;
     }
   }
@@ -138,6 +160,25 @@ export function lockedMinorReason(title = "") {
   for (const re of OBFUSCATED) {
     if (re.test(raw)) return "locked:school-obfuscated";
   }
+  return "";
+}
+
+/**
+ * Why a title belongs in the /pemilik review queue ("" = not a queue item).
+ * Any minor-flag or school auto-block is queued. JAV studio false positives are not.
+ * The queue does not remove the video; reject does, through the catalog blocklist.
+ * @param {string} title
+ * @returns {string}
+ */
+export function reviewHitReason(title = "") {
+  const raw = String(title || "");
+  if (!raw.trim()) return "";
+  if (isJavStudioFalsePositive(raw)) return "";
+  if (isHardMinorWording(raw)) return "minor";
+  const locked = lockedMinorReason(raw).replace(/^locked:/, "");
+  if (locked) return locked;
+  const school = schoolReason(lower(raw));
+  if (school && (SCHOOL_QUEUE.has(school) || school === "minor" || school === "incest-child")) return school;
   return "";
 }
 

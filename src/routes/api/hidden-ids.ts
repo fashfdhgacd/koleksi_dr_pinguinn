@@ -8,6 +8,7 @@ import { releasedIds } from "@/lib/owner-verification.js";
 import blockFile from "@/lib/catalog/catalog-blocklist.json";
 import { normalizeBlockState } from "@/lib/catalog/catalog-block.js";
 import { readCatalogBlockState } from "@/lib/catalog/catalog-block-store";
+import { readFlagReviewState } from "@/lib/catalog/flag-review-store";
 
 /**
  * Publik, hanya id (tanpa judul/alasan/data review):
@@ -57,6 +58,12 @@ export const Route = createFileRoute("/api/hidden-ids")({
           released = undefined;
         }
         // Repo file always; KV is a read (the same moderation namespace). Never written here.
+        let kept: string[] = [];
+        try {
+          kept = Object.keys((await readFlagReviewState()).approved);
+        } catch {
+          kept = [];
+        }
         const blocked = new Set(Object.keys(normalizeBlockState(blockFile).ids));
         try {
           for (const id of Object.keys((await readCatalogBlockState()).ids)) blocked.add(id);
@@ -68,6 +75,7 @@ export const Route = createFileRoute("/api/hidden-ids")({
             ids,
             unhidden,
             blocked: [...blocked],
+            kept,
             ...(released ? { released } : {}),
             ...(ownerHidden ? { ownerHidden } : {}),
             ...(edits ? { edits } : {}),

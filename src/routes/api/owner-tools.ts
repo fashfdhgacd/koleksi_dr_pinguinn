@@ -18,6 +18,8 @@ import {
   isLockedMinor,
   isPublicHidden,
   applyCatalogBlock,
+  applyFlagReviewKept,
+  isCatalogBlocked,
   loadItemsRaw,
   multiServerOf,
   type HiddenCandidate,
@@ -31,7 +33,8 @@ import rankMeta from "@/lib/catalog/rank-periods-meta.json";
 import latestPosters from "../../../data/latest-posters.json";
 import thumbsDeploy from "../../../data/.thumbs-deploy.json";
 import { findCategory } from "@/lib/catalog/categories";
-import { isLockedMinorId, lockedMinorReason, ownerEditBlockReason, schoolReason } from "@/lib/catalog/minor-lock.js";
+import { isLockedMinorId, lockedMinorReason, ownerEditBlockReason, reviewHitReason, schoolReason } from "@/lib/catalog/minor-lock.js";
+import { approveFlagReview, readFlagReviewState } from "@/lib/catalog/flag-review-store";
 import { NO_SOURCE, isRealTitle } from "@/lib/catalog/generic-title.js";
 import { reviewPriority as detectorPriority, minorContentReason as ownerDetectorReason } from "@/lib/catalog/minor-detector.js";
 import { explainTitle } from "@/lib/catalog/minor-context.js";
@@ -994,6 +997,62 @@ async function handleCatalogRemove(body: { id?: unknown; ids?: unknown; dryRun?:
   });
 }
 
+const FLAG_PAGE = 30;
+
+/** Flagged titles waiting for the owner. Read only. Already removed ids are not listed. */
+async function handleFlagReviewList(body: { limit?: unknown; offset?: unknown }) {
+  const limit = Math.min(50, Math.max(1, Math.floor(Number(body.limit) || FLAG_PAGE)));
+  const offset = Math.max(0, Math.floor(Number(body.offset) || 0));
+  let approved: Record<string, { at: number }> = {};
+  try {
+    approved = (await readFlagReviewState()).approved;
+  } catch {
+    return json({ ok: false, error: "kv_unavailable", message: "Antrian review belum bisa dibaca." }, 503);
+  }
+  const { raw, cache } = await catalogBase();
+  const rows: { id: string; title: string; reason: string }[] = [];
+  const seen = new Set<string>();
+  for (const it of raw) {
+    if (!it?.id || seen.has(it.id) || isCatalogBlocked(it.id) || approved[it.id]) continue;
+    seen.add(it.id);
+    const view = cache.byId?.get(it.id) || it;
+    const title = String(view.title || it.title || "");
+    const reason = reviewHitReason(title);
+    if (!reason) continue;
+    rows.push({ id: it.id, title, reason });
+  }
+  rows.sort((a, b) => a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
+  return json({ ok: true, total: rows.length, offset, limit, items: rows.slice(offset, offset + limit) });
+}
+
+async function handleFlagReviewDecide(body: { id?: unknown; decision?: unknown; title?: unknown }) {
+  const parsed = singleRemoveId(body);
+  if ("error" in parsed) return json({ ok: false, error: parsed.error, message: "ID video tidak valid." }, 400);
+  const id = parsed.id;
+  const decision = body.decision === "reject" ? "reject" : body.decision === "approve" ? "approve" : "";
+  if (!decision) return json({ ok: false, error: "bad_decision", message: "Pilih biarkan tayang atau keluarkan." }, 400);
+  if (decision === "approve") {
+    let state;
+    try {
+      state = await approveFlagReview(id);
+    } catch {
+      return json({ ok: false, error: "kv_unavailable", message: "Keputusan belum tersimpan." }, 503);
+    }
+    applyFlagReviewKept(Object.keys(state.approved));
+    return json({ ok: true, decision, id });
+  }
+  const title = String(body.title || "").replace(/\s+/g, " ").trim().slice(0, 200);
+  let state;
+  try {
+    state = await addCatalogBlocked(id, title);
+  } catch {
+    return json({ ok: false, error: "kv_unavailable", message: "Penyimpanan moderasi tidak tersedia." }, 503);
+  }
+  applyCatalogBlock(Object.keys(state.ids));
+  const repo = await commitCatalogBlock(state, id);
+  return json({ ok: true, decision, id, repo: repo.skipped ? "skipped" : repo.ok ? "committed" : "error" });
+}
+
 /** Owner report of videos removed from the catalog. Read only: no KV write. */
 async function handleCatalogRemoved(body: { limit?: unknown; offset?: unknown }) {
   const limit = Math.min(100, Math.max(1, Math.floor(Number(body.limit) || 30)));
@@ -1019,6 +1078,7 @@ type OwnerBody = {
   limit?: number;
   unhide?: boolean;
   ids?: string[];
+  decision?: string;
   dryRun?: boolean;
   dry?: boolean;
   all?: boolean;
@@ -1116,6 +1176,22 @@ export const Route = createFileRoute("/api/owner-tools")({
         if (body.action === "review-mark") {
           const r = await setReviewMark(body as never);
           return json(r, r.status || 200);
+        }
+        if (body.action === "flag-review-list") {
+          try {
+            return await handleFlagReviewList(body);
+          } catch (err) {
+            console.error("[owner-tools] flag-review-list", err);
+            return json({ ok: false, error: `Gagal memuat antrian: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
+          }
+        }
+        if (body.action === "flag-review-decide") {
+          try {
+            return await handleFlagReviewDecide(body);
+          } catch (err) {
+            console.error("[owner-tools] flag-review-decide", err);
+            return json({ ok: false, error: `Gagal menyimpan keputusan: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
+          }
         }
         if (body.action === "catalog-removed") {
           try {

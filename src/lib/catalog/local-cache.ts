@@ -259,6 +259,8 @@ function recomputeBlocked(): Set<string> {
   return out;
 }
 let BLOCKED = recomputeBlocked();
+/** Owner "Biarkan tayang" on the flag review queue. Beats an automatic minor/school flag. */
+let REVIEW_KEPT = new Set<string>();
 
 /** Cache plus the raw (pre-filter, pre-override) item list, so hidden items can be restored. */
 type BuiltCache = CatalogCache & {
@@ -380,8 +382,8 @@ export function isLockedMinor(it: RawItem): boolean {
  * Unhide (Tayangkan) > any automatic reason. An approved video is never hidden again by a re-run check.
  */
 function isHiddenRaw(it: RawItem): boolean {
-  // A removed id stays out even if the owner had Unhidden it. It is not a hide.
   if (isBlockedId(it?.id, BLOCKED)) return true;
+  if (it?.id && REVIEW_KEPT.has(it.id)) return OWNER_HIDDEN.has(it.id);
   return effectiveHidden({
     ownerHidden: OWNER_HIDDEN.has(it.id),
     locked: () => isLockedMinor(it),
@@ -406,6 +408,8 @@ type HideLists = {
   released?: string[];
   /** Catalog blocklist (null = could not read it; keep the previous one). */
   blocked?: string[] | null;
+  /** Flag-review approvals (null = could not read them; keep the previous ones). */
+  kept?: string[] | null;
 };
 
 async function fetchUnhiddenIds(): Promise<HideLists | null> {
@@ -444,7 +448,14 @@ async function fetchUnhiddenIds(): Promise<HideLists | null> {
       } catch {
         blocked = null;
       }
-      return { unhidden: Object.keys(state.ids), ownerHidden, edits, merges, released, blocked };
+      let kept: string[] | null = null;
+      try {
+        const flagMod = await import("./flag-review-store");
+        kept = Object.keys((await flagMod.readFlagReviewState()).approved);
+      } catch {
+        kept = null;
+      }
+      return { unhidden: Object.keys(state.ids), ownerHidden, edits, merges, released, blocked, kept };
     }
     const res = await fetch("/api/hidden-ids");
     if (!res.ok) return null;
@@ -454,6 +465,7 @@ async function fetchUnhiddenIds(): Promise<HideLists | null> {
       edits?: unknown;
       released?: unknown;
       blocked?: unknown;
+      kept?: unknown;
     };
     if (!Array.isArray(data?.unhidden)) return null;
     return {
@@ -465,6 +477,7 @@ async function fetchUnhiddenIds(): Promise<HideLists | null> {
           ? (data.edits as Record<string, OwnerEditLite>)
           : null,
       blocked: Array.isArray(data.blocked) ? data.blocked.map(String) : null,
+      kept: Array.isArray(data.kept) ? data.kept.map(String) : null,
     };
   } catch {
     return null;
@@ -482,6 +495,7 @@ export function applyUnhidden(
   merges?: ManualMergesLite | null,
   released?: Iterable<string> | null,
   blocked?: Iterable<string> | null,
+  kept?: Iterable<string> | null,
 ): void {
   const next = new Set<string>(ids);
   const nextReleased = released ? new Set<string>(released) : RELEASED;
@@ -494,13 +508,15 @@ export function applyUnhidden(
     KV_BLOCKED = new Set(blocked);
     BLOCKED = recomputeBlocked();
   }
+  if (kept) REVIEW_KEPT = new Set(kept);
   const key =
     keyOf(next) +
     (nextHidden.size ? `|hide:${keyOf(nextHidden)}` : "") +
     (nextEditsKey ? `|edit:${nextEditsKey}` : "") +
     (nextMergesKey ? `|merge:${nextMergesKey}` : "") +
     (nextReleased.size ? `|rel:${keyOf(nextReleased)}` : "") +
-    (BLOCKED.size ? `|block:${keyOf(BLOCKED)}` : "");
+    (BLOCKED.size ? `|block:${keyOf(BLOCKED)}` : "") +
+    (REVIEW_KEPT.size ? `|keep:${keyOf(REVIEW_KEPT)}` : "");
   unhideCheckedAt = Date.now();
   if (key === unhideKey) return;
   UNHIDDEN = next;
@@ -524,6 +540,15 @@ export function applyCatalogBlock(ids: Iterable<string>): void {
   applyUnhidden(UNHIDDEN, null, null, null, null, ids);
 }
 
+/** Owner approved a flagged video: this isolate shows it again immediately. */
+export function applyFlagReviewKept(ids: Iterable<string>): void {
+  applyUnhidden(UNHIDDEN, null, null, null, null, null, ids);
+}
+
+export function isCatalogBlocked(id: string): boolean {
+  return isBlockedId(id, BLOCKED);
+}
+
 /**
  * Re-reads the owner lists (KV) at most every UNHIDE_TTL_MS per isolate.
  * A request never awaits a read started by another request: in Workers, when the request that
@@ -541,7 +566,7 @@ async function syncUnhidden(force = false): Promise<void> {
   unhideReadAt = startedAt;
   try {
     const lists = await fetchUnhiddenIds();
-    if (lists) applyUnhidden(lists.unhidden, lists.ownerHidden, lists.edits, lists.merges, lists.released, lists.blocked);
+    if (lists) applyUnhidden(lists.unhidden, lists.ownerHidden, lists.edits, lists.merges, lists.released, lists.blocked, lists.kept);
     else unhideCheckedAt = Date.now(); // keep the previous list; retry after the TTL
   } finally {
     if (unhideReadAt === startedAt) unhideReadAt = 0;
@@ -1090,6 +1115,7 @@ export async function publicIdBeforeBuild(id: string): Promise<boolean | null> {
   const key = String(id || "").trim();
   if (!key) return false;
   if (isBlockedId(key, BLOCKED)) return false;
+  if (REVIEW_KEPT.has(key) && !OWNER_HIDDEN.has(key)) return true;
   if (!rawById) {
     rawById = new Map<string, RawItem>();
     for (const it of assembleLocal().items) rawById.set(it.id, it);
@@ -1109,6 +1135,7 @@ export async function isPublicHidden(id: string): Promise<boolean> {
   // Removed from the catalog: /watch answers 410 (middleware) even after Unhide.
   if (isBlockedId(key, BLOCKED)) return true;
   if (OWNER_HIDDEN.has(key)) return true;
+  if (REVIEW_KEPT.has(key)) return false;
   // Built with isHiddenRaw: already honours Unhide, except for locked clear minor themes.
   if ((cache.hiddenIds || lastHiddenIds).has(key)) return true;
   if (UNHIDDEN.has(key)) return false;
