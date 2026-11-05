@@ -15,7 +15,6 @@ import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
 import { SITE_ORIGIN, cleanDisplayTitle, publicWatchDescription } from "@/lib/seo";
 import { landingForCategory } from "@/lib/catalog/landing";
 import { isSeoBlockedId } from "@/lib/catalog/seo-block";
-import { watchDescription } from "@/lib/catalog/watch-description";
 import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { CatalogBackLink } from "@/components/video/catalog-back-link";
 import { WatchStats } from "@/components/video/watch-stats";
@@ -490,9 +489,6 @@ export function WatchPage() {
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{cleanDisplayTitle(item.title)}</h1>
             {item.episodes && item.episodes.length > 1 ? <EpisodeStrip episodes={item.episodes} currentId={item.id} /> : null}
             <p className="text-sm leading-relaxed text-muted">{publicWatchDescription(item)}</p>
-            {watchDescription(item) !== publicWatchDescription(item) ? (
-              <p className="text-sm leading-relaxed text-muted">{watchDescription(item)}</p>
-            ) : null}
             <nav aria-label="Kategori dan pencarian" className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
               {(() => {
                 const slug = categorySlugFor(item.category);
