@@ -7,7 +7,7 @@
 // on Refresh, and when the tab comes back (owner-panel.tsx, at most once a minute).
 import { OwnerHeroCard } from "@/components/owner-hero";
 import { OwnerPushCard } from "@/components/owner-push";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { CATEGORY_LIST } from "@/lib/catalog/categories";
 import { EXTRA_CHOICES, MAX_EXTRA } from "@/components/owner-edit-sheet";
 import { BulkTagBar } from "@/components/owner-bulk-tags";
@@ -971,6 +971,38 @@ function RemovedCatalogList({ secret, reloadKey }: { secret: string; reloadKey: 
   );
 }
 
+function Fold({
+  title,
+  hint,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  open: boolean;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <section className={card}>
+      <button
+        type="button"
+        className="flex min-h-11 w-full items-center justify-between gap-3 text-left"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <span>
+          <span className="block text-[15px] font-semibold tracking-tight text-zinc-50">{title}</span>
+          {!open && hint ? <span className="mt-0.5 block text-[12px] text-zinc-500">{hint}</span> : null}
+        </span>
+        <span className="shrink-0 text-[13px] font-medium text-[#5eead4]">{open ? "Tutup" : "Buka"}</span>
+      </button>
+      {open ? <div className="mt-3">{children}</div> : null}
+    </section>
+  );
+}
+
 function TopVideos({ videos }: { videos: NonNullable<OwnerStats["topVideos"]> }) {
   const [note, setNote] = useState("");
   const text = videos.map((v) => `${String(v.title || "").trim() || v.id}\n${SITE_ORIGIN}${v.path}`).join("\n\n");
@@ -1058,6 +1090,8 @@ export function OwnerOverview(props: {
   const [healthRange, setHealthRange] = useState<HealthRange>("today");
   const [removedTick, setRemovedTick] = useState(0);
   const noteRemoved = useCallback(() => setRemovedTick((n) => n + 1), []);
+  const [fold, setFold] = useState<Record<string, boolean>>({});
+  const toggleFold = (key: string) => setFold((cur) => ({ ...cur, [key]: !cur[key] }));
 
   const filterBody = useCallback(
     (f: RecentFilter) => (f === "nothumb" ? { noThumb: true } : f ? { source: f } : {}),
@@ -1170,7 +1204,8 @@ export function OwnerOverview(props: {
     .sort((a, b) => b.starts - a.starts);
 
   function showThumbs() {
-    document.getElementById("thumb-kosong")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    setFold((cur) => ({ ...cur, thumbs: true }));
+    window.setTimeout(() => document.getElementById("thumb-kosong")?.scrollIntoView({ behavior: "smooth", block: "start" }), 40);
   }
 
   const shownTotal = ov?.total ?? null;
@@ -1267,7 +1302,7 @@ export function OwnerOverview(props: {
         {error ? <p className="mt-1 text-sm text-red-300">{error}</p> : null}
       </section>
 
-      <section className={card}>
+      <Fold title="Grafik kunjungan" hint="24 jam dan 14 hari" open={Boolean(fold.chart)} onToggle={() => toggleFold("chart")}>
         <Chart days={days} hourly={hourly} />
         <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-300">
           <span>
@@ -1284,28 +1319,32 @@ export function OwnerOverview(props: {
             </span>
           ) : null}
         </div>
-      </section>
+      </Fold>
 
-      <div className="grid items-stretch gap-4 lg:grid-cols-2">
-        <section className={`${card} h-full`}>
-          <div className={h2}>
-            <span>Pengunjung hari ini</span>
-            <span className={h2note}>angka = kunjungan halaman</span>
+      <Fold title="Pengunjung dan player" hint="Sumber, perangkat, kesehatan play" open={Boolean(fold.people)} onToggle={() => toggleFold("people")}>
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <div>
+            <div className={h2}>
+              <span>Pengunjung hari ini</span>
+              <span className={h2note}>angka = kunjungan halaman</span>
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4">
+              <CountList title="Sumber" rows={breakdown.sources} />
+              <CountList title="Perangkat" rows={breakdown.deviceRows} />
+              <CountList title="Browser" rows={breakdown.browsers} />
+              <CountList title="Negara" rows={breakdown.countries} />
+            </div>
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4">
-            <CountList title="Sumber" rows={breakdown.sources} />
-            <CountList title="Perangkat" rows={breakdown.deviceRows} />
-            <CountList title="Browser" rows={breakdown.browsers} />
-            <CountList title="Negara" rows={breakdown.countries} />
-          </div>
-        </section>
-        {playerCard}
-      </div>
+          {playerCard}
+        </div>
+      </Fold>
 
-      <div className="grid items-stretch gap-4 lg:grid-cols-2">
-        <MoneyCard />
-        <StatusCard botOk={botOk} status={ov?.status || null} playerLog={playerLog} />
-      </div>
+      <Fold title="Uang dan status" open={Boolean(fold.money)} onToggle={() => toggleFold("money")}>
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <MoneyCard />
+          <StatusCard botOk={botOk} status={ov?.status || null} playerLog={playerLog} />
+        </div>
+      </Fold>
 
       <section className={card}>
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1417,47 +1456,47 @@ export function OwnerOverview(props: {
         )}
       </section>
 
-      <RemovedCatalogList secret={secret} reloadKey={reloadKey + removedTick} />
+      <Fold title="Dikeluarkan dari katalog" hint="Judul yang sudah dikonfirmasi" open={Boolean(fold.removed)} onToggle={() => toggleFold("removed")}>
+        <RemovedCatalogList secret={secret} reloadKey={reloadKey + removedTick} />
+      </Fold>
 
-      <div className="grid items-stretch gap-4 lg:grid-cols-2">
-        <section className={`${card} h-full`}>
-          <div className={h2}>
-            <span>Kategori</span>
-            <span className={h2note}>jumlah video tampil</span>
+      <Fold title="Kategori dan video teratas" open={Boolean(fold.cats)} onToggle={() => toggleFold("cats")}>
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <div>
+            <div className={h2}>
+              <span>Kategori</span>
+              <span className={h2note}>jumlah video tampil</span>
+            </div>
+            {cats.length ? (
+              <ul className="mt-3 space-y-2">
+                {cats.map((c) => (
+                  <li key={c.slug} className="flex items-center gap-3 text-sm">
+                    <span className="w-28 shrink-0 truncate text-zinc-300 sm:w-40">{c.label}</span>
+                    <span className="h-2 flex-1 bg-white/[0.06]">
+                      <span
+                        className="block h-full bg-gradient-to-r from-[#14b8a6]/50 to-[#2dd4bf]"
+                        style={{ width: `${(c.count / catMax) * 100}%` }}
+                      />
+                    </span>
+                    <span className="w-14 shrink-0 text-right tabular-nums text-zinc-300">{fmt(c.count)}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-sm text-zinc-400">{ov ? "Belum ada." : "Memuat…"}</p>
+            )}
           </div>
-          {cats.length ? (
-            <ul className="mt-3 space-y-2">
-              {cats.map((c) => (
-                <li key={c.slug} className="flex items-center gap-3 text-sm">
-                  <span className="w-28 shrink-0 truncate text-zinc-300 sm:w-40">{c.label}</span>
-                  <span className="h-2 flex-1 bg-white/[0.06]">
-                    <span
-                      className="block h-full bg-gradient-to-r from-[#14b8a6]/50 to-[#2dd4bf]"
-                      style={{ width: `${(c.count / catMax) * 100}%` }}
-                    />
-                  </span>
-                  <span className="w-14 shrink-0 text-right tabular-nums text-zinc-300">{fmt(c.count)}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-3 text-sm text-zinc-400">{ov ? "Belum ada." : "Memuat…"}</p>
-          )}
-        </section>
-        <section className={`${card} h-full`}>
           <TopVideos videos={stats?.topVideos || []} />
-        </section>
-      </div>
+        </div>
+      </Fold>
 
-      <div className="mt-4">
-        <OwnerHeroCard secret={secret} />
-      </div>
-
-      <div className="mt-4">
-        <OwnerPushCard secret={secret} />
-      </div>
-
-      <ThumbMissingCard secret={secret} reloadKey={reloadKey} />
+      <Fold title="Hero, push, dan thumbnail" open={Boolean(fold.thumbs)} onToggle={() => toggleFold("thumbs")}>
+        <div className="flex flex-col gap-4">
+          <OwnerHeroCard secret={secret} />
+          <OwnerPushCard secret={secret} />
+          <ThumbMissingCard secret={secret} reloadKey={reloadKey} />
+        </div>
+      </Fold>
     </>
   );
 }

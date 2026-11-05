@@ -18,6 +18,7 @@ import { OwnerVideyUntitled } from "@/components/owner-videy-untitled";
 import { OwnerAuthedBottom } from "@/components/owner-authed-bottom";
 import { HiddenListSection } from "@/components/owner-hidden-list";
 import { DetectorReviewSection } from "@/components/owner-detector-review";
+import { FlagReviewSection } from "@/components/owner-flag-review";
 import { OwnerTelegramStatus } from "@/components/owner-telegram-status";
 import { OwnerTrafficStars } from "@/components/owner-trafficstars";
 import type { PlayerLogData } from "@/components/owner-health";
@@ -216,7 +217,9 @@ export function OwnerDashboard() {
   const [tab, setTab] = useState<Tab>("ringkasan");
   const [seen, setSeen] = useState<Record<Tab, boolean>>({ ringkasan: true, cek: true, video: false, pengaturan: false });
   const [reviewCount, setReviewCount] = useState<number | null>(null);
+  const [flagCount, setFlagCount] = useState(0);
   const onReviewCount = useCallback((n: number) => setReviewCount(n), []);
+  const onFlagCount = useCallback((n: number) => setFlagCount(n), []);
 
   function goTab(t: Tab) {
     setTab(t);
@@ -245,7 +248,7 @@ export function OwnerDashboard() {
 
   const tabs: { id: Tab; label: string; icon: string; badge?: number | null }[] = [
     { id: "ringkasan", label: "Ringkasan", icon: "◧" },
-    { id: "cek", label: "Perlu dicek", icon: "⚑", badge: reviewCount },
+    { id: "cek", label: "Perlu dicek", icon: "⚑", badge: (reviewCount || 0) + flagCount || null },
     { id: "video", label: "Video", icon: "▶" },
     { id: "pengaturan", label: "Pengaturan", icon: "⚙" },
   ];
@@ -348,16 +351,16 @@ export function OwnerDashboard() {
                 </div>
               ))}
             </div>
-            {reviewCount ? (
+            {reviewCount || flagCount ? (
               <button
                 type="button"
                 onClick={() => goTab("cek")}
-                className={`flex items-center justify-between gap-3 rounded-xl border border-amber-400/25 bg-amber-400/[0.07] px-4 py-3 text-left ${focusRing}`}
+                className={`flex min-h-11 items-center justify-between gap-3 rounded-xl border border-[#2dd4bf]/30 bg-[#2dd4bf]/10 px-4 py-3 text-left ${focusRing}`}
               >
-                <span className="text-sm text-amber-100">
-                  <span className="font-semibold">{fmt(reviewCount)} judul</span> perlu kamu cek (detector minor)
+                <span className="text-sm text-zinc-100">
+                  <span className="font-semibold text-[#5eead4]">{fmt((reviewCount || 0) + flagCount)} judul</span> menunggu review
                 </span>
-                <span className="text-amber-300" aria-hidden="true">›</span>
+                <span className="text-[#5eead4]" aria-hidden="true">›</span>
               </button>
             ) : null}
             <OwnerOverview
@@ -373,7 +376,11 @@ export function OwnerDashboard() {
               botOk={botOk}
               onShowGone={showGone}
             />
-            <OwnerTrafficStars reloadKey={reloadKey} />
+            <div className={glass}>
+              <Collapse id="trafficstars" title="TrafficStars">
+                <OwnerTrafficStars reloadKey={reloadKey} />
+              </Collapse>
+            </div>
             <OwnerAuthedBottom
               days={days}
               devices={devices}
@@ -387,8 +394,11 @@ export function OwnerDashboard() {
 
           {/* PERLU DICEK: selalu dimuat sekali (untuk angka badge), tidak ada polling. */}
           <section className={`${show("cek")} flex-col gap-4`}>
-            <div className={glass + " p-4"}>
-              <DetectorReviewSection key={reloadKey} secret={secret} onCount={onReviewCount} />
+            <FlagReviewSection key={reloadKey} secret={secret} onCount={onFlagCount} />
+            <div className={glass}>
+              <Collapse id="detector" title="Perlu dicek (detector)">
+                <DetectorReviewSection key={reloadKey} secret={secret} onCount={onReviewCount} />
+              </Collapse>
             </div>
           </section>
 
@@ -572,7 +582,7 @@ function Collapse({
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
-        className={`flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium text-zinc-100 transition hover:bg-white/[0.03] ${focusRing}`}
+        className={`flex min-h-11 w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-medium text-zinc-100 transition hover:bg-white/[0.03] ${focusRing}`}
       >
         <span className="flex items-center gap-2.5">
           <span className={`size-2 rounded-full ${accent === "amber" ? "bg-amber-400" : "bg-[#2dd4bf]"}`} aria-hidden="true" />
