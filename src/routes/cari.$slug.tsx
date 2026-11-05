@@ -153,11 +153,13 @@ export function CariExperience({
 }
 
 function LandingPage() {
+  // Child /halaman/N keeps this parent mounted. Hooks stay above the Outlet return
+  // so the hook count does not change between /cari/<slug> and /cari/<slug>/halaman/N.
   const matches = useMatches();
-  if (matches.some((m) => String(m.routeId).includes("halaman"))) return <Outlet />;
   const { slug } = Route.useParams();
   const data = Route.useLoaderData();
   const navigate = useNavigate({ from: "/cari/$slug" });
+  if (matches.some((m) => String(m.routeId).includes("halaman"))) return <Outlet />;
   return (
     <CariExperience
       slug={slug}

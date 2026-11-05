@@ -194,12 +194,14 @@ export function CategoryExperience({ slug, page, periode, loaderData, onPage }: 
 }
 
 function CategoryPage() {
+  // Child /halaman/N keeps this parent mounted. Every hook below must run on every
+  // render; returning before a hook is React error #300.
   const matches = useMatches();
-  if (matches.some((m) => String(m.routeId).includes("halaman"))) return <Outlet />;
   const { slug } = Route.useParams();
   const { page: pageSearch, periode } = Route.useSearch();
   const loaderData = Route.useLoaderData();
   const navigate = useNavigate({ from: "/kategori/$slug" });
+  if (matches.some((m) => String(m.routeId).includes("halaman"))) return <Outlet />;
   const page = pageSearch || 1;
   return (
     <CategoryExperience
