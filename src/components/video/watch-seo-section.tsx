@@ -1,19 +1,20 @@
 import { longWatchDescription } from "@/lib/catalog/watch-description";
-import type { SeoVideoInput } from "@/lib/seo";
+import type { VideoDetail } from "@/lib/catalog/types";
+import { cleanDisplayTitle } from "@/lib/seo";
 
 type Props = {
-  item: SeoVideoInput & { id?: string; title: string; category?: string | null; duration?: number | null };
+  item: VideoDetail;
 };
 
 export function WatchSeoSection({ item }: Props) {
   const longText = longWatchDescription(item);
-  const title = item.title;
-  const cat = item.category || "video";
-  const durMin = item.duration && item.duration > 60 ? Math.round(item.duration / 60) : null;
+  const title = cleanDisplayTitle(item.title);
+  const cat = item.category.trim() || "video";
+  const duration = item.durationLabel && item.durationLabel !== "—" ? item.durationLabel : null;
 
   const faqs = [
     { q: "Video ini tentang apa?", a: `Video berjudul “${title}” di kategori ${cat}.` },
-    { q: "Berapa durasinya?", a: durMin ? `Sekitar ${durMin} menit.` : "Durasi tidak tercatat." },
+    { q: "Berapa durasinya?", a: duration ? `${duration}.` : "Durasi tidak tercatat." },
     { q: "Perlu daftar akun?", a: "Tidak. Bisa langsung diputar tanpa daftar." },
     { q: "Untuk semua umur?", a: "Tidak. Khusus untuk usia 18 tahun ke atas." },
   ];
