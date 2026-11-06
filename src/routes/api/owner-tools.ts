@@ -44,6 +44,7 @@ import { isReviewPendingReason } from "@/lib/catalog/review-pending.js";
 import { readOwnerHideState } from "@/lib/catalog/owner-hide-store";
 import { withSavedEdit } from "@/lib/catalog/owner-edit-merge.js";
 import {
+  MAX_DESCRIPTION,
   MAX_EXTRA_CATEGORIES,
   MAX_MERGE_IDS,
   bulkEditOwnerExtra,
@@ -52,6 +53,7 @@ import {
   setOwnerMerges,
 } from "@/lib/catalog/owner-edit-store";
 import { isOwnerRequest, ownerSecret } from "@/lib/owner-auth";
+import { isSafeManualDescription } from "@/lib/seo";
 import { runPosterFill } from "@/lib/poster-fill";
 import {
   getWebhookInfo,
@@ -692,8 +694,8 @@ async function handleCatalogSearch(body: { q?: unknown; limit?: unknown; offset?
 }
 
 /**
- * Exact lookup of one video for the edit sheet: current title, main category and the extra
- * categories stored in KV (owner:edit:v1), falling back to the catalog view. Unlike catalog-search
+ * Exact lookup of one video for the edit sheet: current title, main category, the extra
+ * categories and the manual description stored in KV (owner:edit:v1), falling back to the catalog view. Unlike catalog-search
  * it never misses an id because of a result limit.
  */
 async function handleEditGet(body: { id?: unknown }) {
@@ -703,7 +705,7 @@ async function handleEditGet(body: { id?: unknown }) {
   const it = raw.find((x) => x?.id === id);
   if (!it) return json({ ok: false, error: "Video tidak ditemukan di katalog." }, 404);
   const row = toCatalogRow(it, cache.byId?.get(id), hidden.has(id), cache.posters, multiServerOf(cache as never));
-  let stored: { extra?: string[]; category?: string } | undefined;
+  let stored: { extra?: string[]; category?: string; description?: string } | undefined;
   try {
     stored = (await readOwnerEditState()).ids[id];
   } catch {
@@ -711,7 +713,12 @@ async function handleEditGet(body: { id?: unknown }) {
   }
   return json({
     ok: true,
-    item: { ...row, category: stored?.category || row.category, extra: stored ? stored.extra || [] : row.extra || [] },
+    item: {
+      ...row,
+      category: stored?.category || row.category,
+      extra: stored ? stored.extra || [] : row.extra || [],
+      description: stored?.description || "",
+    },
   });
 }
 
@@ -727,6 +734,7 @@ async function handleEditVideo(body: {
   extra?: unknown;
   extraAdd?: unknown;
   extraRemove?: unknown;
+  description?: unknown;
 }) {
   const id = String(body.id || "").trim();
   if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return json({ ok: false, error: "ID video tidak valid." }, 400);
@@ -749,7 +757,18 @@ async function handleEditVideo(body: {
     return json({ ok: false, error: `Maksimal ${MAX_EXTRA_CATEGORIES} kategori tambahan.` }, 400);
   }
   const hasDelta = Boolean(extraAdd?.length || extraRemove?.length);
-  if (!title && !category && !extra && !hasDelta) return json({ ok: false, error: "Tidak ada perubahan." }, 400);
+  // Manual description: a string replaces it ("" = back to the generated one); absent = unchanged.
+  const description = typeof body.description === "string" ? body.description.replace(/\s+/g, " ").trim() : undefined;
+  if (description && description.length > MAX_DESCRIPTION) {
+    return json({ ok: false, error: `Deskripsi maksimal ${MAX_DESCRIPTION} karakter.` }, 400);
+  }
+  // Same safety filter as the public page (seo.ts) plus the title checks: rejected, never saved silently.
+  if (description && (!isSafeManualDescription(description) || ownerEditBlockReason(description))) {
+    return json({ ok: false, error: "Deskripsi mengandung kata terlarang (minor/sekolah). Ubah dulu deskripsinya." }, 400);
+  }
+  if (!title && !category && !extra && !hasDelta && description === undefined) {
+    return json({ ok: false, error: "Tidak ada perubahan." }, 400);
+  }
   // Chinese/Japanese/Korean titles are dense: 2 characters ("龍女") is already a real title.
   const minTitle = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(title) ? 2 : 4;
   if (title && (title.length < minTitle || title.length > 200)) {
@@ -774,6 +793,7 @@ async function handleEditVideo(body: {
       title,
       category,
       ...(extra ? { extra } : hasDelta ? { extraAdd: extraAdd || [], extraRemove: extraRemove || [] } : {}),
+      ...(description !== undefined ? { description } : {}),
     });
   } catch (err) {
     const msg = String((err as Error)?.message || err);
@@ -818,6 +838,7 @@ async function handleEditVideo(body: {
     // Status moderasi (locked / review_pending / clear) + penjelasan konteks untuk pemilik.
     moderation: title ? explainTitle(title, ownerDetectorReason(title)) : null,
     ...(extra || hasDelta ? { extra: saved?.extra || [] } : {}),
+    ...(description !== undefined ? { description: saved?.description || "" } : {}),
   });
 }
 
