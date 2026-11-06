@@ -65,10 +65,14 @@ function pgliteBootstrapPlugin(): Plugin {
   return {
     name: "app-builder:pglite-bootstrap",
     apply: "serve",
-    async configureServer() {
+    async configureServer(server) {
       if (!hasGlobbedMigrations(process.cwd())) return;
-      const { ensureDbReady } = await import("./src/lib/db");
-      await ensureDbReady();
+      // SSR transform provides import.meta.glob. A direct import is inlined into
+      // the config bundle, where that call is not a function and dev never listens.
+      const mod = (await server.ssrLoadModule("/src/lib/db.ts")) as {
+        ensureDbReady: () => Promise<void>;
+      };
+      await mod.ensureDbReady();
     },
   };
 }
