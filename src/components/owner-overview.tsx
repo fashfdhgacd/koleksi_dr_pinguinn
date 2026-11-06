@@ -9,7 +9,7 @@ import { OwnerHeroCard } from "@/components/owner-hero";
 import { OwnerPushCard } from "@/components/owner-push";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { CATEGORY_LIST } from "@/lib/catalog/categories";
-import { EXTRA_CHOICES, MAX_EXTRA } from "@/components/owner-edit-sheet";
+import { EXTRA_CHOICES, MAX_DESCRIPTION, MAX_EXTRA } from "@/components/owner-edit-sheet";
 import { BulkTagBar } from "@/components/owner-bulk-tags";
 import { fmt, ownerToast, type OwnerStats, type DayRow } from "@/components/owner-dashboard-shared";
 import {
@@ -374,6 +374,11 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
   );
 }
 
+/** Other isolates can render the pre-edit page for ~90 s (KV read cache + 30 s sync); purge again after that. */
+function purgeWatchLater(secret: string, id: string) {
+  for (const ms of [70_000, 130_000]) setTimeout(() => void ownerPost(secret, { action: "purge-watch", id }), ms);
+}
+
 function EditRow({
   row,
   secret,
@@ -386,8 +391,25 @@ function EditRow({
   const [title, setTitle] = useState(row.title);
   const [cat, setCat] = useState(row.category);
   const [extra, setExtra] = useState<string[]>(row.extra || []);
+  const [desc, setDesc] = useState("");
+  const [origDesc, setOrigDesc] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  useEffect(() => {
+    let alive = true;
+    void ownerPost<{ ok?: boolean; error?: string; item?: { id: string; description?: string } }>(secret, {
+      action: "edit-get",
+      id: row.id,
+    }).then((d) => {
+      if (!alive || !d.ok || d.item?.id !== row.id) return;
+      const v = d.item.description || "";
+      setDesc(v);
+      setOrigDesc(v);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [secret, row.id]);
   const extraChanged = [...extra].sort().join(",") !== [...(row.extra || [])].sort().join(",");
   function toggleExtra(slug: string) {
     setErr("");
@@ -407,7 +429,9 @@ function EditRow({
     if (cat && cat !== row.category) body.category = cat;
     // The main category is never repeated in the extra list.
     if (extraChanged) body.extra = extra.filter((s) => s !== cat);
-    if (!body.title && !body.category && !body.extra) {
+    const d0 = desc.replace(/\s+/g, " ").trim();
+    if (origDesc != null && d0 !== origDesc) body.description = d0;
+    if (!body.title && !body.category && !body.extra && body.description === undefined) {
       setBusy(false);
       onDone("Tidak ada perubahan.");
       return;
@@ -426,7 +450,8 @@ function EditRow({
       setErr(`Gagal: ${d.error || "tidak diketahui"}`);
       return;
     }
-    onDone("Tersimpan. Tampil di situs dalam ±1 menit.", { title: d.title, category: d.category, extra: d.extra });
+    purgeWatchLater(secret, row.id);
+    onDone("Tersimpan. Tampil di situs dalam ±2 menit.", { title: d.title, category: d.category, extra: d.extra });
   }
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-white/[0.07] p-2">
@@ -460,6 +485,32 @@ function EditRow({
             </button>
           ))}
         </div>
+      </div>
+      <div className="basis-full">
+        <div className="flex items-baseline justify-between gap-2">
+          <label htmlFor={`desc-${row.id}`} className="text-[13px] text-zinc-400">
+            Deskripsi manual
+          </label>
+          <span className={`text-[11px] tabular-nums ${desc.length > MAX_DESCRIPTION * 0.9 ? "text-amber-300" : "text-zinc-500"}`}>
+            {desc.length}/{MAX_DESCRIPTION}
+          </span>
+        </div>
+        <textarea
+          id={`desc-${row.id}`}
+          rows={3}
+          maxLength={MAX_DESCRIPTION}
+          value={desc}
+          disabled={origDesc == null}
+          placeholder={origDesc != null ? "Kosongkan untuk memakai deskripsi otomatis." : "Memuat deskripsi tersimpan…"}
+          onChange={(e) => {
+            setErr("");
+            setDesc(e.target.value);
+          }}
+          className={`${input} mt-1 w-full resize-y leading-snug disabled:opacity-50`}
+        />
+        <p className="mt-0.5 text-[12px] text-zinc-500">
+          Tampil di halaman tonton dan meta description. Kosong = deskripsi otomatis. Kata terlarang (minor/sekolah) ditolak.
+        </p>
       </div>
       {err ? <p className="basis-full text-[13px] text-red-400">{err}</p> : null}
     </div>

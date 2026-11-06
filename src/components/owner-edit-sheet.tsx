@@ -41,6 +41,8 @@ export const EXTRA_CHOICES: { slug: string; label: string }[] = [
   { slug: "tobrut", label: "Tobrut" },
 ];
 export const MAX_EXTRA = 6;
+/** Sama dengan MAX_DESCRIPTION di owner-edit-store.ts. */
+export const MAX_DESCRIPTION = 1000;
 
 export type EditVerdict = {
   detector: string | null;
@@ -53,11 +55,12 @@ type EditResp = {
   title?: string | null;
   category?: string | null;
   extra?: string[];
+  description?: string;
   detector?: string | null;
   moderation?: EditVerdict["moderation"];
 };
 
-type SearchRow = { id: string; title: string; category: string; extra?: string[] };
+type SearchRow = { id: string; title: string; category: string; extra?: string[]; description?: string };
 
 async function post<T>(secret: string, body: Record<string, unknown>): Promise<T> {
   try {
@@ -85,12 +88,14 @@ export function verdictText(v: EditVerdict): string {
 }
 
 /**
- * Lembar edit (judul + "Tampil juga di kategori", maks. 6). Simpan lewat aksi owner-tools "edit-video"
+ * Lembar edit (judul + deskripsi manual + "Tampil juga di kategori", maks. 6). Simpan lewat aksi owner-tools "edit-video"
  * yang sudah ada: server menolak judul terlarang dan tidak pernah membuka kunci. Kategori tambahan yang
  * tersimpan dibaca saat lembar dibuka (aksi "edit-get", lookup persis per ID), supaya simpan judul saja
  * tidak menghapus pilihan lama. Kalau gagal dimuat, pilihan kategori dikunci dan muncul pesan + tombol
  * "Coba lagi"; perubahan kategori tidak pernah dibuang diam-diam. Yang dikirim hanya selisihnya
  * (extraAdd / extraRemove), jadi dua simpan yang berdekatan tidak saling menimpa.
+ * Deskripsi manual juga dimuat lewat "edit-get" dan hanya dikirim kalau berubah; dikosongkan =
+ * kembali ke deskripsi otomatis. Server menolak deskripsi berisi kata terlarang.
  */
 export function OwnerEditSheet({
   secret,
@@ -103,11 +108,13 @@ export function OwnerEditSheet({
   id: string;
   title: string;
   onClose: () => void;
-  onSaved: (r: { title: string; extra: string[]; verdict: EditVerdict | null }) => void;
+  onSaved: (r: { title: string; extra: string[]; description?: string; verdict: EditVerdict | null }) => void;
 }) {
   const [title, setTitle] = useState(initialTitle);
   const [extra, setExtra] = useState<string[]>([]);
   const [orig, setOrig] = useState<string[] | null>(null);
+  const [description, setDescription] = useState("");
+  const [origDesc, setOrigDesc] = useState<string | null>(null);
   const [mainCat, setMainCat] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
@@ -122,13 +129,16 @@ export function OwnerEditSheet({
       if (!alive) return;
       if (!d.ok || !d.item || d.item.id !== id) {
         // Never fall back to "no categories": saving that would wipe the stored ones.
-        setLoadErr(`Kategori tersimpan gagal dimuat${d.error ? `: ${d.error}` : "."} Pilihan kategori dikunci sampai berhasil dimuat.`);
+        setLoadErr(`Data tersimpan gagal dimuat${d.error ? `: ${d.error}` : "."} Kategori dan deskripsi dikunci sampai berhasil dimuat.`);
         return;
       }
       const cur = d.item.extra || [];
       setMainCat(d.item.category || "");
       setExtra(cur);
       setOrig(cur);
+      const desc = d.item.description || "";
+      setDescription(desc);
+      setOrigDesc(desc);
     });
     return () => {
       alive = false;
@@ -163,7 +173,9 @@ export function OwnerEditSheet({
       if (add.length) body.extraAdd = add;
       if (remove.length) body.extraRemove = remove;
     }
-    if (!body.title && !body.extraAdd && !body.extraRemove) {
+    const desc = description.replace(/\s+/g, " ").trim();
+    if (origDesc != null && desc !== origDesc) body.description = desc;
+    if (!body.title && !body.extraAdd && !body.extraRemove && body.description === undefined) {
       setErr("Tidak ada perubahan.");
       return;
     }
@@ -181,7 +193,16 @@ export function OwnerEditSheet({
       setOrig(d.extra);
       setExtra(d.extra);
     }
-    onSaved({ title: d.title || t || initialTitle, extra: d.extra || extra, verdict: v });
+    if (typeof d.description === "string") {
+      setOrigDesc(d.description);
+      setDescription(d.description);
+    }
+    onSaved({
+      title: d.title || t || initialTitle,
+      extra: d.extra || extra,
+      ...(typeof d.description === "string" ? { description: d.description } : {}),
+      verdict: v,
+    });
   }
 
   const nExtra = extra.filter((x) => x !== mainCat).length;
@@ -214,6 +235,33 @@ export function OwnerEditSheet({
           onChange={(e) => setTitle(e.target.value)}
           className="mt-1 w-full rounded-lg border border-white/[0.08] bg-black/30 px-2.5 py-1.5 text-sm text-zinc-100 focus:border-[#2dd4bf]/60 focus:outline-none"
         />
+
+        <div className="mt-3 flex items-baseline justify-between gap-2">
+          <label className="text-[12px] font-medium text-zinc-400" htmlFor="edit-description">
+            Deskripsi manual
+          </label>
+          <span className={`text-[11px] tabular-nums ${description.length > MAX_DESCRIPTION * 0.9 ? "text-amber-300" : "text-zinc-500"}`}>
+            {description.length}/{MAX_DESCRIPTION}
+          </span>
+        </div>
+        <textarea
+          id="edit-description"
+          rows={4}
+          maxLength={MAX_DESCRIPTION}
+          value={description}
+          disabled={origDesc == null}
+          placeholder={
+            origDesc != null ? "Kosongkan untuk memakai deskripsi otomatis." : loadErr ? "Deskripsi tersimpan gagal dimuat." : "Memuat deskripsi tersimpan…"
+          }
+          onChange={(e) => {
+            setErr("");
+            setDescription(e.target.value);
+          }}
+          className="mt-1 w-full resize-y rounded-lg border border-white/[0.08] bg-black/30 px-2.5 py-1.5 text-sm leading-snug text-zinc-100 placeholder:text-zinc-600 focus:border-[#2dd4bf]/60 focus:outline-none disabled:opacity-50"
+        />
+        <p className="mt-0.5 text-[11px] leading-snug text-zinc-500">
+          Tampil di halaman tonton dan meta description. Kosong = deskripsi otomatis. Kata terlarang (minor/sekolah) ditolak.
+        </p>
 
         <div className="mt-3 flex items-baseline justify-between gap-2">
           <p className="text-[12px] font-medium text-zinc-400">Tampil juga di kategori (maks. {MAX_EXTRA})</p>

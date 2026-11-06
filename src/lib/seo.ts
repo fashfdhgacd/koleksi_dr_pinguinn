@@ -182,11 +182,38 @@ function durationPhrase(sec?: number | null): string {
   return r ? `${h} jam ${r} menit` : `${h} jam`;
 }
 
+/** Panjang maksimum deskripsi manual pemilik (owner-tools "edit-video"). */
+export const MANUAL_DESCRIPTION_MAX = 1000;
+
+/** Teks bawaan katalog lama yang artinya "tidak ada deskripsi". */
+const EMPTY_DESCRIPTION_RE = /^(tidak ada sinopsis|no description)\.?$/i;
+
 /**
- * Deskripsi publik halaman tonton: judul + kategori + durasi, unik per video.
- * Dipakai meta, teks halaman, VideoObject, dan sitemap. Bukan catatan internal.
+ * Filter keamanan deskripsi manual: kata terlarang (minor/sekolah) tidak pernah tampil.
+ * Server memakai ini juga saat menyimpan, jadi deskripsi yang ditolak tidak diam-diam hilang.
+ */
+export function isSafeManualDescription(s?: string | null): boolean {
+  const t = String(s || "").trim();
+  return Boolean(t) && !MINOR_RE.test(t);
+}
+
+/**
+ * Deskripsi manual pemilik (field `description`), sudah dibersihkan dari catatan internal.
+ * "" = kosong atau tidak lolos filter keamanan → pakai deskripsi otomatis.
+ */
+export function manualDescription(item: Pick<SeoVideoInput, "description">): string {
+  const t = stripInternalNotes(item.description).slice(0, MANUAL_DESCRIPTION_MAX).trim();
+  if (!t || EMPTY_DESCRIPTION_RE.test(t)) return "";
+  return isSafeManualDescription(t) ? t : "";
+}
+
+/**
+ * Deskripsi publik halaman tonton: deskripsi manual pemilik kalau ada; kalau kosong, otomatis dari
+ * judul + kategori + durasi, unik per video. Dipakai meta, teks halaman, VideoObject, dan sitemap.
  */
 export function publicWatchDescription(item: SeoVideoInput, max = 0): string {
+  const manual = manualDescription(item);
+  if (manual) return max > 0 ? clipAtWord(manual, max) : manual;
   const title = seoBaseTitle(item.title);
   const label = videoTextLabel(item.category);
   const dur = durationPhrase(item.duration);
@@ -319,8 +346,10 @@ export function cleanRawDescription(item: SeoVideoInput): string {
   return rawLooksWeak(item, raw) ? "" : raw;
 }
 
-/** Pakai deskripsi katalog hanya kalau cukup bagus; kalau tipis/ulang judul → generator. */
+/** Deskripsi manual pemilik dulu; lalu deskripsi katalog kalau cukup bagus; kalau tipis/ulang judul → generator. */
 export function resolveVideoSeoDescription(item: SeoVideoInput): string {
+  const manual = manualDescription(item);
+  if (manual) return clipAtWord(manual, 158);
   const raw = cleanRawDescription(item);
   if (raw) return clipAtWord(raw, 158);
   return videoSeoDescription(item);

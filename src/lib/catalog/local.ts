@@ -303,6 +303,8 @@ export async function getDetail(requestedId: string, _signal?: AbortSignal): Pro
   const servers = await serversOf(bag, item);
   return {
     ...card,
+    // Manual description from the owner (/pemilik "Edit"); empty = seo.ts generates one.
+    ...(typeof item.ownerDescription === "string" && item.ownerDescription ? { description: item.ownerDescription } : {}),
     video_url: embed || null,
     qualities: embed ? [{ label: card.quality, url: embed, format: "embed" }] : [],
     subjects: [],
