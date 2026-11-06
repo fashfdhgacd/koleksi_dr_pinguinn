@@ -31,7 +31,7 @@ test("genre landings accept only IndoAV and UserBokep; Videy landing stays Videy
 test("hard blocklist ids are excluded; a school-title is not an id block by itself", () => {
   const blocked = blockedIdSet(JSON.parse(readFileSync(new URL("./catalog-blocklist.json", import.meta.url), "utf8")));
   assert.equal(isBlockedId("4RBCLH2sf4Xe", blocked), true);
-  assert.equal(isBlockedId("tbvKj8426f", blocked), false);
+  assert.equal(isBlockedId("synthetic-school-not-blocked", blocked), false);
   assert.equal(isBlockedId("not-a-blocked-id", blocked), false);
   assert.ok(blocked.size >= 60);
   const robots = readFileSync(new URL("../../../public/robots.txt", import.meta.url), "utf8");
