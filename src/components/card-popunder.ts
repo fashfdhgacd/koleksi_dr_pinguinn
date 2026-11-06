@@ -1,15 +1,15 @@
-// TrafficStars direct-link popunder (spot 5210859), shared by every trigger: catalog card / hero click
-// (counts toward the video it opens), the one-shot tap layer over iframe players on the watch page
-// (tap-popunder.tsx) and the Videy player (ts-videy-popunder.tsx).
-// Cap, modelled on the hosts' own players (IndoAV / Lulu: first tap opens an ad tab, next tap plays):
-// at most POP_MAX_PER_VIDEO pops per video id (the count resets when another video is opened) and at
-// least POP_MIN_GAP_MS between two pops on the same video. sessionStorage only; timestamps are compared on tap
-// (no server writes, no timers). A blocked window.open counts nothing.
+// TrafficStars direct-link popunder (spot 5210859), shared by every trigger: catalog card / hero click,
+// the one-shot tap layer over iframe players (tap-popunder.tsx) and the Videy player (ts-videy-popunder.tsx).
+// In-video taps keep the per-video cap below (sessionStorage, resets when another video is opened).
+// Catalog / hero clicks are the page popunder: those also stop after PAGE_POP_MAX_PER_DAY successful
+// opens per Asia/Jakarta calendar day (localStorage + cookie, shared by every page). Videy preroll
+// is a different spot and is not counted here. A blocked window.open counts nothing.
 // Counters: popc_fire / popc_ok / popc_block in player-log (once per video+event per session).
 // Every opened tab is also logged by its position for that video (pop_n1 / pop_n2 / pop_n3, one D1
 // upsert per opened tab, same beacon as today), so /pemilik can compare ALL our opens with
 // TrafficStars' paid impressions instead of only the first tab per video.
 import { sendPlayerLog, type PlayerLogHost } from "@/lib/player-log-client";
+import { nextPagePop, pagePopAllowed, type PagePopDay } from "@/lib/page-pop-cap";
 
 const DIRECT_LINK = "https://fozekikikiminu.com/api/v1/direct/587547ff73c844b39ab9f02d1285154b";
 const HOSTS = new Set(["IndoAV", "UserBokep", "Streamtape", "Putarin", "Videy", "Arsip"]);
@@ -95,7 +95,58 @@ export function popHost(h: string): PlayerLogHost {
   return (HOSTS.has(h) ? h : "Lainnya") as PlayerLogHost;
 }
 
-/** Click handler for a catalog grid container (capture phase). Never prevents navigation. */
+const PAGE_POP_KEY = "kdp_page_pop_day";
+
+function parsePagePop(raw: string | null): PagePopDay | null {
+  if (!raw) return null;
+  try {
+    const v = JSON.parse(raw) as PagePopDay;
+    if (v && typeof v.day === "string" && typeof v.n === "number" && v.n >= 0) return { day: v.day, n: v.n };
+  } catch {
+    /* cookie uses day.n */
+  }
+  const m = /^(\d{4}-\d{2}-\d{2})\.(\d+)$/.exec(raw);
+  return m ? { day: m[1], n: Number(m[2]) } : null;
+}
+
+/** localStorage, with a cookie copy so the same browser still counts if storage throws. */
+function readPagePop(): PagePopDay | null {
+  let stored: PagePopDay | null = null;
+  let cookie: PagePopDay | null = null;
+  try {
+    stored = parsePagePop(localStorage.getItem(PAGE_POP_KEY));
+  } catch {
+    /* private mode */
+  }
+  try {
+    const row = document.cookie.split("; ").find((part) => part.startsWith(`${PAGE_POP_KEY}=`));
+    if (row) cookie = parsePagePop(decodeURIComponent(row.slice(PAGE_POP_KEY.length + 1)));
+  } catch {
+    /* ignore */
+  }
+  if (stored && cookie && stored.day === cookie.day) return stored.n >= cookie.n ? stored : cookie;
+  return stored || cookie;
+}
+
+function writePagePop(state: PagePopDay): void {
+  try {
+    localStorage.setItem(PAGE_POP_KEY, JSON.stringify(state));
+  } catch {
+    /* cookie still records it */
+  }
+  try {
+    document.cookie = `${PAGE_POP_KEY}=${encodeURIComponent(`${state.day}.${state.n}`)}; Max-Age=172800; Path=/; SameSite=Lax`;
+  } catch {
+    /* in-memory only for this hit; the next successful write catches up */
+  }
+}
+
+/**
+ * Catalog / hero card click (capture). This is the page popunder: at most
+ * PAGE_POP_MAX_PER_DAY successful opens per Jakarta calendar day, on every page.
+ * In-video taps and Videy preroll do not call this and are not counted here.
+ * Never prevents navigation. A blocked window.open is not counted.
+ */
 export function onCatalogCardClick(event: { target: EventTarget | null }, hostOf: (id: string) => string): void {
   if (typeof window === "undefined") return;
   const el = event.target instanceof Element ? event.target : null;
@@ -104,8 +155,13 @@ export function onCatalogCardClick(event: { target: EventTarget | null }, hostOf
   if (!a) return;
   const id = decodeURIComponent((a.getAttribute("href") || "").slice("/watch/".length).split(/[?#/]/)[0] || "");
   if (!id) return;
+  const now = Date.now();
+  const today = readPagePop();
+  if (!pagePopAllowed(today, now)) return;
   if (!canPop(id)) return;
   const host = popHost(hostOf(id));
   sendPlayerLog(id, host, "popc_fire");
-  sendPlayerLog(id, host, firePop(id, POP_MAX_PER_VIDEO, host) === "ok" ? "popc_ok" : "popc_block");
+  const opened = firePop(id, POP_MAX_PER_VIDEO, host) === "ok";
+  if (opened) writePagePop(nextPagePop(today, now));
+  sendPlayerLog(id, host, opened ? "popc_ok" : "popc_block");
 }
