@@ -1240,6 +1240,12 @@ export const Route = createFileRoute("/api/owner-tools")({
             return json({ ok: false, error: `catalog_failed: ${String((err as Error)?.message || err).slice(0, 160)}` }, 500);
           }
         }
+        if (body.action === "purge-watch") {
+          // No write: the Worker entry (purgeAfterEdit) drops the cached pages of this id on `purge: true`.
+          const id = String(body.id || "").trim();
+          if (!/^[A-Za-z0-9_-]{3,64}$/.test(id)) return json({ ok: false, error: "ID tidak valid." }, 400);
+          return json({ ok: true, id, purge: true });
+        }
         if (body.action === "edit-get") {
           try {
             return await handleEditGet(body);

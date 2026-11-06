@@ -374,6 +374,11 @@ function Chart({ days, hourly }: { days: DayRow[]; hourly: HourRow[] }) {
   );
 }
 
+/** Other isolates can render the pre-edit page for ~90 s (KV read cache + 30 s sync); purge again after that. */
+function purgeWatchLater(secret: string, id: string) {
+  for (const ms of [70_000, 130_000]) setTimeout(() => void ownerPost(secret, { action: "purge-watch", id }), ms);
+}
+
 function EditRow({
   row,
   secret,
@@ -445,7 +450,8 @@ function EditRow({
       setErr(`Gagal: ${d.error || "tidak diketahui"}`);
       return;
     }
-    onDone("Tersimpan. Tampil di situs dalam ±1 menit.", { title: d.title, category: d.category, extra: d.extra });
+    purgeWatchLater(secret, row.id);
+    onDone("Tersimpan. Tampil di situs dalam ±2 menit.", { title: d.title, category: d.category, extra: d.extra });
   }
   return (
     <div className="mt-2 flex flex-wrap items-center gap-2 rounded-md border border-white/[0.07] p-2">

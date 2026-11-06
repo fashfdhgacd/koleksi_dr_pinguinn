@@ -30,7 +30,9 @@
  * 3. Owner title/category/description edits (/api/owner-videy save, /api/owner-tools edit) purge the cached pages
  *    that show that video in this data centre: /watch/<id>, /, /kategori/videy and the edited
  *    category, on both hosts. A second purge ~29 s later catches a page another isolate rendered
- *    before its 30 s owner-edit sync. Only owner POSTs are read for this; visitors pay nothing.
+ *    before its 30 s owner-edit sync. The panel asks again (action purge-watch) ~70 s and ~130 s after
+ *    a save: KV reads are edge-cached up to 60 s, so an isolate can render the old edit for ~90 s.
+ *    Only owner POSTs are read for this; visitors pay nothing.
  *
  * 4. /pemilik "Edit" (POST /api/owner-tools, action edit-video): the typed title gets exactly one
  *    " - koleksidrpinguin.com" (other site/Telegram branding at the end removed) before the app sees
@@ -417,7 +419,9 @@ async function purgeAfterEdit(request, response, env, context) {
   const id = typeof data?.id === "string" ? data.id : "";
   const hideChange = typeof data?.hidden === "boolean";
   const descChange = typeof data?.description === "string";
-  if (!data?.ok || !/^[A-Za-z0-9_-]{3,64}$/.test(id) || (!data.title && !data.category && !hideChange && !descChange)) return;
+  const asked = data?.purge === true;
+  if (!data?.ok || !/^[A-Za-z0-9_-]{3,64}$/.test(id) || (!data.title && !data.category && !hideChange && !descChange && !asked))
+    return;
   const keys = purgeKeys(env, id, typeof data.category === "string" ? data.category : "");
   const run = () => Promise.all(keys.map((k) => cache.delete(k).catch(() => false)));
   context.waitUntil(
