@@ -13,6 +13,8 @@ export type SitemapWatchEntry = {
   thumbnail?: string;
   duration?: number;
   views?: number;
+  /** Manual description from the owner (/pemilik "Edit"). */
+  description?: string;
 };
 
 function str(v: unknown): string {
@@ -86,6 +88,8 @@ async function listBaseEntries(): Promise<SitemapWatchEntry[]> {
       entry.duration = Math.round(it.duration);
     }
     if (typeof it.views === "number" && Number.isFinite(it.views) && it.views > 0) entry.views = it.views;
+    const description = str(it.ownerDescription);
+    if (description) entry.description = description;
     out.push(entry);
   }
   // Paling ditonton dulu (child sitemap 1 = video terpopuler), lalu terbaru.

@@ -10,7 +10,7 @@
  */
 
 /**
- * @typedef {{ title?: string, category?: string, extra?: string[], at: number }} Edit
+ * @typedef {{ title?: string, category?: string, extra?: string[], description?: string, at: number }} Edit
  * @typedef {Record<string, Edit>} EditMap
  */
 

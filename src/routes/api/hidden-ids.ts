@@ -17,7 +17,7 @@ import { readFlagReviewState } from "@/lib/catalog/flag-review-store";
  *    dipakai katalog di browser supaya navigasi client sama dengan SSR.
  *  - ownerHidden: id yang disembunyikan pemilik dari kartu "Player error" (hanya ada kalau KV terbaca;
  *    kalau tidak ada, browser memakai daftar sebelumnya).
- *  - edits: judul/kategori yang diubah pemilik lewat "Edit" di /pemilik, supaya navigasi client
+ *  - edits: judul/kategori/deskripsi manual yang diubah pemilik lewat "Edit" di /pemilik, supaya navigasi client
  *    menampilkan judul yang sama dengan SSR. Edit hanya bisa dibuat untuk video yang tidak terkunci
  *    dan tidak ditandai (owner-tools.ts).
  */
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/api/hidden-ids")({
         } catch {
           ownerHidden = undefined;
         }
-        let edits: Record<string, { title?: string; category?: string; extra?: string[] }> | undefined;
+        let edits: Record<string, { title?: string; category?: string; extra?: string[]; description?: string }> | undefined;
         try {
           edits = {};
           for (const [id, e] of Object.entries((await readOwnerEditState()).ids)) {
@@ -46,6 +46,7 @@ export const Route = createFileRoute("/api/hidden-ids")({
               ...(e.title ? { title: e.title } : {}),
               ...(e.category ? { category: e.category } : {}),
               ...(e.extra?.length ? { extra: e.extra } : {}),
+              ...(e.description ? { description: e.description } : {}),
             };
           }
         } catch {

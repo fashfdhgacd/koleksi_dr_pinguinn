@@ -145,6 +145,7 @@ function videoBlock(item: Awaited<ReturnType<typeof listSitemapWatchEntries>>[nu
     title,
     category: item.category || null,
     duration: item.duration ?? null,
+    description: item.description ?? null,
   });
   const thumb = seoVideoThumbnail(item.id, item.thumbnail);
   const player = item.embed || pageUrl;

@@ -13,8 +13,12 @@
 import { resolveAnalyticsKV } from "@/lib/analytics-kv";
 import { newerEdits } from "./owner-edit-merge.js";
 
-/** `extra`: additional category slugs the video also appears in (besides its main `category`). */
-export type OwnerEdit = { title?: string; category?: string; extra?: string[]; at: number };
+/**
+ * `extra`: additional category slugs the video also appears in (besides its main `category`).
+ * `description`: manual description from the owner (watch page + meta); absent = generated one.
+ */
+export type OwnerEdit = { title?: string; category?: string; extra?: string[]; description?: string; at: number };
+export const MAX_DESCRIPTION = 1000;
 export const MAX_EXTRA_CATEGORIES = 6;
 /**
  * Manual multi-server merges from /pemilik ("Gabung jadi satu" / "Pisahkan"), same KV blob.
@@ -61,7 +65,7 @@ function clean(raw: unknown): OwnerEditState {
   if (!ids || typeof ids !== "object") return out;
   for (const [id, v] of Object.entries(ids as Record<string, unknown>)) {
     if (!ID_RE.test(id) || !v || typeof v !== "object") continue;
-    const rec = v as { title?: unknown; category?: unknown; extra?: unknown; at?: unknown };
+    const rec = v as { title?: unknown; category?: unknown; extra?: unknown; description?: unknown; at?: unknown };
     const title = typeof rec.title === "string" ? rec.title.replace(/\s+/g, " ").trim().slice(0, 200) : "";
     const category = typeof rec.category === "string" && SLUG_RE.test(rec.category) ? rec.category : "";
     const extra = Array.isArray(rec.extra)
@@ -70,11 +74,14 @@ function clean(raw: unknown): OwnerEditState {
           MAX_EXTRA_CATEGORIES,
         )
       : [];
-    if (!title && !category && !extra.length) continue;
+    const description =
+      typeof rec.description === "string" ? rec.description.replace(/\s+/g, " ").trim().slice(0, MAX_DESCRIPTION) : "";
+    if (!title && !category && !extra.length && !description) continue;
     out.ids[id] = {
       ...(title ? { title } : {}),
       ...(category ? { category } : {}),
       ...(extra.length ? { extra } : {}),
+      ...(description ? { description } : {}),
       at: Number(rec.at) || 0,
     };
   }
@@ -116,11 +123,20 @@ async function readForWrite(kv: { get: (k: string, o?: { cacheTtl?: number }) =>
  * changes, so edits of other ids stored meanwhile are kept.
  * Extra categories: `extraAdd` / `extraRemove` (a delta, preferred) are applied to what is stored
  * now, so two saves close together both keep their changes. `extra` (full list, older clients)
- * replaces the list; undefined leaves it alone. Returns the stored edit (null = nothing left).
+ * replaces the list; undefined leaves it alone. `description`: a string replaces the manual
+ * description ("" removes it, back to the generated one); undefined leaves it alone.
+ * Returns the stored edit (null = nothing left).
  */
 export async function setOwnerEdit(
   id: string,
-  edit: { title?: string; category?: string; extra?: string[]; extraAdd?: string[]; extraRemove?: string[] },
+  edit: {
+    title?: string;
+    category?: string;
+    extra?: string[];
+    extraAdd?: string[];
+    extraRemove?: string[];
+    description?: string;
+  },
 ): Promise<OwnerEdit | null> {
   if (!ID_RE.test(id)) throw new Error("bad_id");
   const r = await resolveAnalyticsKV();
@@ -133,8 +149,11 @@ export async function setOwnerEdit(
     extra = [...(prev.extra || []).filter((s) => !remove.has(s))];
     for (const s of edit.extraAdd || []) if (!extra.includes(s) && extra.length < MAX_EXTRA_CATEGORIES) extra.push(s);
   }
+  const { description: _prevDescription, ...prevRest } = prev;
+  const description = edit.description === undefined ? prev.description : edit.description;
   state.ids[id] = {
-    ...prev,
+    ...prevRest,
+    ...(description ? { description } : {}),
     ...(edit.title ? { title: edit.title } : {}),
     ...(edit.category ? { category: edit.category } : {}),
     // An array (even empty) replaces the stored extra categories; undefined leaves them alone.

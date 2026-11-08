@@ -186,7 +186,7 @@ const OVERRIDES = itemOverrides as Record<string, ItemOverride>;
 type AutoMeta = { title?: string; poster?: string; src?: string; hidden?: string; none?: string };
 const AUTO_META = autoMetaFile as Record<string, AutoMeta>;
 /** Owner edits from /pemilik (KV owner:edit:v1, owner-edit-store.ts), applied on top of OVERRIDES. */
-type OwnerEditLite = { title?: string; category?: string; extra?: string[] };
+type OwnerEditLite = { title?: string; category?: string; extra?: string[]; description?: string };
 let EDITS: Record<string, OwnerEditLite> = {};
 let editsKey = "";
 /** Owner manual merges / splits (same KV blob, owner-edit-store.ts), applied by buildIndexes. */
@@ -617,6 +617,7 @@ function withStats(it: RawItem): RawItem {
       ...(ed.title ? { title: ed.title } : {}),
       ...(ed.category ? { category: ed.category, ownerCategory: ed.category } : {}),
       ...(ed.extra?.length ? { ownerExtraCategories: ed.extra } : {}),
+      ...(ed.description ? { ownerDescription: ed.description } : {}),
     };
   }
   const title = typeof out.title === "string" ? out.title : "";

@@ -103,6 +103,7 @@ export const Route = createFileRoute("/watch/$id")({
             title: cleanDisplayTitle(item.title),
             category: item.category,
             duration: item.duration,
+            description: item.description,
           },
           160,
         )
