@@ -1,6 +1,7 @@
 /**
  * Page popunder cap: 3 successful opens per calendar day in Asia/Jakarta, shared by every page.
- * In-video popunders (player tap layers, Videy) do not use this — they are capped per video.
+ * Applies to every non-Videy popunder — catalog/hero clicks and iframe-player tap layers share
+ * this one counter. The Videy popunder is per-video only and does not use this.
  * A new Jakarta date starts the count at zero.
  */
 
