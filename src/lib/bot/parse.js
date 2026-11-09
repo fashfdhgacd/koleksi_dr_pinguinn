@@ -234,8 +234,38 @@ export function parseVideoLink(url) {
     return probe;
   }
 
+  // Generic embed: any other http(s) URL is accepted as an iframe embed — the
+  // player already renders unknown hosts in an iframe (catalog/embed.ts).
+  // Id is a stable hash of the URL so reposts dedupe; host "embed" marks it for
+  // first-seen-domain review: upload-handler holds unknown domains as
+  // "embed-review" until the owner approves once (lib/embed-hosts.js allowlist).
+  if (!NON_VIDEO_HOST.test(host)) {
+    return {
+      id: `g${urlHash(url)}`,
+      host: "embed",
+      source: host,
+      embed: url,
+      direct: url,
+      file: `videos.json`,
+    };
+  }
+
   return null;
 }
+
+/** FNV-1a 32-bit -> base36: stable, short, collision-safe enough for dedupe. */
+function urlHash(s) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(36);
+}
+
+/** Clearly-not-video sites: a pasted link to these never becomes an embed. */
+const NON_VIDEO_HOST =
+  /(^|\.)(google\.[a-z.]+|ggpht\.com|facebook\.com|fb\.com|fb\.watch|instagram\.com|tiktok\.com|twitter\.com|x\.com|whatsapp\.com|telegram\.(me|org)|t\.me|github\.com|linkedin\.com|pinterest\.|reddit\.com|wikipedia\.org|maps\.google\.)$/i;
 
 /** Path words on these hosts that are pages, not file codes (dashboard links pasted by mistake). */
 const DRP_NOT_A_CODE = new Set([
@@ -334,9 +364,9 @@ export function parseMessage(text = "") {
   let title = "";
   let category = "";
   for (const line of lines) {
-    const tm = line.match(/^(?:title|judul)\s*[:\-]\s*(.+)$/i);
+    const tm = line.match(/^(?:title|judul)\s*[:-]\s*(.+)$/i);
     if (tm) title = tm[1].trim();
-    const cm = line.match(/^(?:category|kategori|cat)\s*[:\-]\s*(.+)$/i);
+    const cm = line.match(/^(?:category|kategori|cat)\s*[:-]\s*(.+)$/i);
     if (cm) category = cm[1].trim().toLowerCase();
   }
   // Tag #aigay (or #ai-gay / #ai_gay) anywhere in the message = category AI GAY (/kategori/ai-gay).
@@ -359,7 +389,7 @@ export function parseMessage(text = "") {
   const onlyIds = !urls.length && lines.length > 0 && lines.every((l) => idLine(l));
   let pendingTitle = "";
   for (const line of lines) {
-    if (/^(?:title|judul|category|kategori|cat)\s*[:\-]/i.test(line)) continue;
+    if (/^(?:title|judul|category|kategori|cat)\s*[:-]/i.test(line)) continue;
     const lineUrls = extractUrls(line);
     const ids = lineUrls.length ? null : idLine(line);
     if (ids && (onlyIds || ids.length >= 3)) {

@@ -20,6 +20,7 @@ import { hasJavCode, uploadRejectReason, uploadWarnReason } from "@/lib/bot/titl
 import { HOLD_REASON, explainTerm, holdReplyLines, isHeldDraftReason, titleHold, uploadAction } from "@/lib/bot/title-hold.js";
 import { isGenericTitle } from "@/lib/catalog/generic-title.js";
 import { guardGivenCategory } from "@/lib/bot/category-guard.js";
+import { embedDomainOf, readEmbedHosts } from "@/lib/embed-hosts.js";
 
 /** Title is clean for the hard checks too (reject list + minor-lock). Used for hold suggestions. */
 /** The word/reason behind an upload moderation hold, for the bot reply. */
@@ -101,7 +102,7 @@ async function resolveMetaFast(video, givenTitle, env) {
       const meta = await fetchStreamtapeMeta(video.id, env);
       if (!title && meta.title) title = cleanTitle(meta.title);
       if (!thumb && isHttpPoster(meta.thumb)) thumb = meta.thumb;
-    } else if ((video.host === "indoav" || video.host === "userbokep") && (!thumb || !title)) {
+    } else if ((video.host === "indoav" || video.host === "userbokep" || video.host === "embed") && (!thumb || !title)) {
       const meta = await fetchEmbedPageMeta(video.embed, video.id);
       if (!title && meta.title) title = cleanTitle(meta.title);
       if (!thumb && isHttpPoster(meta.thumb)) thumb = meta.thumb;
@@ -416,6 +417,8 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   // queue and the hourly flush re-checks each file right before it goes live, so the upfront check
   // is redundant — and on a 100+ link batch it was what pushed the request past its budget.
   const queueModeNow = await queueMode();
+  // Generic-embed domain allowlist (lib/embed-hosts.js): read once per batch.
+  const embedHosts = await readEmbedHosts().catch(() => new Set());
   // Videy only: a video whose file is gone on cdn.videy.co (404 on every retry) is stored hidden,
   // never deleted. Network errors or any other status count as alive. Other sources are never checked.
   const deadVidey = new Set();
@@ -569,6 +572,15 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     }
     if (act.action === "hold") {
       record = { ...record, hidden: true, hidden_reason: HOLD_REASON, title_hold: hold };
+    }
+    // Generic embed (host "embed") from a domain the owner hasn't approved yet:
+    // held as "embed-review" — it shows in /pemilik → Perlu dicek, and approving
+    // one item whitelists the whole domain (owner-detector-review.ts).
+    if (video.host === "embed" && record.hidden !== true) {
+      const dom = embedDomainOf(video.embed || video.direct || "");
+      if (dom && !embedHosts.has(dom)) {
+        record = { ...record, hidden: true, hidden_reason: "embed-review" };
+      }
     }
     const warn = uploadWarnReason(`${guardText} ${baseTitle}`, record.category);
     const fileName = video.file || "videos.json";

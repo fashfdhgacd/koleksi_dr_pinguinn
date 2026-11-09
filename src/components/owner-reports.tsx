@@ -147,7 +147,7 @@ export function OwnerReports({ secret }: { secret: string }) {
                       onClick={() => void act("hide", r.id)}
                       className="rounded-md border border-red-400/40 px-2.5 py-1 text-xs text-red-300 hover:bg-red-400/10 disabled:opacity-40"
                     >
-                      Sembunyikan video + tindaklanjuti
+                      Setuju — sembunyikan video
                     </button>
                     <button
                       type="button"
@@ -155,7 +155,7 @@ export function OwnerReports({ secret }: { secret: string }) {
                       onClick={() => void act("reject", r.id)}
                       className="rounded-md border border-white/15 px-2.5 py-1 text-xs text-zinc-300 hover:bg-white/5 disabled:opacity-40"
                     >
-                      Tolak laporan
+                      Tidak setuju
                     </button>
                   </>
                 ) : (

@@ -39,6 +39,7 @@ import { withSavedEdit } from "@/lib/catalog/owner-edit-merge.js";
 import { readOwnerEditState, setOwnerEdit } from "@/lib/catalog/owner-edit-store";
 import { uploadRejectReason } from "@/lib/bot/title-guard.js";
 import { HOLD_REASON, canPublishTitle, titleHold } from "@/lib/bot/title-hold.js";
+import { allowEmbedHosts, embedDomainOf } from "@/lib/embed-hosts.js";
 
 /** Hard checks a held draft's new title must also pass (reject list + minor lock + detector "minor"). */
 function hardOk(t: string): boolean {
@@ -304,6 +305,12 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
         source = "detektor konteks (upload baru)";
         const ex = explainTitle(title, minorContentReason(title));
         trigger = ex.signals[0] || schoolReviewCue(title) || "isyarat umur";
+      } else if (it.hidden === true && it.hidden_reason === "embed-review") {
+        // Generic embed (parse.js host "embed") from a domain not yet approved:
+        // held until the owner decides once; "show" whitelists the whole domain.
+        flagged = true;
+        source = "domain embed baru — setujui untuk bypass permanen";
+        trigger = embedDomainOf(http(it.embed) || http(it.direct) || "") || "domain baru";
       }
     }
     const verif = verification[id] || null;
@@ -474,6 +481,14 @@ export async function approveDetectorReviewBulk(body: {
       });
     }
     await writeReviewState(state);
+    // Same domain bypass as decideDetectorReview: bulk-approved embed domains
+    // join the allowlist so later links from them publish directly.
+    await allowEmbedHosts(
+      approved.map((id) => {
+        const it2 = byId.get(id);
+        return embedDomainOf(http(it2?.embed) || http(it2?.direct) || "");
+      }),
+    );
     return { ok: true, approved, skipped };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "kv_error", status: 503 };
@@ -530,6 +545,13 @@ export async function decideDetectorReview(body: {
       state.proof = { ...(state.proof || {}), [id]: { note: proof, at: Date.now() } };
     if (!show && state.proof?.[id]) delete state.proof[id];
     await writeReviewState(state);
+    // Embed domain bypass: approving any item whitelists its embed domain, so a
+    // generic embed (host "embed") from that domain publishes without re-review.
+    // Harmless for known hosts — the allowlist is only consulted for host "embed".
+    if (show) {
+      const dom = embedDomainOf(http(it.embed) || http(it.direct) || "");
+      if (dom) await allowEmbedHosts([dom]);
+    }
     return { ok: true, held: !show };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "kv_error", status: 503 };
