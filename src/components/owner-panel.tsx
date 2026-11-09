@@ -19,6 +19,7 @@ import { OwnerAuthedBottom } from "@/components/owner-authed-bottom";
 import { HiddenListSection } from "@/components/owner-hidden-list";
 import { DetectorReviewSection } from "@/components/owner-detector-review";
 import { FlagReviewSection } from "@/components/owner-flag-review";
+import { OwnerComments } from "@/components/owner-comments";
 import { OwnerTelegramStatus } from "@/components/owner-telegram-status";
 import { OwnerTrafficStars } from "@/components/owner-trafficstars";
 import type { PlayerLogData } from "@/components/owner-health";
@@ -398,6 +399,9 @@ export function OwnerDashboard() {
             <div className={glass}>
               <Collapse id="detector" title="Perlu dicek (detector)">
                 <DetectorReviewSection key={reloadKey} secret={secret} onCount={onReviewCount} />
+              </Collapse>
+              <Collapse id="comments" title="Komentar masuk">
+                <OwnerComments secret={secret} />
               </Collapse>
             </div>
           </section>
