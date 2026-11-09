@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 
 const REASONS = [
   { key: "minor", label: "Dugaan konten di bawah umur", hint: "Anak sekolah / di bawah 18 tahun" },
+  { key: "ncsei", label: "Konten intim tanpa persetujuan", hint: "Video pribadi/distribute tanpa izin orang di dalamnya" },
+  { key: "copyright", label: "Pelanggaran hak cipta", hint: "Konten milik orang lain tanpa izin" },
   { key: "illegal", label: "Konten ilegal", hint: "Eksploitasi, kekerasan, atau konten terlarang lain" },
-  { key: "other", label: "Lainnya", hint: "Pelaporan lain (hak cipta, duplikat, dll)" },
+  { key: "other", label: "Lainnya", hint: "Masalah lain yang tidak termasuk di atas" },
 ] as const;
 
 type State = "form" | "busy" | "done" | "error";

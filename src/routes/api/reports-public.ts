@@ -46,7 +46,7 @@ export const Route = createFileRoute("/api/reports-public")({
         const db = await reportsDb().catch(() => null);
         if (!db) {
           return Response.json(
-            { ok: false, totals: { actioned: 0, rejected: 0 }, items: [] },
+            { ok: false, totals: { actioned: 0, rejected: 0, removed: 0 }, categories: [], items: [] },
             { headers: { "cache-control": "no-store" } },
           );
         }
@@ -63,26 +63,38 @@ export const Route = createFileRoute("/api/reports-public")({
             reason: r.reason,
             outcome: r.status === "actioned" ? "actioned" : "rejected",
           }));
-          const counts = await db
+          const catRows = await db
             .prepare(
-              `select status, count(*) as n from content_reports
-               where status in ('actioned','rejected') group by status`,
+              `select reason,
+                 sum(case when status = 'actioned' then 1 else 0 end) as actioned,
+                 sum(case when status = 'rejected' then 1 else 0 end) as rejected,
+                 count(distinct case when status = 'actioned' then video_id end) as removed
+               from content_reports
+               where status in ('actioned','rejected')
+               group by reason`,
             )
-            .all<{ status: string; n: number }>()
-            .catch(() => ({ results: [] as { status: string; n: number }[] }));
-          const totals = { actioned: 0, rejected: 0 };
-          for (const c of counts.results || []) {
-            if (c.status === "actioned") totals.actioned = Number(c.n) || 0;
-            if (c.status === "rejected") totals.rejected = Number(c.n) || 0;
+            .all<{ reason: string; actioned: number; rejected: number; removed: number }>()
+            .catch(() => ({ results: [] as { reason: string; actioned: number; rejected: number; removed: number }[] }));
+          const categories = (catRows.results || []).map((c) => ({
+            reason: c.reason,
+            actioned: Number(c.actioned) || 0,
+            rejected: Number(c.rejected) || 0,
+            removed: Number(c.removed) || 0,
+          }));
+          const totals = { actioned: 0, rejected: 0, removed: 0 };
+          for (const c of categories) {
+            totals.actioned += c.actioned;
+            totals.rejected += c.rejected;
+            totals.removed += c.removed;
           }
           return Response.json(
-            { ok: true, totals, items },
+            { ok: true, totals, categories, items },
             { headers: { "cache-control": "public, max-age=300, s-maxage=300" } },
           );
         } catch (err) {
           console.error("reports-public get failed:", err instanceof Error ? err.message.slice(0, 200) : "d1 error");
           return Response.json(
-            { ok: false, totals: { actioned: 0, rejected: 0 }, items: [] },
+            { ok: false, totals: { actioned: 0, rejected: 0, removed: 0 }, categories: [], items: [] },
             { headers: { "cache-control": "no-store" } },
           );
         }

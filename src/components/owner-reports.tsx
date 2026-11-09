@@ -25,6 +25,8 @@ const FILTERS = [
 
 const REASON_LABEL: Record<string, string> = {
   minor: "Dugaan di bawah umur",
+  ncsei: "Intim tanpa persetujuan",
+  copyright: "Pelanggaran hak cipta",
   illegal: "Konten ilegal",
   other: "Lainnya",
 };

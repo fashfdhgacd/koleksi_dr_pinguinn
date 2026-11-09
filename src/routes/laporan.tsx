@@ -24,20 +24,34 @@ export const Route = createFileRoute("/laporan")({
 
 const REASON_LABEL: Record<string, string> = {
   minor: "Dugaan di bawah umur",
+  ncsei: "Konten intim tanpa persetujuan",
+  copyright: "Pelanggaran hak cipta",
   illegal: "Konten ilegal",
   other: "Lainnya",
 };
 
+const CATEGORY_ORDER = ["minor", "ncsei", "copyright", "illegal", "other"] as const;
+
+type PublicCategory = { reason: string; actioned: number; rejected: number; removed: number };
 type PublicReport = { date: string; reason: string; outcome: "actioned" | "rejected" };
 
 function TransparencyList() {
-  const [data, setData] = useState<{ totals: { actioned: number; rejected: number }; items: PublicReport[] } | null>(null);
+  const [data, setData] = useState<{
+    totals: { actioned: number; rejected: number; removed: number };
+    categories: PublicCategory[];
+    items: PublicReport[];
+  } | null>(null);
   useEffect(() => {
     let alive = true;
     fetch("/api/reports-public", { cache: "no-store" })
       .then((r) => r.json())
       .then((j) => {
-        if (alive && j?.ok) setData({ totals: j.totals || { actioned: 0, rejected: 0 }, items: j.items || [] });
+        if (alive && j?.ok)
+          setData({
+            totals: j.totals || { actioned: 0, rejected: 0, removed: 0 },
+            categories: j.categories || [],
+            items: j.items || [],
+          });
       })
       .catch(() => {});
     return () => {
@@ -46,12 +60,40 @@ function TransparencyList() {
   }, []);
 
   if (!data) return <p className="text-sm text-muted">Memuat…</p>;
+  const byReason = new Map(data.categories.map((c) => [c.reason, c]));
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-foreground">
-        Total ditindaklanjuti: <strong>{data.totals.actioned}</strong> · Total ditolak:{" "}
-        <strong>{data.totals.rejected}</strong>
-      </p>
+    <div className="space-y-4">
+      <div className="overflow-x-auto rounded-xl border border-border">
+        <table className="w-full min-w-[26rem] text-sm">
+          <thead>
+            <tr className="border-b border-border bg-secondary/40 text-left text-xs uppercase tracking-wider text-muted">
+              <th className="px-3 py-2 font-medium">Kategori</th>
+              <th className="px-3 py-2 text-right font-medium">Laporan ditindaklanjuti</th>
+              <th className="px-3 py-2 text-right font-medium">Video ditindaklanjuti</th>
+              <th className="px-3 py-2 text-right font-medium">Ditolak</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {CATEGORY_ORDER.map((key) => {
+              const c = byReason.get(key);
+              return (
+                <tr key={key}>
+                  <td className="px-3 py-2 text-foreground">{REASON_LABEL[key]}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-foreground">{c?.actioned ?? 0}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-foreground">{c?.removed ?? 0}</td>
+                  <td className="px-3 py-2 text-right tabular-nums text-muted">{c?.rejected ?? 0}</td>
+                </tr>
+              );
+            })}
+            <tr className="bg-secondary/30 font-semibold">
+              <td className="px-3 py-2 text-foreground">Total</td>
+              <td className="px-3 py-2 text-right tabular-nums text-foreground">{data.totals.actioned}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-foreground">{data.totals.removed}</td>
+              <td className="px-3 py-2 text-right tabular-nums text-muted">{data.totals.rejected}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
       {data.items.length === 0 ? (
         <p className="text-sm text-muted">Belum ada laporan yang selesai ditinjau.</p>
       ) : (

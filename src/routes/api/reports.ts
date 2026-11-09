@@ -46,7 +46,7 @@ const BOT_UA = /bot|crawl|spider|slurp|headless|curl\/|wget|python-requests|prev
 const REPORT_MAX_PER_DAY = 5;
 const DETAIL_MAX = 1000;
 const CONTACT_MAX = 120;
-const REASONS = new Set(["minor", "illegal", "other"]);
+const REASONS = new Set(["minor", "ncsei", "copyright", "illegal", "other"]);
 
 const g = globalThis as typeof globalThis & { __reportsSchema__?: Promise<void> };
 
