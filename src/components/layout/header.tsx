@@ -37,19 +37,42 @@ export function Header({
   // stays mounted — clipped, not unmounted — so chip state and scroll position
   // inside the overflow row survive.
   const [navHidden, setNavHidden] = useState(false);
+  const navHiddenRef = useRef(false);
   const lastY = useRef(0);
+  const acc = useRef(0);
   useEffect(() => {
     let raf = 0;
+    const apply = (hide: boolean) => {
+      navHiddenRef.current = hide;
+      setNavHidden(hide);
+    };
     const onScroll = () => {
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
         const y = window.scrollY;
-        const prev = lastY.current;
+        const d = y - lastY.current;
         lastY.current = y;
-        if (y < 80) setNavHidden(false);
-        else if (y > prev + 4) setNavHidden(true);
-        else if (y < prev - 4) setNavHidden(false);
+        if (y < 80) {
+          acc.current = 0;
+          if (navHiddenRef.current) apply(false);
+          return;
+        }
+        // Trackpad/mouse-wheel jitter emits many tiny direction-changing deltas;
+        // require sustained travel before toggling so the nav can't flap. The
+        // thresholds MUST exceed the ~56px scroll-anchoring compensation the
+        // browser applies when this row collapses — anything smaller re-triggers
+        // the toggle and the nav oscillates forever.
+        if (Math.abs(d) < 2) return;
+        if ((d > 0) !== (acc.current > 0)) acc.current = 0;
+        acc.current += d;
+        if (!navHiddenRef.current && acc.current > 100) {
+          acc.current = 0;
+          apply(true);
+        } else if (navHiddenRef.current && acc.current < -80) {
+          acc.current = 0;
+          apply(false);
+        }
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -150,7 +173,10 @@ export function Header({
 
       <nav
         className={cn(
-          "mx-auto max-w-[1600px] overflow-hidden px-3 transition-[max-height,opacity] duration-200 ease-out sm:px-6",
+          // overflow-anchor:none — without it the browser's scroll anchoring
+          // compensates for the collapsed row's height change by shifting
+          // scrollY, which re-triggers this toggle and makes the nav oscillate.
+          "mx-auto max-w-[1600px] overflow-hidden px-3 [overflow-anchor:none] transition-[max-height,opacity] duration-200 ease-out sm:px-6",
           navHidden ? "max-h-0 opacity-0" : "max-h-20 opacity-100",
         )}
         aria-label="Navigasi cepat"

@@ -78,6 +78,12 @@ export function PopTapLayer({
           setArmed(false);
           return;
         }
+        // "skip" = a cap was hit between arming and the tap (daily cap or per-video) —
+        // not a blocker, so it must not burn a fail or log pop_block.
+        if (r === "skip") {
+          setArmed(false);
+          return;
+        }
         sendPlayerLog(videoId, lh, "pop_block");
         const n = fails + 1;
         setFails(n);
