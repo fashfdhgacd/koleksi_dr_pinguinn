@@ -19,9 +19,9 @@ import { loadVast, ping, prerollDue, VAST_TIMEOUT_MS, type VastAd } from "@/comp
  * Fullscreen (native video button): a landscape video locks the screen to landscape where the
  * browser allows it, and unlocks on exit.
  *
- * TrafficStars popunder (ts-videy-popunder.tsx): the poster overlay is our tap-catcher; its first tap
- * (within the shared per-video cap, card-popunder.ts) opens the direct link in a new tab; the next tap
- * plays. During playback a one-shot PopTapLayer re-arms when the cap allows a later pop.
+ * TrafficStars popunder (ts-videy-popunder.tsx): the poster tap opens the direct link AND starts
+ * playback in the same gesture (popup blockers require a user gesture, so auto-open is impossible);
+ * a one-shot PopTapLayer during playback can add pops #2/#3 within the shared per-video cap.
  *
  * Kesehatan player (/pemilik): the same /api/player-log beacons as the other hosts, once per video
  * per session (src/lib/player-log-client.ts), host "Videy":
@@ -390,11 +390,10 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
 
   const start = useCallback(() => {
     if (phase !== "idle") return;
-    // Popunder: this overlay is our own element (not an iframe), so the tap is a user gesture on
-    // our page. popTap opens the direct link synchronously; a tap used for the ad (opened, or
-    // blocked with a retry left) does nothing else and the next tap plays. After 2 blocked tries
-    // the tap plays so ad-blocker visitors are never stuck.
-    if (popTap(item.id)) return;
+    // Popunder + play in the SAME tap: the gesture opens the direct link and playback starts right
+    // away, so every Videy play gets pop #1 (popup blockers require a user gesture — auto-open on
+    // play is impossible). Playback taps can still add pops #2/#3 via PopTapLayer; cap is 3/video.
+    popTap(item.id);
     if (!prerollDue()) {
       playFilm();
       return;
