@@ -274,7 +274,7 @@ function RankingPage({
             {RANK_PERIODS.map((p) => {
               const active = p.key === period.key;
               const ok = rankPeriodAvailable(rank.kind, p.period);
-              const cls = `inline-flex h-8 items-center rounded-full border px-3 text-sm ${
+              const cls = `inline-flex h-10 items-center rounded-full border px-3 text-sm ${
                 active ? "border-zinc-200 bg-zinc-100 text-zinc-900" : "border-white/10 text-zinc-300"
               }`;
               if (!ok) {
@@ -421,7 +421,7 @@ function PlainCategoryPage({
                 <a
                   key={c.slug}
                   href={`/kategori/${c.slug}`}
-                  className="inline-flex h-8 items-center rounded-full border border-white/10 px-3 text-sm text-zinc-300 hover:border-white/40 hover:text-white"
+                  className="inline-flex h-10 items-center rounded-full border border-white/10 px-3 text-sm text-zinc-300 hover:border-white/40 hover:text-white"
                 >
                   {c.label}
                 </a>
@@ -447,7 +447,7 @@ function PlainCategoryPage({
                 <Link
                   to="/"
                   search={{ q: undefined, category: undefined }}
-                  className="pixel inline-flex h-9 items-center rounded-none border border-white/35 px-3 text-[11px] text-white/80 hover:border-white/80 hover:text-white sm:text-xs"
+                  className="pixel inline-flex h-10 items-center rounded-none border border-white/35 px-3 text-[11px] text-white/80 hover:border-white/80 hover:text-white sm:text-xs"
                 >
                   Tonton video terbaru dulu
                 </Link>

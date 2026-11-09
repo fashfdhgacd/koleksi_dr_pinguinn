@@ -121,7 +121,7 @@ function ServerButtons({ item, current }: { item: VideoDetail; current: string }
             aria-current={active ? "true" : undefined}
             title={gone ? `${label} (sumber sudah tidak tersedia)` : label}
             className={
-              "inline-flex h-9 items-center rounded-full border px-4 text-sm font-medium " +
+              "inline-flex h-10 items-center rounded-full border px-4 text-sm font-medium " +
               (active
                 ? "border-[#2dd4bf] bg-[#2dd4bf] text-[#09090b]"
                 : "border-white/20 bg-white/5 text-white/90 hover:border-[#2dd4bf] hover:text-[#2dd4bf]") +
@@ -516,7 +516,7 @@ export function WatchPage() {
                     <li key={c.slug}>
                       <a
                         href={`/kategori/${c.slug}`}
-                        className="inline-flex h-9 items-center rounded-full bg-secondary px-4 text-sm font-medium text-foreground hover:bg-primary hover:text-primary-foreground"
+                        className="inline-flex h-10 items-center rounded-full bg-secondary px-4 text-sm font-medium text-foreground hover:bg-primary hover:text-primary-foreground"
                       >
                         {c.label}
                       </a>

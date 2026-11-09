@@ -134,7 +134,7 @@ function CategoriesPage() {
               <a
                 key={l.slug}
                 href={`/cari/${l.slug}`}
-                className="inline-flex h-8 items-center rounded-full border border-white/10 px-3 text-sm text-zinc-300 hover:border-teal-400/60 hover:text-teal-200"
+                className="inline-flex h-10 items-center rounded-full border border-white/10 px-3 text-sm text-zinc-300 hover:border-teal-400/60 hover:text-teal-200"
               >
                 {l.h1}
               </a>

@@ -207,7 +207,7 @@ export function Header({
 
 function chipClass(active: boolean) {
   return cn(
-    "pixel inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-none border px-3 text-[11px] transition-colors duration-150 sm:text-xs",
+    "pixel inline-flex h-10 shrink-0 items-center whitespace-nowrap rounded-none border px-3 text-[11px] transition-colors duration-150 sm:text-xs",
     active ? "border-[#c8c8c8] bg-[#c8c8c8] text-black" : "border-white/35 text-white/75 hover:border-white/80 hover:text-white",
   );
 }
