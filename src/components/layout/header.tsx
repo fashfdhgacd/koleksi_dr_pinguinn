@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { LayoutGrid, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,32 @@ export function Header({
   const [draft, setDraft] = useState(query ?? "");
   const debounced = useDebounce(draft, 400);
   const quickActive = Boolean(category && QUICK_CATS.some((c) => c.slug === category));
+  // Quick-nav row collapses on scroll-down and returns on scroll-up (or near the
+  // top), so the sticky header stops eating ~17-30% of a phone viewport. The row
+  // stays mounted — clipped, not unmounted — so chip state and scroll position
+  // inside the overflow row survive.
+  const [navHidden, setNavHidden] = useState(false);
+  const lastY = useRef(0);
+  useEffect(() => {
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const y = window.scrollY;
+        const prev = lastY.current;
+        lastY.current = y;
+        if (y < 80) setNavHidden(false);
+        else if (y > prev + 4) setNavHidden(true);
+        else if (y < prev - 4) setNavHidden(false);
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
 
   useEffect(() => {
     setDraft(query ?? "");
@@ -122,7 +148,15 @@ export function Header({
         </Button>
       </div>
 
-      <nav className="mx-auto max-w-[1600px] px-3 sm:px-6" aria-label="Navigasi cepat">
+      <nav
+        className={cn(
+          "mx-auto max-w-[1600px] overflow-hidden px-3 transition-[max-height,opacity] duration-200 ease-out sm:px-6",
+          navHidden ? "max-h-0 opacity-0" : "max-h-20 opacity-100",
+        )}
+        aria-label="Navigasi cepat"
+        // Clipped chips must leave the tab order and AT tree while hidden.
+        inert={navHidden}
+      >
         <ul className="-mx-3 flex gap-1.5 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
           <li className="shrink-0">
             <Link
