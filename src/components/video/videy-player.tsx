@@ -55,21 +55,43 @@ function fullscreenEl(): Element | null {
   return d.fullscreenElement || d.webkitFullscreenElement || null;
 }
 
+function fsRequest(el: HTMLElement): void {
+  const r = el.requestFullscreen || (el as HTMLElement & { webkitRequestFullscreen?: () => void }).webkitRequestFullscreen;
+  void r?.call(el);
+}
+
+function fsExit(): void {
+  const d = document as Document & { webkitExitFullscreen?: () => void };
+  const f = document.exitFullscreen || d.webkitExitFullscreen;
+  void f?.call(document);
+}
+
 type Phase = "idle" | "ad" | "main";
 
 /** Our own Skip button appears after this many seconds (or the VAST skipoffset if shorter). */
 const SKIP_AFTER_S = 5;
-/** Film position saved to sessionStorage at most this often, so a reloaded tab resumes there. */
+/** Film position saved to localStorage at most this often, so a reloaded tab — or a visit days
+ * later — resumes there. localStorage (not sessionStorage) so the position survives tab/browser
+ * restarts; still per-browser, never sent anywhere. */
 const RESUME_SAVE_MS = 5000;
 const resumeKey = (id: string) => `kdp:videy-t:${id}`;
 
 function readResume(id: string): number {
   try {
-    const t = Number(sessionStorage.getItem(resumeKey(id)));
+    const t = Number(localStorage.getItem(resumeKey(id)));
     return Number.isFinite(t) && t > 3 ? t : 0;
   } catch {
     return 0;
   }
+}
+
+function fmtResume(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  const mm = h ? String(m).padStart(2, "0") : String(m);
+  return `${h ? `${h}:` : ""}${mm}:${String(r).padStart(2, "0")}`;
 }
 
 /** The ad media must start playing within this long, else the film plays. */
@@ -87,6 +109,7 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
   const adRef = useRef<{ ad: VastAd; fired: Set<string>; token: number } | null>(null);
   const tokenRef = useRef(0);
   const [skipIn, setSkipIn] = useState<number | null>(null);
+  const [resumeNote, setResumeNote] = useState<string | null>(null);
 
   const settle = useCallback(
     (event: "slow2" | "fail2") => {
@@ -105,6 +128,7 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     adRef.current = null;
     setSkipIn(null);
     setPhase("idle");
+    setResumeNote(null);
     track.current = { startedAt: 0, alive: false, settled: false };
     const v = videoRef.current;
     if (v) {
@@ -221,13 +245,16 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     v.muted = false;
     v.src = file;
     v.controls = true;
-    // Tab reloaded (e.g. Android discarded it while the ad tab was open): resume where it was.
+    // Tab reloaded or revisited later: resume where it was, and say so once.
     const resume = readResume(item.id);
     if (resume) {
       v.addEventListener(
         "loadedmetadata",
         () => {
-          if (v.getAttribute("src") === file && resume < (v.duration || Infinity) - 3) v.currentTime = resume;
+          if (v.getAttribute("src") !== file || resume >= (v.duration || Infinity) - 3) return;
+          v.currentTime = resume;
+          setResumeNote(`Melanjutkan dari ${fmtResume(resume)}`);
+          window.setTimeout(() => setResumeNote(null), 2600);
         },
         { once: true },
       );
@@ -235,7 +262,7 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     void v.play().catch(() => undefined);
   }, [file, item.id]);
 
-  // Film playing: remember the position (sessionStorage, at most every 5 s; client only).
+  // Film playing: remember the position (localStorage, at most every 5 s; client only).
   useEffect(() => {
     if (phase !== "main") return;
     const v = videoRef.current;
@@ -247,7 +274,7 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
       if (now - last < RESUME_SAVE_MS) return;
       last = now;
       try {
-        sessionStorage.setItem(resumeKey(item.id), String(Math.floor(v.currentTime)));
+        localStorage.setItem(resumeKey(item.id), String(Math.floor(v.currentTime)));
       } catch {
         /* ignore */
       }
@@ -265,6 +292,48 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
       window.removeEventListener("pagehide", flush);
     };
   }, [phase, file, item.id]);
+
+  // Keyboard shortcuts while the film plays (desktop): Space/K play-pause, ←/→ seek ±5 s,
+  // ↑/↓ volume, M mute, F fullscreen. Ignored during the ad, while typing, and when the
+  // event target is the <video> itself (native controls already handle those keys there).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (phase !== "main") return;
+      const t = e.target as HTMLElement | null;
+      if (!t || t === videoRef.current) return;
+      if (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable) return;
+      const v = videoRef.current;
+      if (!v) return;
+      const k = e.key;
+      if (k === " " || k === "k" || k === "K") {
+        e.preventDefault();
+        void (v.paused ? v.play().catch(() => {}) : v.pause());
+      } else if (k === "ArrowLeft") {
+        e.preventDefault();
+        v.currentTime = Math.max(0, v.currentTime - 5);
+      } else if (k === "ArrowRight") {
+        e.preventDefault();
+        v.currentTime = Math.min(v.duration || Infinity, v.currentTime + 5);
+      } else if (k === "ArrowUp") {
+        e.preventDefault();
+        v.volume = Math.min(1, v.volume + 0.05);
+        v.muted = false;
+      } else if (k === "ArrowDown") {
+        e.preventDefault();
+        v.volume = Math.max(0, v.volume - 0.05);
+      } else if (k === "m" || k === "M") {
+        e.preventDefault();
+        v.muted = !v.muted;
+      } else if (k === "f" || k === "F") {
+        e.preventDefault();
+        const el = fullscreenEl();
+        if (el) fsExit();
+        else if (wrapRef.current) fsRequest(wrapRef.current);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase]);
 
   const endAd = useCallback(
     (how: "complete" | "skip" | "fail") => {
@@ -439,6 +508,11 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
             </svg>
           </span>
         </button>
+      ) : null}
+      {phase === "main" && resumeNote ? (
+        <div className="pointer-events-none absolute left-1/2 top-3 -translate-x-1/2 rounded-md bg-black/75 px-3 py-1.5 text-xs text-white">
+          {resumeNote}
+        </div>
       ) : null}
       {phase === "ad" ? (
         <>

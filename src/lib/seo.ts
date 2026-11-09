@@ -66,10 +66,10 @@ const MINOR_RE =
 /** Hapus suffix branding situs dari judul tampil (data asli tidak diubah). */
 export function cleanDisplayTitle(raw?: string | null): string {
   let t = String(raw || "").replace(/_+/g, " ").trim().replace(/\s+/g, " ");
-  t = t.replace(/\s*[\(\[]\s*(koleksi\s+)?dr\.?\s*pinguin[^\)\]]*[\)\]]\s*$/gi, "");
+  t = t.replace(/\s*[([]\s*(koleksi\s+)?dr\.?\s*pinguin[^)\]]*[)\]]\s*$/gi, "");
   for (let i = 0; i < 3; i++) {
     t = t.replace(/[\s\-–—|:·,]*\b(koleksi\s+)?dr\.?\s*pinguin\.?\s*$/gi, "");
-    t = t.replace(/\s*[\-|–—,]\s*M\.?S\.?B\.?\s*$/gi, "");
+    t = t.replace(/\s*[-|–—,]\s*M\.?S\.?B\.?\s*$/gi, "");
   }
   t = t.replace(/[\s\-–—|:·,]+$/g, "").trim();
   // "TerakotaEpisode 2" -> "Terakota Episode 2" (display only, the stored title is unchanged).
@@ -461,6 +461,8 @@ export function videoJsonLd(input: {
   embedUrl?: string | null;
   contentUrl?: string | null;
   durationSec?: number | null;
+  /** Total pageviews for this video — emitted as interactionStatistic (WatchAction count). */
+  views?: number | null;
   /** Tanggal unggah asli (createdAt/date katalog). Bukti originalitas: tanggal kita lebih awal dari situs penyalin. */
   uploadDate?: string | number | null;
 }) {
@@ -500,6 +502,15 @@ export function videoJsonLd(input: {
       "@type": "WatchAction",
       target: pageUrl,
     },
+    ...(typeof input.views === "number" && input.views > 0
+      ? {
+          interactionStatistic: {
+            "@type": "InteractionCounter",
+            interactionType: "https://schema.org/WatchAction",
+            userInteractionCount: Math.floor(input.views),
+          },
+        }
+      : {}),
     ...(embed ? { embedUrl: normalizeEmbedUrl(embed) } : {}),
     ...(content ? { contentUrl: content } : {}),
     ...(input.durationSec && input.durationSec > 0

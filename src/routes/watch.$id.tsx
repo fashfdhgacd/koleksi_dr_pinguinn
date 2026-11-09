@@ -115,6 +115,16 @@ export const Route = createFileRoute("/watch/$id")({
       : null;
     const contentUrl =
       embedUrl && /\.(mp4|webm|mov)($|\?)/i.test(embedUrl) ? embedUrl : null;
+    // Direct mp4 (Videy) only: lets WhatsApp/Telegram/iMessage render a playable video
+    // preview instead of a static thumbnail. Iframe embeds can't be og:video.
+    const videoMetas =
+      contentUrl ?
+        [
+          { property: "og:video", content: contentUrl },
+          { property: "og:video:secure_url", content: contentUrl },
+          { property: "og:video:type", content: "video/mp4" },
+        ]
+      : [];
     const jsonLd = item
       ? videoJsonLd({
           id: item.id,
@@ -125,6 +135,7 @@ export const Route = createFileRoute("/watch/$id")({
           embedUrl: contentUrl ? null : embedUrl,
           contentUrl,
           durationSec: item.duration,
+          views: item.views,
           uploadDate: item.uploadDate,
         })
       : null;
@@ -157,6 +168,7 @@ export const Route = createFileRoute("/watch/$id")({
         { name: "twitter:image:alt", content: OG_SITE_NAME },
         { name: "robots", content: item && !item.noindex ? "index,follow,max-video-preview:120" : "noindex,follow" },
         { name: "rating", content: "adult" },
+        ...videoMetas,
       ],
       links: [{ rel: "canonical", href: url }],
       scripts: jsonLd
