@@ -37,19 +37,39 @@ export function Header({
   // stays mounted — clipped, not unmounted — so chip state and scroll position
   // inside the overflow row survive.
   const [navHidden, setNavHidden] = useState(false);
+  const navHiddenRef = useRef(false);
   const lastY = useRef(0);
+  const acc = useRef(0);
   useEffect(() => {
     let raf = 0;
+    const apply = (hide: boolean) => {
+      navHiddenRef.current = hide;
+      setNavHidden(hide);
+    };
     const onScroll = () => {
       if (raf) return;
       raf = requestAnimationFrame(() => {
         raf = 0;
         const y = window.scrollY;
-        const prev = lastY.current;
+        const d = y - lastY.current;
         lastY.current = y;
-        if (y < 80) setNavHidden(false);
-        else if (y > prev + 4) setNavHidden(true);
-        else if (y < prev - 4) setNavHidden(false);
+        if (y < 80) {
+          acc.current = 0;
+          if (navHiddenRef.current) apply(false);
+          return;
+        }
+        // Trackpad/mouse-wheel jitter emits many tiny direction-changing deltas;
+        // require sustained travel before toggling so the nav can't flap.
+        if (Math.abs(d) < 2) return;
+        if ((d > 0) !== (acc.current > 0)) acc.current = 0;
+        acc.current += d;
+        if (!navHiddenRef.current && acc.current > 48) {
+          acc.current = 0;
+          apply(true);
+        } else if (navHiddenRef.current && acc.current < -20) {
+          acc.current = 0;
+          apply(false);
+        }
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
