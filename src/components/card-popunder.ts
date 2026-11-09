@@ -1,10 +1,12 @@
 // TrafficStars direct-link popunder (spot 5210859), shared by every trigger: catalog card / hero click,
 // the one-shot tap layer over iframe players (tap-popunder.tsx) and the Videy player (ts-videy-popunder.tsx).
 // In-video taps keep the per-video cap below (sessionStorage, resets when another video is opened).
-// Catalog / hero clicks are the page popunder: those also stop after PAGE_POP_MAX_PER_DAY successful
-// opens per Asia/Jakarta calendar day (localStorage + cookie, shared by every page). Player popunders
-// (tap layer, Videy) are per-video only and are NOT counted in the daily cap. Videy preroll
-// is a different spot and is not counted here. A blocked window.open counts nothing.
+// NON-Videy popunders — catalog / hero clicks AND iframe-player tap layers — are the page popunder:
+// together they stop after PAGE_POP_MAX_PER_DAY successful opens per Asia/Jakarta calendar day
+// (localStorage + cookie, shared by every page and every video), enforced via the `daily` flag.
+// The Videy popunder is the exception: Videy has no in-player ads, so it stays per-video only
+// (POP_MAX_VIDEY per video) and is NOT counted in the daily cap. Videy preroll is a different
+// spot and is not counted either. A blocked window.open counts nothing.
 // Counters: popc_fire / popc_ok / popc_block in player-log (once per video+event per session).
 // Every opened tab is also logged by its position for that video (pop_n1 / pop_n2 / pop_n3, one D1
 // upsert per opened tab, same beacon as today), so /pemilik can compare ALL our opens with
@@ -52,9 +54,14 @@ function writeState(v: PopState): void {
   }
 }
 
-/** True when a popunder for this video is allowed right now (per-video count + global gap). */
-export function canPop(videoId: string, max: number = POP_MAX_PER_VIDEO): boolean {
+/**
+ * True when a popunder for this video is allowed right now. `daily` triggers (every non-Videy
+ * popunder: catalog clicks + iframe-player tap layers) also require a slot left in the shared
+ * PAGE_POP_MAX_PER_DAY Jakarta-day counter; Videy passes daily=false and stays per-video only.
+ */
+export function canPop(videoId: string, max: number = POP_MAX_PER_VIDEO, daily = false): boolean {
   if (typeof window === "undefined" || !videoId) return false;
+  if (daily && !pagePopAllowed(readPagePop(), Date.now())) return false;
   const st = readState();
   if (st.id !== videoId) return true; // another video: fresh count, no gap
   return st.n < max && Date.now() - st.at >= POP_MIN_GAP_MS;
@@ -75,8 +82,9 @@ export function firePop(
   videoId: string,
   max: number = POP_MAX_PER_VIDEO,
   host?: PlayerLogHost,
+  daily = false,
 ): "ok" | "block" | "skip" {
-  if (!canPop(videoId, max)) return "skip";
+  if (!canPop(videoId, max, daily)) return "skip";
   let w: Window | null = null;
   try {
     w = window.open(DIRECT_LINK, "_blank");
@@ -88,6 +96,8 @@ export function firePop(
   const st = readState();
   const n = (st.id === videoId ? st.n : 0) + 1;
   writeState({ id: videoId, n, at: Date.now() });
+  // Daily-capped triggers consume one slot of the shared Jakarta-day counter.
+  if (daily) writePagePop(nextPagePop(readPagePop(), Date.now()));
   if (host && n >= 1 && n <= 3) sendPlayerLog(videoId, host, `pop_n${n}` as "pop_n1" | "pop_n2" | "pop_n3");
   return "ok";
 }
@@ -143,9 +153,8 @@ function writePagePop(state: PagePopDay): void {
 }
 
 /**
- * Catalog / hero card click (capture). This is the page popunder: at most
- * PAGE_POP_MAX_PER_DAY successful opens per Jakarta calendar day, on every page.
- * In-video taps and Videy preroll do not call this and are not counted here.
+ * Catalog / hero card click (capture). A daily-capped page popunder: shares the
+ * PAGE_POP_MAX_PER_DAY Jakarta-day counter with the iframe-player tap layers.
  * Never prevents navigation. A blocked window.open is not counted.
  */
 export function onCatalogCardClick(event: { target: EventTarget | null }, hostOf: (id: string) => string): void {
@@ -156,13 +165,9 @@ export function onCatalogCardClick(event: { target: EventTarget | null }, hostOf
   if (!a) return;
   const id = decodeURIComponent((a.getAttribute("href") || "").slice("/watch/".length).split(/[?#/]/)[0] || "");
   if (!id) return;
-  const now = Date.now();
-  const today = readPagePop();
-  if (!pagePopAllowed(today, now)) return;
-  if (!canPop(id)) return;
+  if (!canPop(id, POP_MAX_PER_VIDEO, true)) return;
   const host = popHost(hostOf(id));
   sendPlayerLog(id, host, "popc_fire");
-  const opened = firePop(id, POP_MAX_PER_VIDEO, host) === "ok";
-  if (opened) writePagePop(nextPagePop(today, now));
+  const opened = firePop(id, POP_MAX_PER_VIDEO, host, true) === "ok";
   sendPlayerLog(id, host, opened ? "popc_ok" : "popc_block");
 }
