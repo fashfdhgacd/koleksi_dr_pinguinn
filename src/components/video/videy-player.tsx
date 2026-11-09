@@ -473,11 +473,12 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
   return (
     <div
       ref={wrapRef}
+      onContextMenu={(e) => e.preventDefault()}
       className="relative aspect-video max-h-[min(70vh,720px)] w-full overflow-hidden bg-black sm:mx-auto sm:rounded-xl [&:fullscreen]:max-h-none [&:fullscreen]:rounded-none"
     >
       <video
         ref={videoRef}
-        className="size-full bg-black object-contain"
+        className="size-full bg-black object-contain [-webkit-touch-callout:none]"
         playsInline
         preload="none"
         poster={poster}
