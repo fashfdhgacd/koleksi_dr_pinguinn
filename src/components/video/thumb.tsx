@@ -82,7 +82,15 @@ export function VideoThumb({
   const [current, setCurrent] = useState(first);
   const [step, setStep] = useState(0);
   const imgRef = useRef<HTMLImageElement | null>(null);
-  const warm = isPosterWarm(current);
+  // Poster-warm state lives in localStorage, so it differs between the SSR pass
+  // (always cold -> lazy) and the hydration pass (warm -> eager): React reports a
+  // hydration mismatch and keeps the server attribute anyway. Resolve it after
+  // mount so both passes agree; the post-mount update still lands before lazy
+  // images near the viewport start fetching.
+  const [warm, setWarm] = useState(false);
+  useEffect(() => {
+    setWarm(isPosterWarm(current));
+  }, [current]);
 
   useEffect(() => {
     setCurrent(first);

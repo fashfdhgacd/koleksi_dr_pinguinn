@@ -6,6 +6,7 @@ import { SwCleanup } from "@/components/sw-cleanup";
 import { DEFAULT_OG, HOME_DESCRIPTION, HOME_TITLE, OG_SITE_NAME } from "@/lib/seo";
 import appCss from "../styles.css?url";
 import figtreeFont from "../assets/fonts/figtree-latin.woff2?url";
+import silkscreenFont from "../assets/fonts/silkscreen-latin-400.woff2?url";
 
 const CANONICAL_HOST = "koleksidrpinguin.com";
 
@@ -77,6 +78,8 @@ export const Route = createRootRoute({
       { rel: "dns-prefetch", href: "https://tv1.userbokep.com" },
       // Body font, self-hosted (styles.css @font-face): fetched with the CSS instead of after it.
       { rel: "preload", href: figtreeFont, as: "font", type: "font/woff2", crossOrigin: "anonymous" },
+      // Pixel font backs the header wordmark, quick-nav chips and the pager — visible on first paint.
+      { rel: "preload", href: silkscreenFont, as: "font", type: "font/woff2", crossOrigin: "anonymous" },
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/site.webmanifest" },
       { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png?v=3" },

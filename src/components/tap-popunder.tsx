@@ -58,7 +58,12 @@ export function PopTapLayer({
   return (
     <button
       type="button"
-      aria-label="Putar video"
+      // Pointer-only monetization layer: its tap opens an ad tab, not playback.
+      // An invisible focusable control would be an a11y violation and a misleading
+      // name ("Putar video"), so it stays out of the tab order and AT tree —
+      // mouse/touch popunders are unaffected.
+      aria-hidden="true"
+      tabIndex={-1}
       className="absolute inset-0 z-10 cursor-pointer bg-transparent"
       onClick={() => {
         if (!canPop(videoId, max)) {

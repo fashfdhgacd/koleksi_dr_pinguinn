@@ -128,7 +128,7 @@ export function CariExperience({
         <div className="mt-6 space-y-3">
           <a
             href={`/kategori/${def.category}`}
-            className="inline-flex h-9 items-center rounded-full border border-teal-400/50 px-4 text-sm text-teal-300 hover:border-teal-300 hover:text-teal-200"
+            className="inline-flex h-10 items-center rounded-full border border-teal-400/50 px-4 text-sm text-teal-300 hover:border-teal-300 hover:text-teal-200"
           >
             Lihat semua video {cat?.label || def.category} (terbaru) →
           </a>
@@ -139,7 +139,7 @@ export function CariExperience({
                 <a
                   key={l.slug}
                   href={`/cari/${l.slug}`}
-                  className="inline-flex h-8 items-center rounded-full border border-white/10 px-3 text-sm text-zinc-300 hover:border-white/40 hover:text-white"
+                  className="inline-flex h-10 items-center rounded-full border border-white/10 px-3 text-sm text-zinc-300 hover:border-white/40 hover:text-white"
                 >
                   {l.h1}
                 </a>
