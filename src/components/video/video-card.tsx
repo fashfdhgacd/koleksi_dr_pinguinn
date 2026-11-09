@@ -60,7 +60,7 @@ export function VideoCard({
         </div>
       </div>
       <div className="px-1 pb-1 pt-2.5 sm:px-1.5 sm:pt-3">
-        <h3 className="line-clamp-2 min-h-[2.5em] text-[13px] font-medium leading-snug text-foreground sm:text-[15px]">
+        <h3 className="line-clamp-2 min-h-[2.75em] text-[13px] font-medium leading-snug text-foreground sm:text-[15px]">
           {cleanDisplayTitle(video.title)}
         </h3>
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] tabular-nums text-muted sm:text-xs">

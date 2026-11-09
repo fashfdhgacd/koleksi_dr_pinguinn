@@ -19,7 +19,7 @@
  * Vite picks the values up because `loadEnv` prefix-matches entries already in
  * `process.env`, which is why the merge has to happen before Vite starts.
  */
-import { spawn } from "node:child_process";
+import { spawn } from "cross-spawn";
 import { readFileSync, realpathSync } from "node:fs";
 import { constants as osConstants } from "node:os";
 import { dirname, join } from "node:path";
@@ -111,6 +111,8 @@ function main(argv) {
     process.exit(2);
   }
   const env = mergeAppEnv(readAppEnv(projectRoot()), process.env);
+  // cross-spawn resolves npm's .cmd shims and quotes args correctly on Windows;
+  // node:child_process spawn() cannot execute them (ENOENT) there.
   const child = spawn(command, args, { stdio: "inherit", env });
   // The dev server is long-running and is stopped by signalling this wrapper.
   for (const signal of ["SIGINT", "SIGTERM", "SIGHUP"]) {

@@ -65,9 +65,14 @@ function pgliteBootstrapPlugin(): Plugin {
   return {
     name: "app-builder:pglite-bootstrap",
     apply: "serve",
-    async configureServer() {
+    async configureServer(server) {
       if (!hasGlobbedMigrations(process.cwd())) return;
-      const { ensureDbReady } = await import("./src/lib/db");
+      // ssrLoadModule keeps db.ts inside Vite's transform pipeline — a plain
+      // import() here gets bundled into the config temp file where
+      // import.meta.glob is not a function and PGLite bootstrap crashes dev.
+      const { ensureDbReady } = (await server.ssrLoadModule("/src/lib/db.ts")) as {
+        ensureDbReady: () => Promise<void>;
+      };
       await ensureDbReady();
     },
   };
