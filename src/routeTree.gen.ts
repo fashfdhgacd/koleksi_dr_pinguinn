@@ -15,6 +15,7 @@ import { Route as CampurRouteImport } from './routes/campur'
 import { Route as DmcaRouteImport } from './routes/dmca'
 import { Route as KategoriRouteImport } from './routes/kategori'
 import { Route as KontakRouteImport } from './routes/kontak'
+import { Route as LaporanRouteImport } from './routes/laporan'
 import { Route as PemilikRouteImport } from './routes/pemilik'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as PrivasiRouteImport } from './routes/privasi'
@@ -43,6 +44,9 @@ import { Route as ApiOwnerVideyRouteImport } from './routes/api/owner-videy'
 import { Route as ApiPlayerLogRouteImport } from './routes/api/player-log'
 import { Route as ApiPushRouteImport } from './routes/api/push'
 import { Route as ApiPuterinThumbRouteImport } from './routes/api/puterin-thumb'
+import { Route as ApiReportsRouteImport } from './routes/api/reports'
+import { Route as ApiReportsAdminRouteImport } from './routes/api/reports-admin'
+import { Route as ApiReportsPublicRouteImport } from './routes/api/reports-public'
 import { Route as ApiTapeThumbRouteImport } from './routes/api/tape-thumb'
 import { Route as ApiTelegramRouteImport } from './routes/api/telegram'
 import { Route as CariIndexRouteImport } from './routes/cari.index'
@@ -88,6 +92,11 @@ const KategoriRoute = KategoriRouteImport.update({
 const KontakRoute = KontakRouteImport.update({
   id: '/kontak',
   path: '/kontak',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LaporanRoute = LaporanRouteImport.update({
+  id: '/laporan',
+  path: '/laporan',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PemilikRoute = PemilikRouteImport.update({
@@ -230,6 +239,21 @@ const ApiPuterinThumbRoute = ApiPuterinThumbRouteImport.update({
   path: '/api/puterin-thumb',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiReportsRoute = ApiReportsRouteImport.update({
+  id: '/api/reports',
+  path: '/api/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiReportsAdminRoute = ApiReportsAdminRouteImport.update({
+  id: '/api/reports-admin',
+  path: '/api/reports-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiReportsPublicRoute = ApiReportsPublicRouteImport.update({
+  id: '/api/reports-public',
+  path: '/api/reports-public',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiTapeThumbRoute = ApiTapeThumbRouteImport.update({
   id: '/api/tape-thumb',
   path: '/api/tape-thumb',
@@ -318,6 +342,7 @@ export interface FileRoutesByFullPath {
   '/dmca': typeof DmcaRoute
   '/kategori': typeof KategoriRouteWithChildren
   '/kontak': typeof KontakRoute
+  '/laporan': typeof LaporanRoute
   '/pemilik': typeof PemilikRoute
   '/privacy': typeof PrivacyRoute
   '/privasi': typeof PrivasiRoute
@@ -346,6 +371,9 @@ export interface FileRoutesByFullPath {
   '/api/player-log': typeof ApiPlayerLogRoute
   '/api/push': typeof ApiPushRoute
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
+  '/api/reports': typeof ApiReportsRoute
+  '/api/reports-admin': typeof ApiReportsAdminRoute
+  '/api/reports-public': typeof ApiReportsPublicRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
   '/cari/$slug': typeof CariSlugRouteWithChildren
@@ -369,6 +397,7 @@ export interface FileRoutesByTo {
   '/campur': typeof CampurRoute
   '/dmca': typeof DmcaRoute
   '/kontak': typeof KontakRoute
+  '/laporan': typeof LaporanRoute
   '/pemilik': typeof PemilikRoute
   '/privacy': typeof PrivacyRoute
   '/privasi': typeof PrivasiRoute
@@ -397,6 +426,9 @@ export interface FileRoutesByTo {
   '/api/player-log': typeof ApiPlayerLogRoute
   '/api/push': typeof ApiPushRoute
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
+  '/api/reports': typeof ApiReportsRoute
+  '/api/reports-admin': typeof ApiReportsAdminRoute
+  '/api/reports-public': typeof ApiReportsPublicRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
   '/cari/$slug': typeof CariSlugRouteWithChildren
@@ -422,6 +454,7 @@ export interface FileRoutesById {
   '/dmca': typeof DmcaRoute
   '/kategori': typeof KategoriRouteWithChildren
   '/kontak': typeof KontakRoute
+  '/laporan': typeof LaporanRoute
   '/pemilik': typeof PemilikRoute
   '/privacy': typeof PrivacyRoute
   '/privasi': typeof PrivasiRoute
@@ -450,6 +483,9 @@ export interface FileRoutesById {
   '/api/player-log': typeof ApiPlayerLogRoute
   '/api/push': typeof ApiPushRoute
   '/api/puterin-thumb': typeof ApiPuterinThumbRoute
+  '/api/reports': typeof ApiReportsRoute
+  '/api/reports-admin': typeof ApiReportsAdminRoute
+  '/api/reports-public': typeof ApiReportsPublicRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
   '/cari/$slug': typeof CariSlugRouteWithChildren
@@ -476,6 +512,7 @@ export interface FileRouteTypes {
     | '/dmca'
     | '/kategori'
     | '/kontak'
+    | '/laporan'
     | '/pemilik'
     | '/privacy'
     | '/privasi'
@@ -504,6 +541,9 @@ export interface FileRouteTypes {
     | '/api/player-log'
     | '/api/push'
     | '/api/puterin-thumb'
+    | '/api/reports'
+    | '/api/reports-admin'
+    | '/api/reports-public'
     | '/api/tape-thumb'
     | '/api/telegram'
     | '/cari/$slug'
@@ -527,6 +567,7 @@ export interface FileRouteTypes {
     | '/campur'
     | '/dmca'
     | '/kontak'
+    | '/laporan'
     | '/pemilik'
     | '/privacy'
     | '/privasi'
@@ -555,6 +596,9 @@ export interface FileRouteTypes {
     | '/api/player-log'
     | '/api/push'
     | '/api/puterin-thumb'
+    | '/api/reports'
+    | '/api/reports-admin'
+    | '/api/reports-public'
     | '/api/tape-thumb'
     | '/api/telegram'
     | '/cari/$slug'
@@ -579,6 +623,7 @@ export interface FileRouteTypes {
     | '/dmca'
     | '/kategori'
     | '/kontak'
+    | '/laporan'
     | '/pemilik'
     | '/privacy'
     | '/privasi'
@@ -607,6 +652,9 @@ export interface FileRouteTypes {
     | '/api/player-log'
     | '/api/push'
     | '/api/puterin-thumb'
+    | '/api/reports'
+    | '/api/reports-admin'
+    | '/api/reports-public'
     | '/api/tape-thumb'
     | '/api/telegram'
     | '/cari/$slug'
@@ -632,6 +680,7 @@ export interface RootRouteChildren {
   DmcaRoute: typeof DmcaRoute
   KategoriRoute: typeof KategoriRouteWithChildren
   KontakRoute: typeof KontakRoute
+  LaporanRoute: typeof LaporanRoute
   PemilikRoute: typeof PemilikRoute
   PrivacyRoute: typeof PrivacyRoute
   PrivasiRoute: typeof PrivasiRoute
@@ -660,6 +709,9 @@ export interface RootRouteChildren {
   ApiPlayerLogRoute: typeof ApiPlayerLogRoute
   ApiPushRoute: typeof ApiPushRoute
   ApiPuterinThumbRoute: typeof ApiPuterinThumbRoute
+  ApiReportsRoute: typeof ApiReportsRoute
+  ApiReportsAdminRoute: typeof ApiReportsAdminRoute
+  ApiReportsPublicRoute: typeof ApiReportsPublicRoute
   ApiTapeThumbRoute: typeof ApiTapeThumbRoute
   ApiTelegramRoute: typeof ApiTelegramRoute
   CariSlugRoute: typeof CariSlugRouteWithChildren
@@ -716,6 +768,13 @@ declare module '@tanstack/react-router' {
       path: '/kontak'
       fullPath: '/kontak'
       preLoaderRoute: typeof KontakRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/laporan': {
+      id: '/laporan'
+      path: '/laporan'
+      fullPath: '/laporan'
+      preLoaderRoute: typeof LaporanRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pemilik': {
@@ -914,6 +973,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPuterinThumbRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/reports': {
+      id: '/api/reports'
+      path: '/api/reports'
+      fullPath: '/api/reports'
+      preLoaderRoute: typeof ApiReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/reports-admin': {
+      id: '/api/reports-admin'
+      path: '/api/reports-admin'
+      fullPath: '/api/reports-admin'
+      preLoaderRoute: typeof ApiReportsAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/reports-public': {
+      id: '/api/reports-public'
+      path: '/api/reports-public'
+      fullPath: '/api/reports-public'
+      preLoaderRoute: typeof ApiReportsPublicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/tape-thumb': {
       id: '/api/tape-thumb'
       path: '/api/tape-thumb'
@@ -1074,6 +1154,7 @@ const rootRouteChildren: RootRouteChildren = {
   DmcaRoute: DmcaRoute,
   KategoriRoute: KategoriRouteWithChildren,
   KontakRoute: KontakRoute,
+  LaporanRoute: LaporanRoute,
   PemilikRoute: PemilikRoute,
   PrivacyRoute: PrivacyRoute,
   PrivasiRoute: PrivasiRoute,
@@ -1102,6 +1183,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPlayerLogRoute: ApiPlayerLogRoute,
   ApiPushRoute: ApiPushRoute,
   ApiPuterinThumbRoute: ApiPuterinThumbRoute,
+  ApiReportsRoute: ApiReportsRoute,
+  ApiReportsAdminRoute: ApiReportsAdminRoute,
+  ApiReportsPublicRoute: ApiReportsPublicRoute,
   ApiTapeThumbRoute: ApiTapeThumbRoute,
   ApiTelegramRoute: ApiTelegramRoute,
   CariSlugRoute: CariSlugRouteWithChildren,

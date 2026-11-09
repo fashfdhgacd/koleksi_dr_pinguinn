@@ -61,6 +61,9 @@ export function Shell({
                 <Link to="/kontak" className="hover:text-white hover:underline">
                   Kontak
                 </Link>
+                <Link to="/laporan" className="hover:text-white hover:underline">
+                  Laporan
+                </Link>
                 <Link to="/teman" className="hover:text-white hover:underline">
                   Teman
                 </Link>

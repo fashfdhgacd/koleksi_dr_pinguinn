@@ -20,6 +20,7 @@ import { categorySlugFor } from "@/lib/catalog/category-seo";
 import { CatalogBackLink } from "@/components/video/catalog-back-link";
 import { WatchStats } from "@/components/video/watch-stats";
 import { PushButton } from "@/components/video/push-button";
+import { ReportSheet } from "@/components/report-sheet";
 import { rememberWatched } from "@/components/video/recently-watched";
 import { DRP_CATEGORY, DRP_SOURCES, drpKindOfUrl } from "@/lib/catalog/drp-hosts.js";
 import deadSources from "@/lib/catalog/dead-sources.json";
@@ -309,9 +310,11 @@ export function WatchPage() {
   );
   const [reload, setReload] = useState(0);
   const [shareOpen, setShareOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const retry = useCallback(() => setReload((n) => n + 1), []);
   const closeShare = useCallback(() => setShareOpen(false), []);
+  const closeReport = useCallback(() => setReportOpen(false), []);
 
   useEffect(() => {
     setShareOpen(false);
@@ -563,6 +566,13 @@ export function WatchPage() {
                 Buka Sumber
               </button>}
               <CatalogBackLink item={item} />
+              <button
+                type="button"
+                className="h-12 min-w-[120px] rounded-xl border border-border px-5 text-base font-medium text-muted active:scale-[0.98]"
+                onClick={() => setReportOpen(true)}
+              >
+                Laporkan
+              </button>
             </div>
           </header>
             </>
@@ -585,6 +595,9 @@ export function WatchPage() {
           {item ? <Comments videoId={item.id} /> : null}
           {item ? (
             <ShareSheet open={shareOpen} title={item.title} id={item.id} onClose={closeShare} />
+          ) : null}
+          {item ? (
+            <ReportSheet open={reportOpen} videoId={item.id} title={item.title} onClose={closeReport} />
           ) : null}
         </article>
       )}

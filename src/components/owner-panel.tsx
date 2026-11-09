@@ -20,6 +20,7 @@ import { HiddenListSection } from "@/components/owner-hidden-list";
 import { DetectorReviewSection } from "@/components/owner-detector-review";
 import { FlagReviewSection } from "@/components/owner-flag-review";
 import { OwnerComments, OwnerCommentsPreview } from "@/components/owner-comments";
+import { OwnerReports } from "@/components/owner-reports";
 import { OwnerTelegramStatus } from "@/components/owner-telegram-status";
 import { OwnerTrafficStars } from "@/components/owner-trafficstars";
 import type { PlayerLogData } from "@/components/owner-health";
@@ -121,6 +122,21 @@ export function OwnerDashboard() {
     }
   }, []);
 
+  // Pending-report total for the same badge — one tiny count read alongside comments.
+  const loadReportsPending = useCallback(async (key: string) => {
+    if (!key) return;
+    try {
+      const r = await fetch("/api/reports-admin?status=pending&limit=1", {
+        headers: { "x-online-key": key },
+        cache: "no-store",
+      });
+      const j = (await r.json().catch(() => null)) as { ok?: boolean; pending?: number } | null;
+      if (j?.ok) setReportPending(Number(j.pending) || 0);
+    } catch {
+      /* keep last count */
+    }
+  }, []);
+
   /** One full load: stats, player health, and (via reloadKey) the catalog overview + thumbnail list. */
   const refreshAll = useCallback(
     (key: string, quiet = false, reloadChildren = true) => {
@@ -129,10 +145,11 @@ export function OwnerDashboard() {
       void fetchOnline(key, quiet);
       void loadPlayerLog(key);
       void loadCommentsPending(key);
+      void loadReportsPending(key);
       // The overview and thumbnail list load by themselves when they mount (panel open).
       if (reloadChildren) setReloadKey((n) => n + 1);
     },
-    [fetchOnline, loadPlayerLog, loadCommentsPending],
+    [fetchOnline, loadPlayerLog, loadCommentsPending, loadReportsPending],
   );
 
   // Approve/hide/delete in the comments collapse bumps the badge + Ringkasan teaser.
@@ -141,6 +158,13 @@ export function OwnerDashboard() {
     window.addEventListener("drp-comments-changed", onChange);
     return () => window.removeEventListener("drp-comments-changed", onChange);
   }, [secret, loadCommentsPending]);
+
+  // Report review actions bump the same badge.
+  useEffect(() => {
+    const onChange = () => void loadReportsPending(secret);
+    window.addEventListener("drp-reports-changed", onChange);
+    return () => window.removeEventListener("drp-reports-changed", onChange);
+  }, [secret, loadReportsPending]);
 
   useEffect(() => {
     const s = loadSecret();
@@ -245,6 +269,7 @@ export function OwnerDashboard() {
   const [reviewCount, setReviewCount] = useState<number | null>(null);
   const [flagCount, setFlagCount] = useState(0);
   const [commentPending, setCommentPending] = useState(0);
+  const [reportPending, setReportPending] = useState(0);
   const onReviewCount = useCallback((n: number) => setReviewCount(n), []);
   const onFlagCount = useCallback((n: number) => setFlagCount(n), []);
 
@@ -275,13 +300,14 @@ export function OwnerDashboard() {
   const pendingBits = [
     reviewCount || flagCount ? `${fmt((reviewCount || 0) + flagCount)} judul` : null,
     commentPending ? `${fmt(commentPending)} komentar` : null,
+    reportPending ? `${fmt(reportPending)} laporan` : null,
   ]
     .filter(Boolean)
     .join(" + ");
 
   const tabs: { id: Tab; label: string; icon: string; badge?: number | null }[] = [
     { id: "ringkasan", label: "Ringkasan", icon: "◧" },
-    { id: "cek", label: "Perlu dicek", icon: "⚑", badge: (reviewCount || 0) + flagCount + commentPending || null },
+    { id: "cek", label: "Perlu dicek", icon: "⚑", badge: (reviewCount || 0) + flagCount + commentPending + reportPending || null },
     { id: "video", label: "Video", icon: "▶" },
     { id: "pengaturan", label: "Pengaturan", icon: "⚙" },
   ];
@@ -444,6 +470,9 @@ export function OwnerDashboard() {
               </Collapse>
               <Collapse id="comments" title="Komentar masuk">
                 <OwnerComments secret={secret} />
+              </Collapse>
+              <Collapse id="reports" title="Laporan konten">
+                <OwnerReports secret={secret} />
               </Collapse>
             </div>
           </section>
