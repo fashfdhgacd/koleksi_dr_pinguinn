@@ -18,6 +18,7 @@ import { OwnerVideyUntitled } from "@/components/owner-videy-untitled";
 import { OwnerAuthedBottom } from "@/components/owner-authed-bottom";
 import { HiddenListSection } from "@/components/owner-hidden-list";
 import { DetectorReviewSection } from "@/components/owner-detector-review";
+import { EmbedReviewSection } from "@/components/owner-embed-review";
 import { FlagReviewSection } from "@/components/owner-flag-review";
 import { OwnerComments, OwnerCommentsPreview } from "@/components/owner-comments";
 import { OwnerReports } from "@/components/owner-reports";
@@ -270,8 +271,10 @@ export function OwnerDashboard() {
   const [flagCount, setFlagCount] = useState(0);
   const [commentPending, setCommentPending] = useState(0);
   const [reportPending, setReportPending] = useState(0);
+  const [embedPending, setEmbedPending] = useState(0);
   const onReviewCount = useCallback((n: number) => setReviewCount(n), []);
   const onFlagCount = useCallback((n: number) => setFlagCount(n), []);
+  const onEmbedCount = useCallback((n: number) => setEmbedPending(n), []);
 
   function goTab(t: Tab) {
     setTab(t);
@@ -301,13 +304,14 @@ export function OwnerDashboard() {
     reviewCount || flagCount ? `${fmt((reviewCount || 0) + flagCount)} judul` : null,
     commentPending ? `${fmt(commentPending)} komentar` : null,
     reportPending ? `${fmt(reportPending)} laporan` : null,
+    embedPending ? `${fmt(embedPending)} domain embed` : null,
   ]
     .filter(Boolean)
     .join(" + ");
 
   const tabs: { id: Tab; label: string; icon: string; badge?: number | null }[] = [
     { id: "ringkasan", label: "Ringkasan", icon: "◧" },
-    { id: "cek", label: "Perlu dicek", icon: "⚑", badge: (reviewCount || 0) + flagCount + commentPending + reportPending || null },
+    { id: "cek", label: "Perlu dicek", icon: "⚑", badge: (reviewCount || 0) + flagCount + commentPending + reportPending + embedPending || null },
     { id: "video", label: "Video", icon: "▶" },
     { id: "pengaturan", label: "Pengaturan", icon: "⚙" },
   ];
@@ -465,6 +469,9 @@ export function OwnerDashboard() {
           <section className={`${show("cek")} flex-col gap-4`}>
             <FlagReviewSection key={reloadKey} secret={secret} onCount={onFlagCount} />
             <div className={glass}>
+              <Collapse id="embed-review" title="Domain embed baru">
+                <EmbedReviewSection key={reloadKey} secret={secret} onCount={onEmbedCount} />
+              </Collapse>
               <Collapse id="detector" title="Perlu dicek (detector)">
                 <DetectorReviewSection key={reloadKey} secret={secret} onCount={onReviewCount} />
               </Collapse>

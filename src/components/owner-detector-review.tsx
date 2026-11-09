@@ -31,6 +31,7 @@ type Row = {
   };
   decidedAt: number | null;
   live: boolean | null;
+  kind?: "embed";
 };
 
 async function post<T>(
@@ -438,10 +439,12 @@ export function DetectorReviewSection({
     !r.locked &&
     !(r.classification && r.classification.contextKeywords.length) &&
     (r.verification?.status || "unverified") === "unverified";
-  const pending = (rows || []).filter((r) => r.group === "pending" && matches(r));
-  const approved = (rows || []).filter((r) => r.group === "approved");
-  const held = (rows || []).filter((r) => r.group === "held" && matches(r));
-  const pendingTotal = (rows || []).filter((r) => r.group === "pending").length;
+  // kind "embed" rows live in their own "Domain embed baru" section, not here.
+  const isEmbed = (r: Row) => r.kind === "embed";
+  const pending = (rows || []).filter((r) => r.group === "pending" && !isEmbed(r) && matches(r));
+  const approved = (rows || []).filter((r) => r.group === "approved" && !isEmbed(r));
+  const held = (rows || []).filter((r) => r.group === "held" && !isEmbed(r) && matches(r));
+  const pendingTotal = (rows || []).filter((r) => r.group === "pending" && !isEmbed(r)).length;
   useEffect(() => {
     if (rows) onCount?.(pendingTotal);
   }, [rows, pendingTotal, onCount]);

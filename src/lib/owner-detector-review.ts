@@ -142,6 +142,8 @@ export type DetectorReviewRow = {
   };
   /** Approved rows: true while the video is public. */
   live: boolean | null;
+  /** "embed" = generic embed held for first-seen-domain approval (own panel section). */
+  kind?: "embed";
 };
 
 /** Glosarium kata Mandarin yang sering muncul di judul (terjemahan kata kunci, bukan mesin). */
@@ -269,6 +271,7 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
     let flagged = false;
     let strict = false;
     let source = "";
+    let embedRow = false;
     if (it.hidden === true && it.hidden_reason === HOLD_REASON) {
       source = "judul upload perlu diganti (title-hold)";
       // Upload held because the title needs renaming (title-hold.js).
@@ -309,6 +312,7 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
         // Generic embed (parse.js host "embed") from a domain not yet approved:
         // held until the owner decides once; "show" whitelists the whole domain.
         flagged = true;
+        embedRow = true;
         source = "domain embed baru — setujui untuk bypass permanen";
         trigger = embedDomainOf(http(it.embed) || http(it.direct) || "") || "domain baru";
       }
@@ -379,6 +383,7 @@ export async function listDetectorReview(): Promise<DetectorReviewRow[]> {
             ? Number(ownerHide.ids[id]?.at) || null
             : null),
       live,
+      ...(embedRow ? { kind: "embed" as const } : {}),
     });
   }
   // Newest decision first in the decided lists; pending keeps catalog order.
