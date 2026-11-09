@@ -3,6 +3,7 @@ import { Link, getRouteApi } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
 import { VideoGrid, VideoGridSkeleton } from "@/components/video/video-grid";
+import { Comments } from "@/components/video/comments";
 import { VideoPlayer } from "@/components/video/player";
 import { PosterIdContext } from "@/components/video/thumb";
 import { VideyPlayer } from "@/components/video/videy-player";
@@ -581,6 +582,7 @@ export function WatchPage() {
           ) : item ? null : (
             <VideoGridSkeleton count={6} />
           )}
+          {item ? <Comments videoId={item.id} /> : null}
           {item ? (
             <ShareSheet open={shareOpen} title={item.title} id={item.id} onClose={closeShare} />
           ) : null}

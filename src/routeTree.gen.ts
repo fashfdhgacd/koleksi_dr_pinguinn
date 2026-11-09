@@ -24,6 +24,8 @@ import { Route as TemanRouteImport } from './routes/teman'
 import { Route as TentangRouteImport } from './routes/tentang'
 import { Route as TermsRouteImport } from './routes/terms'
 import { Route as ApiAdLogRouteImport } from './routes/api/ad-log'
+import { Route as ApiCommentsRouteImport } from './routes/api/comments'
+import { Route as ApiCommentsAdminRouteImport } from './routes/api/comments-admin'
 import { Route as ApiDataRouteImport } from './routes/api/data'
 import { Route as ApiEmbedThumbRouteImport } from './routes/api/embed-thumb'
 import { Route as ApiFrameRouteImport } from './routes/api/frame'
@@ -131,6 +133,16 @@ const TermsRoute = TermsRouteImport.update({
 const ApiAdLogRoute = ApiAdLogRouteImport.update({
   id: '/api/ad-log',
   path: '/api/ad-log',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCommentsRoute = ApiCommentsRouteImport.update({
+  id: '/api/comments',
+  path: '/api/comments',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiCommentsAdminRoute = ApiCommentsAdminRouteImport.update({
+  id: '/api/comments-admin',
+  path: '/api/comments-admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiDataRoute = ApiDataRouteImport.update({
@@ -315,6 +327,8 @@ export interface FileRoutesByFullPath {
   '/tentang': typeof TentangRoute
   '/terms': typeof TermsRoute
   '/api/ad-log': typeof ApiAdLogRoute
+  '/api/comments': typeof ApiCommentsRoute
+  '/api/comments-admin': typeof ApiCommentsAdminRoute
   '/api/data': typeof ApiDataRoute
   '/api/embed-thumb': typeof ApiEmbedThumbRoute
   '/api/frame': typeof ApiFrameRoute
@@ -364,6 +378,8 @@ export interface FileRoutesByTo {
   '/tentang': typeof TentangRoute
   '/terms': typeof TermsRoute
   '/api/ad-log': typeof ApiAdLogRoute
+  '/api/comments': typeof ApiCommentsRoute
+  '/api/comments-admin': typeof ApiCommentsAdminRoute
   '/api/data': typeof ApiDataRoute
   '/api/embed-thumb': typeof ApiEmbedThumbRoute
   '/api/frame': typeof ApiFrameRoute
@@ -415,6 +431,8 @@ export interface FileRoutesById {
   '/tentang': typeof TentangRoute
   '/terms': typeof TermsRoute
   '/api/ad-log': typeof ApiAdLogRoute
+  '/api/comments': typeof ApiCommentsRoute
+  '/api/comments-admin': typeof ApiCommentsAdminRoute
   '/api/data': typeof ApiDataRoute
   '/api/embed-thumb': typeof ApiEmbedThumbRoute
   '/api/frame': typeof ApiFrameRoute
@@ -467,6 +485,8 @@ export interface FileRouteTypes {
     | '/tentang'
     | '/terms'
     | '/api/ad-log'
+    | '/api/comments'
+    | '/api/comments-admin'
     | '/api/data'
     | '/api/embed-thumb'
     | '/api/frame'
@@ -516,6 +536,8 @@ export interface FileRouteTypes {
     | '/tentang'
     | '/terms'
     | '/api/ad-log'
+    | '/api/comments'
+    | '/api/comments-admin'
     | '/api/data'
     | '/api/embed-thumb'
     | '/api/frame'
@@ -566,6 +588,8 @@ export interface FileRouteTypes {
     | '/tentang'
     | '/terms'
     | '/api/ad-log'
+    | '/api/comments'
+    | '/api/comments-admin'
     | '/api/data'
     | '/api/embed-thumb'
     | '/api/frame'
@@ -617,6 +641,8 @@ export interface RootRouteChildren {
   TentangRoute: typeof TentangRoute
   TermsRoute: typeof TermsRoute
   ApiAdLogRoute: typeof ApiAdLogRoute
+  ApiCommentsRoute: typeof ApiCommentsRoute
+  ApiCommentsAdminRoute: typeof ApiCommentsAdminRoute
   ApiDataRoute: typeof ApiDataRoute
   ApiEmbedThumbRoute: typeof ApiEmbedThumbRoute
   ApiFrameRoute: typeof ApiFrameRoute
@@ -753,6 +779,20 @@ declare module '@tanstack/react-router' {
       path: '/api/ad-log'
       fullPath: '/api/ad-log'
       preLoaderRoute: typeof ApiAdLogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/comments': {
+      id: '/api/comments'
+      path: '/api/comments'
+      fullPath: '/api/comments'
+      preLoaderRoute: typeof ApiCommentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/comments-admin': {
+      id: '/api/comments-admin'
+      path: '/api/comments-admin'
+      fullPath: '/api/comments-admin'
+      preLoaderRoute: typeof ApiCommentsAdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/data': {
@@ -1043,6 +1083,8 @@ const rootRouteChildren: RootRouteChildren = {
   TentangRoute: TentangRoute,
   TermsRoute: TermsRoute,
   ApiAdLogRoute: ApiAdLogRoute,
+  ApiCommentsRoute: ApiCommentsRoute,
+  ApiCommentsAdminRoute: ApiCommentsAdminRoute,
   ApiDataRoute: ApiDataRoute,
   ApiEmbedThumbRoute: ApiEmbedThumbRoute,
   ApiFrameRoute: ApiFrameRoute,
