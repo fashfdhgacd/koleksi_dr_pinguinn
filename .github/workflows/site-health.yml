@@ -1,12 +1,14 @@
-# Cek kesehatan situs tiap hari 08:00 WIB (gratis, GitHub Actions; tanpa cron Cloudflare).
+# Cek kesehatan situs + dead-man cron tiap 6 jam (gratis, GitHub Actions; tanpa cron Cloudflare).
 # scripts/site-health.mjs: beranda, /kategori, sitemap (jumlah watch URL >= batas), 10 /watch acak,
-# beberapa /thumb, domain redirect videqsss.icu & videyy.icu harus 301. ~20 GET per hari.
-# Kalau ada masalah job gagal -> GitHub kirim email ke pemilik. Tanpa secret/env baru, tanpa commit.
+# beberapa /thumb, domain redirect videqsss.icu & videyy.icu harus 301, dan /api/cron-status harus
+# menunjukkan cron <=3 jam (kalau tidak, pipeline upload/flush kemungkinan mati -> email peringatan).
+# ~21 GET per run. Kalau ada masalah job gagal -> GitHub kirim email ke pemilik.
+# Tanpa secret/env baru, tanpa KV write, tanpa commit.
 name: Site health
 
 on:
   schedule:
-    - cron: "0 1 * * *"
+    - cron: "17 */6 * * *"
   workflow_dispatch:
     inputs:
       min_watch_urls:

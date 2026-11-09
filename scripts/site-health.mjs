@@ -77,6 +77,23 @@ for (const d of REDIRECTS) {
   record(`https://${d}/ -> ${r.location || "-"}`, r, ok, r.error || (ok ? "" : `harus 301 ke koleksidrpinguin.com, dapat ${r.status}`));
 }
 
+// Dead-man check: /api/cron-status publik dan cuma berisi timestamp/status. Cron Worker jalan tiap
+// jam; kalau `last.at` lebih tua dari 3 jam, pipeline cron/flush/upload kemungkinan mati -> FAIL,
+// job gagal, GitHub email ke pemilik. Satu GET tambahan per run, tanpa secret atau KV write baru.
+const cs = await get(`${BASE}/api/cron-status`, { body: true });
+let cronOk = false;
+let cronWhy = "";
+try {
+  const j = JSON.parse(cs.text);
+  const last = JSON.parse(String(j.last || "{}"));
+  const ageMs = last.at ? Date.now() - Date.parse(last.at) : Infinity;
+  cronOk = cs.status === 200 && Number.isFinite(ageMs) && ageMs < 3 * 3600_000;
+  cronWhy = cronOk ? "" : `cron terakhir ${last.at || "tidak ada"}`;
+} catch {
+  cronWhy = cs.error || `HTTP ${cs.status || "?"}`;
+}
+record("/api/cron-status (cron <=3 jam)", cs, cronOk, cronWhy);
+
 console.log(lines.join("\n"));
 if (process.env.GITHUB_STEP_SUMMARY) {
   const { appendFile } = await import("node:fs/promises");
