@@ -28,6 +28,8 @@ export function popTap(videoId: string): boolean {
     sendPlayerLog(videoId, "Videy", "pop_ok");
     return true;
   }
+  // "skip" = a cap was hit (daily or per-video) — let the tap play, not a blocker.
+  if (r === "skip") return false;
   sendPlayerLog(videoId, "Videy", "pop_block");
   const n = (failures.get(videoId) || 0) + 1;
   failures.set(videoId, n);

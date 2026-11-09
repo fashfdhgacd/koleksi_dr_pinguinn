@@ -2,7 +2,8 @@
 // the one-shot tap layer over iframe players (tap-popunder.tsx) and the Videy player (ts-videy-popunder.tsx).
 // In-video taps keep the per-video cap below (sessionStorage, resets when another video is opened).
 // Catalog / hero clicks are the page popunder: those also stop after PAGE_POP_MAX_PER_DAY successful
-// opens per Asia/Jakarta calendar day (localStorage + cookie, shared by every page). Videy preroll
+// opens per Asia/Jakarta calendar day (localStorage + cookie, shared by every page). Player popunders
+// (tap layer, Videy) are per-video only and are NOT counted in the daily cap. Videy preroll
 // is a different spot and is not counted here. A blocked window.open counts nothing.
 // Counters: popc_fire / popc_ok / popc_block in player-log (once per video+event per session).
 // Every opened tab is also logged by its position for that video (pop_n1 / pop_n2 / pop_n3, one D1
@@ -18,8 +19,8 @@ const HOSTS = new Set(["IndoAV", "UserBokep", "Streamtape", "Putarin", "Videy", 
 export const POP_MAX_PER_VIDEO = 3;
 /** Minimum time between two popunders on the SAME video (a newly opened video may pop at once). */
 export const POP_MIN_GAP_MS = 20_000;
-/** Videy has its own pre-roll as well, so its popunder stops at 2 per video. */
-export const POP_MAX_VIDEY = 2;
+/** Videy popunder cap per video (player-attached, not part of the daily page cap). */
+export const POP_MAX_VIDEY = 3;
 /** Per-video cap for a host label. */
 export function popMaxFor(host: string): number {
   return host === "Videy" ? POP_MAX_VIDEY : POP_MAX_PER_VIDEO;
