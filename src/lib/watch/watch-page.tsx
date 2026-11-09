@@ -415,7 +415,7 @@ export function WatchPage() {
       ) : status === "empty" || (!item && !softLoading) ? (
         <EmptyState title="Video tidak ditemukan" description="Judul ini tidak ada di katalog atau sudah dihapus." />
       ) : (
-        <article className="space-y-8">
+        <article className="space-y-8" onContextMenu={(e) => e.preventDefault()}>
           {item ? (() => {
             const server = pickServer(item, wantedServer);
             const playItem = itemForServer(item, server);
