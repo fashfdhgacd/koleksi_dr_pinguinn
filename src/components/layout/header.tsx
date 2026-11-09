@@ -150,7 +150,10 @@ export function Header({
 
       <nav
         className={cn(
-          "mx-auto max-w-[1600px] overflow-hidden px-3 transition-[max-height,opacity] duration-200 ease-out sm:px-6",
+          // overflow-anchor:none — without it the browser's scroll anchoring
+          // compensates the ~52px collapse by shifting scrollY, which re-triggers
+          // this same scroll handler and makes the nav oscillate forever.
+          "mx-auto max-w-[1600px] overflow-hidden px-3 [overflow-anchor:none] transition-[max-height,opacity] duration-200 ease-out sm:px-6",
           navHidden ? "max-h-0 opacity-0" : "max-h-20 opacity-100",
         )}
         aria-label="Navigasi cepat"
