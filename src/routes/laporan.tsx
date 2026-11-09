@@ -103,9 +103,7 @@ function TransparencyList() {
               <span className="text-muted">
                 {it.date} · {REASON_LABEL[it.reason] || it.reason}
               </span>
-              <span className={it.outcome === "actioned" ? "font-medium text-emerald-500" : "font-medium text-muted"}>
-                {it.outcome === "actioned" ? "Ditindaklanjuti" : "Ditolak"}
-              </span>
+              <span className="font-medium text-emerald-500">Ditindaklanjuti</span>
             </li>
           ))}
         </ul>

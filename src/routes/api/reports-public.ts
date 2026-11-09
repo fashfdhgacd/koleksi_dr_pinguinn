@@ -54,7 +54,7 @@ export const Route = createFileRoute("/api/reports-public")({
           const rows = await db
             .prepare(
               `select reason, status, reviewed_at from content_reports
-               where status in ('actioned','rejected') and reviewed_at is not null
+               where status = 'actioned' and reviewed_at is not null
                order by reviewed_at desc limit 100`,
             )
             .all<{ reason: string; status: string; reviewed_at: number }>();
