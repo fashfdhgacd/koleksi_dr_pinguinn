@@ -46,7 +46,7 @@ export function OwnerComments({ secret }: { secret: string }) {
         headers: { "x-online-key": secret },
         cache: "no-store",
       });
-      const j = (await r.json()) as { ok?: boolean; comments?: AdminComment[]; error?: string };
+      const j = (await r.json()) as { ok?: boolean; comments?: AdminComment[]; pending?: number; error?: string };
       if (j.ok) setItems(j.comments || []);
       else setError(j.error === "unauthorized" ? "Kunci owner salah" : "Gagal memuat komentar");
     } catch {
@@ -70,8 +70,11 @@ export function OwnerComments({ secret }: { secret: string }) {
         body: JSON.stringify({ action, id }),
       });
       const j = (await r.json()) as { ok?: boolean };
-      if (j.ok) await load();
-      else setError("Aksi gagal");
+      if (j.ok) {
+        await load();
+        // Let the Ringkasan preview and the "Perlu dicek" badge refresh without polling.
+        window.dispatchEvent(new Event("drp-comments-changed"));
+      } else setError("Aksi gagal");
     } catch {
       setError("Aksi gagal");
     } finally {
@@ -161,6 +164,61 @@ export function OwnerComments({ secret }: { secret: string }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+/**
+ * Ringkasan teaser: the 3 newest pending comments with a jump into the moderation
+ * collapse. Hidden entirely when nothing waits, so an empty queue costs no space.
+ * Refreshes on mount and whenever a moderation action fires drp-comments-changed.
+ */
+export function OwnerCommentsPreview({ secret, onOpen }: { secret: string; onOpen: () => void }) {
+  const [items, setItems] = useState<AdminComment[] | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const r = await fetch("/api/comments-admin?status=pending&limit=3", {
+        headers: { "x-online-key": secret },
+        cache: "no-store",
+      });
+      const j = (await r.json()) as { ok?: boolean; comments?: AdminComment[] };
+      setItems(j.ok ? j.comments || [] : []);
+    } catch {
+      setItems([]);
+    }
+  }, [secret]);
+
+  useEffect(() => {
+    void load();
+    window.addEventListener("drp-comments-changed", load);
+    return () => window.removeEventListener("drp-comments-changed", load);
+  }, [load]);
+
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="rounded-xl border border-[#2dd4bf]/25 bg-[#2dd4bf]/[0.06] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-[#5eead4]">
+          {items.length >= 3 ? "3+" : items.length} komentar menunggu
+        </p>
+        <button
+          type="button"
+          onClick={onOpen}
+          className="text-xs font-medium text-[#5eead4] hover:underline"
+        >
+          Buka moderasi ›
+        </button>
+      </div>
+      <ul className="mt-2 space-y-1.5">
+        {items.map((c) => (
+          <li key={c.id} className="truncate text-[13px] text-zinc-300">
+            <span className="font-medium text-zinc-100">{c.author}</span>
+            <span className="text-zinc-500"> · {fmtDate(c.created_at)} · </span>
+            {c.body}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

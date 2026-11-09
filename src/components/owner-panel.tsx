@@ -19,7 +19,7 @@ import { OwnerAuthedBottom } from "@/components/owner-authed-bottom";
 import { HiddenListSection } from "@/components/owner-hidden-list";
 import { DetectorReviewSection } from "@/components/owner-detector-review";
 import { FlagReviewSection } from "@/components/owner-flag-review";
-import { OwnerComments } from "@/components/owner-comments";
+import { OwnerComments, OwnerCommentsPreview } from "@/components/owner-comments";
 import { OwnerTelegramStatus } from "@/components/owner-telegram-status";
 import { OwnerTrafficStars } from "@/components/owner-trafficstars";
 import type { PlayerLogData } from "@/components/owner-health";
@@ -105,6 +105,22 @@ export function OwnerDashboard() {
     }
   }, []);
 
+  // Pending-comment total for the "Perlu dicek" badge — one tiny count read on panel
+  // open / Refresh, refreshed again whenever a moderation action fires the change event.
+  const loadCommentsPending = useCallback(async (key: string) => {
+    if (!key) return;
+    try {
+      const r = await fetch("/api/comments-admin?status=pending&limit=1", {
+        headers: { "x-online-key": key },
+        cache: "no-store",
+      });
+      const j = (await r.json().catch(() => null)) as { ok?: boolean; pending?: number } | null;
+      if (j?.ok) setCommentPending(Number(j.pending) || 0);
+    } catch {
+      /* keep last count */
+    }
+  }, []);
+
   /** One full load: stats, player health, and (via reloadKey) the catalog overview + thumbnail list. */
   const refreshAll = useCallback(
     (key: string, quiet = false, reloadChildren = true) => {
@@ -112,11 +128,19 @@ export function OwnerDashboard() {
       lastLoadRef.current = Date.now();
       void fetchOnline(key, quiet);
       void loadPlayerLog(key);
+      void loadCommentsPending(key);
       // The overview and thumbnail list load by themselves when they mount (panel open).
       if (reloadChildren) setReloadKey((n) => n + 1);
     },
-    [fetchOnline, loadPlayerLog],
+    [fetchOnline, loadPlayerLog, loadCommentsPending],
   );
+
+  // Approve/hide/delete in the comments collapse bumps the badge + Ringkasan teaser.
+  useEffect(() => {
+    const onChange = () => void loadCommentsPending(secret);
+    window.addEventListener("drp-comments-changed", onChange);
+    return () => window.removeEventListener("drp-comments-changed", onChange);
+  }, [secret, loadCommentsPending]);
 
   useEffect(() => {
     const s = loadSecret();
@@ -153,6 +177,7 @@ export function OwnerDashboard() {
     setAuthed(false);
     setStats(null);
     setPlayerLog(null);
+    setCommentPending(0);
     setDraft("");
     setError(null);
     openedFor.current = "";
@@ -219,6 +244,7 @@ export function OwnerDashboard() {
   const [seen, setSeen] = useState<Record<Tab, boolean>>({ ringkasan: true, cek: true, video: false, pengaturan: false });
   const [reviewCount, setReviewCount] = useState<number | null>(null);
   const [flagCount, setFlagCount] = useState(0);
+  const [commentPending, setCommentPending] = useState(0);
   const onReviewCount = useCallback((n: number) => setReviewCount(n), []);
   const onFlagCount = useCallback((n: number) => setFlagCount(n), []);
 
@@ -246,10 +272,16 @@ export function OwnerDashboard() {
     { label: "Pengunjung unik hari ini", value: stats?.uniqueToday || 0, sub: `kemarin ${fmt(stats?.yesterdayUnique)}`, series: days.slice().sort((a, b) => (a.day < b.day ? -1 : 1)).map((d) => Number(d.unique) || 0) },
     { label: "Kunjungan 7 hari", value: stats?.views7d || 0, sub: "kunjungan halaman", series: spark.slice(-7) },
   ];
+  const pendingBits = [
+    reviewCount || flagCount ? `${fmt((reviewCount || 0) + flagCount)} judul` : null,
+    commentPending ? `${fmt(commentPending)} komentar` : null,
+  ]
+    .filter(Boolean)
+    .join(" + ");
 
   const tabs: { id: Tab; label: string; icon: string; badge?: number | null }[] = [
     { id: "ringkasan", label: "Ringkasan", icon: "◧" },
-    { id: "cek", label: "Perlu dicek", icon: "⚑", badge: (reviewCount || 0) + flagCount || null },
+    { id: "cek", label: "Perlu dicek", icon: "⚑", badge: (reviewCount || 0) + flagCount + commentPending || null },
     { id: "video", label: "Video", icon: "▶" },
     { id: "pengaturan", label: "Pengaturan", icon: "⚙" },
   ];
@@ -352,18 +384,28 @@ export function OwnerDashboard() {
                 </div>
               ))}
             </div>
-            {reviewCount || flagCount ? (
+            {pendingBits ? (
               <button
                 type="button"
                 onClick={() => goTab("cek")}
                 className={`flex min-h-11 items-center justify-between gap-3 rounded-xl border border-[#2dd4bf]/30 bg-[#2dd4bf]/10 px-4 py-3 text-left ${focusRing}`}
               >
                 <span className="text-sm text-zinc-100">
-                  <span className="font-semibold text-[#5eead4]">{fmt((reviewCount || 0) + flagCount)} judul</span> menunggu review
+                  <span className="font-semibold text-[#5eead4]">{pendingBits}</span> menunggu
                 </span>
                 <span className="text-[#5eead4]" aria-hidden="true">›</span>
               </button>
             ) : null}
+            <OwnerCommentsPreview
+              secret={secret}
+              onOpen={() => {
+                goTab("cek");
+                window.setTimeout(
+                  () => window.dispatchEvent(new CustomEvent("drp-owner-open", { detail: "comments" })),
+                  80,
+                );
+              }}
+            />
             <OwnerOverview
               secret={secret}
               online={online}

@@ -74,7 +74,15 @@ export const Route = createFileRoute("/api/comments-admin")({
             status: string;
             created_at: number;
           }>();
-          return Response.json({ ok: true, comments: rows.results || [] }, { headers: { "cache-control": "no-store" } });
+          // Total pending count for the /pemilik badge — the list itself is capped by limit.
+          const pendingRow = await db
+            .prepare("select count(*) as n from comments where status = 'pending'")
+            .first<{ n: number }>()
+            .catch(() => null);
+          return Response.json(
+            { ok: true, comments: rows.results || [], pending: Number(pendingRow?.n) || 0 },
+            { headers: { "cache-control": "no-store" } },
+          );
         } catch (err) {
           console.error("comments-admin get failed:", err instanceof Error ? err.message.slice(0, 200) : "d1 error");
           return Response.json({ ok: false, error: "storage" }, { status: 503 });
