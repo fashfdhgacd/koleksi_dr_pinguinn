@@ -412,17 +412,23 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     }
   }
 
+  // Upload-queue mode is read before the dead-file check: in mode "1" Videy records go to the KV
+  // queue and the hourly flush re-checks each file right before it goes live, so the upfront check
+  // is redundant — and on a 100+ link batch it was what pushed the request past its budget.
+  const queueModeNow = await queueMode();
   // Videy only: a video whose file is gone on cdn.videy.co (404 on every retry) is stored hidden,
   // never deleted. Network errors or any other status count as alive. Other sources are never checked.
   const deadVidey = new Set();
-  await mapPool(
-    queue.map((v, i) => [v, i]).filter(([v]) => v.host === "videy"),
-    // 8 at a time: a 100+ link batch must finish well inside the Worker's waitUntil budget.
-    8,
-    async ([v, i]) => {
-      if (await isDeadVideyFile(v.id, v.direct)) deadVidey.add(i);
-    },
-  );
+  if (queueModeNow !== "1") {
+    await mapPool(
+      queue.map((v, i) => [v, i]).filter(([v]) => v.host === "videy"),
+      // 8 at a time: a 100+ link batch must finish well inside the Worker's waitUntil budget.
+      8,
+      async ([v, i]) => {
+        if (await isDeadVideyFile(v.id, v.direct)) deadVidey.add(i);
+      },
+    );
+  }
 
   const byFile = new Map();
   for (let i = 0; i < queue.length; i++) {
@@ -578,16 +584,15 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   //  "0":   direct commit only (old path).
   let queuedTotal = 0;
   try {
-    const mode = await queueMode();
+    const mode = queueModeNow;
     if (mode === "1" || mode === "dry") {
       const kv = await import("@/lib/owner-analytics-shared");
       for (const [fileName, items] of byFile) {
-        const keep = [];
-        for (const it of items) {
+        // KV writes run 10 at a time: a few hundred queued links must not serialize into minutes.
+        const settled = await mapPool(items, 10, async (it) => {
           // Held drafts take the direct path so the owner gets the hold reply right away.
           if (String(it.record?.category || "") !== "videy" || it.record?.hidden_reason === HOLD_REASON) {
-            keep.push(it);
-            continue;
+            return { it, queued: false };
           }
           const prefix = mode === "1" ? "bot:q:" : "bot:qdry:";
           const key = `${prefix}${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -599,23 +604,27 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
           } catch {
             ok = false;
           }
-          if (mode === "1" && ok) {
-            queuedTotal += 1;
-            lines.push(
-              it.record.hidden_reason === DEAD_VIDEY_REASON
-                ? `🕒 ${it.record.id} — ${it.title} · disembunyikan: video mati`
-                : `🕒 ${it.record.id} — ${it.title} (antre, tayang saat flush berikutnya)`,
-            );
-            if (it.record.review_reason) {
-              lines.push(`🔎 Belum tayang (REVIEW_PENDING), cek di /pemilik → Perlu dicek: ${it.record.review_reason}.`);
-            }
-            if (it.warn && !it.record.hidden) {
-              lines.push(
-                `⚠️ Masuk, tapi judulnya nyebut "${it.warn}". Cek dulu ya, kalau kesannya di bawah umur, nggak sadar, atau dipaksa, mending disembunyiin.`,
-              );
-            }
-          } else {
+          return { it, queued: mode === "1" && ok };
+        });
+        const keep = [];
+        for (const { it, queued } of settled) {
+          if (!queued) {
             keep.push(it);
+            continue;
+          }
+          queuedTotal += 1;
+          lines.push(
+            it.record.hidden_reason === DEAD_VIDEY_REASON
+              ? `🕒 ${it.record.id} — ${it.title} · disembunyikan: video mati`
+              : `🕒 ${it.record.id} — ${it.title} (antre, tayang saat flush berikutnya)`,
+          );
+          if (it.record.review_reason) {
+            lines.push(`🔎 Belum tayang (REVIEW_PENDING), cek di /pemilik → Perlu dicek: ${it.record.review_reason}.`);
+          }
+          if (it.warn && !it.record.hidden) {
+            lines.push(
+              `⚠️ Masuk, tapi judulnya nyebut "${it.warn}". Cek dulu ya, kalau kesannya di bawah umur, nggak sadar, atau dipaksa, mending disembunyiin.`,
+            );
           }
         }
         if (keep.length) byFile.set(fileName, keep);

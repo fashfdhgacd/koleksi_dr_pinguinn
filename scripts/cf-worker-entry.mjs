@@ -560,16 +560,27 @@ async function realFlush(env) {
     }
   }
   // Videy only: re-check each queued file right before it goes live; dead (404 on 3 tries) -> stored hidden.
+  // 8 at a time: a few hundred queued links must not serialize into minutes inside the cron budget.
+  const deadCheck = [];
   for (const entries of byFile.values()) {
     for (const x of entries) {
       if (String(x.record?.category || "") !== "videy" || x.record.hidden) continue;
-      try {
-        if (await isDeadVideyFile(x.record.id)) x.record = { ...x.record, hidden: true, hidden_reason: DEAD_VIDEY_REASON };
-      } catch {
-        /* treat as alive */
-      }
+      deadCheck.push(x);
     }
   }
+  let dcNext = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(8, deadCheck.length) || 1 }, async () => {
+      while (dcNext < deadCheck.length) {
+        const x = deadCheck[dcNext++];
+        try {
+          if (await isDeadVideyFile(x.record.id)) x.record = { ...x.record, hidden: true, hidden_reason: DEAD_VIDEY_REASON };
+        } catch {
+          /* treat as alive */
+        }
+      }
+    }),
+  );
   const files = {};
   const perChat = new Map();
   let committed = 0;
