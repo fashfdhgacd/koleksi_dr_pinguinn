@@ -10,6 +10,8 @@ export type SitemapWatchEntry = {
   title?: string;
   category?: string;
   embed?: string;
+  /** File video langsung (mis. cdn.videy.co/*.mp4) — untuk video:content_loc. */
+  direct?: string;
   thumbnail?: string;
   duration?: number;
   views?: number;
@@ -84,6 +86,8 @@ async function listBaseEntries(): Promise<SitemapWatchEntry[]> {
     if (category) entry.category = category;
     const embed = str(it.embed);
     if (/^https:\/\//i.test(embed)) entry.embed = embed;
+    const direct = str(it.direct);
+    if (/^https:\/\//i.test(direct)) entry.direct = direct;
     const thumb = str(it.poster) || str(it.thumbnail);
     if (thumb) entry.thumbnail = thumb;
     if (typeof it.duration === "number" && Number.isFinite(it.duration) && it.duration > 0) {
