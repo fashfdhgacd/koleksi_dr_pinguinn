@@ -211,7 +211,7 @@ export function OwnerPosterFill({ secret }: { secret: string }) {
     <section className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3 text-sm text-zinc-200">
       <button type="button" className="flex w-full items-center justify-between text-left font-semibold" onClick={() => setExpanded((v) => !v)}>
         <span>Isi poster + judul (semua platform)</span>
-        <span className="text-xs text-zinc-500">{expanded ? "Tutup" : "Buka"}</span>
+        <span className="text-xs text-zinc-500">{expanded ? "Ciutkan" : "Buka"}</span>
       </button>
       {expanded ? (
         <div className="mt-3 space-y-3">

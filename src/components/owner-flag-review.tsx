@@ -41,6 +41,7 @@ export function FlagReviewSection({ secret, onCount }: { secret: string; onCount
   const [note, setNote] = useState("Memuat…");
   const [busy, setBusy] = useState("");
   const [confirmId, setConfirmId] = useState("");
+  const [open, setOpen] = useState(false);
 
   const load = useCallback(
     async (offset: number) => {
@@ -94,64 +95,78 @@ export function FlagReviewSection({ secret, onCount }: { secret: string; onCount
     <section className="rounded-2xl border border-white/[0.06] bg-[#101214] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-5">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-[15px] font-semibold tracking-tight text-zinc-50">Antrian review</h2>
-        <span className="text-[12px] text-zinc-500">{total ? `${total} menunggu` : "minor / sekolah"}</span>
+        <span className="flex items-center gap-3">
+          <span className="text-[12px] text-zinc-500">{total ? `${total} menunggu` : "minor / sekolah"}</span>
+          <button
+            type="button"
+            className="text-[13px] font-medium text-[#5eead4]"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? "Ciutkan" : "Buka"}
+          </button>
+        </span>
       </div>
-      <p className="mt-2 text-[13px] leading-relaxed text-zinc-400">
-        Tanda minor atau sekolah tidak langsung dihapus. Biarkan tayang menampilkannya. Keluarkan dari katalog baru menghapusnya.
-      </p>
       {note ? <p className="mt-3 text-sm text-zinc-400">{note}</p> : null}
-      {rows.length ? (
-        <ul className="mt-3">
-          {rows.map((r) => (
-            <li key={r.id} className="border-t border-white/[0.06] py-3">
-              <div className="flex items-start gap-3">
-                <img src={`/thumb/${r.id}`} alt="" loading="lazy" decoding="async" className="h-14 w-24 shrink-0 rounded-lg bg-zinc-900 object-cover" />
-                <div className="min-w-0 flex-1">
-                  <p className="line-clamp-2 text-[15px] font-medium leading-snug text-zinc-50">{r.title || r.id}</p>
-                  <p className="mt-1 truncate font-mono text-[12px] text-zinc-500">{r.id}</p>
-                  <span className="mt-1.5 inline-flex rounded-full bg-[#2dd4bf]/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#5eead4] ring-1 ring-[#2dd4bf]/30">
-                    {REASON_LABEL[r.reason] || r.reason}
-                  </span>
-                </div>
-              </div>
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-                <button
-                  type="button"
-                  disabled={busy === r.id}
-                  className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-[#2dd4bf] bg-[#2dd4bf] px-3 text-[13px] font-semibold text-zinc-950 disabled:opacity-50"
-                  onClick={() => void approve(r)}
-                >
-                  Biarkan tayang
-                </button>
-                {confirmId === r.id ? (
-                  <button
-                    type="button"
-                    disabled={busy === r.id}
-                    className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-red-600 px-3 text-[13px] font-semibold text-white disabled:opacity-50"
-                    onClick={() => void reject(r)}
-                  >
-                    {busy === r.id ? "Mengeluarkan…" : "Ya, keluarkan"}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-red-400/40 px-3 text-[13px] font-semibold text-red-200"
-                    onClick={() => setConfirmId(r.id)}
-                  >
-                    Keluarkan dari katalog
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      ) : !note ? (
-        <p className="mt-3 text-sm text-zinc-400">Tidak ada yang menunggu.</p>
-      ) : null}
-      {rows.length < total ? (
-        <button type="button" className="mt-3 min-h-11 w-full rounded-lg border border-white/10 px-3 text-[13px] text-zinc-200" onClick={() => void load(rows.length)}>
-          Muat lagi ({rows.length} dari {total})
-        </button>
+      {open ? (
+        <>
+          <p className="mt-2 text-[13px] leading-relaxed text-zinc-400">
+            Tanda minor atau sekolah tidak langsung dihapus. Biarkan tayang menampilkannya. Keluarkan dari katalog baru menghapusnya.
+          </p>
+          {rows.length ? (
+            <ul className="mt-3">
+              {rows.map((r) => (
+                <li key={r.id} className="border-t border-white/[0.06] py-3">
+                  <div className="flex items-start gap-3">
+                    <img src={`/thumb/${r.id}`} alt="" loading="lazy" decoding="async" className="h-14 w-24 shrink-0 rounded-lg bg-zinc-900 object-cover" />
+                    <div className="min-w-0 flex-1">
+                      <p className="line-clamp-2 text-[15px] font-medium leading-snug text-zinc-50">{r.title || r.id}</p>
+                      <p className="mt-1 truncate font-mono text-[12px] text-zinc-500">{r.id}</p>
+                      <span className="mt-1.5 inline-flex rounded-full bg-[#2dd4bf]/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-[#5eead4] ring-1 ring-[#2dd4bf]/30">
+                        {REASON_LABEL[r.reason] || r.reason}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+                    <button
+                      type="button"
+                      disabled={busy === r.id}
+                      className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-[#2dd4bf] bg-[#2dd4bf] px-3 text-[13px] font-semibold text-zinc-950 disabled:opacity-50"
+                      onClick={() => void approve(r)}
+                    >
+                      Biarkan tayang
+                    </button>
+                    {confirmId === r.id ? (
+                      <button
+                        type="button"
+                        disabled={busy === r.id}
+                        className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg bg-red-600 px-3 text-[13px] font-semibold text-white disabled:opacity-50"
+                        onClick={() => void reject(r)}
+                      >
+                        {busy === r.id ? "Mengeluarkan…" : "Ya, keluarkan"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="inline-flex min-h-11 flex-1 items-center justify-center rounded-lg border border-red-400/40 px-3 text-[13px] font-semibold text-red-200"
+                        onClick={() => setConfirmId(r.id)}
+                      >
+                        Keluarkan dari katalog
+                      </button>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : !note ? (
+            <p className="mt-3 text-sm text-zinc-400">Tidak ada yang menunggu.</p>
+          ) : null}
+          {rows.length < total ? (
+            <button type="button" className="mt-3 min-h-11 w-full rounded-lg border border-white/10 px-3 text-[13px] text-zinc-200" onClick={() => void load(rows.length)}>
+              Muat lagi ({rows.length} dari {total})
+            </button>
+          ) : null}
+        </>
       ) : null}
     </section>
   );

@@ -292,7 +292,7 @@ export function MoneyCard() {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        {open ? "Tutup rincian" : "Rincian"}
+        {open ? "Ciutkan" : "Buka rincian"}
       </button>
       {open ? (
         <ul className="mt-1">

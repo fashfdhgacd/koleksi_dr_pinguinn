@@ -32,7 +32,7 @@ export function OwnerAuthedBottom(props: {
           className="flex w-full items-center justify-between gap-3 px-4 py-3.5 text-left text-sm font-medium text-zinc-100 hover:bg-white/[0.02]"
         >
           Statistik 14 hari · perangkat · halaman · sumber
-          <span className={`text-zinc-500 transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true">›</span>
+          <span className="shrink-0 text-[13px] font-medium text-[#5eead4]">{open ? "Ciutkan" : "Buka"}</span>
         </button>
         {open ? (
           <div className="flex flex-col gap-3 border-t border-white/[0.06] p-2 sm:p-3">
