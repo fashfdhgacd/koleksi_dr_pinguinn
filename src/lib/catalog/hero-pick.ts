@@ -91,15 +91,16 @@ export function isRealHeroThumb(url: string | null | undefined): boolean {
 
 async function cardsFor(ids: string[], needArt: boolean): Promise<VideoCard[]> {
   if (!ids.length) return [];
-  const [{ toCard }, { loadItems }] = await Promise.all([
+  const [{ toCard }, { loadItems }, { isGoneVideo }] = await Promise.all([
     import("./local-shared"),
     import("./local-cache"),
+    import("./dead-ids"),
   ]);
   const bag = await loadItems();
   const out: VideoCard[] = [];
   for (const id of ids) {
     const item = bag.byId.get(id);
-    if (!item) continue;
+    if (!item || isGoneVideo(id)) continue;
     try {
       const card = toCard(item, bag.posters, bag.videyNo);
       if (needArt && !isRealHeroThumb(card.thumbnail)) continue;

@@ -36,6 +36,7 @@ import { softenMinorTerms } from "./minor-title-guard";
 import { HIDDEN_IDS as HIDDEN_ID_REASONS, RESTORED_TITLES, minorContentReason } from "./hidden-ids.js";
 import blockFile from "./catalog-blocklist.json";
 import { blockedIdSet, isBlockedId, withoutBlocked } from "./catalog-block.js";
+import { isGoneVideo } from "./dead-ids";
 import { isLockedMinorId, lockedMinorReason, schoolReason } from "./minor-lock.js";
 import { releaseBlock, releasedIds } from "../owner-verification.js";
 import { reviewPendingReason } from "./review-pending.js";
@@ -885,14 +886,15 @@ export async function mergedPosterOf(id: string): Promise<string> {
 }
 
 export function pageOf(pool: RawItem[], page: number, limit: number, posters: Record<string, string>, videyNo: Map<string, number>): PagedVideos {
+  const visible = pool.filter((x) => !isGoneVideo(x.id));
   const p = Math.max(1, page);
   const start = (p - 1) * limit;
-  const slice = pool.slice(start, start + limit);
+  const slice = visible.slice(start, start + limit);
   return {
     page: p,
     limit,
-    total: pool.length,
-    hasMore: start + limit < pool.length,
+    total: visible.length,
+    hasMore: start + limit < visible.length,
     items: slice.map((x) => toCard(x, posters, videyNo)),
   };
 }

@@ -19,6 +19,7 @@ import { popularIds, tagOptions, titleTags } from "./title-tags";
 import { parseSearchQuery, scoreSearch, searchHayText } from "./search-rank";
 import { episodeLabel, parseSeries, seriesIndex } from "./series";
 import { catalogSlugs, isPublicHidden, isVideyNoThumbHidden, loadItems, multiServerOf, pageOf, sortByNewest } from "./local-cache";
+import { isGoneVideo } from "./dead-ids";
 import { serverHostOf } from "./multi-server";
 import { aiPlusFrontOrder } from "./ai-plus-order";
 import type { CatalogCache } from "./local-shared";
@@ -151,7 +152,7 @@ export async function listFeatured(page = 1, limit = 8, _signal?: AbortSignal): 
   const memoKey = `${seed}:${want}:${limit}`;
   let pool = perBuild.get(memoKey);
   if (!pool) {
-    pool = mixIndoHeavy(items, "", want, seed);
+    pool = mixIndoHeavy(items, "", want, seed).filter((x) => !isGoneVideo(x.id));
     const withArt = pool.filter((x) => Boolean(thumbOf(x, posters)));
     if (withArt.length >= limit) pool = withArt;
     if (perBuild.size > 16) perBuild.clear();

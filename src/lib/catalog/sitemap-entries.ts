@@ -3,6 +3,7 @@ import { slugOf, sourceLabel } from "./local-shared";
 import { significantLastmod } from "./lastmod.js";
 import { readOwnerEditState } from "./owner-edit-store";
 import { isSeoBlockedId } from "./seo-block";
+import { isGoneVideo } from "./dead-ids";
 
 export type SitemapWatchEntry = {
   id: string;
@@ -74,7 +75,7 @@ async function listBaseEntries(): Promise<SitemapWatchEntry[]> {
   const seen = new Set<string>();
   const out: SitemapWatchEntry[] = [];
   for (const it of items) {
-    if (!it?.id || seen.has(it.id) || isSeoBlockedId(it.id)) continue;
+    if (!it?.id || seen.has(it.id) || isSeoBlockedId(it.id) || isGoneVideo(it.id)) continue;
     seen.add(it.id);
     const lastmod = significantLastmod(it.createdAt ?? it.date, undefined) ?? toSitemapLastmod(it.createdAt ?? it.date);
     const entry: SitemapWatchEntry = { id: it.id };
