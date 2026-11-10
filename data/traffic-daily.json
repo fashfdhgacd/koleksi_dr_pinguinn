@@ -1,6 +1,6 @@
 {
   "description": "Pengunjung harian per sumber (AKTUAL dari D1 koleksi-analytics, hari WIB). sources = visitor_id unik per hari menurut referrer kunjungan pertama hari itu; 'internal' = referrer domain sendiri. Bukan request Cloudflare. Data mulai 2026-10-05 11:03 WIB (sebelumnya tidak tercatat). Diisi .github/workflows/traffic-monitor.yml.",
-  "updatedAt": "2026-11-08T21:58:58Z",
+  "updatedAt": "2026-11-10T01:29:19Z",
   "timezone": "Asia/Jakarta (WIB)",
   "days": {
     "2026-10-05": {
@@ -815,32 +815,66 @@
     },
     "2026-11-09": {
       "sources": {
-        "brave": 8,
-        "direct": 3,
-        "duckduckgo": 1,
-        "google": 53,
-        "internal": 164,
-        "justpaste": 203,
-        "other": 2,
-        "tube_ref": 1,
-        "x": 7,
-        "yandex": 2
+        "bluesky": 1,
+        "brave": 35,
+        "direct": 6,
+        "duckduckgo": 8,
+        "google": 201,
+        "internal": 567,
+        "justpaste": 625,
+        "other": 24,
+        "tube_ref": 10,
+        "x": 19,
+        "yandex": 5
       },
       "sources_id": {
-        "brave": 5,
+        "bluesky": 1,
+        "brave": 30,
         "direct": 1,
-        "duckduckgo": 1,
-        "google": 3,
-        "internal": 102,
-        "justpaste": 154,
-        "other": 1,
-        "x": 5
+        "duckduckgo": 7,
+        "google": 29,
+        "internal": 388,
+        "justpaste": 484,
+        "other": 6,
+        "tube_ref": 1,
+        "x": 15
       },
-      "unique_visitors": 430,
-      "pageviews": 6057,
-      "new": 288,
-      "returning": 156,
-      "landing_visitors": 444,
+      "unique_visitors": 1501,
+      "pageviews": 23129,
+      "new": 1021,
+      "returning": 480,
+      "landing_visitors": 1501
+    },
+    "2026-11-10": {
+      "sources": {
+        "bluesky": 1,
+        "brave": 4,
+        "direct": 2,
+        "duckduckgo": 2,
+        "google": 81,
+        "internal": 211,
+        "justpaste": 153,
+        "other": 3,
+        "tube_ref": 2,
+        "x": 6,
+        "yandex": 6
+      },
+      "sources_id": {
+        "bluesky": 1,
+        "brave": 4,
+        "direct": 1,
+        "duckduckgo": 2,
+        "google": 14,
+        "internal": 130,
+        "justpaste": 129,
+        "other": 1,
+        "x": 4
+      },
+      "unique_visitors": 466,
+      "pageviews": 7385,
+      "new": 287,
+      "returning": 184,
+      "landing_visitors": 471,
       "partial": true
     }
   }
