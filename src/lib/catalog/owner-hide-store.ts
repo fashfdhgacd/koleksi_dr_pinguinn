@@ -71,6 +71,20 @@ export async function setOwnerHidden(id: string, hide: boolean): Promise<OwnerHi
   return state;
 }
 
+/** Adds many ids in one read-modify-write (upload unchecked for the main site). */
+export async function hideOwnerMany(ids: string[]): Promise<OwnerHideState> {
+  const r = await resolveAnalyticsKV();
+  if (!r) throw new Error("kv_unavailable");
+  const state = await readOwnerHideState();
+  const now = Date.now();
+  const add = ids.filter((id) => ID_RE.test(id) && !state.ids[id]);
+  if (!add.length) return state;
+  for (const id of add) state.ids[id] = { at: now };
+  await r.kv.put(KEY, JSON.stringify(clean(state)));
+  for (const id of add) journal.set(id, { on: true, at: now });
+  return state;
+}
+
 /** Removes many ids in one read-modify-write (bulk Tayangkan). Returns the new state. */
 export async function unhideOwnerHiddenMany(ids: string[]): Promise<OwnerHideState> {
   const r = await resolveAnalyticsKV();

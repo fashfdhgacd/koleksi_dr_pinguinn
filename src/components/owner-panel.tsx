@@ -17,6 +17,8 @@ import { OwnerTools } from "@/components/owner-tools";
 import { OwnerVideyUntitled } from "@/components/owner-videy-untitled";
 import { OwnerVideySuggest } from "@/components/owner-videy-suggest";
 import { OwnerVideyPanel } from "@/components/owner-videy-panel";
+import { OwnerSatelit } from "@/components/owner-satelit";
+import { PANEL_SITES, type PanelSite } from "@/lib/satelit/config";
 import { OwnerAuthedBottom } from "@/components/owner-authed-bottom";
 import { HiddenListSection } from "@/components/owner-hidden-list";
 import { DetectorReviewSection } from "@/components/owner-detector-review";
@@ -267,6 +269,7 @@ export function OwnerDashboard() {
   const days = stats?.days || [];
   const lastText = wibHourMinute(tickAt);
 
+  const [site, setSite] = useState<PanelSite>("semua");
   const [tab, setTab] = useState<Tab>("ringkasan");
   const [seen, setSeen] = useState<Record<Tab, boolean>>({ ringkasan: true, cek: true, video: false, videyy: false, pengaturan: false });
   const [reviewCount, setReviewCount] = useState<number | null>(null);
@@ -277,6 +280,25 @@ export function OwnerDashboard() {
   const onReviewCount = useCallback((n: number) => setReviewCount(n), []);
   const onFlagCount = useCallback((n: number) => setFlagCount(n), []);
   const onEmbedCount = useCallback((n: number) => setEmbedPending(n), []);
+
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem("kdp-owner-site");
+      if (saved === "semua" || saved === "koleksidrpinguin.com" || saved === "videyy.icu" || saved === "videqsss.icu") setSite(saved);
+    } catch {
+      /* this tab keeps the default */
+    }
+  }, []);
+
+  function pickSite(next: PanelSite) {
+    setSite(next);
+    try {
+      sessionStorage.setItem("kdp-owner-site", next);
+    } catch {
+      /* switcher still works for this view */
+    }
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   function goTab(t: Tab) {
     setTab(t);
@@ -343,11 +365,13 @@ export function OwnerDashboard() {
   }
 
   const show = (t: Tab) => (tab === t ? "flex" : "hidden");
+  const satellite = site === "videyy.icu" || site === "videqsss.icu";
+  const pageTitle = satellite ? site : tabs.find((t) => t.id === tab)?.label;
 
   return (
     <div className="min-h-dvh text-zinc-100 antialiased" style={shellStyle}>
       {/* Desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-white/[0.06] bg-black/30 px-3 py-5 backdrop-blur-xl lg:flex">
+      <aside className={`${satellite ? "hidden" : "hidden lg:flex"} fixed inset-y-0 left-0 z-40 w-60 flex-col border-r border-white/[0.06] bg-black/30 px-3 py-5 backdrop-blur-xl`}>
         <div className="flex items-center gap-2.5 px-2">
           <span className="grid size-9 place-items-center rounded-xl bg-[#2dd4bf]/15 font-bold text-[#2dd4bf]">P</span>
           <div className="leading-tight">
@@ -383,12 +407,12 @@ export function OwnerDashboard() {
         </div>
       </aside>
 
-      <div className="lg:pl-60">
+      <div className={satellite ? "" : "lg:pl-60"}>
         {/* Top bar */}
         <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-[#08090a]/75 backdrop-blur-xl">
           <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
             <div className="min-w-0 leading-tight">
-              <h1 className="truncate text-xl font-semibold tracking-tight text-zinc-50">{tabs.find((t) => t.id === tab)?.label}</h1>
+              <h1 className="truncate text-xl font-semibold tracking-tight text-zinc-50">{pageTitle}</h1>
               <p className="text-[12px] text-zinc-500">
                 {lastText ? `Diperbarui ${lastText} WIB` : loading ? "Memuat…" : "Belum dimuat"},{" "}
                 <span className="text-[#5eead4]">● {fmt(online)} sedang online</span>
@@ -400,9 +424,48 @@ export function OwnerDashboard() {
               </button>
             </div>
           </div>
+          <div className="mx-auto flex w-full max-w-5xl flex-wrap gap-1.5 px-3 pb-2.5 sm:px-4" role="tablist" aria-label="Situs">
+            {PANEL_SITES.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={site === item.id}
+                onClick={() => pickSite(item.id)}
+                className={`min-h-11 rounded-full border px-3 py-1.5 text-[12px] ${focusRing} ${
+                  site === item.id ? "border-[#2dd4bf] bg-[#2dd4bf]/15 font-medium text-[#5eead4]" : "border-white/10 text-zinc-400 hover:text-zinc-100"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </header>
 
-        <main className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 pb-28 pt-4 sm:px-4 lg:pb-10">
+        <main className={`mx-auto flex w-full max-w-5xl flex-col gap-4 px-3 pt-4 sm:px-4 ${satellite ? "pb-10" : "pb-28 lg:pb-10"}`}>
+          {site === "semua" ? (
+            <div className={glass + " divide-y divide-white/[0.06] overflow-hidden"}>
+              <Collapse id="satelit-videyy" title="Situs satelit · videyy.icu">
+                <OwnerSatelit secret={secret} host="videyy.icu" />
+              </Collapse>
+              <Collapse id="satelit-videqsss" title="Situs satelit · videqsss.icu">
+                <OwnerSatelit secret={secret} host="videqsss.icu" />
+              </Collapse>
+            </div>
+          ) : null}
+          {site === "videyy.icu" || site === "videqsss.icu" ? (
+            <div className="flex flex-col gap-4">
+              <OwnerSatelit secret={secret} host={site} />
+              {site === "videyy.icu" ? (
+                <div className={glass}>
+                  <Collapse id="videyy-stats" title="Statistik videyy.icu">
+                    <OwnerVideyPanel secret={secret} />
+                  </Collapse>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+          <div className={satellite ? "hidden" : "contents"}>
           {/* RINGKASAN */}
           <section className={`${show("ringkasan")} flex-col gap-4`}>
             <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
@@ -546,10 +609,12 @@ export function OwnerDashboard() {
               </Group>
             </section>
           ) : null}
+          </div>
         </main>
       </div>
 
       {/* Mobile bottom tab bar */}
+      {satellite ? null : (
       <nav
         className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.08] bg-[#0b0c0d]/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
         aria-label="Menu pemilik"
@@ -575,6 +640,7 @@ export function OwnerDashboard() {
           ))}
         </div>
       </nav>
+      )}
       <OwnerToaster />
     </div>
   );

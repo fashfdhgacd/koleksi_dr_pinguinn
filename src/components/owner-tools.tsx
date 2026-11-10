@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CATEGORY_LIST } from "@/lib/catalog/categories";
+import { MAIN_SITE, defaultUploadSelection, textHasIndoSource } from "@/lib/satelit/config";
 
 // Ambil link: same category list as the rest of the site (plus "Semua" and "Terbaru").
 const CATS = [
@@ -22,6 +23,8 @@ export function OwnerTools({ secret, part = "main" }: { secret: string; part?: "
   const [uploadCat, setUploadCat] = useState("");
   const [uploadNote, setUploadNote] = useState("");
   const [uploadBusy, setUploadBusy] = useState(false);
+  const [sites, setSites] = useState(defaultUploadSelection);
+  const indoSource = textHasIndoSource(uploadText);
   const [posterId, setPosterId] = useState("");
   const [posterUrl, setPosterUrl] = useState("");
   const [posterNote, setPosterNote] = useState("");
@@ -72,7 +75,16 @@ export function OwnerTools({ secret, part = "main" }: { secret: string; part?: "
       const res = await fetch("/api/owner-tools", {
         method: "POST",
         headers: { "content-type": "application/json", "x-online-key": secret },
-        body: JSON.stringify({ action: "upload", text, category: uploadCat }),
+        body: JSON.stringify({
+          action: "upload",
+          text,
+          category: uploadCat,
+          sites: [
+            sites.main ? MAIN_SITE : null,
+            sites.videyy ? "videyy.icu" : null,
+            indoSource && sites.videqsss ? "videqsss.icu" : null,
+          ].filter(Boolean),
+        }),
       });
       const data = (await res.json()) as { ok?: boolean; text?: string; error?: string };
       if (!res.ok || !data.ok) {
@@ -199,6 +211,33 @@ export function OwnerTools({ secret, part = "main" }: { secret: string; part?: "
             {uploadBusy ? "Memproses..." : "Simpan batch"}
           </Button>
         </div>
+        <fieldset className="mt-3">
+          <legend className="text-[11px] uppercase tracking-wide text-zinc-500">Tayang di</legend>
+          <div className="mt-2 flex flex-col gap-1.5 text-sm text-zinc-200">
+            <label className="flex min-h-11 items-center gap-2">
+              <input type="checkbox" checked={sites.main} onChange={(e) => setSites((s) => ({ ...s, main: e.target.checked }))} className="size-4 accent-[#2dd4bf]" />
+              koleksidrpinguin.com
+            </label>
+            <label className="flex min-h-11 items-center gap-2">
+              <input type="checkbox" checked={sites.videyy} onChange={(e) => setSites((s) => ({ ...s, videyy: e.target.checked }))} className="size-4 accent-[#2dd4bf]" />
+              videyy.icu
+            </label>
+            {indoSource ? (
+              <label className="flex min-h-11 items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={sites.videqsss}
+                  onChange={(e) => setSites((s) => ({ ...s, videqsss: e.target.checked }))}
+                  className="size-4 accent-[#2dd4bf]"
+                />
+                videqsss.icu
+              </label>
+            ) : null}
+          </div>
+          <p className="mt-1 text-[11px] text-zinc-500">
+            Centang berlaku untuk semua link di batch ini. videqsss.icu hanya muncul untuk sumber IndoAV atau UserBokep, dan tidak ikut tercentang.
+          </p>
+        </fieldset>
         <textarea
           value={uploadText}
           onChange={(e) => setUploadText(e.target.value)}

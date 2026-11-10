@@ -309,13 +309,13 @@ async function handleShare(body: { count?: number; category?: string; source?: s
   return json({ ok: true, count: take.length, reset: picked.reset, text });
 }
 
-async function handleUpload(body: { text?: string; category?: string }) {
+async function handleUpload(body: { text?: string; category?: string; sites?: unknown }) {
   const raw = String(body.text || "").trim();
   if (!raw) return json({ ok: false, error: "kosong" }, 400);
   const cat = String(body.category || "").trim();
   const text = cat ? `Kategori: ${cat}\n${raw}` : raw;
   const lines: string[] = [];
-  await processUploadBatch({
+  const result = (await processUploadBatch({
     token: "panel",
     chatId: 0,
     text,
@@ -328,7 +328,36 @@ async function handleUpload(body: { text?: string; category?: string }) {
       lines.push(msg);
     },
     MAIN_KEYBOARD: {},
-  });
+  })) as { created?: { id?: string; title?: string }[] } | undefined;
+  const { selectionFromHosts } = await import("@/lib/satelit/config");
+  const selection = selectionFromHosts(body.sites);
+  const created = Array.isArray(result?.created) ? result.created : [];
+  if (selection && created.length) {
+    try {
+      const { parseMessage } = await import("@/lib/bot/parse.js");
+      const parsed = parseMessage(text) as { videos?: { id?: string; host?: string }[] };
+      const hostById = new Map<string, string>();
+      for (const video of parsed.videos || []) hostById.set(String(video.id || ""), String(video.host || ""));
+      const { applyUploadSites } = await import("@/lib/satelit/store");
+      const applied = await applyUploadSites(
+        created.map((row) => ({
+          id: String(row.id || ""),
+          title: String(row.title || ""),
+          host: hostById.get(String(row.id || "")) || "",
+        })),
+        selection,
+      );
+      const names = [
+        selection.main ? "koleksidrpinguin.com" : null,
+        selection.videyy ? "videyy.icu" : null,
+        applied.videqsss ? `videqsss.icu (${applied.videqsss} IndoAV/UserBokep)` : null,
+      ].filter(Boolean);
+      lines.push(`Situs: ${names.join(", ") || "tidak ada"}.`);
+      if (applied.hiddenOnMain) lines.push(`${applied.hiddenOnMain} video disembunyikan di koleksidrpinguin.com.`);
+    } catch {
+      lines.push("Video masuk, tetapi pengaturan situs gagal disimpan.");
+    }
+  }
   return json({ ok: true, text: lines.filter(Boolean).join("\n\n") || "Selesai." });
 }
 

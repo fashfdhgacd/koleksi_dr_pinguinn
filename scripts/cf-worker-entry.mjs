@@ -406,6 +406,22 @@ function purgeKeys(env, id, category) {
   return keys;
 }
 
+/** Owner satellite save: drop the cached public config so the next sync reads the new copy. */
+async function purgeSatelitConfig(response, env, context) {
+  const cache = edgeCache();
+  if (!cache || !context?.waitUntil || response.status !== 200) return;
+  let data = null;
+  try {
+    data = await response.clone().json();
+  } catch {
+    return;
+  }
+  if (!data?.ok || data.purgeConfig !== true) return;
+  const keys = [];
+  for (const origin of PURGE_HOSTS) keys.push(cacheKey(new URL("/api/satelit/config.json", origin), env));
+  context.waitUntil(Promise.all(keys.map((key) => cache.delete(key).catch(() => false))));
+}
+
 /** After a successful owner edit: drop the cached pages that show the edited video. */
 async function purgeAfterEdit(request, response, env, context) {
   const cache = edgeCache();
@@ -812,6 +828,11 @@ export default {
       return new Response("forbidden", { status: 403, headers: { "cache-control": "private, no-store" } });
     }
     if (url.pathname === "/api/cron-status" && request.method === "GET") return cronStatus(env);
+    if (request.method === "POST" && url.pathname === "/api/owner-satelit" && request.headers.has("x-online-key")) {
+      const response = await nitroHandler.fetch(request, env, context);
+      await purgeSatelitConfig(response, env, context).catch(() => undefined);
+      return response;
+    }
     if (request.method === "POST" && (url.pathname === "/api/owner-videy" || url.pathname === "/api/owner-tools")) {
       const req = url.pathname === "/api/owner-tools" ? await brandEditRequest(request).catch(() => request) : request;
       const response = await nitroHandler.fetch(req, env, context);
