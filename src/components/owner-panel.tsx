@@ -15,6 +15,8 @@ import { OwnerLoginForm } from "@/components/owner-login-form";
 import { OwnerOverview } from "@/components/owner-overview";
 import { OwnerTools } from "@/components/owner-tools";
 import { OwnerVideyUntitled } from "@/components/owner-videy-untitled";
+import { OwnerVideySuggest } from "@/components/owner-videy-suggest";
+import { OwnerVideyPanel } from "@/components/owner-videy-panel";
 import { OwnerAuthedBottom } from "@/components/owner-authed-bottom";
 import { HiddenListSection } from "@/components/owner-hidden-list";
 import { DetectorReviewSection } from "@/components/owner-detector-review";
@@ -266,7 +268,7 @@ export function OwnerDashboard() {
   const lastText = wibHourMinute(tickAt);
 
   const [tab, setTab] = useState<Tab>("ringkasan");
-  const [seen, setSeen] = useState<Record<Tab, boolean>>({ ringkasan: true, cek: true, video: false, pengaturan: false });
+  const [seen, setSeen] = useState<Record<Tab, boolean>>({ ringkasan: true, cek: true, video: false, videyy: false, pengaturan: false });
   const [reviewCount, setReviewCount] = useState<number | null>(null);
   const [flagCount, setFlagCount] = useState(0);
   const [commentPending, setCommentPending] = useState(0);
@@ -313,6 +315,7 @@ export function OwnerDashboard() {
     { id: "ringkasan", label: "Ringkasan", icon: "◧" },
     { id: "cek", label: "Perlu dicek", icon: "⚑", badge: (reviewCount || 0) + flagCount + commentPending + reportPending + embedPending || null },
     { id: "video", label: "Video", icon: "▶" },
+    { id: "videyy", label: "Videyy", icon: "◈" },
     { id: "pengaturan", label: "Pengaturan", icon: "⚙" },
   ];
 
@@ -502,11 +505,21 @@ export function OwnerDashboard() {
                 <Collapse id="videy" title="Videy belum dikasih judul">
                   <OwnerVideyUntitled secret={secret} />
                 </Collapse>
+                <Collapse id="videy-suggest" title="Usulan video Videy (videyy.icu)">
+                  <OwnerVideySuggest secret={secret} />
+                </Collapse>
                 <Collapse id="poster" title="Poster video">
                   <OwnerTools secret={secret} part="poster" />
                 </Collapse>
               </Group>
               <p className="px-1 text-[12px] text-zinc-500">Cari dan edit video ada di tab Ringkasan, bagian Upload terbaru.</p>
+            </section>
+          ) : null}
+
+          {/* VIDEYY: satelit videyy.icu */}
+          {seen.videyy ? (
+            <section className={`${show("videyy")} flex-col gap-4`}>
+              <OwnerVideyPanel />
             </section>
           ) : null}
 
@@ -541,7 +554,7 @@ export function OwnerDashboard() {
         className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.08] bg-[#0b0c0d]/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
         aria-label="Menu pemilik"
       >
-        <div className="mx-auto grid max-w-md grid-cols-4">
+        <div className="mx-auto grid max-w-md grid-cols-5">
           {tabs.map((t) => (
             <button
               key={t.id}
@@ -567,7 +580,7 @@ export function OwnerDashboard() {
   );
 }
 
-type Tab = "ringkasan" | "cek" | "video" | "pengaturan";
+type Tab = "ringkasan" | "cek" | "video" | "videyy" | "pengaturan";
 
 const shellStyle: React.CSSProperties = {
   backgroundColor: "#08090a",
