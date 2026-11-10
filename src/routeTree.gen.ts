@@ -50,6 +50,7 @@ import { Route as ApiReportsAdminRouteImport } from './routes/api/reports-admin'
 import { Route as ApiReportsPublicRouteImport } from './routes/api/reports-public'
 import { Route as ApiTapeThumbRouteImport } from './routes/api/tape-thumb'
 import { Route as ApiTelegramRouteImport } from './routes/api/telegram'
+import { Route as ApiVideyFeaturedRouteImport } from './routes/api/videy-featured'
 import { Route as ApiVideyHitRouteImport } from './routes/api/videy-hit'
 import { Route as ApiVideySuggestRouteImport } from './routes/api/videy-suggest'
 import { Route as CariIndexRouteImport } from './routes/cari.index'
@@ -273,6 +274,11 @@ const ApiTelegramRoute = ApiTelegramRouteImport.update({
   path: '/api/telegram',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiVideyFeaturedRoute = ApiVideyFeaturedRouteImport.update({
+  id: '/api/videy-featured',
+  path: '/api/videy-featured',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiVideyHitRoute = ApiVideyHitRouteImport.update({
   id: '/api/videy-hit',
   path: '/api/videy-hit',
@@ -401,6 +407,7 @@ export interface FileRoutesByFullPath {
   '/api/reports-public': typeof ApiReportsPublicRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/api/videy-featured': typeof ApiVideyFeaturedRoute
   '/api/videy-hit': typeof ApiVideyHitRoute
   '/api/videy-suggest': typeof ApiVideySuggestRoute
   '/cari/$slug': typeof CariSlugRouteWithChildren
@@ -460,6 +467,7 @@ export interface FileRoutesByTo {
   '/api/reports-public': typeof ApiReportsPublicRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/api/videy-featured': typeof ApiVideyFeaturedRoute
   '/api/videy-hit': typeof ApiVideyHitRoute
   '/api/videy-suggest': typeof ApiVideySuggestRoute
   '/cari/$slug': typeof CariSlugRouteWithChildren
@@ -521,6 +529,7 @@ export interface FileRoutesById {
   '/api/reports-public': typeof ApiReportsPublicRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/api/videy-featured': typeof ApiVideyFeaturedRoute
   '/api/videy-hit': typeof ApiVideyHitRoute
   '/api/videy-suggest': typeof ApiVideySuggestRoute
   '/cari/$slug': typeof CariSlugRouteWithChildren
@@ -583,6 +592,7 @@ export interface FileRouteTypes {
     | '/api/reports-public'
     | '/api/tape-thumb'
     | '/api/telegram'
+    | '/api/videy-featured'
     | '/api/videy-hit'
     | '/api/videy-suggest'
     | '/cari/$slug'
@@ -642,6 +652,7 @@ export interface FileRouteTypes {
     | '/api/reports-public'
     | '/api/tape-thumb'
     | '/api/telegram'
+    | '/api/videy-featured'
     | '/api/videy-hit'
     | '/api/videy-suggest'
     | '/cari/$slug'
@@ -702,6 +713,7 @@ export interface FileRouteTypes {
     | '/api/reports-public'
     | '/api/tape-thumb'
     | '/api/telegram'
+    | '/api/videy-featured'
     | '/api/videy-hit'
     | '/api/videy-suggest'
     | '/cari/$slug'
@@ -763,6 +775,7 @@ export interface RootRouteChildren {
   ApiReportsPublicRoute: typeof ApiReportsPublicRoute
   ApiTapeThumbRoute: typeof ApiTapeThumbRoute
   ApiTelegramRoute: typeof ApiTelegramRoute
+  ApiVideyFeaturedRoute: typeof ApiVideyFeaturedRoute
   ApiVideyHitRoute: typeof ApiVideyHitRoute
   ApiVideySuggestRoute: typeof ApiVideySuggestRoute
   CariSlugRoute: typeof CariSlugRouteWithChildren
@@ -1067,6 +1080,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelegramRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/videy-featured': {
+      id: '/api/videy-featured'
+      path: '/api/videy-featured'
+      fullPath: '/api/videy-featured'
+      preLoaderRoute: typeof ApiVideyFeaturedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/videy-hit': {
       id: '/api/videy-hit'
       path: '/api/videy-hit'
@@ -1269,6 +1289,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiReportsPublicRoute: ApiReportsPublicRoute,
   ApiTapeThumbRoute: ApiTapeThumbRoute,
   ApiTelegramRoute: ApiTelegramRoute,
+  ApiVideyFeaturedRoute: ApiVideyFeaturedRoute,
   ApiVideyHitRoute: ApiVideyHitRoute,
   ApiVideySuggestRoute: ApiVideySuggestRoute,
   CariSlugRoute: CariSlugRouteWithChildren,
