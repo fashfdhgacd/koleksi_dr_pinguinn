@@ -38,6 +38,7 @@ import { Route as ApiOnlineRouteImport } from './routes/api/online'
 import { Route as ApiOwnerHeroRouteImport } from './routes/api/owner-hero'
 import { Route as ApiOwnerPushRouteImport } from './routes/api/owner-push'
 import { Route as ApiOwnerRecentRouteImport } from './routes/api/owner-recent'
+import { Route as ApiOwnerSatelitRouteImport } from './routes/api/owner-satelit'
 import { Route as ApiOwnerStats14RouteImport } from './routes/api/owner-stats14'
 import { Route as ApiOwnerToolsRouteImport } from './routes/api/owner-tools'
 import { Route as ApiOwnerVideyRouteImport } from './routes/api/owner-videy'
@@ -63,6 +64,7 @@ import { Route as ApiAnalyticsHealthRouteImport } from './routes/api/analytics.h
 import { Route as ApiAnalyticsHourlyRouteImport } from './routes/api/analytics.hourly'
 import { Route as ApiAnalyticsOverviewRouteImport } from './routes/api/analytics.overview'
 import { Route as ApiAnalyticsTrackRouteImport } from './routes/api/analytics.track'
+import { Route as ApiSatelitConfigDotjsonRouteImport } from './routes/api/satelit/config[.]json'
 import { Route as CariSlugHalamanPageRouteImport } from './routes/cari.$slug.halaman.$page'
 import { Route as KategoriSlugHalamanPageRouteImport } from './routes/kategori.$slug.halaman.$page'
 
@@ -211,6 +213,11 @@ const ApiOwnerRecentRoute = ApiOwnerRecentRouteImport.update({
   path: '/api/owner-recent',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiOwnerSatelitRoute = ApiOwnerSatelitRouteImport.update({
+  id: '/api/owner-satelit',
+  path: '/api/owner-satelit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiOwnerStats14Route = ApiOwnerStats14RouteImport.update({
   id: '/api/owner-stats14',
   path: '/api/owner-stats14',
@@ -336,6 +343,11 @@ const ApiAnalyticsTrackRoute = ApiAnalyticsTrackRouteImport.update({
   path: '/api/analytics/track',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSatelitConfigDotjsonRoute = ApiSatelitConfigDotjsonRouteImport.update({
+  id: '/api/satelit/config.json',
+  path: '/api/satelit/config.json',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CariSlugHalamanPageRoute = CariSlugHalamanPageRouteImport.update({
   id: '/halaman/$page',
   path: '/halaman/$page',
@@ -377,6 +389,7 @@ export interface FileRoutesByFullPath {
   '/api/owner-hero': typeof ApiOwnerHeroRoute
   '/api/owner-push': typeof ApiOwnerPushRoute
   '/api/owner-recent': typeof ApiOwnerRecentRoute
+  '/api/owner-satelit': typeof ApiOwnerSatelitRoute
   '/api/owner-stats14': typeof ApiOwnerStats14Route
   '/api/owner-tools': typeof ApiOwnerToolsRoute
   '/api/owner-videy': typeof ApiOwnerVideyRoute
@@ -402,6 +415,7 @@ export interface FileRoutesByFullPath {
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
   '/api/analytics/overview': typeof ApiAnalyticsOverviewRoute
   '/api/analytics/track': typeof ApiAnalyticsTrackRoute
+  '/api/satelit/config.json': typeof ApiSatelitConfigDotjsonRoute
   '/cari/$slug/halaman/$page': typeof CariSlugHalamanPageRoute
   '/kategori/$slug/halaman/$page': typeof KategoriSlugHalamanPageRoute
 }
@@ -434,6 +448,7 @@ export interface FileRoutesByTo {
   '/api/owner-hero': typeof ApiOwnerHeroRoute
   '/api/owner-push': typeof ApiOwnerPushRoute
   '/api/owner-recent': typeof ApiOwnerRecentRoute
+  '/api/owner-satelit': typeof ApiOwnerSatelitRoute
   '/api/owner-stats14': typeof ApiOwnerStats14Route
   '/api/owner-tools': typeof ApiOwnerToolsRoute
   '/api/owner-videy': typeof ApiOwnerVideyRoute
@@ -459,6 +474,7 @@ export interface FileRoutesByTo {
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
   '/api/analytics/overview': typeof ApiAnalyticsOverviewRoute
   '/api/analytics/track': typeof ApiAnalyticsTrackRoute
+  '/api/satelit/config.json': typeof ApiSatelitConfigDotjsonRoute
   '/cari/$slug/halaman/$page': typeof CariSlugHalamanPageRoute
   '/kategori/$slug/halaman/$page': typeof KategoriSlugHalamanPageRoute
 }
@@ -493,6 +509,7 @@ export interface FileRoutesById {
   '/api/owner-hero': typeof ApiOwnerHeroRoute
   '/api/owner-push': typeof ApiOwnerPushRoute
   '/api/owner-recent': typeof ApiOwnerRecentRoute
+  '/api/owner-satelit': typeof ApiOwnerSatelitRoute
   '/api/owner-stats14': typeof ApiOwnerStats14Route
   '/api/owner-tools': typeof ApiOwnerToolsRoute
   '/api/owner-videy': typeof ApiOwnerVideyRoute
@@ -518,6 +535,7 @@ export interface FileRoutesById {
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
   '/api/analytics/overview': typeof ApiAnalyticsOverviewRoute
   '/api/analytics/track': typeof ApiAnalyticsTrackRoute
+  '/api/satelit/config.json': typeof ApiSatelitConfigDotjsonRoute
   '/cari/$slug/halaman/$page': typeof CariSlugHalamanPageRoute
   '/kategori/$slug/halaman/$page': typeof KategoriSlugHalamanPageRoute
 }
@@ -553,6 +571,7 @@ export interface FileRouteTypes {
     | '/api/owner-hero'
     | '/api/owner-push'
     | '/api/owner-recent'
+    | '/api/owner-satelit'
     | '/api/owner-stats14'
     | '/api/owner-tools'
     | '/api/owner-videy'
@@ -578,6 +597,7 @@ export interface FileRouteTypes {
     | '/api/analytics/hourly'
     | '/api/analytics/overview'
     | '/api/analytics/track'
+    | '/api/satelit/config.json'
     | '/cari/$slug/halaman/$page'
     | '/kategori/$slug/halaman/$page'
   fileRoutesByTo: FileRoutesByTo
@@ -610,6 +630,7 @@ export interface FileRouteTypes {
     | '/api/owner-hero'
     | '/api/owner-push'
     | '/api/owner-recent'
+    | '/api/owner-satelit'
     | '/api/owner-stats14'
     | '/api/owner-tools'
     | '/api/owner-videy'
@@ -635,6 +656,7 @@ export interface FileRouteTypes {
     | '/api/analytics/hourly'
     | '/api/analytics/overview'
     | '/api/analytics/track'
+    | '/api/satelit/config.json'
     | '/cari/$slug/halaman/$page'
     | '/kategori/$slug/halaman/$page'
   id:
@@ -668,6 +690,7 @@ export interface FileRouteTypes {
     | '/api/owner-hero'
     | '/api/owner-push'
     | '/api/owner-recent'
+    | '/api/owner-satelit'
     | '/api/owner-stats14'
     | '/api/owner-tools'
     | '/api/owner-videy'
@@ -693,6 +716,7 @@ export interface FileRouteTypes {
     | '/api/analytics/hourly'
     | '/api/analytics/overview'
     | '/api/analytics/track'
+    | '/api/satelit/config.json'
     | '/cari/$slug/halaman/$page'
     | '/kategori/$slug/halaman/$page'
   fileRoutesById: FileRoutesById
@@ -727,6 +751,7 @@ export interface RootRouteChildren {
   ApiOwnerHeroRoute: typeof ApiOwnerHeroRoute
   ApiOwnerPushRoute: typeof ApiOwnerPushRoute
   ApiOwnerRecentRoute: typeof ApiOwnerRecentRoute
+  ApiOwnerSatelitRoute: typeof ApiOwnerSatelitRoute
   ApiOwnerStats14Route: typeof ApiOwnerStats14Route
   ApiOwnerToolsRoute: typeof ApiOwnerToolsRoute
   ApiOwnerVideyRoute: typeof ApiOwnerVideyRoute
@@ -750,6 +775,7 @@ export interface RootRouteChildren {
   ApiAnalyticsHourlyRoute: typeof ApiAnalyticsHourlyRoute
   ApiAnalyticsOverviewRoute: typeof ApiAnalyticsOverviewRoute
   ApiAnalyticsTrackRoute: typeof ApiAnalyticsTrackRoute
+  ApiSatelitConfigDotjsonRoute: typeof ApiSatelitConfigDotjsonRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -957,6 +983,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiOwnerRecentRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/owner-satelit': {
+      id: '/api/owner-satelit'
+      path: '/api/owner-satelit'
+      fullPath: '/api/owner-satelit'
+      preLoaderRoute: typeof ApiOwnerSatelitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/owner-stats14': {
       id: '/api/owner-stats14'
       path: '/api/owner-stats14'
@@ -1132,6 +1165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAnalyticsTrackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/satelit/config.json': {
+      id: '/api/satelit/config.json'
+      path: '/api/satelit/config.json'
+      fullPath: '/api/satelit/config.json'
+      preLoaderRoute: typeof ApiSatelitConfigDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/cari/$slug/halaman/$page': {
       id: '/cari/$slug/halaman/$page'
       path: '/halaman/$page'
@@ -1217,6 +1257,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOwnerHeroRoute: ApiOwnerHeroRoute,
   ApiOwnerPushRoute: ApiOwnerPushRoute,
   ApiOwnerRecentRoute: ApiOwnerRecentRoute,
+  ApiOwnerSatelitRoute: ApiOwnerSatelitRoute,
   ApiOwnerStats14Route: ApiOwnerStats14Route,
   ApiOwnerToolsRoute: ApiOwnerToolsRoute,
   ApiOwnerVideyRoute: ApiOwnerVideyRoute,
@@ -1240,6 +1281,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAnalyticsHourlyRoute: ApiAnalyticsHourlyRoute,
   ApiAnalyticsOverviewRoute: ApiAnalyticsOverviewRoute,
   ApiAnalyticsTrackRoute: ApiAnalyticsTrackRoute,
+  ApiSatelitConfigDotjsonRoute: ApiSatelitConfigDotjsonRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
