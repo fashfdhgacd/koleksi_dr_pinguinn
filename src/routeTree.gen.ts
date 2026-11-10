@@ -49,6 +49,7 @@ import { Route as ApiReportsAdminRouteImport } from './routes/api/reports-admin'
 import { Route as ApiReportsPublicRouteImport } from './routes/api/reports-public'
 import { Route as ApiTapeThumbRouteImport } from './routes/api/tape-thumb'
 import { Route as ApiTelegramRouteImport } from './routes/api/telegram'
+import { Route as ApiVideyHitRouteImport } from './routes/api/videy-hit'
 import { Route as ApiVideySuggestRouteImport } from './routes/api/videy-suggest'
 import { Route as CariIndexRouteImport } from './routes/cari.index'
 import { Route as CariSlugRouteImport } from './routes/cari.$slug'
@@ -265,6 +266,11 @@ const ApiTelegramRoute = ApiTelegramRouteImport.update({
   path: '/api/telegram',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiVideyHitRoute = ApiVideyHitRouteImport.update({
+  id: '/api/videy-hit',
+  path: '/api/videy-hit',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiVideySuggestRoute = ApiVideySuggestRouteImport.update({
   id: '/api/videy-suggest',
   path: '/api/videy-suggest',
@@ -382,6 +388,7 @@ export interface FileRoutesByFullPath {
   '/api/reports-public': typeof ApiReportsPublicRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/api/videy-hit': typeof ApiVideyHitRoute
   '/api/videy-suggest': typeof ApiVideySuggestRoute
   '/cari/$slug': typeof CariSlugRouteWithChildren
   '/halaman/$page': typeof HalamanPageRoute
@@ -438,6 +445,7 @@ export interface FileRoutesByTo {
   '/api/reports-public': typeof ApiReportsPublicRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/api/videy-hit': typeof ApiVideyHitRoute
   '/api/videy-suggest': typeof ApiVideySuggestRoute
   '/cari/$slug': typeof CariSlugRouteWithChildren
   '/halaman/$page': typeof HalamanPageRoute
@@ -496,6 +504,7 @@ export interface FileRoutesById {
   '/api/reports-public': typeof ApiReportsPublicRoute
   '/api/tape-thumb': typeof ApiTapeThumbRoute
   '/api/telegram': typeof ApiTelegramRoute
+  '/api/videy-hit': typeof ApiVideyHitRoute
   '/api/videy-suggest': typeof ApiVideySuggestRoute
   '/cari/$slug': typeof CariSlugRouteWithChildren
   '/halaman/$page': typeof HalamanPageRoute
@@ -555,6 +564,7 @@ export interface FileRouteTypes {
     | '/api/reports-public'
     | '/api/tape-thumb'
     | '/api/telegram'
+    | '/api/videy-hit'
     | '/api/videy-suggest'
     | '/cari/$slug'
     | '/halaman/$page'
@@ -611,6 +621,7 @@ export interface FileRouteTypes {
     | '/api/reports-public'
     | '/api/tape-thumb'
     | '/api/telegram'
+    | '/api/videy-hit'
     | '/api/videy-suggest'
     | '/cari/$slug'
     | '/halaman/$page'
@@ -668,6 +679,7 @@ export interface FileRouteTypes {
     | '/api/reports-public'
     | '/api/tape-thumb'
     | '/api/telegram'
+    | '/api/videy-hit'
     | '/api/videy-suggest'
     | '/cari/$slug'
     | '/halaman/$page'
@@ -726,6 +738,7 @@ export interface RootRouteChildren {
   ApiReportsPublicRoute: typeof ApiReportsPublicRoute
   ApiTapeThumbRoute: typeof ApiTapeThumbRoute
   ApiTelegramRoute: typeof ApiTelegramRoute
+  ApiVideyHitRoute: typeof ApiVideyHitRoute
   ApiVideySuggestRoute: typeof ApiVideySuggestRoute
   CariSlugRoute: typeof CariSlugRouteWithChildren
   HalamanPageRoute: typeof HalamanPageRoute
@@ -1021,6 +1034,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiTelegramRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/videy-hit': {
+      id: '/api/videy-hit'
+      path: '/api/videy-hit'
+      fullPath: '/api/videy-hit'
+      preLoaderRoute: typeof ApiVideyHitRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/videy-suggest': {
       id: '/api/videy-suggest'
       path: '/api/videy-suggest'
@@ -1208,6 +1228,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiReportsPublicRoute: ApiReportsPublicRoute,
   ApiTapeThumbRoute: ApiTapeThumbRoute,
   ApiTelegramRoute: ApiTelegramRoute,
+  ApiVideyHitRoute: ApiVideyHitRoute,
   ApiVideySuggestRoute: ApiVideySuggestRoute,
   CariSlugRoute: CariSlugRouteWithChildren,
   HalamanPageRoute: HalamanPageRoute,

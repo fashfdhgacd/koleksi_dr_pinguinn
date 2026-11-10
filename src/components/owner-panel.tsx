@@ -519,7 +519,7 @@ export function OwnerDashboard() {
           {/* VIDEYY: satelit videyy.icu */}
           {seen.videyy ? (
             <section className={`${show("videyy")} flex-col gap-4`}>
-              <OwnerVideyPanel />
+              <OwnerVideyPanel secret={secret} />
             </section>
           ) : null}
 
