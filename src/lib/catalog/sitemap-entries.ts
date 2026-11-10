@@ -1,5 +1,5 @@
 import { loadItems } from "./local";
-import { slugOf } from "./local-shared";
+import { slugOf, sourceLabel } from "./local-shared";
 import { significantLastmod } from "./lastmod.js";
 import { readOwnerEditState } from "./owner-edit-store";
 import { isSeoBlockedId } from "./seo-block";
@@ -13,6 +13,8 @@ export type SitemapWatchEntry = {
   thumbnail?: string;
   duration?: number;
   views?: number;
+  /** Host label (IndoAV, UserBokep, …) so the sitemap blurb matches the watch page. */
+  source?: string;
   /** Manual description from the owner (/pemilik "Edit"). */
   description?: string;
 };
@@ -88,6 +90,8 @@ async function listBaseEntries(): Promise<SitemapWatchEntry[]> {
       entry.duration = Math.round(it.duration);
     }
     if (typeof it.views === "number" && Number.isFinite(it.views) && it.views > 0) entry.views = it.views;
+    const source = sourceLabel(it);
+    if (source && !/^unknown$/i.test(source)) entry.source = source;
     const description = str(it.ownerDescription);
     if (description) entry.description = description;
     out.push(entry);

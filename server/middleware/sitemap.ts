@@ -139,13 +139,14 @@ function pageEntries(
 function videoBlock(item: Awaited<ReturnType<typeof listSitemapWatchEntries>>[number]): string {
   const pageUrl = `${SITE_ORIGIN}/watch/${encodeURIComponent(item.id)}`;
   const title = cleanDisplayTitle(item.title || "") || "Video";
-  // id/duration/year make each description its own (seeded variants + real facts), not one template.
   const desc = publicWatchDescription({
     id: item.id,
     title,
     category: item.category || null,
     duration: item.duration ?? null,
     description: item.description ?? null,
+    creator: item.source || null,
+    source: item.source || null,
   });
   const thumb = seoVideoThumbnail(item.id, item.thumbnail);
   const player = item.embed || pageUrl;

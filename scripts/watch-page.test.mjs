@@ -76,17 +76,21 @@ describe("watch page", () => {
     assert.equal(typeof WatchPage, "function");
   });
 
-  it("renders the generated description and video controls without the added FAQ", async () => {
+  it("renders one generated description and video controls without the added FAQ", async () => {
+    const { publicWatchDescription } = await vite.ssrLoadModule("/src/lib/seo.ts");
+    const desc = publicWatchDescription(video);
     const html = await renderWatch(video);
     assert.match(html, /Judul Contoh/);
     assert.match(html, /href="\/cari"/);
-    assert.match(html, /durasi 1 menit/);
-    assert.equal(html.split("ada di kategori").length - 1, 1);
+    assert.match(desc, /1 menit/);
+    assert.match(desc, /Contoh/);
+    assert.equal(html.split(desc).length - 1, 1);
     assert.equal(html.split("Judul Contoh").length - 1, 2);
     assert.match(html, /Bagikan/);
     assert.match(html, /1m 0s/);
     assert.doesNotMatch(html, /Pertanyaan Umum/);
     assert.doesNotMatch(html, /Video ini berjudul/);
+    assert.doesNotMatch(html, /ada di kategori/);
   });
 
   it("shows the owner's manual description instead of the generated one", async () => {
@@ -101,7 +105,8 @@ describe("manual description (seo.ts)", () => {
   const base = { id: "test-video", title: "Judul Contoh", category: "jilbab", duration: 120 };
 
   it("uses a non-empty manual description for the page text and meta", async () => {
-    const { publicWatchDescription, resolveVideoSeoDescription } = await vite.ssrLoadModule("/src/lib/seo.ts");
+    const { publicWatchDescription, resolveVideoSeoDescription } =
+      await vite.ssrLoadModule("/src/lib/seo.ts");
     const manual = "Cewek hijab viral, rekaman asli yang lagi rame dibicarakan.";
     assert.equal(publicWatchDescription({ ...base, description: manual }), manual);
     assert.equal(publicWatchDescription({ ...base, description: manual }, 160), manual);
@@ -113,22 +118,103 @@ describe("manual description (seo.ts)", () => {
   });
 
   it("keeps the generated description when the manual one is empty", async () => {
-    const { publicWatchDescription, resolveVideoSeoDescription } = await vite.ssrLoadModule("/src/lib/seo.ts");
+    const { publicWatchDescription, resolveVideoSeoDescription } =
+      await vite.ssrLoadModule("/src/lib/seo.ts");
     const auto = publicWatchDescription(base, 160);
-    assert.match(auto, /ada di kategori/);
+    assert.match(auto, /Jilbab/);
+    assert.match(auto, /2 menit/);
+    assert.equal(auto.split("Judul Contoh").length - 1, 1);
     for (const description of ["", "   ", null, undefined, "Tidak ada sinopsis."]) {
       assert.equal(publicWatchDescription({ ...base, description }, 160), auto);
-      assert.equal(resolveVideoSeoDescription({ ...base, description }), resolveVideoSeoDescription(base));
+      assert.equal(
+        resolveVideoSeoDescription({ ...base, description }),
+        resolveVideoSeoDescription(base),
+      );
     }
   });
 
   it("never shows a manual description with forbidden words", async () => {
-    const { publicWatchDescription, isSafeManualDescription } = await vite.ssrLoadModule("/src/lib/seo.ts");
+    const { publicWatchDescription, isSafeManualDescription } =
+      await vite.ssrLoadModule("/src/lib/seo.ts");
     const auto = publicWatchDescription(base);
     for (const bad of ["Video anak SMP viral", "abg bocil colmek", "cewek masih sekolah"]) {
       assert.equal(isSafeManualDescription(bad), false);
       assert.equal(publicWatchDescription({ ...base, description: bad }), auto);
     }
     assert.equal(isSafeManualDescription("Tante hijab viral"), true);
+  });
+
+  it("writes a different sentence per video and lets a manual description replace curated text", async () => {
+    const { publicWatchDescription } = await vite.ssrLoadModule("/src/lib/seo.ts");
+    const facts = {
+      title: "Judul Sama Persis",
+      category: "hotel",
+      duration: 300,
+      creator: "UserBokep",
+    };
+    const tails = new Set();
+    for (let i = 0; i < 32; i++) {
+      const text = publicWatchDescription({ ...facts, id: `vid-${i}` });
+      assert.ok(text.length <= 158, text);
+      assert.equal(text.split("Judul Sama Persis").length - 1, 1);
+      assert.match(text, /Hotel/);
+      assert.match(text, /5 menit/);
+      assert.match(text, /UserBokep/);
+      assert.doesNotMatch(text, /Text Import/);
+      tails.add(text.replaceAll("Judul Sama Persis", "T"));
+    }
+    assert.ok(tails.size >= 12, `only ${tails.size} distinct sentences`);
+    const again = publicWatchDescription({ ...facts, id: "vid-3" });
+    assert.equal(again, publicWatchDescription({ ...facts, id: "vid-3" }));
+
+    const curatedId = "XyqeEIe5pG6q";
+    const curated = publicWatchDescription({
+      id: curatedId,
+      title: "Judul Apa Saja",
+      category: "amatir",
+      duration: 180,
+      creator: "IndoAV",
+    });
+    assert.match(curated, /seorang wanita berjilbab/);
+    assert.doesNotMatch(curated, /Judul Apa Saja/);
+    const manual = "Teks pemilik yang harus menang atas teks kurasi.";
+    assert.equal(
+      publicWatchDescription({
+        id: curatedId,
+        title: "Judul Apa Saja",
+        category: "amatir",
+        description: manual,
+      }),
+      manual,
+    );
+    const withNote = "Seorang wanita berjilbab, rekaman amatir. seo: catatan internal.";
+    assert.equal(
+      publicWatchDescription({
+        id: "lain",
+        title: "Judul",
+        category: "jilbab",
+        description: withNote,
+      }),
+      "Seorang wanita berjilbab, rekaman amatir.",
+    );
+    const long =
+      "Cerita panjang sekali yang harus dipotong supaya nomor bagian tetap kebaca di akhir judul video ini (Koleksi Dr. Pinguin Bokep, M.S.B.)";
+    const part6 = publicWatchDescription({
+      id: "part-6",
+      title: `${long} Part 6`,
+      category: "amatir",
+      duration: 60,
+      creator: "IndoAV",
+    });
+    const part7 = publicWatchDescription({
+      id: "part-7",
+      title: `${long} Part 7`,
+      category: "amatir",
+      duration: 74,
+      creator: "IndoAV",
+    });
+    assert.match(part6, /Part 6/);
+    assert.match(part7, /Part 7/);
+    assert.notEqual(part6, part7);
   });
 });
