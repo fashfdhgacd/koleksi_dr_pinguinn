@@ -16,7 +16,7 @@
  */
 
 import { resolveAnalyticsKV, type KVNamespaceLike } from "@/lib/analytics-kv";
-import { readyD1 } from "@/lib/analytics-d1";
+import { OWNER_TOP_REFS, readyD1 } from "@/lib/analytics-d1";
 
 const ONLINE_PREFIX = "online:";
 const ROLL_PREFIX = "roll:";
@@ -250,7 +250,7 @@ export function rollToStats(roll: KvRoll, online: number, history: KvDayRow[] = 
     yesterdayUnique: yesterday?.unique || 0,
     days: history,
     topPaths: top(roll.paths, 12).map((r) => ({ path: r.key, views: r.views })),
-    topRefs: top(roll.refs, 8).map((r) => ({ ref: r.key, views: r.views })),
+    topRefs: top(roll.refs, OWNER_TOP_REFS).map((r) => ({ ref: r.key, views: r.views })),
     devices: top(roll.devices, 6).map((r) => ({
       device: r.key as "mobile" | "desktop" | "tablet" | "bot" | "other",
       views: r.views,

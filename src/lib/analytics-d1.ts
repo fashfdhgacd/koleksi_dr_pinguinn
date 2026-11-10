@@ -24,6 +24,12 @@ const DAY_MS = 86_400_000;
 const W = "coalesce(w, 1)";
 /** Max rows for "Video terpopuler hari ini". */
 export const TOP_VIDEOS_LIMIT = 20;
+/**
+ * Referrer hosts returned to the owner "Sumber" list.
+ * The panel shows 6, then "Lihat semua". This only widens an owner read
+ * (the GROUP BY already runs); it does not add a per-visit write.
+ */
+export const OWNER_TOP_REFS = 40;
 
 function pickD1(obj: unknown): D1DatabaseLike | null {
   if (!obj || typeof obj !== "object") return null;
@@ -530,7 +536,7 @@ export async function d1StatsParts(db: D1DatabaseLike, today: string, now = Date
       all<{ ref: string; views: number }>(
         db,
         `select coalesce(referrer,'(direct)') as ref, sum(${W}) as views from analytics_events where ${TODAY}
-         group by 1 order by views desc limit 12`,
+         group by 1 order by views desc limit ${OWNER_TOP_REFS}`,
         t0,
         t1,
       ),

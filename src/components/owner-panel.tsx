@@ -670,9 +670,7 @@ function Collapse({
           <span className={`size-2 rounded-full ${accent === "amber" ? "bg-amber-400" : "bg-[#2dd4bf]"}`} aria-hidden="true" />
           {title}
         </span>
-        <span className={`text-zinc-500 transition-transform ${open ? "rotate-90" : ""}`} aria-hidden="true">
-          ›
-        </span>
+        <span className="shrink-0 text-[13px] font-medium text-[#5eead4]">{open ? "Ciutkan" : "Buka"}</span>
       </button>
       {open ? <div className="border-t border-white/[0.06] bg-black/20 p-2 sm:p-3">{children}</div> : null}
     </div>

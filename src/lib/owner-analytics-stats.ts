@@ -17,7 +17,7 @@ import {
 } from "@/lib/owner-analytics-shared";
 import { countKvOnline, countMemoryOnline, describeDbError } from "@/lib/owner-analytics-presence";
 import { kvReadHistory } from "@/lib/kv-live";
-import { TOP_VIDEOS_LIMIT, d1HistoryRows, d1Prune, d1StatsParts, readyD1 } from "@/lib/analytics-d1";
+import { OWNER_TOP_REFS, TOP_VIDEOS_LIMIT, d1HistoryRows, d1Prune, d1StatsParts, readyD1 } from "@/lib/analytics-d1";
 import { toTopVideos, withVideoTitles } from "@/lib/owner-top-videos";
 
 /** Days of D1 daily summary read for the history table + 30-day total. */
@@ -254,7 +254,7 @@ export async function getOwnerStats(): Promise<OwnerStats> {
         sql.query<{ ref: string; views: number }>(
           `select coalesce(referrer,'(direct)') as ref, count(*)::int as views from analytics_events
          where ${TODAY_WINDOW} and event_type = 'pageview'
-         group by 1 order by views desc limit 12`,
+         group by 1 order by views desc limit ${OWNER_TOP_REFS}`,
           [dk],
         ),
         sql.query<{ device: DeviceKind; views: number }>(

@@ -71,16 +71,23 @@ function mergeRows(rows: CountRow[], limit = 6): CountRow[] {
     if (cur) cur.views += r.views;
     else m.set(r.label, { ...r });
   }
-  return [...m.values()].filter((r) => r.views > 0).sort((a, b) => b.views - a.views).slice(0, limit);
+  const sorted = [...m.values()].filter((r) => r.views > 0).sort((a, b) => b.views - a.views);
+  return limit > 0 ? sorted.slice(0, limit) : sorted;
 }
 
-function CountList({ title, rows }: { title: string; rows: CountRow[] }) {
+/** How many "Sumber" hosts stay visible before "Lihat semua". */
+const SOURCE_PREVIEW = 6;
+
+function CountList({ title, rows, preview = 0 }: { title: string; rows: CountRow[]; preview?: number }) {
+  const [all, setAll] = useState(false);
+  const more = preview > 0 && rows.length > preview;
+  const shown = more && !all ? rows.slice(0, preview) : rows;
   return (
     <div className="min-w-0">
       <p className="text-xs font-medium uppercase tracking-[0.1em] text-[#5eead4]">{title}</p>
-      {rows.length ? (
+      {shown.length ? (
         <ul className="mt-2 space-y-1.5 text-sm">
-          {rows.map((r) => (
+          {shown.map((r) => (
             <li key={r.key} className="flex items-baseline justify-between gap-3">
               <span className="truncate text-zinc-300">{r.label}</span>
               <span className="shrink-0 tabular-nums text-zinc-400">{fmt(r.views)}</span>
@@ -90,6 +97,16 @@ function CountList({ title, rows }: { title: string; rows: CountRow[] }) {
       ) : (
         <p className="mt-2 text-[13px] text-zinc-500">Belum ada.</p>
       )}
+      {more ? (
+        <button
+          type="button"
+          className="mt-2 text-left text-[12px] font-medium text-[#5eead4] underline"
+          aria-expanded={all}
+          onClick={() => setAll((v) => !v)}
+        >
+          {all ? "Ciutkan" : `Lihat semua (${fmt(rows.length)})`}
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -1047,7 +1064,7 @@ function Fold({
           <span className="block text-[15px] font-semibold tracking-tight text-zinc-50">{title}</span>
           {!open && hint ? <span className="mt-0.5 block text-[12px] text-zinc-500">{hint}</span> : null}
         </span>
-        <span className="shrink-0 text-[13px] font-medium text-[#5eead4]">{open ? "Tutup" : "Buka"}</span>
+        <span className="shrink-0 text-[13px] font-medium text-[#5eead4]">{open ? "Ciutkan" : "Buka"}</span>
       </button>
       {open ? <div className="mt-3">{children}</div> : null}
     </section>
@@ -1204,6 +1221,7 @@ export function OwnerOverview(props: {
   const breakdown = useMemo(() => {
     const sources = mergeRows(
       (stats?.topRefs || []).map((r) => ({ key: r.ref, label: refName(r.ref), views: Number(r.views) || 0 })),
+      0,
     );
     const deviceRows = mergeRows(
       devices.map((d) => ({ key: d.device, label: DEVICE_NAMES[d.device] || d.device, views: Number(d.views) || 0 })),
@@ -1380,7 +1398,7 @@ export function OwnerOverview(props: {
               <span className={h2note}>angka = kunjungan halaman</span>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-4">
-              <CountList title="Sumber" rows={breakdown.sources} />
+              <CountList title="Sumber" rows={breakdown.sources} preview={SOURCE_PREVIEW} />
               <CountList title="Perangkat" rows={breakdown.deviceRows} />
               <CountList title="Browser" rows={breakdown.browsers} />
               <CountList title="Negara" rows={breakdown.countries} />
@@ -1397,10 +1415,9 @@ export function OwnerOverview(props: {
         </div>
       </Fold>
 
-      <section className={card}>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className={h2}>Upload terbaru</span>
-          <span className="flex w-full flex-1 items-center gap-2 sm:w-auto sm:max-w-md">
+      <Fold title="Upload terbaru" hint="Cari, edit, dan daftar upload" open={Boolean(fold.uploads)} onToggle={() => toggleFold("uploads")}>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <span className="flex w-full flex-1 items-center gap-2 sm:max-w-md">
             <input
               className={`${input} min-w-0 flex-1`}
               value={q}
@@ -1505,7 +1522,7 @@ export function OwnerOverview(props: {
             ) : null}
           </>
         )}
-      </section>
+      </Fold>
 
       <Fold title="Dikeluarkan dari katalog" hint="Judul yang sudah dikonfirmasi" open={Boolean(fold.removed)} onToggle={() => toggleFold("removed")}>
         <RemovedCatalogList secret={secret} reloadKey={reloadKey + removedTick} />
