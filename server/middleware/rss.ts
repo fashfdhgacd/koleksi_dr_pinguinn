@@ -4,7 +4,7 @@
  * Dibangun dari katalog in-memory, di-cache per colo (Cache API) 1 jam: tanpa KV/D1, tanpa timer.
  */
 import { listSitemapWatchEntries } from "../../src/lib/catalog/sitemap-entries";
-import { SITE_NAME, SITE_ORIGIN, cleanDisplayTitle, seoVideoThumbnail, videoSeoDescription } from "../../src/lib/seo";
+import { SITE_NAME, SITE_ORIGIN, cleanDisplayTitle, publicWatchDescription, seoVideoThumbnail } from "../../src/lib/seo";
 
 interface RssEvent {
   url: URL;
@@ -33,12 +33,14 @@ async function buildRss(): Promise<string> {
   const items = entries.map((e) => {
     const link = `${SITE_ORIGIN}/watch/${encodeURIComponent(e.id)}`;
     const title = cleanDisplayTitle(e.title || "") || "Video";
-    const desc = videoSeoDescription({
+    const desc = publicWatchDescription({
       id: e.id,
       title,
       category: e.category || null,
       duration: e.duration ?? null,
-      year: e.lastmod ? e.lastmod.slice(0, 4) : null,
+      description: e.description || null,
+      creator: e.source || null,
+      source: e.source || null,
     });
     const thumb = seoVideoThumbnail(e.id, e.thumbnail);
     const date = rfc822(e.lastmod);
