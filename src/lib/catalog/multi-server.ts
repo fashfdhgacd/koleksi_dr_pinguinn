@@ -88,6 +88,7 @@ export function serverHostOf(it: ServerItem): ServerHost {
   if (drp === "dood") return "DoodStream";
   if (drp === "byse") return "Byse";
   if (drp === "mxdrop") return "MXDrop";
+  if (drp === "vidara") return "Vidara";
   return "Lain";
 }
 

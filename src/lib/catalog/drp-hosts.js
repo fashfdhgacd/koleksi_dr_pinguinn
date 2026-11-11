@@ -13,9 +13,9 @@
 
 export const DRP_CATEGORY = "bokep";
 
-export const DRP_SOURCES = { lulu: "LuluStream", dood: "DoodStream", byse: "Byse", mxdrop: "MXDrop" };
+export const DRP_SOURCES = { lulu: "LuluStream", dood: "DoodStream", byse: "Byse", mxdrop: "MXDrop", vidara: "Vidara" };
 
-export const DRP_ID_PREFIX = { lulu: "lu-", dood: "dd-", byse: "by-", mxdrop: "mx-" };
+export const DRP_ID_PREFIX = { lulu: "lu-", dood: "dd-", byse: "by-", mxdrop: "mx-", vidara: "vd-" };
 
 /**
  * LuluStream player + panel domains. luluvdo.com is the embed host (lulustream.com/e/ redirects there).
@@ -80,6 +80,9 @@ export const MXDROP_DOMAINS = [
   "mxdrop.site",
 ];
 
+/** Vidara embed/watch domains (vidara.to; /v/<code> watch page, /e/<code> embed). */
+export const VIDARA_DOMAINS = ["vidara.to", "vidara.sx", "vidara.click", "vidara.com", "vidara.net", "vidara.org"];
+
 /** Byse panel + embed domains seen so far (any byse*.tld also matches). */
 export const BYSE_DOMAINS = [
   "byse.sx",
@@ -110,7 +113,7 @@ function inList(host, list) {
 /**
  * "lulu" | "dood" | "byse" | "" for a hostname (no network).
  * @param {unknown} hostname
- * @returns {"lulu" | "dood" | "byse" | "mxdrop" | ""}
+ * @returns {"lulu" | "dood" | "byse" | "mxdrop" | "vidara" | ""}
  */
 export function drpKindOfHost(hostname) {
   const h = bareHost(hostname);
@@ -118,6 +121,7 @@ export function drpKindOfHost(hostname) {
   if (inList(h, LULU_DOMAINS) || LULU_MIRROR_RE.test(h)) return "lulu";
   if (inList(h, DOOD_DOMAINS) || /^(?:[a-z0-9-]+\.)*dood[a-z0-9]*\.[a-z]{2,}$/.test(h)) return "dood";
   if (inList(h, MXDROP_DOMAINS) || /^(?:[a-z0-9-]+\.)*mxdrop\.[a-z]{2,}$/.test(h)) return "mxdrop";
+  if (inList(h, VIDARA_DOMAINS) || /^(?:[a-z0-9-]+\.)*vidara\.[a-z]{2,}$/.test(h)) return "vidara";
   if (inList(h, BYSE_DOMAINS) || /^(?:[a-z0-9-]+\.)*byse[a-z0-9]*\.[a-z]{2,}$/.test(h)) return "byse";
   return "";
 }
@@ -125,7 +129,7 @@ export function drpKindOfHost(hostname) {
 /**
  * Same, for a full URL.
  * @param {unknown} url
- * @returns {"lulu" | "dood" | "byse" | "mxdrop" | ""}
+ * @returns {"lulu" | "dood" | "byse" | "mxdrop" | "vidara" | ""}
  */
 export function drpKindOfUrl(url) {
   const key = String(url || "");
@@ -145,14 +149,14 @@ export function drpKindOfUrl(url) {
   return kind;
 }
 
-/** @type {Map<string, "lulu" | "dood" | "byse" | "mxdrop" | "">} */
+/** @type {Map<string, "lulu" | "dood" | "byse" | "mxdrop" | "vidara" | "">} */
 const kindByUrl = new Map();
 const KIND_MEMO_MAX = 50_000;
 
 /**
  * Kind from a stored catalog item: source label first (Byse custom domains), then embed/direct host.
  * @param {{ source?: unknown; embed?: unknown; direct?: unknown } | null | undefined} item
- * @returns {"lulu" | "dood" | "byse" | "mxdrop" | ""}
+ * @returns {"lulu" | "dood" | "byse" | "mxdrop" | "vidara" | ""}
  */
 export function drpKindOfItem(item) {
   if (!item || typeof item !== "object") return "";
@@ -161,6 +165,7 @@ export function drpKindOfItem(item) {
   if (src === "doodstream") return "dood";
   if (src === "byse") return "byse";
   if (src === "mxdrop") return "mxdrop";
+  if (src === "vidara") return "vidara";
   return drpKindOfUrl(item.embed) || drpKindOfUrl(item.direct);
 }
 

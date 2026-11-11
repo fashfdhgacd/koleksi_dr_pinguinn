@@ -45,7 +45,7 @@ async function rawCatalogItems() {
 }
 
 /** Owner's own LuluStream / DoodStream / Byse uploads ("byse-probe" = Byse on a not-yet-listed domain). */
-const DRP_HOSTS = new Set(["lulu", "dood", "byse", "byse-probe", "mxdrop"]);
+const DRP_HOSTS = new Set(["lulu", "dood", "byse", "byse-probe", "mxdrop", "vidara"]);
 function isDrpHost(host) {
   return DRP_HOSTS.has(String(host || ""));
 }
@@ -55,7 +55,7 @@ function isDrpHost(host) {
  * processUploadBatch replaces it with the numbered "Koleksi Dr. Pinguin Bokep N".
  */
 function drpAutoTitle(video) {
-  return `Bokep Indo Pilihan ${String(video.code || video.id || "").replace(/^(?:lu|dd|by|mx)-/i, "")}`.trim();
+  return `Bokep Indo Pilihan ${String(video.code || video.id || "").replace(/^(?:lu|dd|by|mx|vd)-/i, "")}`.trim();
 }
 
 /** /kategori/bokep auto title, numbered on from the catalog: "Koleksi Dr. Pinguin Bokep 13". */

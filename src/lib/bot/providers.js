@@ -267,9 +267,11 @@ export async function fetchDrpPageMeta(kind, embedUrl, code) {
     const pages =
       kind === "dood"
         ? [`${origin}/e/${c}`, `${origin}/d/${c}`]
-        : kind === "lulu"
-          ? [`https://luluvdo.com/e/${c}`, `https://lulustream.com/${c}.html`]
-          : [embedUrl];
+        : kind === "vidara"
+          ? [`${origin}/v/${c}`, `${origin}/e/${c}`]
+          : kind === "lulu"
+            ? [`https://luluvdo.com/e/${c}`, `https://lulustream.com/${c}.html`]
+            : [embedUrl];
     let title = "";
     let thumb = "";
     for (const page of pages) {
