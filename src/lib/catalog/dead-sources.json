@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-10T20:30:09Z",
+  "checkedAt": "2026-11-11T06:43:13Z",
   "gone": {
     "1d6rOGbA2aheokz": {
       "code": "1d6rOGbA2aheokz",
@@ -194,5 +194,12 @@
       "status": 404
     }
   },
-  "suspect": {}
+  "suspect": {
+    "3VoW6vR6w2CdkYP": {
+      "code": "3VoW6vR6w2CdkYP",
+      "first": "2026-11-11T06:43:13Z",
+      "host": "Streamtape",
+      "status": 404
+    }
+  }
 }
