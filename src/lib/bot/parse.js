@@ -280,7 +280,7 @@ const BYSE_PANEL_HOST = /^(?:api\.)?byse\.sx$/i;
 /**
  * LuluStream / DoodStream / Byse link -> record base. Ids are prefixed (lu-/dd-/by-) so they never
  * clash with another host's id; `code` keeps the host's own file code for meta lookups.
- * @param {"lulu" | "dood" | "byse"} kind
+ * @param {"lulu" | "dood" | "byse" | "mxdrop"} kind
  * @param {URL} parsed
  * @returns {Record<string, any> | null}
  */
@@ -290,7 +290,7 @@ function parseDrpLink(kind, parsed) {
   if (!code || DRP_NOT_A_CODE.has(code.toLowerCase())) return null;
   let embed;
   if (kind === "lulu") embed = `https://luluvdo.com/e/${code}`;
-  else if (kind === "dood") embed = `https://${host}/e/${code}`;
+  else if (kind === "dood" || kind === "mxdrop") embed = `https://${host}/e/${code}`;
   else embed = `${parsed.origin}/e/${code}`;
   return {
     id: `${DRP_ID_PREFIX[kind]}${code}`,
@@ -353,7 +353,7 @@ export function titleFromSlug(slug, code = "") {
 }
 
 /** Hosts whose "link judul" on one line means: the text after the link is that video's title. */
-const SAME_LINE_TITLE_HOSTS = new Set(["videy", "lulu", "dood", "byse", "byse-probe"]);
+const SAME_LINE_TITLE_HOSTS = new Set(["videy", "lulu", "dood", "byse", "byse-probe", "mxdrop"]);
 
 export function parseMessage(text = "") {
   const lines = String(text)

@@ -45,7 +45,7 @@ async function rawCatalogItems() {
 }
 
 /** Owner's own LuluStream / DoodStream / Byse uploads ("byse-probe" = Byse on a not-yet-listed domain). */
-const DRP_HOSTS = new Set(["lulu", "dood", "byse", "byse-probe"]);
+const DRP_HOSTS = new Set(["lulu", "dood", "byse", "byse-probe", "mxdrop"]);
 function isDrpHost(host) {
   return DRP_HOSTS.has(String(host || ""));
 }
@@ -55,7 +55,7 @@ function isDrpHost(host) {
  * processUploadBatch replaces it with the numbered "Koleksi Dr. Pinguin Bokep N".
  */
 function drpAutoTitle(video) {
-  return `Bokep Indo Pilihan ${String(video.code || video.id || "").replace(/^(?:lu|dd|by)-/i, "")}`.trim();
+  return `Bokep Indo Pilihan ${String(video.code || video.id || "").replace(/^(?:lu|dd|by|mx)-/i, "")}`.trim();
 }
 
 /** /kategori/bokep auto title, numbered on from the catalog: "Koleksi Dr. Pinguin Bokep 13". */
@@ -698,7 +698,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
             hidden: Boolean(it.record.hidden),
           });
           lines.push(
-            `✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}${it.record.hidden_reason === DEAD_VIDEY_REASON ? " · disembunyikan: video mati" : it.record.hidden_reason === "detector-review" ? " · 🔎 ditahan, perlu dicek di /pemilik (konteks sekolah/keluarga + umur)" : String(it.record.hidden_reason || "").startsWith("review-pending") ? " · 🔎 ditahan (REVIEW_PENDING)" : it.record.hidden ? " · 🙈 disembunyikan (judul menyiratkan minor/sekolah)" : ""}`,
+            `✅ ${it.record.id} — ${it.title}${isHttpPoster(poster) ? " · poster" : ""}${it.record.hidden_reason === DEAD_VIDEY_REASON ? " · disembunyikan: video mati" : it.record.hidden_reason === "detector-review" ? " · 🔎 ditahan, perlu dicek di /pemilik (konteks sekolah/keluarga + umur)" : it.record.hidden_reason === "embed-review" ? " · 🌐 ditahan: domain embed baru (setujui massal di /pemilik)" : String(it.record.hidden_reason || "").startsWith("review-pending") ? " · 🔎 ditahan (REVIEW_PENDING)" : it.record.hidden ? " · 🙈 disembunyikan (judul menyiratkan minor/sekolah)" : ""}`,
           );
           if (it.record.review_reason) {
             lines.push(`🔎 Belum tayang (REVIEW_PENDING) karena ${it.record.review_reason}.`);

@@ -67,6 +67,22 @@ export function EmbedReviewSection({
     onCount?.(pending.length);
   }, [rows, pending.length, onCount]);
 
+  const approveAll = async () => {
+    const ids = pending.map((r) => r.id);
+    if (!ids.length) return;
+    setBusy("__all__");
+    setErr("");
+    const d = await post<{ approved?: string[] }>(secret, { action: "detector-review-approve-all", ids });
+    setBusy("");
+    if (!d.ok) {
+      setErr(d.error || "Gagal.");
+      return;
+    }
+    const n = d.approved?.length ?? ids.length;
+    void load();
+    void n;
+  };
+
   const decide = async (r: Row, decision: "show" | "keep") => {
     setBusy(r.id);
     setErr("");
@@ -107,6 +123,16 @@ export function EmbedReviewSection({
         <p role="alert" className="text-[13px] text-red-300">
           {err}
         </p>
+      ) : null}
+      {pending.length ? (
+        <button
+          type="button"
+          disabled={busy === "__all__"}
+          onClick={() => void approveAll()}
+          className="self-start rounded-lg bg-[#2dd4bf] px-4 py-2 text-[13px] font-medium text-zinc-950 transition hover:opacity-90 disabled:opacity-50"
+        >
+          {busy === "__all__" ? "Menyetujui…" : `Setujui semua (${pending.length}) — tayang + bypass semua domain`}
+        </button>
       ) : null}
       {pending.map((r) => (
         <div
