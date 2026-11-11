@@ -58,6 +58,8 @@ export type ServerHost =
   | "Putarin"
   | "UserBokep"
   | "Byse"
+  | "MXDrop"
+  | "Vidara"
   | "Videy"
   | "Lain";
 
@@ -69,6 +71,8 @@ export const HOST_RANK: Record<string, number> = {
   Streamtape: 4,
   Putarin: 5,
   UserBokep: 6,
+  MXDrop: 8,
+  Vidara: 8,
   Byse: 9,
 };
 const rankOf = (h: string): number => HOST_RANK[h] ?? 7;
