@@ -111,7 +111,7 @@ function inList(host, list) {
 }
 
 /**
- * "lulu" | "dood" | "byse" | "" for a hostname (no network).
+ * "lulu" | "dood" | "byse" | "mxdrop" | "vidara" | "" for a hostname (no network).
  * @param {unknown} hostname
  * @returns {"lulu" | "dood" | "byse" | "mxdrop" | "vidara" | ""}
  */
@@ -135,7 +135,7 @@ export function drpKindOfUrl(url) {
   const key = String(url || "");
   const hit = kindByUrl.get(key);
   if (hit !== undefined) return hit;
-  /** @type {"lulu" | "dood" | "byse" | ""} */
+  /** @type {"lulu" | "dood" | "byse" | "mxdrop" | "vidara" | ""} */
   let kind = "";
   try {
     kind = drpKindOfHost(new URL(key).hostname);
