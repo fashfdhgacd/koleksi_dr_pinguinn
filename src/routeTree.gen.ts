@@ -65,6 +65,8 @@ import { Route as ApiAnalyticsHealthRouteImport } from './routes/api/analytics.h
 import { Route as ApiAnalyticsHourlyRouteImport } from './routes/api/analytics.hourly'
 import { Route as ApiAnalyticsOverviewRouteImport } from './routes/api/analytics.overview'
 import { Route as ApiAnalyticsTrackRouteImport } from './routes/api/analytics.track'
+import { Route as ApiSatelitCatalogBlocklistDotjsonRouteImport } from './routes/api/satelit/catalog-blocklist[.]json'
+import { Route as ApiSatelitCatalogDotjsonRouteImport } from './routes/api/satelit/catalog[.]json'
 import { Route as ApiSatelitConfigDotjsonRouteImport } from './routes/api/satelit/config[.]json'
 import { Route as CariSlugHalamanPageRouteImport } from './routes/cari.$slug.halaman.$page'
 import { Route as KategoriSlugHalamanPageRouteImport } from './routes/kategori.$slug.halaman.$page'
@@ -349,6 +351,18 @@ const ApiAnalyticsTrackRoute = ApiAnalyticsTrackRouteImport.update({
   path: '/api/analytics/track',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSatelitCatalogBlocklistDotjsonRoute =
+  ApiSatelitCatalogBlocklistDotjsonRouteImport.update({
+    id: '/api/satelit/catalog-blocklist.json',
+    path: '/api/satelit/catalog-blocklist.json',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const ApiSatelitCatalogDotjsonRoute =
+  ApiSatelitCatalogDotjsonRouteImport.update({
+    id: '/api/satelit/catalog.json',
+    path: '/api/satelit/catalog.json',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiSatelitConfigDotjsonRoute = ApiSatelitConfigDotjsonRouteImport.update({
   id: '/api/satelit/config.json',
   path: '/api/satelit/config.json',
@@ -422,6 +436,8 @@ export interface FileRoutesByFullPath {
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
   '/api/analytics/overview': typeof ApiAnalyticsOverviewRoute
   '/api/analytics/track': typeof ApiAnalyticsTrackRoute
+  '/api/satelit/catalog-blocklist.json': typeof ApiSatelitCatalogBlocklistDotjsonRoute
+  '/api/satelit/catalog.json': typeof ApiSatelitCatalogDotjsonRoute
   '/api/satelit/config.json': typeof ApiSatelitConfigDotjsonRoute
   '/cari/$slug/halaman/$page': typeof CariSlugHalamanPageRoute
   '/kategori/$slug/halaman/$page': typeof KategoriSlugHalamanPageRoute
@@ -482,6 +498,8 @@ export interface FileRoutesByTo {
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
   '/api/analytics/overview': typeof ApiAnalyticsOverviewRoute
   '/api/analytics/track': typeof ApiAnalyticsTrackRoute
+  '/api/satelit/catalog-blocklist.json': typeof ApiSatelitCatalogBlocklistDotjsonRoute
+  '/api/satelit/catalog.json': typeof ApiSatelitCatalogDotjsonRoute
   '/api/satelit/config.json': typeof ApiSatelitConfigDotjsonRoute
   '/cari/$slug/halaman/$page': typeof CariSlugHalamanPageRoute
   '/kategori/$slug/halaman/$page': typeof KategoriSlugHalamanPageRoute
@@ -544,6 +562,8 @@ export interface FileRoutesById {
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
   '/api/analytics/overview': typeof ApiAnalyticsOverviewRoute
   '/api/analytics/track': typeof ApiAnalyticsTrackRoute
+  '/api/satelit/catalog-blocklist.json': typeof ApiSatelitCatalogBlocklistDotjsonRoute
+  '/api/satelit/catalog.json': typeof ApiSatelitCatalogDotjsonRoute
   '/api/satelit/config.json': typeof ApiSatelitConfigDotjsonRoute
   '/cari/$slug/halaman/$page': typeof CariSlugHalamanPageRoute
   '/kategori/$slug/halaman/$page': typeof KategoriSlugHalamanPageRoute
@@ -607,6 +627,8 @@ export interface FileRouteTypes {
     | '/api/analytics/hourly'
     | '/api/analytics/overview'
     | '/api/analytics/track'
+    | '/api/satelit/catalog-blocklist.json'
+    | '/api/satelit/catalog.json'
     | '/api/satelit/config.json'
     | '/cari/$slug/halaman/$page'
     | '/kategori/$slug/halaman/$page'
@@ -667,6 +689,8 @@ export interface FileRouteTypes {
     | '/api/analytics/hourly'
     | '/api/analytics/overview'
     | '/api/analytics/track'
+    | '/api/satelit/catalog-blocklist.json'
+    | '/api/satelit/catalog.json'
     | '/api/satelit/config.json'
     | '/cari/$slug/halaman/$page'
     | '/kategori/$slug/halaman/$page'
@@ -728,6 +752,8 @@ export interface FileRouteTypes {
     | '/api/analytics/hourly'
     | '/api/analytics/overview'
     | '/api/analytics/track'
+    | '/api/satelit/catalog-blocklist.json'
+    | '/api/satelit/catalog.json'
     | '/api/satelit/config.json'
     | '/cari/$slug/halaman/$page'
     | '/kategori/$slug/halaman/$page'
@@ -788,6 +814,8 @@ export interface RootRouteChildren {
   ApiAnalyticsHourlyRoute: typeof ApiAnalyticsHourlyRoute
   ApiAnalyticsOverviewRoute: typeof ApiAnalyticsOverviewRoute
   ApiAnalyticsTrackRoute: typeof ApiAnalyticsTrackRoute
+  ApiSatelitCatalogBlocklistDotjsonRoute: typeof ApiSatelitCatalogBlocklistDotjsonRoute
+  ApiSatelitCatalogDotjsonRoute: typeof ApiSatelitCatalogDotjsonRoute
   ApiSatelitConfigDotjsonRoute: typeof ApiSatelitConfigDotjsonRoute
 }
 
@@ -1185,6 +1213,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAnalyticsTrackRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/satelit/catalog-blocklist.json': {
+      id: '/api/satelit/catalog-blocklist.json'
+      path: '/api/satelit/catalog-blocklist.json'
+      fullPath: '/api/satelit/catalog-blocklist.json'
+      preLoaderRoute: typeof ApiSatelitCatalogBlocklistDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/satelit/catalog.json': {
+      id: '/api/satelit/catalog.json'
+      path: '/api/satelit/catalog.json'
+      fullPath: '/api/satelit/catalog.json'
+      preLoaderRoute: typeof ApiSatelitCatalogDotjsonRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/satelit/config.json': {
       id: '/api/satelit/config.json'
       path: '/api/satelit/config.json'
@@ -1302,6 +1344,9 @@ const rootRouteChildren: RootRouteChildren = {
   ApiAnalyticsHourlyRoute: ApiAnalyticsHourlyRoute,
   ApiAnalyticsOverviewRoute: ApiAnalyticsOverviewRoute,
   ApiAnalyticsTrackRoute: ApiAnalyticsTrackRoute,
+  ApiSatelitCatalogBlocklistDotjsonRoute:
+    ApiSatelitCatalogBlocklistDotjsonRoute,
+  ApiSatelitCatalogDotjsonRoute: ApiSatelitCatalogDotjsonRoute,
   ApiSatelitConfigDotjsonRoute: ApiSatelitConfigDotjsonRoute,
 }
 export const routeTree = rootRouteImport
