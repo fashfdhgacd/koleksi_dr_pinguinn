@@ -67,6 +67,9 @@ export function Shell({
                 <Link to="/teman" className="hover:text-white hover:underline">
                   Teman
                 </Link>
+                <a href="/en" hrefLang="en" lang="en" className="hover:text-white hover:underline">
+                  English
+                </a>
               </nav>
               <a
                 href="https://www.rtalabel.org/"

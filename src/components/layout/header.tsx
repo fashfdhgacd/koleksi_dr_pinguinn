@@ -7,6 +7,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { BRAND_LOGO_SRC } from "@/lib/brand-logo";
 import { prefetchCatalog } from "@/lib/catalog/client";
+import { langSwitchForPath } from "@/lib/catalog/en-landing";
 import { DEFAULT_PAGE_SIZE } from "@/lib/catalog/types";
 
 const QUICK_CATS = [
@@ -18,6 +19,35 @@ const QUICK_CATS = [
   { slug: "videy", label: "drpinguin videy" },
   { slug: "paling-disukai", label: "Paling Banyak Disukai" },
 ] as const;
+
+function LangSwitcher() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { lang, idHref, enHref } = langSwitchForPath(pathname);
+  const item = (href: string, label: string, current: boolean, hrefLang: string) => (
+    <a
+      href={href}
+      hrefLang={hrefLang}
+      lang={hrefLang}
+      aria-current={current ? "page" : undefined}
+      className={
+        current
+          ? "pixel rounded-none px-1.5 py-0.5 text-[11px] text-foreground"
+          : "pixel rounded-none px-1.5 py-0.5 text-[11px] text-white/70 hover:text-white"
+      }
+    >
+      {label}
+    </a>
+  );
+  return (
+    <nav aria-label="Language" className="flex shrink-0 items-center gap-0.5 border-l border-white/30 pl-2 sm:pl-3">
+      {item(idHref, "ID", lang === "id", "id")}
+      <span aria-hidden="true" className="text-[11px] text-white/40">
+        /
+      </span>
+      {item(enHref, "EN", lang === "en", "en")}
+    </nav>
+  );
+}
 
 export function Header({
   query,
@@ -163,6 +193,8 @@ export function Header({
             </button>
           ) : null}
         </form>
+
+        <LangSwitcher />
 
         <Button variant="ghost" size="icon" asChild aria-label="Semua kategori" className="size-10 shrink-0 rounded-none border border-white/40 hover:border-white/80 hover:bg-transparent sm:size-11">
           <Link to="/kategori">

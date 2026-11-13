@@ -3,13 +3,16 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { blockedIdSet, isBlockedId } from "./catalog-block.js";
 import { acceptLandingCard } from "./landing.ts";
-import { categoryHref, cariHref, homeHref, legacyPageRedirect, parseHalamanParam } from "./halaman.ts";
+import { categoryHref, cariHref, enHref, homeHref, landingPath, legacyPageRedirect, parseHalamanParam } from "./halaman.ts";
 
 test("halaman paths replace query pagination", () => {
   assert.equal(homeHref(1), "/");
   assert.equal(homeHref(2), "/halaman/2");
   assert.equal(categoryHref("jilbab", 3), "/kategori/jilbab/halaman/3");
   assert.equal(cariHref("bokep-ojol", 2), "/cari/bokep-ojol/halaman/2");
+  assert.equal(enHref("indo-hijab", 2), "/en/indo-hijab/halaman/2");
+  assert.equal(landingPath("en", "indonesian-amateur", 1), "/en/indonesian-amateur");
+  assert.equal(legacyPageRedirect("/en/indonesian-amateur", "?page=3"), "/en/indonesian-amateur/halaman/3");
   assert.equal(parseHalamanParam("2"), 2);
   assert.equal(parseHalamanParam("1"), null);
   assert.equal(legacyPageRedirect("/", "?page=2"), "/halaman/2");
