@@ -12,11 +12,10 @@ const DAYS = 14;
 
 const key = (process.env.TRAFFICSTARS_API_KEY || "").trim();
 if (!key) {
-  console.error(
-    "TRAFFICSTARS_API_KEY belum diisi. Tambahkan di GitHub: Settings > Secrets and variables > Actions > New repository secret " +
-      "(nama: TRAFFICSTARS_API_KEY, isi: API key dari https://admin.trafficstars.com/profile/).",
+  console.log(
+    "TRAFFICSTARS_API_KEY belum diisi. Sync dilewati. Tambahkan secret TRAFFICSTARS_API_KEY di GitHub (Settings > Secrets and variables > Actions) dari https://admin.trafficstars.com/profile/.",
   );
-  process.exit(1);
+  process.exit(0);
 }
 
 const ymd = (d) => d.toISOString().slice(0, 10);
@@ -40,17 +39,33 @@ async function fetchJson(url, init, label) {
   }
 }
 
-const auth = await fetchJson(
-  `${API}/v1/auth/token`,
-  {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: key }),
-  },
-  "auth/token",
-);
-if (!auth?.access_token)
-  throw new Error("auth/token: tidak ada access_token (API key salah/kedaluwarsa?)");
+let auth;
+try {
+  auth = await fetchJson(
+    `${API}/v1/auth/token`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ grant_type: "refresh_token", refresh_token: key }),
+    },
+    "auth/token",
+  );
+} catch (e) {
+  const msg = String(e?.message || e);
+  if (/invalid_grant|Invalid refresh token/i.test(msg)) {
+    console.log(
+      "TRAFFICSTARS_API_KEY kedaluwarsa atau ditolak TrafficStars (invalid_grant). Sync dilewati. Isi ulang secret TRAFFICSTARS_API_KEY di GitHub dari https://admin.trafficstars.com/profile/.",
+    );
+    process.exit(0);
+  }
+  throw e;
+}
+if (!auth?.access_token) {
+  console.log(
+    "TRAFFICSTARS_API_KEY tidak menghasilkan access_token. Sync dilewati. Isi ulang secret TRAFFICSTARS_API_KEY di GitHub dari https://admin.trafficstars.com/profile/.",
+  );
+  process.exit(0);
+}
 
 const now = new Date();
 const to = ymd(now);
