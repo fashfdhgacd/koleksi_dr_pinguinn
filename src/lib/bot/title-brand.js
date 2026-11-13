@@ -346,7 +346,7 @@ export function cleanUploadTitle(raw = "") {
   // File names pasted as titles (MXDrop share text, Nov 13 2026): "! STEPFATHERS CUM INSIDE ME.mp4".
   // Drop the junk punctuation in front and the video file extension at the end.
   t = t
-    .replace(/^[\s!¡?¿*~.,;:|•·\-–—]+/u, "")
+    .replace(/^[\s!¡?¿~.,;:|•·\-–—]+/u, "")
     .replace(/\.(?:mp4|mkv|mov|webm|avi|m4v|flv|3gp|ts)\s*$/i, "")
     .trim();
   if (isPlaceholderTitle(t)) return "Video";
