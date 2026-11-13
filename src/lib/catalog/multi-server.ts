@@ -107,6 +107,9 @@ const CJK = /[\u3040-\u30ff\u3400-\u9fff]/;
 function cleanTitle(t: unknown): string {
   let s = String(cleanUploadTitle(String(t || "")) || "")
     .normalize("NFKC")
+    // A file name pasted as the title ("! STEPFATHERS CUM INSIDE ME.mp4", MXDrop uploads Nov 13
+    // 2026) is the same video as the copy titled without the extension.
+    .replace(/\.(?:mp4|mkv|mov|webm|avi|m4v|flv|3gp)(?=$|[\s\-–—|:·,)\]])/giu, " ")
     .replace(/_+/g, " ")
     .replace(/\s+/g, " ")
     .trim();

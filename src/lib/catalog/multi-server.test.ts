@@ -374,3 +374,15 @@ describe("applyManualMerges", () => {
     assert.equal(borrowedTitles(items, groups).get("i2"), "Raja Episode 1 Asli");
   });
 });
+
+describe("mergeServers with MXDrop file-name titles", () => {
+  it("joins an MXDrop copy titled like a file name with the Lulu and Dood copies", () => {
+    const r = mergeServers([
+      { id: "lu-a", title: "STEPFATHERS CUM INSIDE ME - koleksidrpinguin.com", embed: "https://luluvdo.com/e/a", source: "LuluStream", createdAt: 1 },
+      { id: "dd-b", title: "! STEPFATHERS CUM INSIDE ME - koleksidrpinguin.com", embed: "https://playmogo.com/e/b", source: "DoodStream", createdAt: 2 },
+      { id: "mx-c", title: "! STEPFATHERS CUM INSIDE ME.mp4 - koleksidrpinguin.com", embed: "https://mxdrop.sx/e/c", source: "MXDrop", createdAt: 3 },
+    ]);
+    assert.equal(r.groups.length, 1);
+    assert.deepEqual(r.groups[0].hosts, ["LuluStream", "DoodStream", "MXDrop"]);
+  });
+});
