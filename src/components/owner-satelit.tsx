@@ -5,7 +5,7 @@ import { ownerToast } from "@/components/owner-dashboard-shared";
 import {
   AD_RULES_LABEL,
   SPOT_FIELDS,
-  TRAFFICSTARS_SITE_ID,
+  EXOCLICK_SITE,
   type SatelliteHost,
   type SpotKey,
   emptySpots,
@@ -17,7 +17,9 @@ const field = "h-10 w-full rounded-lg border border-white/[0.08] bg-[#0f0f11] px
 type VideoRow = { id: string; title: string; at: number; reason: "hidden" | "upload" };
 type SitePayload = {
   host: SatelliteHost;
-  trafficstarsSiteId: number;
+  exoclickSiteId: number;
+  lastSync: { syncedAt: string | null; trigger: string | null; added: number | null; upstream: number | null; ok: boolean | null; runUrl: string | null } | null;
+  liveCount: number | null;
   sync: boolean;
   folderUrl: string;
   spots: Record<SpotKey, string>;
@@ -61,6 +63,8 @@ export function OwnerSatelit({ secret, host }: { secret: string; host: Satellite
   const [spots, setSpots] = useState<Record<SpotKey, string>>(emptySpots());
   const [requestedAt, setRequestedAt] = useState<string | null>(null);
   const [lastSyncAt, setLastSyncAt] = useState<string | null>(null);
+  const [lastSync, setLastSync] = useState<SitePayload["lastSync"]>(null);
+  const [liveCount, setLiveCount] = useState<number | null>(null);
   const [videos, setVideos] = useState<VideoRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState("");
@@ -74,6 +78,8 @@ export function OwnerSatelit({ secret, host }: { secret: string; host: Satellite
     setSpots({ ...emptySpots(), ...site.spots });
     setRequestedAt(site.syncRequestedAt);
     setLastSyncAt(site.lastSyncAt);
+    setLastSync(site.lastSync ?? null);
+    setLiveCount(typeof site.liveCount === "number" ? site.liveCount : null);
     setVideos(Array.isArray(site.videos) ? site.videos : []);
   }, [host]);
 
@@ -149,7 +155,7 @@ export function OwnerSatelit({ secret, host }: { secret: string; host: Satellite
           <div>
             <h2 className="text-sm font-semibold text-zinc-50">Situs satelit · {host}</h2>
             <p className="mt-1 text-[12px] text-zinc-500">
-              TrafficStars site {TRAFFICSTARS_SITE_ID[host]}, menunggu persetujuan. Daftar blokir katalog tetap berlaku di semua situs.
+              ExoClick · {EXOCLICK_SITE[host].name} (site {EXOCLICK_SITE[host].siteId}), aktif · popunder zone {EXOCLICK_SITE[host].popunderZone}. Daftar blokir katalog tetap berlaku di semua situs.
             </p>
           </div>
           <a href={`https://${host}`} target="_blank" rel="noopener noreferrer" className="text-[13px] text-[#5eead4] hover:underline">
@@ -164,10 +170,32 @@ export function OwnerSatelit({ secret, host }: { secret: string; host: Satellite
           <div>
             <dt className="text-[11px] uppercase tracking-wide text-zinc-500">Sync terakhir</dt>
             <dd className="text-zinc-200">{fmt(lastSyncAt)}</dd>
+            {lastSync ? (
+              <dd className="text-[12px] text-zinc-500">
+                {lastSync.ok === false ? "Gagal ambil katalog · " : ""}
+                {lastSync.added != null ? `+${lastSync.added.toLocaleString("id-ID")} video baru` : ""}
+                {lastSync.trigger ? ` · ${lastSync.trigger === "daily" ? "harian" : lastSync.trigger === "panel-request" ? "dari panel" : "manual"}` : ""}
+                {lastSync.runUrl ? (
+                  <>
+                    {" · "}
+                    <a href={lastSync.runUrl} target="_blank" rel="noopener noreferrer" className="text-[#5eead4] hover:underline">
+                      log
+                    </a>
+                  </>
+                ) : null}
+              </dd>
+            ) : null}
+          </div>
+          <div>
+            <dt className="text-[11px] uppercase tracking-wide text-zinc-500">Video tayang</dt>
+            <dd className="text-zinc-200">{liveCount != null ? liveCount.toLocaleString("id-ID") : "—"}</dd>
           </div>
           <div>
             <dt className="text-[11px] uppercase tracking-wide text-zinc-500">Permintaan sync</dt>
             <dd className="text-zinc-200">{fmt(requestedAt)}</dd>
+            {requestedAt && (!lastSyncAt || Date.parse(requestedAt) > Date.parse(lastSyncAt)) ? (
+              <dd className="text-[12px] text-amber-300/80">Menunggu workflow satelit (biasanya beberapa menit, paling lama ±2 jam).</dd>
+            ) : null}
           </div>
         </dl>
         <div className="mt-4 flex flex-wrap gap-2">
@@ -202,7 +230,7 @@ export function OwnerSatelit({ secret, host }: { secret: string; host: Satellite
         </Collapse>
       ) : null}
 
-      <Collapse title="Iklan TrafficStars">
+      <Collapse title="Iklan ExoClick">
         <p className="text-[12px] text-zinc-400">{AD_RULES_LABEL}</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {SPOT_FIELDS.map((fieldDef) => (
@@ -212,13 +240,13 @@ export function OwnerSatelit({ secret, host }: { secret: string; host: Satellite
                 value={spots[fieldDef.key]}
                 onChange={(e) => setSpots((cur) => ({ ...cur, [fieldDef.key]: e.target.value.trim() }))}
                 inputMode="numeric"
-                placeholder="Kosong, menunggu persetujuan"
+                placeholder="Zone ID ExoClick"
                 className={`${field} mt-1`}
               />
             </label>
           ))}
         </div>
-        <p className="mt-2 text-[12px] text-zinc-500">Simpan lewat tombol Simpan di atas. Spot ID hanya angka.</p>
+        <p className="mt-2 text-[12px] text-zinc-500">Simpan lewat tombol Simpan di atas. Zone ID hanya angka; popunder kosong = zone terverifikasi di atas.</p>
       </Collapse>
 
       <Collapse title="Video di situs ini">

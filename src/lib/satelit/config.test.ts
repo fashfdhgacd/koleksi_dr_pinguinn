@@ -46,14 +46,15 @@ test("public config shape for an empty save", () => {
   );
   const videyy = pub.sites[0];
   const videq = pub.sites[1];
-  assert.equal(videyy.trafficstarsSiteId, 92720);
-  assert.equal(videq.trafficstarsSiteId, 92721);
+  assert.equal(videyy.adNetwork, "exoclick");
+  assert.equal(videyy.exoclickSiteId, 1119546);
+  assert.equal(videq.exoclickSiteId, 1119548);
   assert.equal(TRAFFICSTARS_SITE_ID["videyy.icu"], 92720);
   assert.equal(TRAFFICSTARS_SITE_ID["videqsss.icu"], 92721);
-  assert.equal(videyy.approval, "pending");
+  assert.equal(videyy.approval, "active");
   assert.equal(videyy.sync, true);
   assert.deepEqual(videyy.spots, {
-    popunder: "",
+    popunder: "6088480",
     preroll: "",
     inpagePush: "",
     videoSlider: "",
