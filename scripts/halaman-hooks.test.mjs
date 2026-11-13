@@ -12,6 +12,8 @@ const FILES = [
   "src/routes/kategori.$slug.halaman.$page.tsx",
   "src/routes/cari.$slug.tsx",
   "src/routes/cari.$slug.halaman.$page.tsx",
+  "src/routes/en.$slug.tsx",
+  "src/routes/en.$slug.halaman.$page.tsx",
 ];
 
 const HOOK_AT = /\b(?:use[A-Z][A-Za-z0-9]*|Route\.use[A-Za-z]+)\s*\(/y;

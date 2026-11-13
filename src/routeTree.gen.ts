@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as R2257RouteImport } from './routes/2257'
 import { Route as CampurRouteImport } from './routes/campur'
 import { Route as DmcaRouteImport } from './routes/dmca'
+import { Route as EnRouteImport } from './routes/en'
 import { Route as KategoriRouteImport } from './routes/kategori'
 import { Route as KontakRouteImport } from './routes/kontak'
 import { Route as LaporanRouteImport } from './routes/laporan'
@@ -55,6 +56,8 @@ import { Route as ApiVideyHitRouteImport } from './routes/api/videy-hit'
 import { Route as ApiVideySuggestRouteImport } from './routes/api/videy-suggest'
 import { Route as CariIndexRouteImport } from './routes/cari.index'
 import { Route as CariSlugRouteImport } from './routes/cari.$slug'
+import { Route as EnIndexRouteImport } from './routes/en.index'
+import { Route as EnSlugRouteImport } from './routes/en.$slug'
 import { Route as HalamanPageRouteImport } from './routes/halaman.$page'
 import { Route as KategoriIndexRouteImport } from './routes/kategori.index'
 import { Route as KategoriSlugRouteImport } from './routes/kategori.$slug'
@@ -69,6 +72,7 @@ import { Route as ApiSatelitCatalogBlocklistDotjsonRouteImport } from './routes/
 import { Route as ApiSatelitCatalogDotjsonRouteImport } from './routes/api/satelit/catalog[.]json'
 import { Route as ApiSatelitConfigDotjsonRouteImport } from './routes/api/satelit/config[.]json'
 import { Route as CariSlugHalamanPageRouteImport } from './routes/cari.$slug.halaman.$page'
+import { Route as EnSlugHalamanPageRouteImport } from './routes/en.$slug.halaman.$page'
 import { Route as KategoriSlugHalamanPageRouteImport } from './routes/kategori.$slug.halaman.$page'
 
 const IndexRoute = IndexRouteImport.update({
@@ -89,6 +93,11 @@ const CampurRoute = CampurRouteImport.update({
 const DmcaRoute = DmcaRouteImport.update({
   id: '/dmca',
   path: '/dmca',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EnRoute = EnRouteImport.update({
+  id: '/en',
+  path: '/en',
   getParentRoute: () => rootRouteImport,
 } as any)
 const KategoriRoute = KategoriRouteImport.update({
@@ -301,6 +310,16 @@ const CariSlugRoute = CariSlugRouteImport.update({
   path: '/cari/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const EnIndexRoute = EnIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => EnRoute,
+} as any)
+const EnSlugRoute = EnSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => EnRoute,
+} as any)
 const HalamanPageRoute = HalamanPageRouteImport.update({
   id: '/halaman/$page',
   path: '/halaman/$page',
@@ -373,6 +392,11 @@ const CariSlugHalamanPageRoute = CariSlugHalamanPageRouteImport.update({
   path: '/halaman/$page',
   getParentRoute: () => CariSlugRoute,
 } as any)
+const EnSlugHalamanPageRoute = EnSlugHalamanPageRouteImport.update({
+  id: '/halaman/$page',
+  path: '/halaman/$page',
+  getParentRoute: () => EnSlugRoute,
+} as any)
 const KategoriSlugHalamanPageRoute = KategoriSlugHalamanPageRouteImport.update({
   id: '/halaman/$page',
   path: '/halaman/$page',
@@ -384,6 +408,7 @@ export interface FileRoutesByFullPath {
   '/2257': typeof R2257Route
   '/campur': typeof CampurRoute
   '/dmca': typeof DmcaRoute
+  '/en': typeof EnRouteWithChildren
   '/kategori': typeof KategoriRouteWithChildren
   '/kontak': typeof KontakRoute
   '/laporan': typeof LaporanRoute
@@ -425,12 +450,14 @@ export interface FileRoutesByFullPath {
   '/api/videy-hit': typeof ApiVideyHitRoute
   '/api/videy-suggest': typeof ApiVideySuggestRoute
   '/cari/$slug': typeof CariSlugRouteWithChildren
+  '/en/$slug': typeof EnSlugRouteWithChildren
   '/halaman/$page': typeof HalamanPageRoute
   '/kategori/$slug': typeof KategoriSlugRouteWithChildren
   '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
   '/cari/': typeof CariIndexRoute
+  '/en/': typeof EnIndexRoute
   '/kategori/': typeof KategoriIndexRoute
   '/api/analytics/health': typeof ApiAnalyticsHealthRoute
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
@@ -440,6 +467,7 @@ export interface FileRoutesByFullPath {
   '/api/satelit/catalog.json': typeof ApiSatelitCatalogDotjsonRoute
   '/api/satelit/config.json': typeof ApiSatelitConfigDotjsonRoute
   '/cari/$slug/halaman/$page': typeof CariSlugHalamanPageRoute
+  '/en/$slug/halaman/$page': typeof EnSlugHalamanPageRoute
   '/kategori/$slug/halaman/$page': typeof KategoriSlugHalamanPageRoute
 }
 export interface FileRoutesByTo {
@@ -487,12 +515,14 @@ export interface FileRoutesByTo {
   '/api/videy-hit': typeof ApiVideyHitRoute
   '/api/videy-suggest': typeof ApiVideySuggestRoute
   '/cari/$slug': typeof CariSlugRouteWithChildren
+  '/en/$slug': typeof EnSlugRouteWithChildren
   '/halaman/$page': typeof HalamanPageRoute
   '/kategori/$slug': typeof KategoriSlugRouteWithChildren
   '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
   '/cari': typeof CariIndexRoute
+  '/en': typeof EnIndexRoute
   '/kategori': typeof KategoriIndexRoute
   '/api/analytics/health': typeof ApiAnalyticsHealthRoute
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
@@ -502,6 +532,7 @@ export interface FileRoutesByTo {
   '/api/satelit/catalog.json': typeof ApiSatelitCatalogDotjsonRoute
   '/api/satelit/config.json': typeof ApiSatelitConfigDotjsonRoute
   '/cari/$slug/halaman/$page': typeof CariSlugHalamanPageRoute
+  '/en/$slug/halaman/$page': typeof EnSlugHalamanPageRoute
   '/kategori/$slug/halaman/$page': typeof KategoriSlugHalamanPageRoute
 }
 export interface FileRoutesById {
@@ -510,6 +541,7 @@ export interface FileRoutesById {
   '/2257': typeof R2257Route
   '/campur': typeof CampurRoute
   '/dmca': typeof DmcaRoute
+  '/en': typeof EnRouteWithChildren
   '/kategori': typeof KategoriRouteWithChildren
   '/kontak': typeof KontakRoute
   '/laporan': typeof LaporanRoute
@@ -551,12 +583,14 @@ export interface FileRoutesById {
   '/api/videy-hit': typeof ApiVideyHitRoute
   '/api/videy-suggest': typeof ApiVideySuggestRoute
   '/cari/$slug': typeof CariSlugRouteWithChildren
+  '/en/$slug': typeof EnSlugRouteWithChildren
   '/halaman/$page': typeof HalamanPageRoute
   '/kategori/$slug': typeof KategoriSlugRouteWithChildren
   '/thumb/$id': typeof ThumbIdRoute
   '/v/$id': typeof VIdRoute
   '/watch/$id': typeof WatchIdRoute
   '/cari/': typeof CariIndexRoute
+  '/en/': typeof EnIndexRoute
   '/kategori/': typeof KategoriIndexRoute
   '/api/analytics/health': typeof ApiAnalyticsHealthRoute
   '/api/analytics/hourly': typeof ApiAnalyticsHourlyRoute
@@ -566,6 +600,7 @@ export interface FileRoutesById {
   '/api/satelit/catalog.json': typeof ApiSatelitCatalogDotjsonRoute
   '/api/satelit/config.json': typeof ApiSatelitConfigDotjsonRoute
   '/cari/$slug/halaman/$page': typeof CariSlugHalamanPageRoute
+  '/en/$slug/halaman/$page': typeof EnSlugHalamanPageRoute
   '/kategori/$slug/halaman/$page': typeof KategoriSlugHalamanPageRoute
 }
 export interface FileRouteTypes {
@@ -575,6 +610,7 @@ export interface FileRouteTypes {
     | '/2257'
     | '/campur'
     | '/dmca'
+    | '/en'
     | '/kategori'
     | '/kontak'
     | '/laporan'
@@ -616,12 +652,14 @@ export interface FileRouteTypes {
     | '/api/videy-hit'
     | '/api/videy-suggest'
     | '/cari/$slug'
+    | '/en/$slug'
     | '/halaman/$page'
     | '/kategori/$slug'
     | '/thumb/$id'
     | '/v/$id'
     | '/watch/$id'
     | '/cari/'
+    | '/en/'
     | '/kategori/'
     | '/api/analytics/health'
     | '/api/analytics/hourly'
@@ -631,6 +669,7 @@ export interface FileRouteTypes {
     | '/api/satelit/catalog.json'
     | '/api/satelit/config.json'
     | '/cari/$slug/halaman/$page'
+    | '/en/$slug/halaman/$page'
     | '/kategori/$slug/halaman/$page'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -678,12 +717,14 @@ export interface FileRouteTypes {
     | '/api/videy-hit'
     | '/api/videy-suggest'
     | '/cari/$slug'
+    | '/en/$slug'
     | '/halaman/$page'
     | '/kategori/$slug'
     | '/thumb/$id'
     | '/v/$id'
     | '/watch/$id'
     | '/cari'
+    | '/en'
     | '/kategori'
     | '/api/analytics/health'
     | '/api/analytics/hourly'
@@ -693,6 +734,7 @@ export interface FileRouteTypes {
     | '/api/satelit/catalog.json'
     | '/api/satelit/config.json'
     | '/cari/$slug/halaman/$page'
+    | '/en/$slug/halaman/$page'
     | '/kategori/$slug/halaman/$page'
   id:
     | '__root__'
@@ -700,6 +742,7 @@ export interface FileRouteTypes {
     | '/2257'
     | '/campur'
     | '/dmca'
+    | '/en'
     | '/kategori'
     | '/kontak'
     | '/laporan'
@@ -741,12 +784,14 @@ export interface FileRouteTypes {
     | '/api/videy-hit'
     | '/api/videy-suggest'
     | '/cari/$slug'
+    | '/en/$slug'
     | '/halaman/$page'
     | '/kategori/$slug'
     | '/thumb/$id'
     | '/v/$id'
     | '/watch/$id'
     | '/cari/'
+    | '/en/'
     | '/kategori/'
     | '/api/analytics/health'
     | '/api/analytics/hourly'
@@ -756,6 +801,7 @@ export interface FileRouteTypes {
     | '/api/satelit/catalog.json'
     | '/api/satelit/config.json'
     | '/cari/$slug/halaman/$page'
+    | '/en/$slug/halaman/$page'
     | '/kategori/$slug/halaman/$page'
   fileRoutesById: FileRoutesById
 }
@@ -764,6 +810,7 @@ export interface RootRouteChildren {
   R2257Route: typeof R2257Route
   CampurRoute: typeof CampurRoute
   DmcaRoute: typeof DmcaRoute
+  EnRoute: typeof EnRouteWithChildren
   KategoriRoute: typeof KategoriRouteWithChildren
   KontakRoute: typeof KontakRoute
   LaporanRoute: typeof LaporanRoute
@@ -847,6 +894,13 @@ declare module '@tanstack/react-router' {
       path: '/dmca'
       fullPath: '/dmca'
       preLoaderRoute: typeof DmcaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/en': {
+      id: '/en'
+      path: '/en'
+      fullPath: '/en'
+      preLoaderRoute: typeof EnRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/kategori': {
@@ -1143,6 +1197,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CariSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/en/': {
+      id: '/en/'
+      path: '/'
+      fullPath: '/en/'
+      preLoaderRoute: typeof EnIndexRouteImport
+      parentRoute: typeof EnRoute
+    }
+    '/en/$slug': {
+      id: '/en/$slug'
+      path: '/$slug'
+      fullPath: '/en/$slug'
+      preLoaderRoute: typeof EnSlugRouteImport
+      parentRoute: typeof EnRoute
+    }
     '/halaman/$page': {
       id: '/halaman/$page'
       path: '/halaman/$page'
@@ -1241,6 +1309,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CariSlugHalamanPageRouteImport
       parentRoute: typeof CariSlugRoute
     }
+    '/en/$slug/halaman/$page': {
+      id: '/en/$slug/halaman/$page'
+      path: '/halaman/$page'
+      fullPath: '/en/$slug/halaman/$page'
+      preLoaderRoute: typeof EnSlugHalamanPageRouteImport
+      parentRoute: typeof EnSlugRoute
+    }
     '/kategori/$slug/halaman/$page': {
       id: '/kategori/$slug/halaman/$page'
       path: '/halaman/$page'
@@ -1250,6 +1325,29 @@ declare module '@tanstack/react-router' {
     }
   }
 }
+
+interface EnSlugRouteChildren {
+  EnSlugHalamanPageRoute: typeof EnSlugHalamanPageRoute
+}
+
+const EnSlugRouteChildren: EnSlugRouteChildren = {
+  EnSlugHalamanPageRoute: EnSlugHalamanPageRoute,
+}
+
+const EnSlugRouteWithChildren =
+  EnSlugRoute._addFileChildren(EnSlugRouteChildren)
+
+interface EnRouteChildren {
+  EnSlugRoute: typeof EnSlugRouteWithChildren
+  EnIndexRoute: typeof EnIndexRoute
+}
+
+const EnRouteChildren: EnRouteChildren = {
+  EnSlugRoute: EnSlugRouteWithChildren,
+  EnIndexRoute: EnIndexRoute,
+}
+
+const EnRouteWithChildren = EnRoute._addFileChildren(EnRouteChildren)
 
 interface KategoriSlugRouteChildren {
   KategoriSlugHalamanPageRoute: typeof KategoriSlugHalamanPageRoute
@@ -1294,6 +1392,7 @@ const rootRouteChildren: RootRouteChildren = {
   R2257Route: R2257Route,
   CampurRoute: CampurRoute,
   DmcaRoute: DmcaRoute,
+  EnRoute: EnRouteWithChildren,
   KategoriRoute: KategoriRouteWithChildren,
   KontakRoute: KontakRoute,
   LaporanRoute: LaporanRoute,

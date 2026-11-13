@@ -89,7 +89,12 @@ export default async function cacheHeadersMiddleware(
   if (
     type.includes("text/html") &&
     result.status === 200 &&
-    (path === "/kategori" || path.startsWith("/kategori/"))
+    (path === "/kategori" ||
+      path.startsWith("/kategori/") ||
+      path === "/cari" ||
+      path.startsWith("/cari/") ||
+      path === "/en" ||
+      path.startsWith("/en/"))
   ) {
     return withHeaders(result, "public, max-age=60, s-maxage=1800, stale-while-revalidate=86400");
   }

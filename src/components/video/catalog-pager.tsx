@@ -18,6 +18,7 @@ export function CatalogPager({
   onPage,
   basePath,
   pageHref,
+  lang = "id",
 }: {
   page: number;
   total: number;
@@ -30,6 +31,7 @@ export function CatalogPager({
   basePath?: string;
   /** Absolute path for page n, e.g. "/halaman/2". Wins over basePath so crawlers see /halaman links. */
   pageHref?: (page: number) => string;
+  lang?: "id" | "en";
 }) {
   const totalPages = Math.max(1, Math.ceil((total || 0) / Math.max(1, limit)));
   if (totalPages <= 1) {
@@ -82,17 +84,17 @@ export function CatalogPager({
   }
 
   return (
-    <nav className="relative z-10 mt-10 flex flex-col items-center gap-5 sm:mt-14 sm:gap-7" aria-label="Halaman katalog">
+    <nav className="relative z-10 mt-10 flex flex-col items-center gap-5 sm:mt-14 sm:gap-7" aria-label={lang === "en" ? "Catalog pages" : "Halaman katalog"}>
       <p className="pixel text-center text-xs text-white/85 sm:text-base">
-        Halaman {page.toLocaleString("id-ID")} dari {totalPages.toLocaleString("id-ID")}
+        {lang === "en" ? "Page" : "Halaman"} {page.toLocaleString(lang === "en" ? "en" : "id-ID")} {lang === "en" ? "of" : "dari"} {totalPages.toLocaleString(lang === "en" ? "en" : "id-ID")}
         {" · "}
-        {total.toLocaleString("id-ID")} video
+        {total.toLocaleString(lang === "en" ? "en" : "id-ID")} video
       </p>
       <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3.5">
         <a
           {...(page > 1 ? { ...linkProps(page - 1), rel: "prev" } : { "aria-disabled": true })}
           className={`${btn} px-3 text-white sm:px-5`}
-          aria-label="Halaman sebelumnya"
+          aria-label={lang === "en" ? "Previous page" : "Halaman sebelumnya"}
         >
           <span aria-hidden="true" className="text-lg leading-none sm:text-2xl">←</span>
         </a>
@@ -128,7 +130,7 @@ export function CatalogPager({
         <a
           {...(page < totalPages ? { ...linkProps(page + 1), rel: "next" } : { "aria-disabled": true })}
           className={`${btn} gap-2 px-3 text-white sm:gap-3 sm:px-5`}
-          aria-label="Halaman berikutnya"
+          aria-label={lang === "en" ? "Next page" : "Halaman berikutnya"}
         >
           <span>Next</span>
           <span aria-hidden="true" className="text-lg leading-none sm:text-2xl">→</span>

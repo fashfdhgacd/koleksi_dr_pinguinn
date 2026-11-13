@@ -13,7 +13,16 @@ export function categoryHref(slug: string, page: number, periode?: string | null
 }
 
 export function cariHref(slug: string, page: number): string {
-  return page > 1 ? `/cari/${encodeURIComponent(slug)}/halaman/${page}` : `/cari/${encodeURIComponent(slug)}`;
+  return landingPath("cari", slug, page);
+}
+
+export function enHref(slug: string, page: number): string {
+  return landingPath("en", slug, page);
+}
+
+export function landingPath(root: "cari" | "en", slug: string, page: number): string {
+  const base = `/${root}/${encodeURIComponent(slug)}`;
+  return page > 1 ? `${base}/halaman/${page}` : base;
 }
 
 /** Path segment for /halaman/N. Page 1 is not a halaman URL. */
@@ -34,7 +43,7 @@ export function legacyPageRedirect(pathname: string, search = ""): string | null
   const homeHal = /^\/halaman\/([1-9]\d*)$/.exec(path);
   if (homeHal && Number(homeHal[1]) < 2) return "/";
 
-  const nested = /^\/(kategori|cari)\/([^/]+)\/halaman\/([1-9]\d*)$/.exec(path);
+  const nested = /^\/(kategori|cari|en)\/([^/]+)\/halaman\/([1-9]\d*)$/.exec(path);
   if (nested && Number(nested[3]) < 2) {
     url.searchParams.delete("page");
     const qs = url.searchParams.toString();
@@ -54,5 +63,7 @@ export function legacyPageRedirect(pathname: string, search = ""): string | null
   if (cat) return `/kategori/${cat[1]}/halaman/${n}${tail}`;
   const cari = /^\/cari\/([^/]+)$/.exec(path);
   if (cari) return `/cari/${cari[1]}/halaman/${n}${tail}`;
+  const en = /^\/en\/([^/]+)$/.exec(path);
+  if (en) return `/en/${en[1]}/halaman/${n}${tail}`;
   return null;
 }

@@ -1,4 +1,4 @@
-import { createRootRoute, HeadContent, Outlet, Scripts, redirect } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, Scripts, redirect, useRouterState } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PresencePing } from "@/components/presence-ping";
@@ -89,8 +89,14 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+  const lang = useRouterState({
+    select: (s) => {
+      const p = s.location.pathname;
+      return p === "/en" || p.startsWith("/en/") ? "en" : "id";
+    },
+  });
   return (
-    <html lang="id" suppressHydrationWarning className="antialiased">
+    <html lang={lang} suppressHydrationWarning className="antialiased">
       <head>
         <HeadContent />
       </head>

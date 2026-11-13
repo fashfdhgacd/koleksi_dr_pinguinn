@@ -6,6 +6,8 @@
 import { DEFAULT_PAGE_SIZE, type CategoryInfo } from "../../src/lib/catalog/types";
 import { listCategory, listLatest, listListedCategories } from "../../src/lib/catalog/local";
 import { LANDINGS, LANDING_INDEX_PAGES, LANDING_MIN_VIDEOS, LANDING_PAGE_SIZE, LANDING_POOL, acceptLandingCard } from "../../src/lib/catalog/landing";
+import { enHref } from "../../src/lib/catalog/halaman";
+import { indexableEnLandings } from "../../src/lib/catalog/en-landing-query";
 import { isMinorContentTitle } from "../../src/lib/catalog/minor-detector.js";
 import { isSeoBlockedId } from "../../src/lib/catalog/seo-block";
 import { STATIC_PAGE_LASTMOD } from "../../src/lib/catalog/lastmod.js";
@@ -86,6 +88,7 @@ function pageEntries(
   mods: { all?: string; bySlug: Map<string, string> },
   landings: Array<{ slug: string; pages: number }> = [],
   homePages = 1,
+  enLandings: Array<{ slug: string; pages: number }> = [],
 ): string[] {
   const out: string[] = [
     urlEntry(`${SITE_ORIGIN}/`, { changefreq: "hourly", priority: "1.0", lastmod: mods.all }),
@@ -128,6 +131,13 @@ function pageEntries(
     out.push(urlEntry(`${SITE_ORIGIN}/cari/${landing.slug}`, { changefreq: "daily", priority: "0.6" }));
     for (let n = 2; n <= landing.pages; n++) {
       out.push(urlEntry(`${SITE_ORIGIN}/cari/${landing.slug}/halaman/${n}`, { changefreq: "daily", priority: "0.5" }));
+    }
+  }
+  out.push(urlEntry(`${SITE_ORIGIN}/en`, { changefreq: "weekly", priority: "0.6", lastmod: "2026-11-13" }));
+  for (const landing of enLandings) {
+    out.push(urlEntry(`${SITE_ORIGIN}${enHref(landing.slug, 1)}`, { changefreq: "daily", priority: "0.6" }));
+    for (let n = 2; n <= landing.pages; n++) {
+      out.push(urlEntry(`${SITE_ORIGIN}${enHref(landing.slug, n)}`, { changefreq: "daily", priority: "0.5" }));
     }
   }
   for (const path of LEGAL_PATHS) {
@@ -216,14 +226,15 @@ function errorXml(method: string, message: string): Response {
 }
 
 async function buildPagesXml(): Promise<string> {
-  const [categories, entries, landings, latest] = await Promise.all([
+  const [categories, entries, landings, enLandings, latest] = await Promise.all([
     listListedCategories({ sitemap: true }),
     listSitemapWatchEntries(),
     indexableLandings(),
+    indexableEnLandings(),
     listLatest(1, 1).catch(() => ({ total: 0 })),
   ]);
   const homePages = Math.min(5, Math.max(1, Math.ceil((latest.total || 0) / DEFAULT_PAGE_SIZE)));
-  return wrapUrlset(pageEntries(categories, listingLastmods(entries), landings, homePages));
+  return wrapUrlset(pageEntries(categories, listingLastmods(entries), landings, homePages, enLandings));
 }
 
 async function buildWatchXml(chunkIndex?: number): Promise<{ xml: string; total: number; chunks: number }> {
