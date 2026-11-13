@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseIndexNowState, planIndexNowSync } from "./lib/indexnow-sync-lib.mjs";
+import { parseIndexNowState, planIndexNowSync, prioritizeIndexNow } from "./lib/indexnow-sync-lib.mjs";
 
 test("state parsing normalizes CRLF so unchanged URLs do not look changed", () => {
   assert.deepEqual(
@@ -60,4 +60,10 @@ test("--all still preserves removed URLs beyond the deletion cap", () => {
   assert.equal(plan.send.length, 2001);
   assert.equal(plan.next.size, 502);
   assert.equal(plan.next.has("/watch/2000"), true);
+});
+
+test("prioritizeIndexNow sends brand-new /watch pages first", () => {
+  const prev = new Map([["/watch/old", "a"], ["/kategori/x", "a"]]);
+  const out = prioritizeIndexNow(["/kategori/x", "/halaman/9", "/watch/old", "/watch/new1", "/watch/new2"], prev);
+  assert.deepEqual(out, ["/watch/new1", "/watch/new2", "/halaman/9", "/kategori/x", "/watch/old"]);
 });
