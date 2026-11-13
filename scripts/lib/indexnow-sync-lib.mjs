@@ -26,3 +26,17 @@ export function planIndexNowSync(live, previous, { all = false, maxRemoved = 200
     next,
   };
 }
+
+/**
+ * Submission order: brand-new /watch pages, then other new pages, then changed pages, then
+ * removed ones. Stable within each group.
+ */
+export function prioritizeIndexNow(paths, previous) {
+  const rank = (p) => {
+    const isNew = !previous || !previous.has(p);
+    if (isNew && p.startsWith("/watch/")) return 0;
+    if (isNew) return 1;
+    return 2;
+  };
+  return paths.map((p, i) => [p, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([p]) => p);
+}
