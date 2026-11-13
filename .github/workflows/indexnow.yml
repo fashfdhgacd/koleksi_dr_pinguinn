@@ -12,6 +12,12 @@ on:
   workflow_run:
     workflows: ["Daily video sync"]
     types: [completed]
+  # Bot / owner uploads commit the catalog JSON; announce those new /watch pages right after deploy.
+  push:
+    branches: [main]
+    paths:
+      - "data/videos-latest*.json"
+      - "data/putarin-latest*.json"
   workflow_dispatch:
     inputs:
       all:
@@ -43,6 +49,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "20"
+
+      # Upload commit: poll the live sitemap (max ~8 min) until the new pages are deployed,
+      # instead of a fixed sleep, so each run stays short on Actions minutes.
+      - name: Wait until the upload is live
+        if: github.event_name == 'push'
+        run: |
+          for i in $(seq 1 16); do
+            node scripts/indexnow-sync.mjs --dry-run | grep -qE "baru/berubah: [1-9]" && exit 0
+            sleep 30
+          done
+          echo "Belum ada URL baru di sitemap live; lanjut (run terjadwal akan menyusul)."
 
       - name: Submit new/changed URLs
         run: node scripts/indexnow-sync.mjs ${{ inputs.all && '--all' || '' }}
