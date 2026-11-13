@@ -155,7 +155,7 @@
 /kontak 2026-11-04
 /privasi 2026-10-01
 /syarat 2026-10-01
-/teman 2026-10-15
+/teman 2026-11-13
 /tentang 2026-11-02
 /watch/00jxDRD4f7If -
 /watch/00r0vPrli4v0 -
