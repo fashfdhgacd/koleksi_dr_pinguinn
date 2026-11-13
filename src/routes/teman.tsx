@@ -11,6 +11,16 @@ const DESCRIPTION =
 /** Reciprocal links for adult-site directories that list koleksidrpinguin.com. */
 export const TEMAN_LINKS = [
   {
+    name: "Videy Hub (videyy.icu)",
+    href: "https://videyy.icu/",
+    note: "Situs saudara: semua video Videy viral dan terbaru, update tiap hari.",
+  },
+  {
+    name: "Videqsss (videqsss.icu)",
+    href: "https://videqsss.icu/",
+    note: "Situs saudara: bokep Indo dari IndoAV dan UserBokep terbaru.",
+  },
+  {
     name: "Porn Whitelist: Indonesian Porn Sites",
     href: "https://pornwhitelist.com/indonesian-porn-sites/",
     note: "Direktori situs bokep Indonesia yang sudah dicek.",
@@ -59,7 +69,7 @@ function Page() {
   return (
     <LegalPage title="Situs Teman & Direktori">
       <p>
-        Situs dan direktori di bawah ini mencantumkan <strong>koleksidrpinguin.com</strong>. Semuanya khusus untuk
+        Situs saudara dan direktori di bawah ini terhubung dengan <strong>koleksidrpinguin.com</strong>. Semuanya khusus untuk
         pengunjung 18+.
       </p>
       <ul className="space-y-3">
