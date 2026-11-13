@@ -30,11 +30,22 @@ export const PANEL_SITES: { id: PanelSite; label: string }[] = [
   { id: "videqsss.icu", label: "videqsss.icu" },
 ];
 
-/** TrafficStars site ids. Spots stay empty until those sites are approved. */
+/** Old TrafficStars site ids (both sites were rejected, Nov 13 2026). Kept for reference only. */
 export const TRAFFICSTARS_SITE_ID: Record<SatelliteHost, number> = {
   "videyy.icu": 92720,
   "videqsss.icu": 92721,
 };
+
+/** ExoClick publisher sites (verified Nov 13 2026) and their popunder zones. */
+export const EXOCLICK_SITE: Record<SatelliteHost, { siteId: number; name: string; popunderZone: string }> = {
+  "videyy.icu": { siteId: 1119546, name: "Videy Hub", popunderZone: "6088480" },
+  "videqsss.icu": { siteId: 1119548, name: "Videqsss", popunderZone: "6088490" },
+};
+
+/** Saved zone ids, with the verified ExoClick popunder zone when the owner left it empty. */
+export function effectiveSpots(host: SatelliteHost, spots: Record<SpotKey, string>): Record<SpotKey, string> {
+  return { ...spots, popunder: spots.popunder || EXOCLICK_SITE[host].popunderZone };
+}
 
 /** Same caps as the main site (page-pop-cap.ts PAGE_POP_MAX_PER_DAY, card-popunder.ts POP_MAX_VIDEY). */
 export const PAGE_POPUNDER_MAX_PER_DAY = 3;
@@ -269,8 +280,9 @@ function unionIds(site: SiteSettings): string[] {
 export type PublicSite = {
   host: SatelliteHost;
   sync: boolean;
-  trafficstarsSiteId: number;
-  approval: "pending" | "spots-set";
+  adNetwork: "exoclick";
+  exoclickSiteId: number;
+  approval: "active";
   spots: Record<SpotKey, string>;
   hiddenIds: string[];
   uploadExcludeIds: string[];
@@ -321,9 +333,10 @@ export function toPublicConfig(state: SatelitState, blockedIds: readonly string[
       const row: PublicSite = {
         host,
         sync: site.sync,
-        trafficstarsSiteId: TRAFFICSTARS_SITE_ID[host],
-        approval: spotsApproval(site.spots),
-        spots: { ...site.spots },
+        adNetwork: "exoclick",
+        exoclickSiteId: EXOCLICK_SITE[host].siteId,
+        approval: "active",
+        spots: effectiveSpots(host, site.spots),
         hiddenIds: sortedIds(site.hidden),
         uploadExcludeIds: sortedIds(site.exclude),
         skipIds: unionIds(site),

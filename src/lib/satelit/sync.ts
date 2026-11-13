@@ -1,6 +1,7 @@
 /**
  * "Sync sekarang" without a new Worker env var.
- * 1. repository_dispatch on fashfdhgacd/vidy using the GitHub token the bot already has.
+ * 1. workflow_dispatch of vidy "Videy catalog sync" (then repository_dispatch satelit-sync) with the
+ *    GitHub token the bot already has (Worker secret GH_TOKEN, read from cloudflare:workers env).
  * 2. Otherwise POST https://<host>/api/satelit/sync (no secret). A 404 is expected until
  *    that worker grows the route.
  * Either way the owner save records syncRequestedAt in the public config, which the
@@ -24,37 +25,60 @@ function githubToken(env: Record<string, string | undefined>): string {
     .trim();
 }
 
+/** Worker secrets live on the cloudflare:workers env; process.env is only a fallback (tests, node). */
+async function workerEnv(): Promise<Record<string, string | undefined>> {
+  try {
+    const mod = (await import("cloudflare:workers")) as { env?: Record<string, unknown> };
+    const out: Record<string, string | undefined> = {};
+    for (const key of ["GITHUB_TOKEN", "GH_TOKEN"]) {
+      const v = mod.env?.[key];
+      if (typeof v === "string" && v) out[key] = v;
+    }
+    if (out.GITHUB_TOKEN || out.GH_TOKEN) return out;
+  } catch {
+    /* not on Workers */
+  }
+  return process.env as Record<string, string | undefined>;
+}
+
+const GH_HEADERS = (token: string) => ({
+  Authorization: `Bearer ${token}`,
+  Accept: "application/vnd.github+json",
+  "X-GitHub-Api-Version": "2022-11-28",
+  "User-Agent": "kdp-satelit",
+  "Content-Type": "application/json",
+});
+
 export async function triggerSatelliteSync(
   host: SatelliteHost,
-  env: Record<string, string | undefined> = process.env,
+  env?: Record<string, string | undefined>,
   fetchImpl: FetchLike = fetch,
 ): Promise<SyncTrigger> {
-  const token = githubToken(env);
+  const token = githubToken(env ?? (await workerEnv()));
   if (token) {
-    try {
-      const res = await fetchImpl("https://api.github.com/repos/fashfdhgacd/vidy/dispatches", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-          "User-Agent": "kdp-satelit",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ event_type: "satelit-sync", client_payload: { host } }),
-        signal: AbortSignal.timeout(8000),
-      });
-      if (res.status === 204) {
-        return {
-          triggered: true,
-          via: "github",
-          detail:
-            "Sinyal sync terkirim ke repo satelit. Workflow hanya berjalan jika mendengar event satelit-sync. Permintaan juga tercatat di config.",
-          lastSyncAt: null,
-        };
+    const attempts: Array<[string, unknown]> = [
+      ["https://api.github.com/repos/fashfdhgacd/vidy/actions/workflows/videyy-catalog-sync.yml/dispatches", { ref: "main" }],
+      ["https://api.github.com/repos/fashfdhgacd/vidy/dispatches", { event_type: "satelit-sync", client_payload: { host } }],
+    ];
+    for (const [url, body] of attempts) {
+      try {
+        const res = await fetchImpl(url, {
+          method: "POST",
+          headers: GH_HEADERS(token),
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(8000),
+        });
+        if (res.status === 204) {
+          return {
+            triggered: true,
+            via: "github",
+            detail: "Sync satelit dimulai (GitHub Actions). Selesai ±1–3 menit, lalu situs deploy ulang.",
+            lastSyncAt: null,
+          };
+        }
+      } catch {
+        /* next attempt */
       }
-    } catch {
-      /* fall through to the site itself */
     }
   }
 
@@ -82,7 +106,7 @@ export async function triggerSatelliteSync(
   return {
     triggered: false,
     via: "config",
-    detail: "Permintaan disimpan di config. Sync harian satelit akan membacanya. Pemicu langsung tidak menjawab.",
+    detail: "Permintaan disimpan. Workflow satelit mengecek permintaan tiap 2 jam dan menjalankan sync.",
     lastSyncAt: null,
   };
 }
