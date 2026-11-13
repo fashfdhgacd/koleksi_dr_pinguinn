@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // Cek kesehatan situs harian (dipanggil .github/workflows/site-health.yml). Cuma GET publik,
 // ~20 request per run: beranda, /kategori, sitemap (+ chunk watch), 10 /watch acak, beberapa /thumb,
-// dan domain redirect harus 301. Exit 1 kalau ada masalah -> job gagal -> GitHub email ke pemilik.
+// dan situs satelit (videyy.icu, videqsss.icu) harus 200 tanpa redirect. Exit 1 kalau ada masalah -> job gagal -> GitHub email ke pemilik.
 const BASE = (process.env.SITE_URL || "https://koleksidrpinguin.com").replace(/\/$/, "");
 const MIN_WATCH = Number(process.env.MIN_WATCH_URLS || 9000);
 const SAMPLE = Number(process.env.WATCH_SAMPLE || 10);
 const THUMBS = 3;
-const REDIRECTS = ["videqsss.icu", "videyy.icu"];
+// Satellite sites are standalone now (own Worker, own catalog): 200 with no redirect.
+const SATELLITES = ["videqsss.icu", "videyy.icu"];
 const UA = "koleksi-site-health/1.0 (+github-actions)";
 
 const problems = [];
@@ -71,10 +72,10 @@ for (const [i, u] of pick.entries()) {
   }
 }
 
-for (const d of REDIRECTS) {
+for (const d of SATELLITES) {
   const r = await get(`https://${d}/`, { redirect: "manual" });
-  const ok = r.status === 301 && /koleksidrpinguin\.com/.test(r.location);
-  record(`https://${d}/ -> ${r.location || "-"}`, r, ok, r.error || (ok ? "" : `harus 301 ke koleksidrpinguin.com, dapat ${r.status}`));
+  const ok = r.status === 200;
+  record(`https://${d}/`, r, ok, r.error || (ok ? "" : `harus 200 tanpa redirect, dapat ${r.status}${r.location ? ` -> ${r.location}` : ""}`));
 }
 
 // Dead-man check: /api/cron-status publik dan cuma berisi timestamp/status. Cron Worker jalan tiap
