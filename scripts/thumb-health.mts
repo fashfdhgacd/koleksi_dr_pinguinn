@@ -7,12 +7,15 @@
 //  - missing R2 copy: same /thumb call resolves + stores it (or 302s to the brand poster = "missing").
 //  - Putarin without a poster entry: resolve the embed's player.image (src/lib/puterin-poster.ts) and
 //    add it to data/latest-posters.json (map file only: no chunk files touched).
+//  - A dead anipop URL is not a source (the player still returns it, and it 404s). mx-/dd-/lu-/by-
+//    ids are resolvable from the id, so a missing R2 object is repaired through /thumb.
 // Writes data/thumb-health.json with counts per source. DRY_RUN=1: classify only, no requests to
 // /thumb, no file writes.  Usage: npx tsx --tsconfig tsconfig.json scripts/thumb-health.mts
 import fs from "node:fs";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { isPlaceholderMd5, isPlaceholderUrl, MIN_IMAGE_BYTES } from "../src/lib/image-guard";
+import { isDeadPosterUrl, workerCanResolve } from "../src/lib/poster-sources.js";
 import { resolvePuterinImage } from "../src/lib/puterin-poster";
 import { javCoverFromTitle, isPutarin, isVidey } from "../src/lib/catalog/local-shared";
 import { attemptThumbRepair, isCloudflareChallenge, poolUntil } from "./lib/thumb-health-http.mjs";
@@ -138,7 +141,9 @@ const work: Array<{ src: string; it: Item }> = [];
 for (const [src, items] of sources) {
   stats[src] = { total: 0, ok: 0, placeholder: 0, small: 0, blank: 0, notimage: 0, absent: 0, error: 0, repaired: 0, stillBad: 0, repairError: 0, repairDeferred: 0, noSource: 0, putarinResolved: 0 };
   for (const it of items) {
-    if (!it.id || seen.has(it.id) || it.hidden || isVidey(it as never)) continue;
+    // Safety holds and dead Videy stay out. embed-review (Vidara/g1 on videyy) is still a catalog id.
+    if (!it.id || seen.has(it.id) || isVidey(it as never)) continue;
+    if (it.hidden && /school|teacher-student|detector-review|dead-videy/i.test(String((it as { hidden_reason?: string }).hidden_reason || ""))) continue;
     seen.add(it.id);
     stats[src].total++;
     work.push({ src, it });
@@ -152,17 +157,26 @@ const badIds: Array<{ id: string; src: string; verdict: string }> = [];
 let checked = 0;
 await poolUntil(work, 10, async ({ src, it }) => {
   const s = stats[src];
-  let poster = knownPoster(it);
+  const rawPoster = knownPoster(it);
+  // static.anipop.xyz still answers the player.image field and 404s. Treating it as a source made
+  // /thumb fetch that URL and store nothing (stillBad), and a fresh decrypt returns the same URL.
+  const dead = Boolean(rawPoster && isDeadPosterUrl(rawPoster));
+  let poster = dead ? "" : rawPoster;
   const putarin = isPutarin(it as never);
-  if (putarin && (!poster || isPlaceholderUrl(poster)) && !javCoverFromTitle(String(it.title || "")) && putarinBudget-- > 0) {
+  if (putarin && !dead && (!poster || isPlaceholderUrl(poster)) && !javCoverFromTitle(String(it.title || "")) && putarinBudget-- > 0) {
     const r = await resolvePuterinImage(it.id!).catch(() => null);
-    if (r) {
+    if (r && !isDeadPosterUrl(r.url)) {
       added[it.id!] = r.url;
       poster = r.url;
       s.putarinResolved++;
     }
   }
-  const has = Boolean(poster || (putarin && (javCoverFromTitle(String(it.title || "")) || /^[A-Za-z0-9]{6,20}$/.test(it.id!))));
+  const has = Boolean(
+    poster ||
+      workerCanResolve(it.id) ||
+      (putarin && javCoverFromTitle(String(it.title || ""))) ||
+      (putarin && !dead && /^[A-Za-z0-9]{6,20}$/.test(it.id!)),
+  );
   const v = await checkR2(it.id!);
   if (blockedByCloudflare) return;
   checked++;

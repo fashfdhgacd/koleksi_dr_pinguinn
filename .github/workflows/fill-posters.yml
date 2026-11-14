@@ -361,6 +361,15 @@ jobs:
           })().catch((e) => { console.error(e); process.exit(0); });
           SCRIPT
 
+      - name: Poster URLs the hourly fill skipped (MXDrop, Vidara, Dood)
+        # MXDrop's poster is packed in the embed page. Vidara/g1 were embed-review so nothing stored a URL.
+        # Writes data/latest-posters.json only (the commit step below). No ffmpeg, no R2.
+        run: node scripts/poster-backfill.mjs
+        env:
+          URLS_ONLY: "1"
+          LIMIT: "300"
+          BUDGET_MS: "480000"
+
       - name: Commit posters
         run: |
           set -e

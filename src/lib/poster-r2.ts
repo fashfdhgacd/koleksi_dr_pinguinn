@@ -1,3 +1,5 @@
+import { typedPosterKey } from "@/lib/poster-sources.js";
+
 export type R2BucketLike = {
   get(key: string): Promise<{ body: ReadableStream; httpMetadata?: { contentType?: string } } | null>;
   put(key: string, value: ArrayBuffer | ArrayBufferView | string | ReadableStream, options?: { httpMetadata?: { contentType?: string } }): Promise<unknown>;
@@ -47,5 +49,6 @@ export async function resolvePostersBucket(): Promise<R2BucketLike | null> {
 }
 
 export function posterKey(id: string): string {
-  return `posters/${id.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80)}`;
+  // Cards and /thumb read posters/typed/<id>. The owner fill used to write posters/<id>, so those copies never showed.
+  return typedPosterKey(id);
 }
