@@ -3,6 +3,7 @@ import { resolvePostersBucket } from "@/lib/poster-r2";
 import { fixDmmCover, javCoverFromTitle } from "@/lib/catalog/local-shared";
 import { checkImage, isPlaceholderMd5 } from "@/lib/image-guard";
 import { resolvePuterinImage } from "@/lib/puterin-poster";
+import { bysePosterUrls, isDeadPosterUrl, luluPosterUrls, metaImage, mxdropFromHtml, typedPosterKey } from "@/lib/poster-sources.js";
 
 /** Putarin item for an id (putarin-latest feed), loaded lazily only on a full miss. */
 async function putarinItem(id: string): Promise<{ id?: string; title?: string; category?: string } | null> {
@@ -41,7 +42,69 @@ async function sourceFor(id: string): Promise<string> {
 }
 
 function keyFor(id: string): string {
-  return `posters/typed/${id.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 80)}`;
+  return typedPosterKey(id);
+}
+
+const PAGE_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
+
+async function pageHtml(url: string): Promise<string> {
+  try {
+    const res = await fetch(url, {
+      headers: { accept: "text/html", "user-agent": PAGE_UA },
+      redirect: "follow",
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!res.ok) return "";
+    const text = await res.text();
+    if (/Just a moment|challenge-platform/i.test(text.slice(0, 600))) return "";
+    return text.slice(0, 400_000);
+  } catch {
+    return "";
+  }
+}
+
+/** Poster URLs /thumb can resolve from the id alone when the stored map has nothing live. */
+async function extraPosterUrls(id: string): Promise<string[]> {
+  const mx = id.match(/^mx-([A-Za-z0-9]{4,40})$/);
+  if (mx) {
+    const { poster } = mxdropFromHtml(await pageHtml(`https://mxdrop.click/e/${mx[1]}`));
+    return poster ? [poster] : [];
+  }
+  const lu = id.match(/^lu-([A-Za-z0-9]{4,40})$/);
+  if (lu) return luluPosterUrls(lu[1]);
+  const by = id.match(/^by-([A-Za-z0-9]{4,40})$/);
+  if (by) return bysePosterUrls(by[1]);
+  const dd = id.match(/^dd-([A-Za-z0-9]{4,40})$/);
+  if (dd) {
+    const image = metaImage(await pageHtml(`https://playmogo.com/e/${dd[1]}`));
+    return image ? [image] : [];
+  }
+  return [];
+}
+
+async function posterIngestKey(): Promise<string> {
+  try {
+    const mod = (await import("cloudflare:workers")) as { env?: Record<string, unknown> };
+    const v = mod.env?.PUTARIN_API_KEY;
+    if (typeof v === "string" && v.trim()) return v.trim();
+  } catch {
+    /* node */
+  }
+  return String(process.env.PUTARIN_API_KEY || "").trim();
+}
+
+async function sameSecret(given: string, expect: string): Promise<boolean> {
+  if (!given || !expect) return false;
+  const enc = new TextEncoder();
+  const [a, b] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(given)),
+    crypto.subtle.digest("SHA-256", enc.encode(expect)),
+  ]);
+  const x = new Uint8Array(a);
+  const y = new Uint8Array(b);
+  let diff = x.length ^ y.length;
+  for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
+  return diff === 0;
 }
 
 function sniffType(buf: ArrayBuffer): string {
@@ -129,6 +192,7 @@ export const Route = createFileRoute("/thumb/$id")({
 
           const bucket = await resolvePostersBucket().catch(() => null);
           const key = keyFor(id);
+          if (!key) return new Response(null, { status: 404 });
           if (bucket) {
             const saved = await bucket.get(key).catch(() => null);
             // Self-heal: a copy whose md5 (R2 etag) is a known placeholder is deleted and re-resolved.
@@ -146,12 +210,15 @@ export const Route = createFileRoute("/thumb/$id")({
           }
 
           let source = await sourceFor(id);
+          // A stored anipop (or other dead-host) URL used to win here and skip every later source.
+          if (isDeadPosterUrl(source)) source = "";
           // Multi-server main page without a poster of its own: the poster borrowed from another copy
           // of the same video (local-cache.ts buildIndexes). Stored in R2 under this id like any other.
           if (!source) {
             source = await import("@/lib/catalog/local-cache")
               .then((m) => m.mergedPosterOf(id))
               .catch(() => "");
+            if (isDeadPosterUrl(source)) source = "";
           }
           // Putarin uploads carry no poster: try the DMM cover from a JAV code in the title, else the
           // embed's own player.image (same decrypt as /api/puterin-thumb). Stored to R2 once.
@@ -161,7 +228,7 @@ export const Route = createFileRoute("/thumb/$id")({
             if (dmm) source = dmm;
             else {
               const pt = await resolvePuterinImage(id);
-              if (pt) {
+              if (pt && !isDeadPosterUrl(pt.url)) {
                 if (bucket) await bucket.put(key, pt.buf, { httpMetadata: { contentType: pt.type } }).catch(() => undefined);
                 const res = imageResponse(pt.buf, pt.type);
                 try {
@@ -173,40 +240,59 @@ export const Route = createFileRoute("/thumb/$id")({
               }
             }
           }
-          if (!source) {
-            const vy = await videyStatic(id, request);
-            if (!vy) return await cachedFallback(request);
+          const tryUrls = [source, ...(source ? [] : await extraPosterUrls(id))].filter((url) => url && !isDeadPosterUrl(url));
+          for (const url of tryUrls.slice(0, 3)) {
+            const remote = await fetch(url, {
+              headers: { "user-agent": "kdp-poster/1" },
+              signal: AbortSignal.timeout(8000),
+            }).catch(() => null);
+            // DMM answers a missing cover with a redirect to its "NOW PRINTING" image: never save that.
+            if (!remote?.ok) continue;
+            const buf = await remote.arrayBuffer().catch(() => null);
+            // Central guard (image-guard.ts): placeholder URL/md5, < 3 KB, non-image never reach R2.
+            const verdict = await checkImage(buf, remote.url || url);
+            if (!buf || !verdict.ok) continue;
+            if (bucket) {
+              await bucket.put(key, buf, { httpMetadata: { contentType: verdict.type } }).catch(() => undefined);
+            }
+            const res = imageResponse(buf, verdict.type);
             try {
-              await caches.default.put(request, vy.clone());
+              await caches.default.put(request, res.clone());
             } catch {
               /* cache optional */
             }
-            return vy;
+            return res;
           }
-          const remote = await fetch(source, {
-            headers: { "user-agent": "kdp-poster/1" },
-            signal: AbortSignal.timeout(8000),
-          }).catch(() => null);
-          // DMM answers a missing cover with a redirect to its "NOW PRINTING" image: never save that.
-          if (!remote?.ok) return await cachedFallback(request);
-          const buf = await remote.arrayBuffer().catch(() => null);
-          // Central guard (image-guard.ts): placeholder URL/md5, < 3 KB, non-image never reach R2.
-          const verdict = await checkImage(buf, remote.url || source);
-          if (!buf || !verdict.ok) return await cachedFallback(request);
-          const type = verdict.type;
-          if (bucket) {
-            await bucket.put(key, buf, { httpMetadata: { contentType: type } }).catch(() => undefined);
-          }
-          const res = imageResponse(buf, type);
+          const vy = await videyStatic(id, request);
+          if (!vy) return await cachedFallback(request);
           try {
-            await caches.default.put(request, res.clone());
+            await caches.default.put(request, vy.clone());
           } catch {
             /* cache optional */
           }
-          return res;
+          return vy;
         } catch {
           return fallback(request);
         }
+      },
+      // GitHub poster backfill only. Same R2 key as GET. Auth is the Putarin key the Worker already has.
+      POST: async ({ params, request }) => {
+        const id = String(params.id || "").replace(/\.(jpg|jpeg|webp|png)$/i, "");
+        const key = keyFor(id);
+        if (!key) return new Response(null, { status: 404 });
+        const header = String(request.headers.get("authorization") || "");
+        const given = header.replace(/^Bearer\s+/i, "").trim();
+        if (!(await sameSecret(given, await posterIngestKey()))) return new Response(null, { status: 404 });
+        const len = Number(request.headers.get("content-length") || 0);
+        if (len > 500_000) return Response.json({ ok: false, error: "too-big" }, { status: 413, headers: { "cache-control": "no-store" } });
+        const buf = await request.arrayBuffer().catch(() => null);
+        if (!buf || buf.byteLength > 500_000) return Response.json({ ok: false, error: "too-big" }, { status: 413, headers: { "cache-control": "no-store" } });
+        const verdict = await checkImage(buf, "");
+        if (!verdict.ok) return Response.json({ ok: false, error: verdict.reason }, { status: 422, headers: { "cache-control": "no-store" } });
+        const bucket = await resolvePostersBucket().catch(() => null);
+        if (!bucket) return Response.json({ ok: false, error: "r2_unavailable" }, { status: 503, headers: { "cache-control": "no-store" } });
+        await bucket.put(key, buf, { httpMetadata: { contentType: verdict.type } });
+        return Response.json({ ok: true }, { headers: { "cache-control": "no-store" } });
       },
     },
   },

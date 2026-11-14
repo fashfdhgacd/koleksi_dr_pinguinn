@@ -8,7 +8,8 @@
  * - IndoAV / UserBokep: stored poster, else og:image of the public /d|/e page.
  * - Putarin (Puterin): stored poster, else JAV cover from the title, else the embed's player.image.
  * - Streamtape: stored poster, else file/info (+ getsplash with the existing login/key).
- * - LuluStream / DoodStream: stored poster, else the embed page poster.
+ * - LuluStream / DoodStream / Vidara: stored poster, else the embed page poster.
+ * - MXDrop: stored poster, else the packed MDCore.poster on the embed page.
  * - Byse: stored poster, else Byse's public embed details (img-place.com).
  * - Videy: no remote poster exists; frames come from the videy-thumbs workflow (ffmpeg), which a
  *   Worker cannot run. Reported as "frame belum ada" only, never fetched here.
@@ -23,6 +24,7 @@
  * img-place.com first.
  */
 import { checkImage, isPlaceholderMd5 } from "@/lib/image-guard";
+import { isDeadPosterUrl, mxdropFromHtml } from "@/lib/poster-sources.js";
 import { posterKey, resolvePostersBucket } from "@/lib/poster-r2";
 import { fetchPosterBytes, resolvePuterinImage } from "@/lib/puterin-poster";
 import {
@@ -177,7 +179,23 @@ async function platformMeta(it: RawItem, wantTitle: boolean, wantThumb: boolean,
     }
     return out;
   }
-  if ((kind === "lulu" || kind === "dood") && code) {
+  if (kind === "mxdrop" && code) {
+    if (!spend()) return empty;
+    const page = /^https:\/\//i.test(embed) ? embed : `https://mxdrop.click/e/${code}`;
+    try {
+      const res = await fetch(page, {
+        headers: { accept: "text/html", "user-agent": "Mozilla/5.0" },
+        redirect: "follow",
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!res.ok) return empty;
+      const { poster } = mxdropFromHtml(await res.text());
+      return { title: "", thumb: httpUrl(poster), referer: page };
+    } catch {
+      return empty;
+    }
+  }
+  if ((kind === "lulu" || kind === "dood" || kind === "vidara") && code) {
     if (!spend()) return empty;
     const meta = await fetchDrpPageMeta(kind, embed, code).catch(() => null);
     return { title: String(meta?.title || ""), thumb: httpUrl(meta?.thumb), referer: embed };
@@ -198,6 +216,7 @@ function embedOf(it: RawItem): string {
 function candidates(it: RawItem, posters: Record<string, string>, meta: Meta | null): { url: string; referer: string }[] {
   const out: { url: string; referer: string }[] = [];
   const add = (url: string, referer = "") => {
+    if (isDeadPosterUrl(url)) return;
     if (url && !/\/api\/(puterin-thumb|tape-thumb|embed-thumb|img-proxy)/i.test(url) && !out.some((c) => c.url === url)) {
       out.push({ url, referer });
     }
