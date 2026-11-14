@@ -33,6 +33,7 @@ import { Route as ApiEmbedThumbRouteImport } from './routes/api/embed-thumb'
 import { Route as ApiFrameRouteImport } from './routes/api/frame'
 import { Route as ApiHiddenIdsRouteImport } from './routes/api/hidden-ids'
 import { Route as ApiImgProxyRouteImport } from './routes/api/img-proxy'
+import { Route as ApiKirimanVideyRouteImport } from './routes/api/kiriman-videy'
 import { Route as ApiLikeRouteImport } from './routes/api/like'
 import { Route as ApiOgRouteImport } from './routes/api/og'
 import { Route as ApiOnlineRouteImport } from './routes/api/online'
@@ -193,6 +194,11 @@ const ApiHiddenIdsRoute = ApiHiddenIdsRouteImport.update({
 const ApiImgProxyRoute = ApiImgProxyRouteImport.update({
   id: '/api/img-proxy',
   path: '/api/img-proxy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiKirimanVideyRoute = ApiKirimanVideyRouteImport.update({
+  id: '/api/kiriman-videy',
+  path: '/api/kiriman-videy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiLikeRoute = ApiLikeRouteImport.update({
@@ -428,6 +434,7 @@ export interface FileRoutesByFullPath {
   '/api/frame': typeof ApiFrameRoute
   '/api/hidden-ids': typeof ApiHiddenIdsRoute
   '/api/img-proxy': typeof ApiImgProxyRoute
+  '/api/kiriman-videy': typeof ApiKirimanVideyRoute
   '/api/like': typeof ApiLikeRoute
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
@@ -493,6 +500,7 @@ export interface FileRoutesByTo {
   '/api/frame': typeof ApiFrameRoute
   '/api/hidden-ids': typeof ApiHiddenIdsRoute
   '/api/img-proxy': typeof ApiImgProxyRoute
+  '/api/kiriman-videy': typeof ApiKirimanVideyRoute
   '/api/like': typeof ApiLikeRoute
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
@@ -561,6 +569,7 @@ export interface FileRoutesById {
   '/api/frame': typeof ApiFrameRoute
   '/api/hidden-ids': typeof ApiHiddenIdsRoute
   '/api/img-proxy': typeof ApiImgProxyRoute
+  '/api/kiriman-videy': typeof ApiKirimanVideyRoute
   '/api/like': typeof ApiLikeRoute
   '/api/og': typeof ApiOgRoute
   '/api/online': typeof ApiOnlineRoute
@@ -630,6 +639,7 @@ export interface FileRouteTypes {
     | '/api/frame'
     | '/api/hidden-ids'
     | '/api/img-proxy'
+    | '/api/kiriman-videy'
     | '/api/like'
     | '/api/og'
     | '/api/online'
@@ -695,6 +705,7 @@ export interface FileRouteTypes {
     | '/api/frame'
     | '/api/hidden-ids'
     | '/api/img-proxy'
+    | '/api/kiriman-videy'
     | '/api/like'
     | '/api/og'
     | '/api/online'
@@ -762,6 +773,7 @@ export interface FileRouteTypes {
     | '/api/frame'
     | '/api/hidden-ids'
     | '/api/img-proxy'
+    | '/api/kiriman-videy'
     | '/api/like'
     | '/api/og'
     | '/api/online'
@@ -830,6 +842,7 @@ export interface RootRouteChildren {
   ApiFrameRoute: typeof ApiFrameRoute
   ApiHiddenIdsRoute: typeof ApiHiddenIdsRoute
   ApiImgProxyRoute: typeof ApiImgProxyRoute
+  ApiKirimanVideyRoute: typeof ApiKirimanVideyRoute
   ApiLikeRoute: typeof ApiLikeRoute
   ApiOgRoute: typeof ApiOgRoute
   ApiOnlineRoute: typeof ApiOnlineRoute
@@ -1034,6 +1047,13 @@ declare module '@tanstack/react-router' {
       path: '/api/img-proxy'
       fullPath: '/api/img-proxy'
       preLoaderRoute: typeof ApiImgProxyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/kiriman-videy': {
+      id: '/api/kiriman-videy'
+      path: '/api/kiriman-videy'
+      fullPath: '/api/kiriman-videy'
+      preLoaderRoute: typeof ApiKirimanVideyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/like': {
@@ -1412,6 +1432,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiFrameRoute: ApiFrameRoute,
   ApiHiddenIdsRoute: ApiHiddenIdsRoute,
   ApiImgProxyRoute: ApiImgProxyRoute,
+  ApiKirimanVideyRoute: ApiKirimanVideyRoute,
   ApiLikeRoute: ApiLikeRoute,
   ApiOgRoute: ApiOgRoute,
   ApiOnlineRoute: ApiOnlineRoute,

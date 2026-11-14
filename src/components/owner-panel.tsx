@@ -16,6 +16,7 @@ import { OwnerOverview } from "@/components/owner-overview";
 import { OwnerTools } from "@/components/owner-tools";
 import { OwnerVideyUntitled } from "@/components/owner-videy-untitled";
 import { OwnerVideySuggest } from "@/components/owner-videy-suggest";
+import { OwnerKirimanVidey } from "@/components/owner-kiriman-videy";
 import { OwnerVideyPanel } from "@/components/owner-videy-panel";
 import { OwnerSatelit } from "@/components/owner-satelit";
 import { PANEL_SITES, type PanelSite } from "@/lib/satelit/config";
@@ -565,6 +566,7 @@ export function OwnerDashboard() {
                 </Collapse>
               </Group>
               <Group title="Rapikan katalog">
+                <OwnerKirimanVidey secret={secret} />
                 <Collapse id="videy" title="Videy belum dikasih judul">
                   <OwnerVideyUntitled secret={secret} />
                 </Collapse>
