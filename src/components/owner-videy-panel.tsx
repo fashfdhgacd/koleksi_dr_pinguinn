@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { OwnerKirimanVidey } from "@/components/owner-kiriman-videy";
 import { OwnerVideySuggest } from "@/components/owner-videy-suggest";
 
 const glass = "rounded-xl border border-white/[0.07] bg-[#101214] shadow-[0_1px_0_rgba(255,255,255,0.04)_inset]";
@@ -225,6 +226,8 @@ export function OwnerVideyPanel({ secret }: { secret: string }) {
           )}
         </div>
       </div>
+
+      <OwnerKirimanVidey secret={secret} boxed />
 
       <div className={glass + " p-4"}>
         <div className="flex items-center justify-between gap-2">
