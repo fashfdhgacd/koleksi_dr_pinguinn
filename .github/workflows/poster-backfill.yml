@@ -1,13 +1,18 @@
 # Backfill posters/typed/<id> for catalog rows the hourly fill and daily thumb-health skipped
 # (MXDrop packed poster, Vidara/g1 embed-review, dead anipop Putarin images, Dood splash).
 # One batch per run, newest and mx-/dd-/g1/IndoAV/UserBokep first. Re-runnable: a poster already
-# in R2 is left alone. Scheduled run stays small (30 frames). workflow_dispatch drains the backlog.
-# Existing secrets only. No new Worker env, no KV.
+# in R2 is left alone. The daily run stays small (30 frames). A push of this file, or
+# workflow_dispatch, drains the backlog inside the time budget. Existing secrets only.
+# No new Worker env, no KV.
 name: Poster backfill
 
 on:
   schedule:
     - cron: "30 18 * * *"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/poster-backfill.yml"
   workflow_dispatch:
     inputs:
       full_scan:
@@ -51,9 +56,10 @@ jobs:
           PUTARIN_API_KEY: ${{ secrets.PUTARIN_API_KEY }}
           STREAMTAPE_LOGIN: ${{ secrets.STREAMTAPE_LOGIN }}
           STREAMTAPE_KEY: ${{ secrets.STREAMTAPE_KEY }}
-          FULL_SCAN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.full_scan || '0' }}
-          FRAME_CAP: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.frame_cap || '30' }}
-          BUDGET_MIN: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.budget_min || '8' }}
+          # Daily cron stays a small batch. A push of this file, or a manual run, drains the backlog.
+          FULL_SCAN: ${{ github.event_name == 'schedule' && '0' || (github.event.inputs.full_scan || '1') }}
+          FRAME_CAP: ${{ github.event_name == 'schedule' && '30' || (github.event.inputs.frame_cap || '0') }}
+          BUDGET_MIN: ${{ github.event_name == 'schedule' && '8' || (github.event.inputs.budget_min || '18') }}
         run: node scripts/poster-backfill.mjs
 
       - name: Commit stable poster URLs
