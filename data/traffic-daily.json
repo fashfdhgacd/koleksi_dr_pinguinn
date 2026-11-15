@@ -1,6 +1,6 @@
 {
   "description": "Pengunjung harian per sumber (AKTUAL dari D1 koleksi-analytics, hari WIB). sources = visitor_id unik per hari menurut referrer kunjungan pertama hari itu; 'internal' = referrer domain sendiri. Bukan request Cloudflare. Data mulai 2026-10-05 11:03 WIB (sebelumnya tidak tercatat). Diisi .github/workflows/traffic-monitor.yml.",
-  "updatedAt": "2026-11-14T22:18:34Z",
+  "updatedAt": "2026-11-15T22:45:39Z",
   "timezone": "Asia/Jakarta (WIB)",
   "days": {
     "2026-10-05": {
@@ -1007,32 +1007,58 @@
     },
     "2026-11-15": {
       "sources": {
+        "brave": 39,
+        "direct": 7,
+        "duckduckgo": 2,
+        "google": 220,
+        "internal": 527,
+        "justpaste": 756,
+        "other": 74,
+        "tube_ref": 9,
+        "x": 8,
+        "yandex": 20
+      },
+      "sources_id": {
+        "brave": 35,
+        "direct": 3,
+        "google": 18,
+        "internal": 321,
+        "justpaste": 610,
+        "other": 38,
+        "tube_ref": 1,
+        "x": 7,
+        "yandex": 3
+      },
+      "unique_visitors": 1455,
+      "pageviews": 19061,
+      "new": 1220,
+      "returning": 442,
+      "landing_visitors": 1662
+    },
+    "2026-11-16": {
+      "sources": {
         "brave": 13,
         "direct": 2,
-        "duckduckgo": 1,
-        "google": 65,
-        "internal": 137,
-        "justpaste": 182,
-        "other": 17,
-        "tube_ref": 1,
+        "google": 73,
+        "internal": 150,
+        "justpaste": 86,
+        "other": 19,
+        "tube_ref": 4,
         "x": 3,
-        "yandex": 7
+        "yandex": 4
       },
       "sources_id": {
         "brave": 13,
-        "direct": 1,
-        "google": 7,
-        "internal": 80,
-        "justpaste": 142,
-        "other": 10,
-        "x": 3,
-        "yandex": 2
+        "google": 4,
+        "internal": 92,
+        "justpaste": 70,
+        "other": 7,
+        "tube_ref": 1,
+        "x": 3
       },
-      "unique_visitors": 61,
-      "pageviews": 552,
-      "new": 286,
-      "returning": 142,
-      "landing_visitors": 428,
+      "new": 244,
+      "returning": 110,
+      "landing_visitors": 354,
       "partial": true
     }
   }
