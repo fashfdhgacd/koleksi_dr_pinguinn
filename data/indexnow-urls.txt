@@ -254,11 +254,11 @@
 /kategori/tiktok -
 /kategori/tobrut 2026-11-01
 /kategori/vcs -
-/kategori/videy 2026-11-10
-/kategori/videy/halaman/2 2026-11-10
-/kategori/videy/halaman/3 2026-11-10
-/kategori/videy/halaman/4 2026-11-10
-/kategori/videy/halaman/5 2026-11-10
+/kategori/videy 2026-11-16
+/kategori/videy/halaman/2 2026-11-16
+/kategori/videy/halaman/3 2026-11-16
+/kategori/videy/halaman/4 2026-11-16
+/kategori/videy/halaman/5 2026-11-16
 /kategori/viral 2026-11-05
 /kategori/wot 2026-11-06
 /kontak 2026-11-04
@@ -643,7 +643,6 @@
 /watch/2UzZecux1 2026-10-16
 /watch/2VKYQKM8ZG 2026-10-24
 /watch/2VP8VLMFnM7S -
-/watch/2VWD28Kl23tZ3oQ -
 /watch/2Vb5ktiXoWJL 2026-10-27
 /watch/2WLIYvy70i9K -
 /watch/2Wd7zX2Q01ix1p 2026-10-02
@@ -846,6 +845,7 @@
 /watch/3k2BucIShImI -
 /watch/3kQNw2cKqbeI -
 /watch/3kRQT0nDrDl8 -
+/watch/3ltU989L1 2026-11-16
 /watch/3lzlWOMBgsMl -
 /watch/3m1PieA31 2026-10-17
 /watch/3mbdAEUYmC 2026-10-27
@@ -1452,6 +1452,7 @@
 /watch/7iwE9JIs1 2026-10-28
 /watch/7j2sCtMzqn 2026-10-29
 /watch/7jPrYsa3ruZi -
+/watch/7kJ6wR5y1 2026-11-16
 /watch/7klaUMFdH4nM -
 /watch/7kyjPHveLgpf -
 /watch/7l569ygHjokP -
@@ -1974,6 +1975,7 @@
 /watch/BUOQyYEPvdCf -
 /watch/BUZwk8Zj1 2026-10-28
 /watch/BVExZ5shG4 2026-10-24
+/watch/BVJKfkWq1 2026-11-16
 /watch/BVOmlmOv1 2026-10-14
 /watch/BVvpNDTH1 2026-10-16
 /watch/BVzzwfwV3tyi -
@@ -2732,6 +2734,7 @@
 /watch/GlAIcEODBEu5 -
 /watch/GlNteK9eNM8g -
 /watch/GmnEx60TlFak -
+/watch/GmpK3bPn1 2026-11-16
 /watch/GndDJbxfFHDA -
 /watch/GoPU7dl11 2026-10-20
 /watch/Gp5KlF614hni -
@@ -2900,6 +2903,7 @@
 /watch/I9R7eaSSd0Ke 2026-10-27
 /watch/IAZZVyMnVqvR -
 /watch/IBDJpSsxcZiK -
+/watch/IBDVTRYH1 2026-11-16
 /watch/ICBFrsMeBYwP -
 /watch/ICRjg70eCwGS -
 /watch/ICm4EM80a38q -
@@ -3544,6 +3548,7 @@
 /watch/MhALbODskcyl -
 /watch/MhW0Mjt5fHKp -
 /watch/Mi6K2388fGZE -
+/watch/MiUGK1l11 2026-11-16
 /watch/MirMyCl3AB5U -
 /watch/Mj5qIaaplIUJ -
 /watch/MjZ2Q08R90tmvgV 2026-10-02
@@ -4234,6 +4239,7 @@
 /watch/RTvrJhY0NZHN -
 /watch/RUJ2ctlCOkv8 -
 /watch/RUJ9bTJJX9f9 -
+/watch/RUvKTfTy1 2026-11-16
 /watch/RVKYnujdcdJX -
 /watch/RVLqwCEpoloZ -
 /watch/RVsvZ2GMCA 2026-10-24
@@ -4987,6 +4993,7 @@
 /watch/WdZvV3cZyw 2026-09-04
 /watch/Wdb9HntkYOaE 2026-09-25
 /watch/WdkX0pCk9wjk -
+/watch/Wdtk33QW1 2026-11-16
 /watch/WeAJy7N0z07w -
 /watch/WeG4umjizcR8 -
 /watch/WeQymGzFJIzf -
@@ -5577,6 +5584,7 @@
 /watch/aMPlcvIV5QWd -
 /watch/aMTXsdRM3E62 -
 /watch/aMsKiZQGYYk0 -
+/watch/aNZlmzFo1 2026-11-16
 /watch/aNaNa6FKyb 2026-10-27
 /watch/aNeVgtmDlA4R -
 /watch/aNpCy6PptF 2026-09-11
@@ -5707,6 +5715,7 @@
 /watch/bKRAUaGy1 2026-10-15
 /watch/bKUyHdXmXGdR -
 /watch/bL2huZQifnQy 2026-10-07
+/watch/bL2qvnYH1 2026-11-16
 /watch/bLIMgPwSLJEZ -
 /watch/bLJnwD0ciEhj -
 /watch/bMU8crGwbyg5 2026-11-05
@@ -6724,6 +6733,7 @@
 /watch/eVFJO9R81 2026-10-20
 /watch/eVdXNc2Z55QS -
 /watch/eVsBSJWc9JnL -
+/watch/eWVz6Hl01 2026-11-16
 /watch/eWyGGHMSw38D -
 /watch/eXESRoeVZEAw -
 /watch/eXnrredaAZ 2026-10-29
@@ -7286,6 +7296,7 @@
 /watch/hq0iAogL0MYk 2026-10-07
 /watch/hqQ64g4ppuZN -
 /watch/hqy4Jn9Wg3le -
+/watch/hrKgmaH11 2026-11-16
 /watch/hrzTvWqknG 2026-09-04
 /watch/hs5vYtQQDg 2026-09-16
 /watch/hsbiwY1M1UTc -
@@ -7331,6 +7342,7 @@
 /watch/iAtXK3CWRplY -
 /watch/iBDoiPmCUaML -
 /watch/iBMf1X6L1 2026-10-16
+/watch/iBm1ntRe1 2026-11-16
 /watch/iDDZQG4aBNOD 2026-11-01
 /watch/iEY9mZpmmui1 -
 /watch/iEcvPaG90Rzg -
@@ -7436,7 +7448,6 @@
 /watch/j3LZClwiE4C3 2026-10-20
 /watch/j3NNAQ4DQieO -
 /watch/j3Su59ghA0d8 -
-/watch/j4OV8O6JRouqW8 -
 /watch/j4TNSUJN1 2026-10-17
 /watch/j4jzkYO72AIzzpr 2026-09-25
 /watch/j5AjsY0uteOL -
@@ -8905,7 +8916,9 @@
 /watch/nMjMGFUF9bWL -
 /watch/nNauny9BhQ 2026-10-27
 /watch/nNlXChcDHApi -
+/watch/nO6zTOcX1 2026-11-16
 /watch/nOmuQGmkNwze -
+/watch/nOysujMF1 2026-11-16
 /watch/nPC4Cy7dgoOv -
 /watch/nPLqSnRe1 2026-11-09
 /watch/nPTjkQxhbOx1 -
@@ -9117,6 +9130,7 @@
 /watch/p1ztmFOptEv6 -
 /watch/p2XFjrQtVW 2026-09-04
 /watch/p3GZvUitONdH -
+/watch/p3ccX6XN1 2026-11-16
 /watch/p40EcAT0hm9N -
 /watch/p4gK6BGVq9Ba -
 /watch/p5gd2iwCnu4C -
@@ -9200,6 +9214,7 @@
 /watch/pYG1kZLfQ7VV -
 /watch/pYG4z4u4HpiK 2026-10-11
 /watch/pYOVhgcyVJkL -
+/watch/pYV7KQVN1 2026-11-16
 /watch/pYWjvqmLkOtXjr 2026-10-02
 /watch/pYmxcTAsKJSQ -
 /watch/pZ3ebGBCgvGf -
@@ -9331,6 +9346,7 @@
 /watch/qLuMu7w3iKUb -
 /watch/qMPeNCTeZyKh -
 /watch/qMVEkwR5uXmU -
+/watch/qMuFAfvm1 2026-11-16
 /watch/qN0k1RFVyQNR -
 /watch/qO2fgKzYSJfq -
 /watch/qO83ob3hqJhk 2026-11-05
@@ -10195,6 +10211,7 @@
 /watch/wRZest7gSTWj -
 /watch/wRdH3YLIUXYq -
 /watch/wRpdLgnfM4eR -
+/watch/wS9KcjyT1 2026-11-16
 /watch/wSGjgJEf53o4 -
 /watch/wSGxwn3pawVf -
 /watch/wSYQX3jC8v 2026-10-24
@@ -10447,6 +10464,7 @@
 /watch/y1foTUzA1 2026-10-16
 /watch/y1wwtgPH1 2026-10-13
 /watch/y24jWXfDCW 2026-10-24
+/watch/y2M7tERw1 2026-11-16
 /watch/y2O7WIACE6ll -
 /watch/y2QBkztxfz 2026-10-24
 /watch/y39LM8Dro59j -
@@ -10608,6 +10626,7 @@
 /watch/z8uwqjAb3h 2026-10-29
 /watch/z9aBmdyna8 2026-10-29
 /watch/z9l2OUyq8qQX -
+/watch/zAdXdRn11 2026-11-16
 /watch/zAhB2DMfKa 2026-09-04
 /watch/zBTLkMKHRcNw -
 /watch/zD6YEDxN6H 2026-09-04
@@ -10704,6 +10723,7 @@
 /watch/zrOaaVdWQyCY67Z 2026-10-25
 /watch/zrdYPr05c15S -
 /watch/zs6snh4FCaon -
+/watch/zsJNfM3P1 2026-11-16
 /watch/zsN0OztNmuA7 -
 /watch/zsOAoOv3FNtf -
 /watch/zsVp3GetML4Q -
