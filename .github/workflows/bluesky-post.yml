@@ -1,4 +1,4 @@
-# Bluesky auto-post: tiap 4 jam (maks 6 post/hari), 1 post per run.
+# Bluesky auto-post: tiap 8 jam (maks 3 post/hari), 1 post per run.
 # scripts/bluesky-post.mjs pilih 1 video BARU yang publik (ada di sitemap live), lolos cek judul situs
 # + blocklist ketat, belum pernah diposting; posting teks + kartu link TANPA gambar, label 18+ (porn),
 # link pakai UTM (utm_source=bluesky). State data/bluesky-posted.json di-commit pakai [skip ci].
@@ -7,7 +7,7 @@ name: Bluesky post
 
 on:
   schedule:
-    - cron: "17 */4 * * *"
+    - cron: "17 */8 * * *"
   workflow_dispatch:
     inputs:
       dry_run:

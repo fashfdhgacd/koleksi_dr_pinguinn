@@ -1,4 +1,4 @@
-# Cek kesehatan situs + dead-man cron tiap 6 jam (gratis, GitHub Actions; tanpa cron Cloudflare).
+# Cek kesehatan situs + dead-man cron 2x sehari (gratis, GitHub Actions; tanpa cron Cloudflare).
 # scripts/site-health.mjs: beranda, /kategori, sitemap (jumlah watch URL >= batas), 10 /watch acak,
 # beberapa /thumb, domain redirect videqsss.icu & videyy.icu harus 301, dan /api/cron-status harus
 # menunjukkan cron <=3 jam (kalau tidak, pipeline upload/flush kemungkinan mati -> email peringatan).
@@ -8,7 +8,7 @@ name: Site health
 
 on:
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "17 0,12 * * *"
   workflow_dispatch:
     inputs:
       min_watch_urls:

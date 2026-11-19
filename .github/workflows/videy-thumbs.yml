@@ -2,12 +2,12 @@ name: videy-thumbs
 # One frame per new Videy video, grabbed once with ffmpeg and saved as a static image
 # (public/videy-thumbs/<id>.jpg). Cards show that file; nothing is fetched per visit.
 # Videy only: a file that 404s on cdn.videy.co on 3 tries is added to HIDDEN_IDS (never deleted).
-# Batched: runs every 2 hours (and on demand) instead of once per bot upload commit, so bursts of
-# uploads cost one run per 2 hours, not one per upload (GitHub Actions minutes).
+# Batched: runs 4x a day (and on demand) instead of once per bot upload commit, so bursts of
+# uploads cost a few runs a day, not one per upload (GitHub Actions minutes).
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17 */2 * * *"
+    - cron: "17 1,7,13,19 * * *"
   push:
     branches: [main]
     paths:

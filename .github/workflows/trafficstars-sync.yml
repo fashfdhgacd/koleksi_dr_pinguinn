@@ -1,4 +1,4 @@
-# Sinkron statistik TrafficStars 2x sehari (07:30 & 19:30 WIB), gratis di GitHub Actions, tanpa Grok Bot.
+# Sinkron statistik TrafficStars 1x sehari (07:30 WIB), gratis di GitHub Actions, tanpa Grok Bot.
 # scripts/trafficstars-sync.mjs ambil 14 hari UTC terakhir (impressions, clicks, earnings) lewat REST API
 # TrafficStars dan tulis public/data/trafficstars.json. Commit cuma kalau angkanya berubah.
 # Butuh secret repo TRAFFICSTARS_API_KEY (Settings > Secrets and variables > Actions).
@@ -8,7 +8,6 @@ name: TrafficStars sync
 on:
   schedule:
     - cron: "30 0 * * *"
-    - cron: "30 12 * * *"
   workflow_dispatch:
 
 permissions:
