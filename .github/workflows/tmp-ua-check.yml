@@ -1,0 +1,22 @@
+name: tmp-ua-check
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Query user agents by referrer source
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          SQL1='select substr(coalesce(user_agent,""),1,90) ua, count(*) n, count(distinct visitor_id) v, count(distinct country) countries from analytics_events where created_at >= (strftime("%s","now","-3 days")*1000) and lower(coalesce(referrer,"")) like "%duckduckgo%" group by ua order by n desc limit 15'
+          SQL2='select substr(coalesce(user_agent,""),1,90) ua, count(*) n, count(distinct visitor_id) v from analytics_events where created_at >= (strftime("%s","now","-3 days")*1000) and lower(coalesce(referrer,"")) like "%justpaste%" group by ua order by n desc limit 15'
+          SQL3='select coalesce(country,"?") c, count(distinct visitor_id) v from analytics_events where created_at >= (strftime("%s","now","-3 days")*1000) and lower(coalesce(referrer,"")) like "%duckduckgo%" group by c order by v desc limit 15'
+          for pair in "DDG_UA:$SQL1" "JUSTPASTE_UA:$SQL2" "DDG_COUNTRY:$SQL3"; do
+            name="${pair%%:*}"; sql="${pair#*:}"
+            echo "===== $name ====="
+            curl -s -X POST "https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database/97453aca-c414-4251-92db-a7fb6d8d3b54/query" \
+              -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" -H "Content-Type: application/json" \
+              --data "$(node -e 'console.log(JSON.stringify({sql:process.argv[1]}))' "$sql")" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);(j.result?.[0]?.results||[]).forEach(r=>console.log(JSON.stringify(r)))})'
+          done
