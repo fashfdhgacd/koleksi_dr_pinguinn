@@ -262,6 +262,29 @@ export const LANDINGS: LandingDef[] = [
       "VCS adalah singkatan yang dipakai orang untuk video call dewasa. Halaman ini mengumpulkan rekaman VCS Indo yang paling banyak ditonton di koleksidrpinguin.com, hanya dari sumber IndoAV dan UserBokep yang sudah tersimpan di katalog. Urutannya dari jumlah tayangan, bukan dari tanggal masuk. Layar HP, obrolan, dan gaya amatir adalah ciri yang paling sering muncul di judul. Semua pemeran dewasa dan judul yang tidak pantas disaring. Putar langsung di browser tanpa VPN dan tanpa daftar akun. Urutan terbaru ada di kategori VCS lewat tautan di bawah. Simpan alamat situs ini supaya mudah membuka daftar yang sama lagi.",
     queries: ["bokep vcs", "video vcs indo", "vcs indo"],
   },
+  {
+    slug: "bokep-malaysia-rempit",
+    category: "jilbab",
+    match: /rempit|malay|tudung|hijab|jawi/i,
+    h1: "Bokep Malay Rempit dan Hijab Malaysia Terpopuler",
+    title: "Bokep Malay Rempit Terpopuler | koleksidrpinguin.com",
+    description:
+      "Bokep Malay rempit dan video Malaysia berhijab paling banyak ditonton. Streaming di HP tanpa login. Khusus 18+.",
+    intro:
+      "Rempit adalah budaya jalanan Malaysia yang sering muncul di video amatir: motor besar, gadis cantik, dan aksen Melayu yang bikin banyak penonton Indonesia betah. Halaman ini mengumpulkan video Malaysia dan rempit dari kategori Jilbab yang paling banyak ditonton di koleksidrpinguin.com, diurutkan dari jumlah tayangan terbanyak. Semua pemeran adalah orang dewasa dan judul yang tidak pantas sudah disaring. Video diputar langsung di browser HP tanpa VPN dan tanpa daftar akun. Kalau mau yang lebih baru, buka kategori Malaysia lewat tautan di bawah, lalu simpan alamat situs ini supaya mudah kembali lagi.",
+    queries: ["bokep malay rempit", "malay rempit bokep", "bokep malaysia rempit", "rempit bokep"],
+  },
+  {
+    slug: "bokep-indoav-userbokep",
+    category: "amatir",
+    h1: "Bokep IndoAV dan UserBokep Terpopuler",
+    title: "Bokep IndoAV & UserBokep Terpopuler | koleksidrpinguin.com",
+    description:
+      "Bokep IndoAV dan UserBokep paling banyak ditonton: video amatir Indonesia terlaris. Streaming tanpa login. Khusus 18+.",
+    intro:
+      "IndoAV dan UserBokep adalah dua sumber video amatir Indonesia paling besar di internet, dan koleksidrpinguin.com mengumpulkan yang terbaik dari keduanya. Halaman ini menampilkan video dari kedua sumber itu yang paling banyak ditonton pengunjung, diurutkan dari jumlah tayangan terbanyak. Isinya rekaman asli pasangan dewasa Indonesia: gaya rumah, kamar kos, dan cerita yang terasa dekat. Semua pemeran dewasa dan judul yang tidak pantas sudah disaring. Video diputar langsung di browser HP tanpa VPN dan tanpa akun. Untuk urutan terbaru, buka kategori Amatir lewat tautan di bawah, lalu simpan alamat situs ini supaya gampang kembali.",
+    queries: ["userbokep", "indoav", "indoav cok", "bokep indoav", "bokep userbokep", "userbokep indo"],
+  },
 ];
 
 export function findLanding(slug: string | undefined | null): LandingDef | undefined {
