@@ -1,5 +1,5 @@
 {
-  "checkedAt": "2026-11-18T20:52:26Z",
+  "checkedAt": "2026-11-19T17:00:00Z",
   "gone": {
     "1d6rOGbA2aheokz": {
       "code": "1d6rOGbA2aheokz",
@@ -113,6 +113,12 @@
       "code": "AL298goo2zcXqyz",
       "host": "Streamtape",
       "since": "2026-11-10T20:30:09Z",
+      "status": 404
+    },
+    "AlZrPd9DGGtXYyw": {
+      "code": "AlZrPd9DGGtXYyw",
+      "host": "Streamtape",
+      "since": "2026-11-19T17:00:00Z",
       "status": 404
     },
     "BQj4BGOryQsyORb": {
@@ -435,9 +441,39 @@
     }
   },
   "suspect": {
-    "AlZrPd9DGGtXYyw": {
-      "code": "AlZrPd9DGGtXYyw",
-      "first": "2026-11-18T20:52:26Z",
+    "Bv6WXGrBkosyxLP": {
+      "code": "Bv6WXGrBkosyxLP",
+      "first": "2026-11-19T17:00:00Z",
+      "host": "Streamtape",
+      "status": 404
+    },
+    "GMkJ2824P7F1gjz": {
+      "code": "GMkJ2824P7F1gjz",
+      "first": "2026-11-19T17:00:00Z",
+      "host": "Streamtape",
+      "status": 404
+    },
+    "XB0o1JAo78SDrzx": {
+      "code": "XB0o1JAo78SDrzx",
+      "first": "2026-11-19T17:00:00Z",
+      "host": "Streamtape",
+      "status": 404
+    },
+    "Yw7veDPP8vuv9yK": {
+      "code": "Yw7veDPP8vuv9yK",
+      "first": "2026-11-19T17:00:00Z",
+      "host": "Streamtape",
+      "status": 404
+    },
+    "er647R2q1mU9kw": {
+      "code": "er647R2q1mU9kw",
+      "first": "2026-11-19T17:00:00Z",
+      "host": "Streamtape",
+      "status": 404
+    },
+    "x9863aoGgGsopy": {
+      "code": "x9863aoGgGsopy",
+      "first": "2026-11-19T17:00:00Z",
       "host": "Streamtape",
       "status": 404
     }
