@@ -410,7 +410,28 @@ async function putWorker(id, bytes, type) {
   return { ok: false, status: res.status, message: text.replace(/\s+/g, " ").slice(0, 120) };
 }
 
+/** The Worker refuses bodies over 500 KB (413 too-big): re-encode big host posters to a 640px JPEG. */
+function shrinkImage(bytes) {
+  if (!ffmpegOk || bytes.length <= 480_000) return null;
+  const tmp = path.join(os.tmpdir(), `big-${process.pid}-${Math.random().toString(16).slice(2)}`);
+  try {
+    fs.writeFileSync(tmp, bytes);
+    const out = `${tmp}.jpg`;
+    const run = spawnSync("ffmpeg", ["-loglevel", "error", "-y", "-i", tmp, "-frames:v", "1", "-vf", "scale='min(640,iw)':-2", "-q:v", "5", out], { timeout: 20000 });
+    if (run.status !== 0 || !fs.existsSync(out)) return null;
+    const jpg = fs.readFileSync(out);
+    fs.rmSync(out, { force: true });
+    return jpg.length && jpg.length <= 480_000 ? jpg : null;
+  } catch {
+    return null;
+  } finally {
+    fs.rmSync(tmp, { force: true });
+  }
+}
+
 async function storeBytes(id, bytes, type) {
+  const small = shrinkImage(bytes);
+  if (small) return putWorker(id, small, "image/jpeg");
   return putWorker(id, bytes, type);
 }
 
