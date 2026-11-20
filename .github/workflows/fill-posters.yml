@@ -196,7 +196,7 @@ jobs:
           }
           async function candidates(kind, code) {
             if (kind === "by") return [`https://img-place.com/${code}_xt.jpg`, `https://img-place.com/${code}_t.jpg`];
-            if (kind === "lu") return [`https://img.lulucdn.com/${code}_xt.jpg`, `https://img.lulucdn.com/${code}_t.jpg`];
+            if (kind === "lu") return [`https://img.lulustream.co/${code}_xt.jpg`, `https://img.lulustream.co/${code}.jpg`];
             const og = doodOg(code);
             return og ? [og] : [];
           }
