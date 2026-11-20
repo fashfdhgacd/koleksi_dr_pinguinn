@@ -13,7 +13,8 @@ import { hostLabel } from "@/lib/catalog/embed";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
-import { SITE_ORIGIN, cleanDisplayTitle, publicWatchDescription } from "@/lib/seo";
+import { cleanDisplayTitle, publicWatchDescription } from "@/lib/seo";
+import { shareIntentUrls, videoShareUrl } from "@/lib/share-url";
 import { landingForCategory } from "@/lib/catalog/landing";
 import { isSeoBlockedId } from "@/lib/catalog/seo-block";
 import { categorySlugFor } from "@/lib/catalog/category-seo";
@@ -26,20 +27,8 @@ import { DRP_CATEGORY, DRP_SOURCES, drpKindOfUrl } from "@/lib/catalog/drp-hosts
 import deadSources from "@/lib/catalog/dead-sources.json";
 
 const routeApi = getRouteApi("/watch/$id");
-const SHARE_CARD_VERSION = "13";
-
-function cleanWatchUrl(id: string): string {
-  if (typeof window === "undefined") return `${SITE_ORIGIN}/watch/${id}`;
-  return `${window.location.origin}/watch/${id}`;
-}
-
 function shareUrl(id: string): string {
-  return `${cleanWatchUrl(id)}?v=${SHARE_CARD_VERSION}`;
-}
-
-function xIntentUrl(title: string, url: string): string {
-  const text = `${title}\n\n${url}`;
-  return `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
+  return videoShareUrl(id);
 }
 
 const VIDEY_LABEL = "drpinguin videy";
@@ -201,10 +190,10 @@ function ShareSheet({
     }
   }
 
-  function shareToX() {
-    window.open(xIntentUrl(title, url), "_blank", "noopener,noreferrer");
-    onClose();
-  }
+  const intents = shareIntentUrls(title, url);
+
+  const btn =
+    "flex h-12 w-full items-center justify-center rounded-xl px-4 text-base font-semibold active:scale-[0.98]";
 
   return (
     <div
@@ -219,23 +208,44 @@ function ShareSheet({
           <div className="min-w-0">
             <p className="text-xs font-medium uppercase tracking-wider text-muted">Bagikan</p>
             <p className="mt-1 line-clamp-2 text-base font-medium text-foreground">{title}</p>
+            <p className="mt-1 text-xs text-muted">Link anti blokir / tanpa VPN</p>
           </div>
           <button type="button" onClick={onClose} className="shrink-0 rounded-md px-2 py-1 text-sm text-muted hover:bg-secondary">
             Tutup
           </button>
         </div>
-        <div className="grid gap-3">
-          <button
-            type="button"
-            onClick={shareToX}
-            className="flex h-14 w-full items-center justify-center gap-3 rounded-xl bg-[#1d9bf0] px-4 text-base font-semibold text-white active:scale-[0.98]"
+        <div className="grid gap-2">
+          <a
+            href={intents.telegram}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onClose}
+            className={btn + " bg-[#2AABEE] text-white"}
           >
-            Bagikan ke X
-          </button>
+            Telegram
+          </a>
+          <a
+            href={intents.x}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onClose}
+            className={btn + " bg-[#1d9bf0] text-white"}
+          >
+            X
+          </a>
+          <a
+            href={intents.reddit}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={onClose}
+            className={btn + " bg-[#FF4500] text-white"}
+          >
+            Reddit
+          </a>
           <button
             type="button"
             onClick={() => void copyLink()}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-secondary px-4 text-base font-medium text-foreground active:scale-[0.98]"
+            className={btn + " bg-secondary font-medium text-foreground"}
           >
             {copied ? "\u2713 Link disalin" : "Salin link"}
           </button>
@@ -243,13 +253,21 @@ function ShareSheet({
             <button
               type="button"
               onClick={() => void nativeShare()}
-              className="flex h-14 w-full items-center justify-center rounded-xl border border-border px-4 text-base font-medium text-foreground active:scale-[0.98]"
+              className={btn + " border border-border font-medium text-foreground"}
             >
               Bagikan via sistem
             </button>
           ) : null}
         </div>
         <p className="mt-4 break-all text-center text-xs text-muted">{url}</p>
+        {intents.whatsapp ? (
+          <p className="mt-2 text-center text-[11px] text-muted">
+            <a href={intents.whatsapp} target="_blank" rel="noopener noreferrer" onClick={onClose} className="underline-offset-2 hover:underline">
+              WhatsApp
+            </a>
+            <span> (link anti blokir)</span>
+          </p>
+        ) : null}
       </div>
     </div>
   );
