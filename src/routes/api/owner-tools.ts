@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { hostAlertText, isRepoActionsRequest } from "@/lib/actions-auth";
+import { hostAlertText, isRepoActionsRequest, shareAlertText } from "@/lib/actions-auth";
 import { collectSharePool } from "@/lib/bot/share-pool";
 import { loadShareUsed, saveShareUsed } from "@/lib/bot/share-used";
 import { processUploadBatch } from "@/lib/bot/upload-handler.js";
@@ -1167,6 +1167,27 @@ async function handleHostAlert(body: { lines?: unknown }) {
   }
 }
 
+async function handleShareAlert(body: { lines?: unknown }) {
+  const text = shareAlertText(body.lines);
+  if (!text) return json({ ok: false, error: "empty" }, 400);
+  const token = String(process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN || "").trim();
+  const chat = String(process.env.TELEGRAM_USER_ID || process.env.TELEGRAM_ADMIN_ID || process.env.AUTHORIZED_USER_IDS || "")
+    .split(/[,\s]+/)
+    .filter(Boolean)[0];
+  if (!token || !chat) return json({ ok: false, error: "telegram_not_configured" }, 503);
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ chat_id: chat, text, disable_web_page_preview: true }),
+      signal: AbortSignal.timeout(8000),
+    });
+    return json({ ok: res.ok }, res.ok ? 200 : 502);
+  } catch {
+    return json({ ok: false, error: "telegram_failed" }, 502);
+  }
+}
+
 /** Telegram webhook status for the owner: registered url, pending updates, last error, last OK. */
 async function handleTelegramWebhook(install: boolean) {
   const [result, lastOk, lastSetup] = await Promise.all([
@@ -1209,6 +1230,11 @@ export const Route = createFileRoute("/api/owner-tools")({
           if (!(await isOwnerRequest(request, body.key)) && !(await isRepoActionsRequest(request)))
             return json({ ok: false, error: "forbidden" }, 403);
           return handleHostAlert(body as { lines?: unknown });
+        }
+        if (body && (body as { action?: string }).action === "share-alert") {
+          if (!(await isOwnerRequest(request, body.key)) && !(await isRepoActionsRequest(request)))
+            return json({ ok: false, error: "forbidden" }, 403);
+          return handleShareAlert(body as { lines?: unknown });
         }
         // Owner key: header x-online-key (or body.key). Never the URL query.
         if (!(await isOwnerRequest(request, body.key))) return json({ ok: false, error: "forbidden" }, 403);

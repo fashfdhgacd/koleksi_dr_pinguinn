@@ -87,13 +87,22 @@ Disallow: /
 
 User-agent: Twitterbot
 Allow: /
+Allow: /og/
+Allow: /thumb/
 Allow: /api/og
 Allow: /og.jpg
+Allow: /og-v2.jpg
 Allow: /brand-poster.jpg
+Allow: /brand-poster-6x5.jpg
 
 User-agent: facebookexternalhit
 Allow: /
+Allow: /og/
+Allow: /thumb/
 Allow: /api/og
 Allow: /og.jpg
+Allow: /og-v2.jpg
+Allow: /brand-poster.jpg
+Allow: /brand-poster-6x5.jpg
 
 Sitemap: https://koleksidrpinguin.com/sitemap.xml
