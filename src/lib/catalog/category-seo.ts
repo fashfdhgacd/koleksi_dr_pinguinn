@@ -220,11 +220,13 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     title: `Video Blunder Indo Viral Terbaru ${YEAR} | ${TITLE_SUFFIX}`,
     description: `Video blunder indo viral terbaru ${YEAR}: rekaman kelepasan yang lagi dicari, langsung putar di HP.`,
   },
+  // 2026-11-20: GSC "bokep kelas bintang" / "bokep indo kelas bintang" landed on /kategori/paling-ditonton
+  // (pos 53-68) instead of this page. Copy now names the "Film Kelas Bintang" series the videos come from.
   "kelas-bintang": {
-    h1: "Bokep Kelas Bintang",
-    intro: "Koleksi kelas bintang: video yang judulnya menyebut kelas bintang, pemeran dewasa, kualitas rekaman lebih rapi.",
-    title: `Bokep Kelas Bintang Terbaru ${YEAR} | ${TITLE_SUFFIX}`,
-    description: `Bokep kelas bintang terbaru ${YEAR} di Koleksi Dr. Pinguin: video pilihan dengan pemeran dewasa, putar langsung tanpa download.`,
+    h1: "Bokep Kelas Bintang Indo – Film Kelas Bintang",
+    intro: "Kumpulan bokep indo kelas bintang: film Kelas Bintang lengkap dengan pemeran dewasa, cerita rumahan sampai hotel, rekaman lebih rapi daripada video amatir. Diurutkan dari yang baru masuk dan bisa langsung diputar di HP tanpa download.",
+    title: `Bokep Kelas Bintang Indo Terbaru ${YEAR} - Film Kelas Bintang | ${TITLE_SUFFIX}`,
+    description: `Bokep kelas bintang indo terbaru ${YEAR}: film Kelas Bintang dengan pemeran dewasa, cerita rapi, langsung putar di HP tanpa download.`,
   },
   "tiktok": {
     h1: "Video TikTok Viral 18+",
@@ -286,10 +288,13 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
     title: `Bokep Indo Terbaru ${YEAR} - Video Pilihan Lainnya | ${TITLE_SUFFIX}`,
     description: `Bokep indo terbaru ${YEAR}: video pilihan lain yang tetap seru, langsung tonton di HP tanpa download.`,
   },
+  // 2026-11-20: GSC "bokep videy indo" (pos 9.4), "videy indo bokep" (9.3), "bokep videyindo" /
+  // "bokep indo videyindo" / "videyindo bokep" (pos 8-9, ~180 imp, ~0 clicks). Title keeps its
+  // ranking prefix and only appends "Videyindo"; h1 now matches the head query exactly.
   videy: {
-    h1: "Video Viral Videy Terbaru",
-    intro: "Kumpulan link videy viral dan bokep videy indo terbaru, langsung diputar di sini tanpa buka link satu-satu. Selalu nambah tiap ada video videy baru yang lagi rame.",
-    title: `Bokep Videy Indo Viral Terbaru ${YEAR} - Link Videy | ${TITLE_SUFFIX}`,
+    h1: "Bokep Videy Indo Terbaru",
+    intro: "Kumpulan bokep videy indo terbaru dan link videy viral (videyindo), langsung diputar di sini tanpa buka link videy satu-satu. Selalu nambah tiap ada video videy indo baru yang lagi rame, jadi cek halaman ini tiap hari.",
+    title: `Bokep Videy Indo Viral Terbaru ${YEAR} - Videyindo & Link Videy | ${TITLE_SUFFIX}`,
     // CTR experiment 2026-11-02: GSC "bokep videy indo" / "videy indo bokep" (pos 10-15). Title already
     // leads with the query, so only the snippet changes: query wording first, then what the page does.
     description: `Bokep videy indo terbaru ${YEAR}: video videy viral yang langsung diputar di sini, tanpa buka link videy satu-satu. Nambah tiap ada video videy baru.`,

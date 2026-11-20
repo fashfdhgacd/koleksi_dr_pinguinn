@@ -11,7 +11,7 @@ import { LANDINGS, LANDING_INDEX_PAGES, LANDING_MIN_VIDEOS, LANDING_PAGE_SIZE, f
 import { queryCatalog } from "@/lib/catalog/service";
 import type { CatalogResponse, VideoCard } from "@/lib/catalog/types";
 import { jsonLdString } from "@/lib/json-ld";
-import { DEFAULT_OG, HOME_CANONICAL, SITE_NAME, SITE_ORIGIN, breadcrumbJsonLd, collectionPageJsonLd } from "@/lib/seo";
+import { DEFAULT_OG, HOME_CANONICAL, SITE_NAME, SITE_ORIGIN, breadcrumbJsonLd, collectionPageJsonLd, loaderItems } from "@/lib/seo";
 
 export async function loadLanding(slug: string, page = 1) {
   return queryCatalog({ type: "landing", q: slug, page });
@@ -59,7 +59,15 @@ export function landingHead(slug: string, page: number, loaderData: unknown) {
       ? [
           {
             type: "application/ld+json",
-            children: jsonLdString(collectionPageJsonLd({ name: def.h1, url, description: def.description })),
+            children: jsonLdString(
+              collectionPageJsonLd({
+                name: def.h1,
+                url,
+                description: def.description,
+                items: loaderItems(loaderData),
+                startPosition: (page - 1) * LANDING_PAGE_SIZE + 1,
+              }),
+            ),
           },
           {
             type: "application/ld+json",

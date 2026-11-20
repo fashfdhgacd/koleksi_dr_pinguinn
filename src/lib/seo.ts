@@ -597,7 +597,20 @@ export function breadcrumbJsonLd(items: Array<{ name: string; url: string }>) {
 }
 
 /** CollectionPage untuk halaman kategori, terhubung ke WebSite brand. */
-export function collectionPageJsonLd(input: { name: string; url: string; description: string }) {
+/**
+ * CollectionPage for category / landing pages. With `items` (the videos rendered on this page) it
+ * also carries mainEntity ItemList -> /watch URLs, so Google sees which videos the list page holds.
+ * `startPosition` keeps ListItem positions continuous across /halaman/N pages.
+ */
+export function collectionPageJsonLd(input: {
+  name: string;
+  url: string;
+  description: string;
+  items?: ReadonlyArray<{ id: string; title?: string | null }>;
+  startPosition?: number;
+}) {
+  const items = (input.items || []).filter((v) => v && typeof v.id === "string" && v.id).slice(0, 48);
+  const start = Math.max(1, Math.floor(input.startPosition || 1));
   return {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -607,7 +620,34 @@ export function collectionPageJsonLd(input: { name: string; url: string; descrip
     inLanguage: "id",
     isPartOf: { "@id": `${HOME_CANONICAL}#website` },
     publisher: { "@id": `${HOME_CANONICAL}#organization` },
+    ...(items.length
+      ? {
+          mainEntity: {
+            "@type": "ItemList",
+            numberOfItems: items.length,
+            itemListElement: items.map((v, i) => ({
+              "@type": "ListItem",
+              position: start + i,
+              url: `${SITE_ORIGIN}/watch/${encodeURIComponent(v.id)}`,
+              ...(v.title ? { name: String(v.title).slice(0, 110) } : {}),
+            })),
+          },
+        }
+      : {}),
   };
+}
+
+/** Video cards from a catalog loader response (category / landing), or [] for anything else. */
+export function loaderItems(loaderData: unknown): Array<{ id: string; title?: string | null }> {
+  const ld = loaderData as { ok?: boolean; items?: unknown } | undefined;
+  if (!ld || !ld.ok || !Array.isArray(ld.items)) return [];
+  return (ld.items as Array<{ id?: unknown; title?: unknown }>)
+    .filter((v) => v && typeof v.id === "string" && v.id)
+    .map((v) => ({
+      id: v.id as string,
+      // Card titles often end in " - koleksidrpinguin.com"; the list item name is just the video.
+      title: typeof v.title === "string" ? v.title.replace(/\s*[-–|]\s*koleksidrpinguin\.com\s*$/i, "").trim() || null : null,
+    }));
 }
 
 export const ABOUT_TITLE = `Tentang ${SITE_NAME} - Situs Resmi koleksidrpinguin.com`;
