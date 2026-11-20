@@ -1,0 +1,57 @@
+{
+  "date": "2026-11-20",
+  "counts": {
+    "Vidara": 106,
+    "DoodStream": 285,
+    "MXDrop": 239,
+    "Byse": 754,
+    "Streamtape": 951,
+    "LuluStream": 1265,
+    "Videy": 639,
+    "IndoAV": 6113,
+    "Userbokep": 855,
+    "Putarin": 1629
+  },
+  "recent3d": {
+    "Vidara": 69,
+    "DoodStream": 68,
+    "MXDrop": 69,
+    "Byse": 68,
+    "Streamtape": 69,
+    "LuluStream": 72,
+    "Putarin": 69
+  },
+  "topHosts": {
+    "Vidara": [
+      "vidara.to"
+    ],
+    "DoodStream": [
+      "playmogo.com"
+    ],
+    "MXDrop": [
+      "mxdrop.sx"
+    ],
+    "Byse": [
+      "bysejikuar.com"
+    ],
+    "Streamtape": [
+      "streamtape.com"
+    ],
+    "LuluStream": [
+      "lplaygo.com"
+    ],
+    "Videy": [
+      "videy.co",
+      "cdn2.aceimg.com"
+    ],
+    "IndoAV": [
+      "tv1.indoav.app"
+    ],
+    "Userbokep": [
+      "tv1.userbokep.com"
+    ],
+    "Putarin": [
+      "puterin.biz"
+    ]
+  }
+}

@@ -18,11 +18,26 @@ export const DRP_SOURCES = { lulu: "LuluStream", dood: "DoodStream", byse: "Byse
 export const DRP_ID_PREFIX = { lulu: "lu-", dood: "dd-", byse: "by-", mxdrop: "mx-", vidara: "vd-" };
 
 /**
- * LuluStream player + panel domains. luluvdo.com is the embed host (lulustream.com/e/ redirects there).
+ * LuluStream embed + poster hosts used for NEW records and the 2026-11-20 data repair.
+ * luluvdo.com and img.lulucdn.com went NXDOMAIN around 2026-11-16; lulustream.com/e/<code> now 301s to
+ * lplaygo.com/e/<code> (owner approved lplaygo.com in /pemilik, KV embed:allowed-hosts:v1). When Lulu
+ * moves again, change these two constants and rewrite the stored rows (scripts/lulu-repair.mjs).
+ */
+export const LULU_EMBED_HOST = "lplaygo.com";
+export const LULU_IMG_HOST = "img.lulustream.co";
+
+/** Embed URL for a LuluStream file code (same /e/<code> iframe format as before). */
+export function luluEmbedUrl(code) {
+  return `https://${LULU_EMBED_HOST}/e/${code}`;
+}
+
+/**
+ * LuluStream player + panel domains (old and current mirrors).
  * Any lulu<v…|stream…>.<tld> mirror also matches (LULU_MIRROR_RE), e.g. luluvido.com (share links
  * https://luluvido.com/d/<code>, seen 2026-10-19).
  */
 export const LULU_DOMAINS = [
+  "lplaygo.com",
   "luluvdo.com",
   "luluvdoo.com",
   "luluvido.com",

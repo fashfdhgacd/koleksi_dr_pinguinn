@@ -45,7 +45,7 @@ test("typed R2 key and prefix resolvers", () => {
   assert.equal(typedPosterKey("bad id!"), "posters/typed/badid");
   assert.equal(workerCanResolve("mx-033vl48juj9jlg"), true);
   assert.equal(workerCanResolve("g117kfjz"), false);
-  assert.deepEqual(luluPosterUrls("abc12345"), ["https://img.lulucdn.com/abc12345_xt.jpg", "https://img.lulucdn.com/abc12345_t.jpg"]);
+  assert.deepEqual(luluPosterUrls("abc12345"), ["https://img.lulustream.co/abc12345_xt.jpg", "https://img.lulustream.co/abc12345.jpg"]);
   assert.deepEqual(bysePosterUrls("wq1qy2midnle").length, 2);
 });
 

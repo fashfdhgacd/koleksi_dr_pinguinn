@@ -359,6 +359,12 @@ jobs:
           console.log("Done posters ok=", ok, "fail=", fail, "map=", Object.keys(posters).length);
           SCRIPT
 
+      - name: Host health (per-host counts + embed domain DNS)
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/host-health.mjs
+
       - name: Commit changes
         run: |
           set -e
@@ -368,6 +374,7 @@ jobs:
           git add -- data/videos-latest.json data/videos-latest-p*.json 2>/dev/null || true
           git add \
             data/latest-posters.json \
+            data/host-counts.json \
             src/lib/catalog/posters.json \
             src/lib/catalog/streamtape-batch-20260925.json \
             2>/dev/null || true
@@ -385,3 +392,12 @@ jobs:
             sleep 3
           done
           exit 1
+
+      - name: Fail on host alert (GitHub emails the owner)
+        if: always()
+        run: |
+          if [ -f host-alerts.txt ]; then
+            echo "::error::Host health alert"
+            cat host-alerts.txt
+            exit 1
+          fi

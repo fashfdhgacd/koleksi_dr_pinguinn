@@ -270,7 +270,7 @@ export async function fetchDrpPageMeta(kind, embedUrl, code) {
         : kind === "vidara"
           ? [`${origin}/v/${c}`, `${origin}/e/${c}`]
           : kind === "lulu"
-          ? [`https://luluvdo.com/e/${c}`, `https://lulustream.com/${c}.html`]
+          ? [`https://lplaygo.com/${c}`, `https://lplaygo.com/e/${c}`]
           : [embedUrl];
     let title = "";
     let thumb = "";

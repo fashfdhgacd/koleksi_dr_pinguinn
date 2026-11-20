@@ -1,4 +1,5 @@
 import { parseMessage, detectCategory, cleanTitle, brandTitle } from "@/lib/bot/parse.js";
+import { coverageLines, reconcileLine } from "./upload-coverage.js";
 import { toRecord } from "@/lib/bot/store.js";
 import {
   fetchPutarinMeta,
@@ -286,7 +287,8 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
 
   await tgSend(token, chatId, `⏳ Menerima ${parsedMsg.videos.length} link. Sedang diproses…`);
 
-  const lines = [];
+  const lines = [...coverageLines(parsedMsg)];
+  let blockedTotal = 0;
   let createdTotal = 0;
   let skippedTotal = 0;
   let failedTotal = 0;
@@ -332,6 +334,8 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     }
     queue.push(folderTitle && folderTitle !== "Video" ? { ...video, title: folderTitle } : video);
   });
+
+  const queuedInitial = queue.length;
 
   // Lulu/Dood/Byse already on the site (any catalog copy, incl. the data/drp-bokep.json import): a
   // resend is a duplicate. The bot's own dedupe only sees data/videos-latest*.json, so on 2026-10-29
@@ -687,6 +691,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
           continue;
         }
         if (blockedIds.has(idKey)) {
+          blockedTotal += 1;
           lines.push(`⏭️ ${it.record.id} — dikeluarkan dari katalog, tidak dimasukkan lagi`);
           continue;
         }
@@ -774,6 +779,17 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
   } catch {
     /* never break uploads */
   }
+
+  const recon = reconcileLine(queuedInitial, {
+    created: createdTotal,
+    skipped: skippedTotal,
+    failed: failedTotal,
+    held: heldTotal,
+    queuedKv: queuedTotal,
+    rejected: rejectedTotal,
+    blocked: blockedTotal,
+  });
+  if (recon) lines.unshift(recon);
 
   if (aiGayDropped) {
     lines.push(`ℹ️ ${aiGayDropped} video tidak masuk AI GAY (judulnya bukan gay); kategori diambil dari judul.`);
