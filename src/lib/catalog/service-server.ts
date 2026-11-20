@@ -13,7 +13,7 @@ import { fetchCatalog } from "./client";
 import { uploadDateOf } from "./sitemap-entries";
 import { listRanking, rankedAllTime, withVideyViews } from "./ranking-list";
 import { parseRankingKey } from "./rankings";
-import { LANDING_PAGE_SIZE, LANDING_POOL, acceptLandingCard, findLanding } from "./landing";
+import { ALL_CATEGORIES, LANDING_PAGE_SIZE, LANDING_POOL, SOURCE_POOL, acceptLandingCard, findLanding } from "./landing";
 import { isSeoBlockedId } from "./seo-block";
 import { isMinorContentTitle } from "./minor-detector.js";
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from "./types";
@@ -170,18 +170,25 @@ export async function queryCatalogServer(query: CatalogQuery, signal?: AbortSign
         // /cari/<slug>: own catalog (IndoAV + UserBokep), clean titles, most viewed first,
         // then /halaman/N. Blocklist ids never appear. School-word JAV is not a title block.
         const def = findLanding(query.q);
-        if (!def || !findCategory(def.category)) return { ok: false, error: "Halaman tidak dikenal.", code: "not_found" };
+        const allFeed = def?.category === ALL_CATEGORIES;
+        if (!def || (!allFeed && !findCategory(def.category))) return { ok: false, error: "Halaman tidak dikenal.", code: "not_found" };
         const requested = Math.max(1, page ?? 1);
         const limit = LANDING_PAGE_SIZE;
-        const pool = await listCategory(def.category, 1, LANDING_POOL, signal);
+        const pool = allFeed
+          ? await listLatest(1, SOURCE_POOL, signal)
+          : await listCategory(def.category, 1, LANDING_POOL, signal);
         const clean = pool.items.filter(
           (c) => acceptLandingCard(c, def) && !isMinorContentTitle(c.title) && !isSeoBlockedId(c.id),
         );
         const withViews = await withVideyViews(clean);
-        const sorted = withViews
-          .map((c, i) => ({ c, i }))
-          .sort((a, b) => (b.c.views || 0) - (a.c.views || 0) || a.i - b.i)
-          .map((x) => x.c);
+        // Source pages keep feed order (newest first); genre pages sort by views.
+        const sorted =
+          def.order === "latest"
+            ? withViews
+            : withViews
+                .map((c, i) => ({ c, i }))
+                .sort((a, b) => (b.c.views || 0) - (a.c.views || 0) || a.i - b.i)
+                .map((x) => x.c);
         const total = sorted.length;
         const last = Math.max(1, Math.ceil(total / limit) || 1);
         const safePage = Math.min(requested, last);

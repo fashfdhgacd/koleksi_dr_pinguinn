@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { LANDINGS, findLanding, hasBannedWord, wordCount } from "./landing.ts";
+import { LANDINGS, acceptLandingCard, findLanding, hasBannedWord, wordCount } from "./landing.ts";
 
 const categorySlugs = new Set(
   [...readFileSync(new URL("./categories.ts", import.meta.url), "utf8").matchAll(/slug: "([a-z0-9-]+)"/g)].map((m) => m[1]),
@@ -18,7 +18,8 @@ describe("search landing allowlist", () => {
   it("uses url-safe slugs mapped to existing categories", () => {
     for (const l of LANDINGS) {
       assert.match(l.slug, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
-      assert.ok(categorySlugs.has(l.category), `${l.slug}: unknown category ${l.category}`);
+      if (l.category === "*") assert.ok(l.sources && l.sources.length, `${l.slug}: "*" needs sources`);
+      else assert.ok(categorySlugs.has(l.category), `${l.slug}: unknown category ${l.category}`);
       assert.ok(!["teen-18", "college-18"].includes(l.category), `${l.slug}: noindex category`);
       assert.equal(findLanding(l.slug), l);
     }
@@ -45,6 +46,30 @@ describe("search landing allowlist", () => {
     }
     for (const t of ["Tante STW", "Bokep amatir", "Rekaman rumahan", "Pasangan dewasa"]) {
       assert.equal(hasBannedWord(t), false, t);
+    }
+  });
+});
+
+describe("source landings (IndoAV / UserBokep)", () => {
+  it("only take their own source, newest first, ad-free, and never claim to be the source site", () => {
+    const indoav = findLanding("bokep-indoav-terbaru");
+    const ub = findLanding("bokep-userbokep-indo");
+    assert.ok(indoav && ub);
+    for (const l of [indoav, ub]) {
+      assert.equal(l.order, "latest");
+      assert.equal(l.adFree, true);
+      assert.match(l.intro, /Kami bukan situs/);
+      assert.match(l.title, /Koleksi Video dari/);
+    }
+    assert.equal(acceptLandingCard({ title: "Tante rumahan", creator: "IndoAV" }, indoav), true);
+    assert.equal(acceptLandingCard({ title: "Tante rumahan", creator: "UserBokep" }, indoav), false);
+    assert.equal(acceptLandingCard({ title: "Tante rumahan", creator: "Userbokep" }, ub), true);
+    assert.equal(acceptLandingCard({ title: "Tante rumahan", creator: "Videy" }, ub), false);
+  });
+
+  it("drop Andini Permata titles from every landing", () => {
+    for (const l of LANDINGS) {
+      assert.equal(acceptLandingCard({ title: "Andini Permata viral", creator: "IndoAV", category: l.category }, l), false, l.slug);
     }
   });
 });

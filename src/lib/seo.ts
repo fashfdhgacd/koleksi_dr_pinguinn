@@ -643,6 +643,8 @@ export function loaderItems(loaderData: unknown): Array<{ id: string; title?: st
   if (!ld || !ld.ok || !Array.isArray(ld.items)) return [];
   return (ld.items as Array<{ id?: unknown; title?: unknown }>)
     .filter((v) => v && typeof v.id === "string" && v.id)
+    // Owner decision 2026-11-20: "Andini Permata" titles stay out of every SEO surface.
+    .filter((v) => !/andini\s*permata/i.test(typeof v.title === "string" ? v.title : ""))
     .map((v) => ({
       id: v.id as string,
       // Card titles often end in " - koleksidrpinguin.com"; the list item name is just the video.

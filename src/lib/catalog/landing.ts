@@ -11,8 +11,17 @@
 
 export type LandingDef = {
   slug: string;
-  /** Existing category slug (src/lib/catalog/categories.ts) the videos come from. */
+  /**
+   * Existing category slug (src/lib/catalog/categories.ts) the videos come from, or ALL_CATEGORIES
+   * ("*") for a source page that draws on the whole Terbaru feed (newest SOURCE_POOL videos).
+   */
   category: string;
+  /** Source page: only cards whose creator is one of these (e.g. ["IndoAV"]). */
+  sources?: string[];
+  /** "latest" keeps feed order (newest first); default sorts by views. */
+  order?: "views" | "latest";
+  /** No grid ad slots and no card-click popunder on this page (IndoAV source pages stay ad-free). */
+  adFree?: boolean;
   /** Optional extra title filter inside the category (case-insensitive). */
   match?: RegExp;
   h1: string;
@@ -32,6 +41,15 @@ export const LANDING_PAGE_SIZE = 24;
 export const LANDING_LIMIT = LANDING_PAGE_SIZE;
 /** Category pool scanned for a landing page (sorted by views, then paginated). */
 export const LANDING_POOL = 144;
+/** Source landings (category "*"): newest videos scanned from the Terbaru feed. */
+export const SOURCE_POOL = 600;
+export const ALL_CATEGORIES = "*";
+/**
+ * Titles kept out of every SEO surface (landing pages, list JSON-LD), owner decision 2026-11-20:
+ * the "Andini Permata" name is tied in the news to a video with a child.
+ */
+export const SEO_EXCLUDED_TITLE = /andini\s*permata/i;
+
 /** Pages 1..this stay indexable; deeper /cari pages are noindex,follow. */
 export const LANDING_INDEX_PAGES = 5;
 
@@ -285,6 +303,38 @@ export const LANDINGS: LandingDef[] = [
       "IndoAV dan UserBokep adalah dua sumber video amatir Indonesia paling besar di internet, dan koleksidrpinguin.com mengumpulkan yang terbaik dari keduanya. Halaman ini menampilkan video dari kedua sumber itu yang paling banyak ditonton pengunjung, diurutkan dari jumlah tayangan terbanyak. Isinya rekaman asli pasangan dewasa Indonesia: gaya rumah, kamar kos, dan cerita yang terasa dekat. Semua pemeran dewasa dan judul yang tidak pantas sudah disaring. Video diputar langsung di browser HP tanpa VPN dan tanpa akun. Untuk urutan terbaru, buka kategori Amatir lewat tautan di bawah, lalu simpan alamat situs ini supaya gampang kembali.",
     queries: ["userbokep", "indoav", "indoav cok", "bokep indoav", "bokep userbokep", "userbokep indo"],
   },
+  // Source pages (2026-11-20, owner request): GSC 90 d "userbokep" 101 imp / 12 clicks (pos 10.4, lands
+  // on /), "indoav" 27 imp / 10 clicks (pos 52), "bokep indoav" 8 imp, "indoav stw" 6 imp. Navigational
+  // domain queries (indoav.com, userbokep.com) are not targeted. Copy says these are videos FROM the
+  // source, collected here; never that this site is IndoAV or UserBokep. Ad-free (IndoAV no-ads rule).
+  {
+    slug: "bokep-indoav-terbaru",
+    category: ALL_CATEGORIES,
+    sources: ["IndoAV"],
+    order: "latest",
+    adFree: true,
+    h1: "Bokep IndoAV Terbaru: Koleksi Video dari IndoAV",
+    title: "Bokep IndoAV Terbaru – Koleksi Video dari IndoAV | koleksidrpinguin.com",
+    description:
+      "Bokep IndoAV terbaru: kumpulan video yang bersumber dari IndoAV, diurutkan dari yang baru masuk. Streaming di HP tanpa login. Khusus 18+.",
+    intro:
+      "Halaman ini berisi kumpulan video terbaru di koleksidrpinguin.com yang bersumber dari IndoAV. Kami bukan situs IndoAV dan tidak berafiliasi dengan mereka; kami hanya mengumpulkan video dari sumber itu ke satu daftar supaya gampang ditonton. Urutannya dari video yang paling baru masuk, jadi tiap ada tambahan langsung muncul di atas. Isinya rekaman Indonesia dengan pemeran dewasa, dan judul yang tidak pantas sudah disaring. Video diputar langsung di browser HP tanpa daftar akun. Halaman ini tanpa iklan banner. Mau video dari sumber lain juga? Buka halaman UserBokep atau beranda lewat tautan di bawah.",
+    queries: ["indoav", "bokep indoav", "indoav terbaru", "indoav stw", "bokep indo av terbaru"],
+  },
+  {
+    slug: "bokep-userbokep-indo",
+    category: ALL_CATEGORIES,
+    sources: ["UserBokep"],
+    order: "latest",
+    adFree: true,
+    h1: "Bokep UserBokep Indo Terbaru: Koleksi Video dari UserBokep",
+    title: "Bokep UserBokep Indo Terbaru – Koleksi Video dari UserBokep | koleksidrpinguin.com",
+    description:
+      "Bokep UserBokep indo terbaru: kumpulan video yang bersumber dari UserBokep, diurutkan dari yang baru masuk. Streaming di HP tanpa login. Khusus 18+.",
+    intro:
+      "Halaman ini berisi kumpulan video Indonesia terbaru di koleksidrpinguin.com yang bersumber dari UserBokep. Kami bukan situs UserBokep dan tidak berafiliasi dengan mereka; kami hanya mengumpulkan video dari sumber itu ke satu daftar supaya gampang ditonton. Urutannya dari video yang paling baru masuk, jadi tiap ada tambahan langsung muncul di atas. Isinya rekaman amatir dengan pemeran dewasa, dan judul yang tidak pantas sudah disaring. Video diputar langsung di browser HP tanpa daftar akun. Halaman ini tanpa iklan banner. Mau video dari sumber lain juga? Buka halaman IndoAV atau beranda lewat tautan di bawah.",
+    queries: ["userbokep", "bokep userbokep", "userbokep indo", "user bokep"],
+  },
 ];
 
 export function findLanding(slug: string | undefined | null): LandingDef | undefined {
@@ -296,12 +346,12 @@ export function findLanding(slug: string | undefined | null): LandingDef | undef
 export function landingForCategory(category: string | undefined | null): LandingDef | undefined {
   const s = String(category || "").trim().toLowerCase();
   if (!s) return undefined;
-  return LANDINGS.find((l) => l.category === s);
+  return LANDINGS.find((l) => l.category === s && !l.sources);
 }
 
 export function landingTitleOk(title: string, match?: RegExp): boolean {
   const t = String(title || "");
-  if (!t || hasBannedWord(t)) return false;
+  if (!t || hasBannedWord(t) || SEO_EXCLUDED_TITLE.test(t)) return false;
   if (match && !match.test(t)) return false;
   return true;
 }
@@ -313,9 +363,13 @@ export function landingTitleOk(title: string, match?: RegExp): boolean {
  */
 export function acceptLandingCard(
   card: { title?: string; creator?: string | null; category?: string },
-  def: Pick<LandingDef, "category" | "match">,
+  def: Pick<LandingDef, "category" | "match" | "sources">,
 ): boolean {
   if (!landingTitleOk(String(card.title || ""), def.match)) return false;
+  if (def.sources && def.sources.length) {
+    const creator = String(card.creator || "").toLowerCase();
+    return def.sources.some((src) => src.toLowerCase() === creator);
+  }
   if (def.category === "videy") return card.category === "videy" || String(card.creator || "") === "Videy";
   return OWN_CATALOG_SOURCES.has(String(card.creator || ""));
 }
