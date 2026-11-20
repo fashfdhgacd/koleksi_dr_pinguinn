@@ -25,7 +25,6 @@ import {
   playlistSegments,
   posterRank,
   segmentPicks,
-  typedPosterKey,
 } from "../src/lib/poster-sources.js";
 
 const require = createRequire(import.meta.url);
@@ -43,11 +42,9 @@ const blocklist = JSON.parse(fs.readFileSync(new URL("../src/lib/image-blocklist
 const MIN_BYTES = Number(blocklist.minBytes) || 3000;
 const PLACEHOLDER_MD5 = blocklist.md5 || {};
 
-const started = Date.now();
+let started = Date.now();
 const overBudget = () => Date.now() - started > BUDGET_MS;
 let framesUsed = 0;
-let storeMode = "";
-let workerWaited = false;
 
 function readJson(p, fb) {
   try {
@@ -387,29 +384,22 @@ async function headPoster(id) {
   return "error";
 }
 
-async function putApi(id, bytes, type) {
-  const account = (process.env.CLOUDFLARE_ACCOUNT_ID || "").trim();
-  const token = (process.env.CLOUDFLARE_API_TOKEN || "").trim();
-  if (!account || !token) return { ok: false, status: 0, message: "no-r2-api-env" };
-  const key = typedPosterKey(id);
-  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}/r2/buckets/posters/objects/${key}`, {
-    method: "PUT",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": type || "image/jpeg" },
-    body: bytes,
-    signal: AbortSignal.timeout(20000),
-  });
-  const data = await res.json().catch(() => null);
-  const message = String(data?.errors?.[0]?.message || data?.errors?.[0]?.code || "").slice(0, 160);
-  if (res.ok && data?.success !== false) return { ok: true, status: res.status, message: "" };
-  return { ok: false, status: res.status, message };
+function ingestHeaders(type) {
+  const headers = { "content-type": type || "image/jpeg", "user-agent": UA };
+  const owner = (process.env.ONLINE_VIEW_SECRET || process.env.OWNER_SECRET || process.env.PEMILIK_SECRET || "").trim();
+  if (owner) headers["x-online-key"] = owner;
+  const token = (process.env.GITHUB_TOKEN || "").trim();
+  if (token) headers.authorization = `Bearer ${token}`;
+  return headers;
 }
 
 async function putWorker(id, bytes, type) {
-  const key = (process.env.PUTARIN_API_KEY || "").trim();
-  if (!key) return { ok: false, status: 0, message: "no-ingest-key" };
+  if (!ingestHeaders("image/jpeg").authorization && !ingestHeaders("image/jpeg")["x-online-key"]) {
+    return { ok: false, status: 0, message: "no-ingest-auth" };
+  }
   const res = await fetch(`${SITE}/thumb/${encodeURIComponent(id)}`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": type || "image/jpeg", "user-agent": UA },
+    headers: ingestHeaders(type),
     body: bytes,
     redirect: "manual",
     signal: AbortSignal.timeout(25000),
@@ -421,25 +411,21 @@ async function putWorker(id, bytes, type) {
 }
 
 async function storeBytes(id, bytes, type) {
-  if (!storeMode) storeMode = process.env.CLOUDFLARE_API_TOKEN && process.env.CLOUDFLARE_ACCOUNT_ID ? "api" : "worker";
-  if (storeMode === "api") {
-    const up = await putApi(id, bytes, type);
-    if (up.ok) return up;
-    if (up.status === 401 || up.status === 403 || up.status === 0) {
-      console.log(`r2 api put refused HTTP ${up.status} ${up.message} — using Worker ingest`);
-      storeMode = "worker";
-    } else return up;
+  return putWorker(id, bytes, type);
+}
+
+/** 422 = route is live and auth worked (probe body is not an image). 401 = auth rejected. 404 = old worker. */
+async function waitForIngest() {
+  const probe = new Uint8Array(32);
+  for (let i = 0; i < 10; i++) {
+    const up = await putWorker("mx-ingestprobe", probe, "image/jpeg");
+    if (up.message === "challenge") return "challenge";
+    if (up.status === 422 || up.status === 200) return "ready";
+    if (up.status === 401) return "auth";
+    console.log(`ingest probe HTTP ${up.status}`);
+    await sleep(30_000);
   }
-  let up = await putWorker(id, bytes, type);
-  if (up.status === 404 && !workerWaited) {
-    workerWaited = true;
-    for (let i = 0; up.status === 404 && i < 8; i++) {
-      console.log("poster ingest not deployed yet, waiting");
-      await sleep(40_000);
-      up = await putWorker(id, bytes, type);
-    }
-  }
-  return up;
+  return "missing";
 }
 
 function writePosterMap(found) {
@@ -510,6 +496,18 @@ async function backfill(items, maps) {
   }
   const work = LIMIT > 0 ? missing.slice(0, LIMIT) : missing;
   console.log(`missing=${missing.length} head_errors=${headErrors} will_try=${work.length} ffmpeg=${ffmpegOk ? "yes" : "no"}`);
+  const ingest = await waitForIngest();
+  if (ingest === "challenge") {
+    console.error("poster-backfill: Cloudflare challenge while opening ingest; nothing was uploaded");
+    process.exitCode = 1;
+    return;
+  }
+  if (ingest !== "ready") {
+    console.error(`poster-backfill: worker ingest not usable (${ingest}); nothing was uploaded`);
+    process.exitCode = 1;
+    return;
+  }
+  started = Date.now();
   const found = new Map();
   const counts = { stored: 0, noSource: 0, deferred: 0, uploadFailed: 0 };
   const noSourceBy = {};

@@ -4,6 +4,7 @@ import { fixDmmCover, javCoverFromTitle } from "@/lib/catalog/local-shared";
 import { checkImage, isPlaceholderMd5 } from "@/lib/image-guard";
 import { resolvePuterinImage } from "@/lib/puterin-poster";
 import { bysePosterUrls, isDeadPosterUrl, luluPosterUrls, metaImage, mxdropFromHtml, typedPosterKey } from "@/lib/poster-sources.js";
+import { isOwnerRequest } from "@/lib/owner-auth";
 
 /** Putarin item for an id (putarin-latest feed), loaded lazily only on a full miss. */
 async function putarinItem(id: string): Promise<{ id?: string; title?: string; category?: string } | null> {
@@ -105,6 +106,32 @@ async function sameSecret(given: string, expect: string): Promise<boolean> {
   let diff = x.length ^ y.length;
   for (let i = 0; i < x.length; i++) diff |= x[i] ^ y[i];
   return diff === 0;
+}
+
+/**
+ * Backfill auth, no new Worker env var.
+ * Owner key (x-online-key / ONLINE_VIEW_SECRET) when the caller has it.
+ * Otherwise the GitHub Actions token: we ask GitHub if that token can see this
+ * private repo. The R2 API token in Actions is rejected (401); the bucket binding is not.
+ */
+async function allowPosterIngest(request: Request): Promise<boolean> {
+  if (await isOwnerRequest(request)) return true;
+  const token = String(request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  if (!token) return false;
+  if (await sameSecret(token, await posterIngestKey())) return true;
+  try {
+    const res = await fetch("https://api.github.com/repos/fashfdhgacd/koleksi_dr_pinguinn", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "User-Agent": "kdp-poster-ingest",
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    return res.status === 200;
+  } catch {
+    return false;
+  }
 }
 
 function sniffType(buf: ArrayBuffer): string {
@@ -275,14 +302,14 @@ export const Route = createFileRoute("/thumb/$id")({
           return fallback(request);
         }
       },
-      // GitHub poster backfill only. Same R2 key as GET. Auth is the Putarin key the Worker already has.
+      // GitHub poster backfill only. Same R2 key as GET. Writes with the POSTERS binding.
       POST: async ({ params, request }) => {
         const id = String(params.id || "").replace(/\.(jpg|jpeg|webp|png)$/i, "");
         const key = keyFor(id);
         if (!key) return new Response(null, { status: 404 });
-        const header = String(request.headers.get("authorization") || "");
-        const given = header.replace(/^Bearer\s+/i, "").trim();
-        if (!(await sameSecret(given, await posterIngestKey()))) return new Response(null, { status: 404 });
+        if (!(await allowPosterIngest(request))) {
+          return Response.json({ ok: false, error: "auth" }, { status: 401, headers: { "cache-control": "no-store" } });
+        }
         const len = Number(request.headers.get("content-length") || 0);
         if (len > 500_000) return Response.json({ ok: false, error: "too-big" }, { status: 413, headers: { "cache-control": "no-store" } });
         const buf = await request.arrayBuffer().catch(() => null);
