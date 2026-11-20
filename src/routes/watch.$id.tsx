@@ -13,48 +13,25 @@ import {
   publicWatchDescription,
   videoJsonLd,
   videoSeoTitle,
+  seoVideoThumbnail,
 } from "@/lib/seo";
 import { WatchPage } from "@/lib/watch/watch-page";
 
-/** Absolute https image for share cards. Never a page or a stream. */
-function shareCardImage(thumbnail: string | null | undefined): string {
-  const raw = String(thumbnail || "").trim();
-  const absolute = raw.startsWith("/")
-    ? `${SITE_ORIGIN}${raw}`
-    : /^https:\/\//i.test(raw)
-      ? raw
-      : "";
-  if (!absolute) return DEFAULT_OG;
-  if (/\.(mp4|webm|m3u8|mov)(?:$|\?)/i.test(absolute)) return DEFAULT_OG;
-  return absolute;
-}
-
-/** BreadcrumbList (Beranda > Kategori > Video) so Google can show the path in the result. */
-function watchBreadcrumb(category: string | null | undefined, title: string, url: string) {
-  const slug = categorySlugFor(category);
-  const crumbs: Array<{ name: string; url: string }> = [{ name: "Beranda", url: SITE_ORIGIN }];
-  if (slug && category) crumbs.push({ name: String(category), url: `${SITE_ORIGIN}/kategori/${slug}` });
-  crumbs.push({ name: title, url });
-  return {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: crumbs.map((c, i) => ({ "@type": "ListItem", position: i + 1, name: c.name, item: c.url })),
-  };
-}
-
-export type WatchSearch = {
-  /** Multi-server: id of the server (host copy) to play; absent = the page's default server. */
-  s?: string;
-};
-
 /** MIME type for og:image:type from the image URL's extension (default jpeg). */
 function ogImageType(url: string): string {
+  // Share cards always use a same-origin JPEG (/og/<id>.jpg or the brand /og-v2.jpg).
+  if (/\/og\//i.test(url) || /og-v2\.jpg/i.test(url) || /brand-poster/i.test(url)) return "image/jpeg";
   const ext = /\.(webp|png|gif|jpe?g)(?:[?#]|$)/i.exec(url)?.[1]?.toLowerCase();
   if (ext === "webp") return "image/webp";
   if (ext === "png") return "image/png";
   if (ext === "gif") return "image/gif";
   return "image/jpeg";
 }
+
+export type WatchSearch = {
+  /** Multi-server: id of the server (host copy) to play; absent = the page's default server. */
+  s?: string;
+};
 
 export const Route = createFileRoute("/watch/$id")({
   validateSearch: (search: Record<string, unknown>): WatchSearch => ({
@@ -110,7 +87,7 @@ export const Route = createFileRoute("/watch/$id")({
           160,
         )
       : "Koleksi bokep Indo Dr. Pinguin. Konten 18+.";
-    const image = item ? shareCardImage(item.thumbnail) : DEFAULT_OG;
+    const image = item ? seoVideoThumbnail(item.id, item.thumbnail) : DEFAULT_OG;
     const url = item ? `${SITE_ORIGIN}/watch/${item.id}` : SITE_ORIGIN;
     const embedUrl = item
       ? (item.video_url || item.qualities?.[0]?.url || "").trim() || null

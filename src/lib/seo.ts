@@ -388,7 +388,7 @@ export function isGoogleVideoThumbFormat(url: string): boolean {
   if (/\.(webp|avif|svg|gif|bmp|ico)($|\/)/i.test(path)) return false;
   if (/\.(jpe?g|png)($|\/)/i.test(path)) return true;
   // same-origin OG/proxy endpoints that we force to JPEG
-  if (/\/api\/og(\?|$)/i.test(url) || /\/og(-v2)?\.jpg(\?|$)/i.test(url) || /\/brand-poster(-v2)?\.jpg(\?|$)/i.test(url)) {
+  if (/\/api\/og(\?|$)/i.test(url) || /\/og\/[A-Za-z0-9_-]+(?:\.jpe?g)?(\?|$)/i.test(url) || /\/og(-v2)?\.jpg(\?|$)/i.test(url) || /\/brand-poster(-v2)?\.jpg(\?|$)/i.test(url)) {
     return true;
   }
   return false;
@@ -396,12 +396,12 @@ export function isGoogleVideoThumbFormat(url: string): boolean {
 
 /**
  * Thumbnail for VideoObject / GSC video indexing.
- * Prefer same-origin /api/og (JPEG) so bots are not sent unreachable .webp hosters.
+ * Prefer same-origin /og/<id>.jpg (JPEG) so bots are not sent unreachable .webp hosters.
  */
 export function seoVideoThumbnail(id?: string | null, thumbnail?: string | null): string {
   const idClean = (id || "").trim();
   if (idClean && /^[A-Za-z0-9_-]{3,64}$/.test(idClean)) {
-    return `${SITE_ORIGIN}/thumb/${encodeURIComponent(idClean)}.jpg`;
+    return `${SITE_ORIGIN}/og/${encodeURIComponent(idClean)}.jpg`;
   }
   const raw = String(thumbnail || "").trim();
   if (raw && isGoogleVideoThumbFormat(raw)) {

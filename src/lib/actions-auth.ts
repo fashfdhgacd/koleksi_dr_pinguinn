@@ -26,3 +26,13 @@ export function hostAlertText(lines: unknown): string {
   if (!list.length) return "";
   return ["🚨 Cek server harian (koleksidrpinguin.com):", ...list.map((l) => `• ${l}`), "", "Detail: GitHub → Daily video sync → Host health."].join("\n");
 }
+
+/** Telegram text for the share/OG health check (plain text, capped). */
+export function shareAlertText(lines: unknown): string {
+  const list = (Array.isArray(lines) ? lines : [])
+    .map((l) => String(l || "").replace(/\s+/g, " ").trim().slice(0, 300))
+    .filter(Boolean)
+    .slice(0, 15);
+  if (!list.length) return "";
+  return ["🚨 Kartu share / OG (koleksidrpinguin.com, videyy.icu, videqsss.icu):", ...list.map((l) => `• ${l}`), "", "Detail: GitHub → Site health."].join("\n");
+}
