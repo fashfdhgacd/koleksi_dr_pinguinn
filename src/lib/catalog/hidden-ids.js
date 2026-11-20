@@ -1,7 +1,7 @@
 /**
  * Hidden-ids list + detector for titles whose content itself is school- or minor-themed
  * (shared by the site catalog and the Telegram bot). Such items are HIDDEN (not deleted): left out of
- * listings, categories, search, related videos, sitemap, and /watch returns 404.
+ * listings, categories, search, related videos, sitemap, and /watch 302s to the homepage with noindex.
  *
  * Translated wording on adult videos (e.g. "teen" → "remaja") is NOT hidden here;
  * minor-title-guard.ts renames those at display time instead.

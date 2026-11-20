@@ -1043,7 +1043,7 @@ async function handleCatalogRemove(body: { id?: unknown; ids?: unknown; dryRun?:
     ok: true,
     dryRun: false,
     ...detail,
-    watch: 410,
+    watch: 302,
     blocked: true,
     repo: repo.skipped ? "skipped" : repo.ok ? "committed" : "error",
   });

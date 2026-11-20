@@ -1,32 +1,23 @@
 /**
- * URL template /watch/$id (atau /watch/:id, /watch/{id}) yang sempat terindeks → 404 + noindex.
- * Hidden ids (minor/school-themed content, see src/lib/catalog/hidden-ids.js) → 410 Gone + noindex
- * (video tidak dihapus, cuma disembunyikan; 410 bikin Google cepat buang URL-nya).
- * Template /kategori/$slug yang bocor dari manifest router → 410.
+ * URL template /watch/$id (atau /watch/:id, /watch/{id}) yang sempat terindeks → 302 ke beranda + noindex.
+ * Hidden / blocked / rejected ids (minor/school, owner hide, catalog block) → 302 ke beranda + noindex
+ * (video tidak dihidupkan lagi; pengunjung masuk ke situs, bukan halaman teks "Gone").
+ * Template /kategori/$slug yang bocor dari manifest router → 302 ke /kategori + noindex.
  * Trailing slash (mis. /kategori/) → satu kali 301 ke versi tanpa slash.
- * Multi-server: id salinan yang digabung ke halaman utama (multi-server.ts) → 301 ke /watch/<utama>
- * (video tidak dihapus; salinannya jadi tombol server di halaman utama).
+ * Multi-server: id salinan yang digabung ke halaman utama yang masih publik (multi-server.ts) → 301
+ * ke /watch/<utama>. Kalau halaman utamanya juga tersembunyi, 302 ke beranda.
  */
 import { isPublicHidden, mergedMainOf } from "../../src/lib/catalog/local-cache";
+import {
+  WATCH_ID_RE,
+  decideWatchPlaceholder,
+  decisionResponse,
+  type WatchIdInfo,
+} from "../lib/watch-placeholder-decide";
 
 interface WatchPlaceholderEvent {
   url: URL;
   req: { method: string; headers: Headers };
-}
-
-const PLACEHOLDER_RE = /^\/(watch|v)\/(\$id|%24id|:id|\{id\}|%7bid%7d)\/?$/i;
-const CAT_PLACEHOLDER_RE = /^\/kategori\/(\$slug|%24slug|:slug|\{slug\}|%7bslug%7d)\/?$/i;
-const WATCH_ID_RE = /^\/(?:watch|v)\/([A-Za-z0-9_-]{3,64})\/?$/;
-
-function notFound(status = 404): Response {
-  return new Response(status === 410 ? "Gone" : "Not Found", {
-    status,
-    headers: {
-      "content-type": "text/plain; charset=utf-8",
-      "x-robots-tag": "noindex, nofollow",
-      "cache-control": "public, max-age=3600",
-    },
-  });
 }
 
 export default async function watchPlaceholderMiddleware(
@@ -45,38 +36,22 @@ export default async function watchPlaceholderMiddleware(
       headers: { "content-type": "text/plain; charset=utf-8", "x-robots-tag": "noindex" },
     });
   }
+
   const path = event.url.pathname;
-  if (PLACEHOLDER_RE.test(path)) return notFound();
-  if (CAT_PLACEHOLDER_RE.test(path)) return notFound(410);
-  if (
-    path.length > 1 &&
-    path.endsWith("/") &&
-    !path.startsWith("/api/") &&
-    (event.req.method === "GET" || event.req.method === "HEAD")
-  ) {
-    const clean = path.replace(/\/+$/, "") || "/";
-    return new Response(null, {
-      status: 301,
-      headers: { location: `https://koleksidrpinguin.com${clean}${event.url.search}` },
-    });
-  }
-  const m = event.url.pathname.match(WATCH_ID_RE);
+  const method = event.req.method;
+  let info: WatchIdInfo | null = null;
+  const m = path.match(WATCH_ID_RE);
   if (m) {
     try {
-      if (await isPublicHidden(m[1])) return notFound(410);
-      const main = event.req.method === "GET" || event.req.method === "HEAD" ? await mergedMainOf(m[1]) : null;
-      if (main && main !== m[1]) {
-        return new Response(null, {
-          status: 301,
-          headers: {
-            location: `https://koleksidrpinguin.com/watch/${encodeURIComponent(main)}`,
-            "cache-control": "public, max-age=3600",
-          },
-        });
-      }
+      const id = m[1];
+      const main = method === "GET" || method === "HEAD" ? await mergedMainOf(id) : null;
+      const target = main && main !== id ? main : id;
+      info = { targetHidden: await isPublicHidden(target), main };
     } catch {
       /* catalog unavailable: let the page decide */
     }
   }
-  return next();
+
+  const decision = decideWatchPlaceholder(path, method, event.url.search, info);
+  return decisionResponse(decision) ?? next();
 }
