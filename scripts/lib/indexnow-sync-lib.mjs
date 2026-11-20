@@ -40,3 +40,51 @@ export function prioritizeIndexNow(paths, previous) {
   };
   return paths.map((p, i) => [p, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([p]) => p);
 }
+
+/** Path map for one origin, from `https://host/path lastmod` lines in the shared state file. */
+export function parseIndexNowOriginState(contents, origin) {
+  const prefix = String(origin || "").replace(/\/$/, "");
+  const map = new Map();
+  if (!prefix.startsWith("https://")) return map;
+  for (const rawLine of String(contents || "").split("\n")) {
+    const line = rawLine.trim();
+    const splitAt = line.lastIndexOf(" ");
+    if (splitAt <= 0) continue;
+    const loc = line.slice(0, splitAt);
+    if (loc !== prefix && !loc.startsWith(prefix + "/")) continue;
+    const path = loc === prefix || loc === prefix + "/" ? "/" : loc.slice(prefix.length);
+    if (path.startsWith("/")) map.set(path, line.slice(splitAt + 1));
+  }
+  return map;
+}
+
+/** Format a path map as state lines. Pass origin to write absolute URLs; omit it for `/path` lines. */
+export function formatIndexNowState(pathMap, origin = "") {
+  const prefix = origin ? String(origin).replace(/\/$/, "") : "";
+  return [...pathMap]
+    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .map(([p, m]) => {
+      const loc = prefix ? prefix + (p === "/" ? "/" : p) : p;
+      return `${loc} ${m}`;
+    })
+    .join("\n");
+}
+
+/**
+ * First-run drip: sitemap + home + newest /watch pages, then other paths, capped.
+ * The rest stay out of state so later runs submit them.
+ */
+export function seedIndexNowPaths(live, { max = 500 } = {}) {
+  const watches = [...live]
+    .filter(([p]) => p.startsWith("/watch/"))
+    .sort((a, b) => String(b[1]).localeCompare(String(a[1])) || (a[0] < b[0] ? -1 : 1))
+    .map(([p]) => p);
+  const others = [...live.keys()]
+    .filter((p) => p !== "/" && p !== "/sitemap.xml" && !p.startsWith("/watch/"))
+    .sort();
+  const ordered = [];
+  for (const p of ["/sitemap.xml", "/", ...watches, ...others]) {
+    if (p === "/sitemap.xml" || live.has(p)) ordered.push(p);
+  }
+  return [...new Set(ordered)].slice(0, max);
+}

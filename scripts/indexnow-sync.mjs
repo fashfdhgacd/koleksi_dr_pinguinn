@@ -15,14 +15,28 @@
  *   node scripts/indexnow-sync.mjs --dry-run  print what would be sent, change nothing
  *
  * Google does not use IndexNow; it reads the sitemap from robots.txt / Search Console.
+ *
+ * The same run also diffs videyy.icu and videqsss.icu (own keys, already live) and stores
+ * their state as absolute URLs in the same file, so the existing IndexNow workflow — which
+ * only `git add`s data/indexnow-urls.txt — keeps the satellites pinged even when the
+ * private vidy repo's Actions cannot run.
  */
 import { readFile, rename, writeFile } from "node:fs/promises";
-import { parseIndexNowState, planIndexNowSync, prioritizeIndexNow } from "./lib/indexnow-sync-lib.mjs";
+import {
+  formatIndexNowState,
+  parseIndexNowOriginState,
+  parseIndexNowState,
+  planIndexNowSync,
+  prioritizeIndexNow,
+  seedIndexNowPaths,
+} from "./lib/indexnow-sync-lib.mjs";
 
-const ORIGIN = "https://koleksidrpinguin.com";
-const HOST = new URL(ORIGIN).host;
-/** Same public key as src/lib/bot/indexnow.ts; the file public/<key>.txt is already live. */
-const KEY = "73356680884e9de90f845b0907eb4053";
+/** Public IndexNow keys (also served as /{key}.txt on each host). Not secrets. */
+const SITES = [
+  { origin: "https://koleksidrpinguin.com", key: "73356680884e9de90f845b0907eb4053", seedIfEmpty: false },
+  { origin: "https://videyy.icu", key: "73356680884e9de90f845b0907eb4053", seedIfEmpty: true },
+  { origin: "https://videqsss.icu", key: "34776cb0e75d82e12409aa3b3c9b5eea", seedIfEmpty: true },
+];
 const ENDPOINTS = ["https://api.indexnow.org/indexnow", "https://yandex.com/indexnow"];
 const STATE = new URL("../data/indexnow-urls.txt", import.meta.url);
 /**
@@ -76,87 +90,122 @@ function blocks(xml, tag) {
 }
 
 /** path -> lastmod, from the live sitemap index and all child sitemaps. */
-async function liveUrls() {
-  const index = blocks(await getText(`${ORIGIN}/sitemap.xml`), "sitemap");
-  if (!index.length) throw new Error("sitemap index kosong");
+async function liveUrls(origin) {
+  const index = blocks(await getText(`${origin}/sitemap.xml`), "sitemap");
+  if (!index.length) throw new Error(`${origin}/sitemap.xml index kosong`);
   const map = new Map();
   for (const s of index) {
     const urls = blocks(await getText(s.loc), "url");
     if (!urls.length) throw new Error(`${s.loc} kosong`);
     for (const u of urls) {
-      if (!u.loc.startsWith(`${ORIGIN}/`)) continue;
-      map.set(u.loc.slice(ORIGIN.length), u.lastmod || "-");
+      if (!u.loc.startsWith(`${origin}/`)) continue;
+      map.set(u.loc.slice(origin.length), u.lastmod || "-");
     }
   }
   return map;
 }
 
-async function readState() {
-  try {
-    return parseIndexNowState(await readFile(STATE, "utf8"));
-  } catch (e) {
-    if (e?.code === "ENOENT") return null;
-    throw e;
-  }
-}
 
-async function submit(urls) {
+async function submit(origin, key, urls) {
+  const host = new URL(origin).host;
   for (let i = 0; i < urls.length; i += MAX_PER_POST) {
     if (i > 0) await new Promise((res) => setTimeout(res, POST_GAP_MS));
     const urlList = urls.slice(i, i + MAX_PER_POST);
-    const payload = JSON.stringify({ host: HOST, key: KEY, keyLocation: `${ORIGIN}/${KEY}.txt`, urlList });
-    for (const [i, endpoint] of ENDPOINTS.entries()) {
+    const payload = JSON.stringify({ host, key, keyLocation: `${origin}/${key}.txt`, urlList });
+    for (const [n, endpoint] of ENDPOINTS.entries()) {
       const r = await fetch(endpoint, {
         method: "POST",
         headers: { "content-type": "application/json; charset=utf-8" },
         body: payload,
       });
       const body = (await r.text()).slice(0, 300);
-      console.log(`IndexNow ${new URL(endpoint).host} POST ${urlList.length} URL -> HTTP ${r.status} ${body}`);
+      console.log(`IndexNow ${host} ${new URL(endpoint).host} POST ${urlList.length} URL -> HTTP ${r.status} ${body}`);
       // Shared endpoint must accept (200/202). Yandex is the same body; a Yandex blip does not
       // fail the run because the shared endpoint already fans out, but we still call Yandex directly.
-      if (i === 0 && r.status !== 200 && r.status !== 202) throw new Error(`IndexNow HTTP ${r.status}`);
-      if (i > 0 && r.status !== 200 && r.status !== 202) console.warn(`Yandex IndexNow HTTP ${r.status}`);
+      if (n === 0 && r.status !== 200 && r.status !== 202) throw new Error(`IndexNow ${host} HTTP ${r.status}`);
+      if (n > 0 && r.status !== 200 && r.status !== 202) console.warn(`Yandex IndexNow ${host} HTTP ${r.status}`);
     }
   }
 }
 
-const live = await liveUrls();
-const prev = await readState();
-console.log(`sitemap live: ${live.size} URL; state: ${prev ? prev.size : "belum ada"}`);
-if (prev && prev.size > 100 && live.size < prev.size * 0.5) {
-  throw new Error(
-    `sitemap live cuma ${live.size} URL (state ${prev.size}); dibatalkan, state tidak diubah`,
-  );
+async function planOne(site, contents) {
+  const { origin, seedIfEmpty } = site;
+  const live = await liveUrls(origin);
+  const prev = origin.includes("koleksidrpinguin.com")
+    ? parseIndexNowState(contents)
+    : parseIndexNowOriginState(contents, origin);
+  const prevOrNull = prev.size ? prev : null;
+  console.log(`== ${origin} ==`);
+  console.log(`sitemap live: ${live.size} URL; state: ${prevOrNull ? prev.size : "belum ada"}`);
+  if (prevOrNull && prev.size > 100 && live.size < prev.size * 0.5) {
+    throw new Error(
+      `${origin} sitemap live cuma ${live.size} URL (state ${prev.size}); dibatalkan, state tidak diubah`,
+    );
+  }
+
+  let sendPlan;
+  if (!prevOrNull && !ALL && seedIfEmpty) {
+    const send = seedIndexNowPaths(live, { max: MAX_PER_RUN });
+    const next = new Map();
+    for (const path of send) {
+      if (live.has(path)) next.set(path, live.get(path));
+    }
+    sendPlan = { send, next };
+    console.log(`state belum ada: seed ${send.length} URL (drip)`);
+  } else if (!prevOrNull && !ALL) {
+    sendPlan = { send: [], next: new Map(live) };
+    console.log("state belum ada: dicatat saja, tidak ada yang dikirim");
+  } else {
+    sendPlan = planIndexNowSync(live, prevOrNull, { all: ALL, maxRemoved: MAX_REMOVED });
+  }
+  const { send, next } = sendPlan;
+  if (prevOrNull && !ALL) {
+    const removedCount = send.filter((path) => !live.has(path)).length;
+    console.log(`baru/berubah: ${send.length - removedCount}; hilang dari sitemap: ${removedCount}`);
+    if (next.size > live.size) console.log(`sisa URL hilang dalam antrean: ${next.size - live.size}`);
+  }
+  const ordered = prioritizeIndexNow([...new Set(send)], prevOrNull);
+  const deferred = ordered.slice(MAX_PER_RUN);
+  for (const path of deferred) {
+    if (prevOrNull?.has(path)) next.set(path, prevOrNull.get(path));
+    else next.delete(path);
+  }
+  if (deferred.length) console.log(`ditunda ke run berikutnya: ${deferred.length} URL`);
+  const urls = ordered.slice(0, MAX_PER_RUN).map((p) => (p === "/sitemap.xml" ? `${origin}/sitemap.xml` : origin + p));
+  if (!urls.includes(`${origin}/sitemap.xml`) && urls.length) urls.unshift(`${origin}/sitemap.xml`);
+  return { origin, key: site.key, urls, next };
 }
 
-if (!prev && !ALL) console.log("state belum ada: dicatat saja, tidak ada yang dikirim");
-const { send, next } = planIndexNowSync(live, prev, { all: ALL, maxRemoved: MAX_REMOVED });
-if (prev && !ALL) {
-  const removedCount = send.filter((path) => !live.has(path)).length;
-  console.log(`baru/berubah: ${send.length - removedCount}; hilang dari sitemap: ${removedCount}`);
-  if (next.size > live.size) console.log(`sisa URL hilang dalam antrean: ${next.size - live.size}`);
+const contents = await readFile(STATE, "utf8").catch((e) => {
+  if (e?.code === "ENOENT") return "";
+  throw e;
+});
+
+const plans = [];
+for (const site of SITES) {
+  plans.push(await planOne(site, contents));
 }
-// New /watch pages first, then everything else; anything over MAX_PER_RUN waits for the next run.
-const ordered = prioritizeIndexNow([...new Set(send)], prev);
-const deferred = ordered.slice(MAX_PER_RUN);
-for (const path of deferred) {
-  if (prev?.has(path)) next.set(path, prev.get(path));
-  else next.delete(path);
-}
-if (deferred.length) console.log(`ditunda ke run berikutnya: ${deferred.length} URL`);
-const urls = ordered.slice(0, MAX_PER_RUN).map((p) => ORIGIN + p);
+
 if (DRY) {
-  console.log(`[dry-run] akan dikirim ${urls.length} URL`, urls.slice(0, 10));
+  for (const plan of plans) {
+    console.log(`[dry-run] ${plan.origin} akan dikirim ${plan.urls.length} URL`, plan.urls.slice(0, 10));
+  }
   process.exit(0);
 }
-if (urls.length) await submit(urls);
-else console.log("tidak ada URL baru");
 
-const lines = [...next]
-  .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-  .map(([p, m]) => `${p} ${m}`);
+for (const plan of plans) {
+  if (plan.urls.length) await submit(plan.origin, plan.key, plan.urls);
+  else console.log(`${plan.origin}: tidak ada URL baru`);
+}
+
+const parts = [];
+const kdp = plans[0];
+if (kdp?.next) parts.push(formatIndexNowState(kdp.next));
+for (const plan of plans.slice(1)) {
+  if (plan.next?.size) parts.push(formatIndexNowState(plan.next, plan.origin));
+}
+const lines = parts.filter(Boolean).join("\n");
 const tempState = new URL(`../data/indexnow-urls.txt.${process.pid}.tmp`, import.meta.url);
-await writeFile(tempState, lines.join("\n") + "\n");
+await writeFile(tempState, (lines ? lines + "\n" : ""));
 await rename(tempState, STATE);
-console.log(`state ditulis: ${lines.length} baris`);
+console.log(`state ditulis: ${lines ? lines.split("\n").filter(Boolean).length : 0} baris`);
