@@ -292,17 +292,6 @@ export const LANDINGS: LandingDef[] = [
       "Rempit adalah budaya jalanan Malaysia yang sering muncul di video amatir: motor besar, gadis cantik, dan aksen Melayu yang bikin banyak penonton Indonesia betah. Halaman ini mengumpulkan video Malaysia dan rempit dari kategori Jilbab yang paling banyak ditonton di koleksidrpinguin.com, diurutkan dari jumlah tayangan terbanyak. Semua pemeran adalah orang dewasa dan judul yang tidak pantas sudah disaring. Video diputar langsung di browser HP tanpa VPN dan tanpa daftar akun. Kalau mau yang lebih baru, buka kategori Malaysia lewat tautan di bawah, lalu simpan alamat situs ini supaya mudah kembali lagi.",
     queries: ["bokep malay rempit", "malay rempit bokep", "bokep malaysia rempit", "rempit bokep"],
   },
-  {
-    slug: "bokep-indoav-userbokep",
-    category: "amatir",
-    h1: "Bokep IndoAV dan UserBokep Terpopuler",
-    title: "Bokep IndoAV & UserBokep Terpopuler | koleksidrpinguin.com",
-    description:
-      "Bokep IndoAV dan UserBokep paling banyak ditonton: video amatir Indonesia terlaris. Streaming tanpa login. Khusus 18+.",
-    intro:
-      "IndoAV dan UserBokep adalah dua sumber video amatir Indonesia paling besar di internet, dan koleksidrpinguin.com mengumpulkan yang terbaik dari keduanya. Halaman ini menampilkan video dari kedua sumber itu yang paling banyak ditonton pengunjung, diurutkan dari jumlah tayangan terbanyak. Isinya rekaman asli pasangan dewasa Indonesia: gaya rumah, kamar kos, dan cerita yang terasa dekat. Semua pemeran dewasa dan judul yang tidak pantas sudah disaring. Video diputar langsung di browser HP tanpa VPN dan tanpa akun. Untuk urutan terbaru, buka kategori Amatir lewat tautan di bawah, lalu simpan alamat situs ini supaya gampang kembali.",
-    queries: ["userbokep", "indoav", "indoav cok", "bokep indoav", "bokep userbokep", "userbokep indo"],
-  },
   // Source pages (2026-11-20, owner request): GSC 90 d "userbokep" 101 imp / 12 clicks (pos 10.4, lands
   // on /), "indoav" 27 imp / 10 clicks (pos 52), "bokep indoav" 8 imp, "indoav stw" 6 imp. Navigational
   // domain queries (indoav.com, userbokep.com) are not targeted. Copy says these are videos FROM the
