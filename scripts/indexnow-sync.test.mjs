@@ -67,3 +67,51 @@ test("prioritizeIndexNow sends brand-new /watch pages first", () => {
   const out = prioritizeIndexNow(["/kategori/x", "/halaman/9", "/watch/old", "/watch/new1", "/watch/new2"], prev);
   assert.deepEqual(out, ["/watch/new1", "/watch/new2", "/halaman/9", "/kategori/x", "/watch/old"]);
 });
+
+import { parseIndexNowOriginState, formatIndexNowState, seedIndexNowPaths } from "./lib/indexnow-sync-lib.mjs";
+
+test("parseIndexNowState ignores absolute satellite URLs", () => {
+  const mixed = "/ 2026-11-03\nhttps://videyy.icu/watch/a 2026-11-04\n";
+  assert.deepEqual([...parseIndexNowState(mixed)], [["/", "2026-11-03"]]);
+});
+
+test("parseIndexNowOriginState reads only that host's absolute URLs", () => {
+  const mixed = [
+    "/ 2026-11-03",
+    "https://videyy.icu/ 2026-11-04",
+    "https://videyy.icu/watch/a 2026-11-05",
+    "https://videqsss.icu/watch/a 2026-11-06",
+    "",
+  ].join("\n");
+  assert.deepEqual(
+    [...parseIndexNowOriginState(mixed, "https://videyy.icu")],
+    [
+      ["/", "2026-11-04"],
+      ["/watch/a", "2026-11-05"],
+    ],
+  );
+  assert.deepEqual([...parseIndexNowOriginState(mixed, "https://videqsss.icu")], [["/watch/a", "2026-11-06"]]);
+});
+
+test("formatIndexNowState writes /path lines or absolute URLs", () => {
+  const map = new Map([
+    ["/", "2026-11-03"],
+    ["/watch/a", "2026-11-04"],
+  ]);
+  assert.equal(formatIndexNowState(map), "/ 2026-11-03\n/watch/a 2026-11-04");
+  assert.equal(
+    formatIndexNowState(map, "https://videyy.icu"),
+    "https://videyy.icu/ 2026-11-03\nhttps://videyy.icu/watch/a 2026-11-04",
+  );
+});
+
+test("seedIndexNowPaths puts sitemap and home first, then newest watch pages", () => {
+  const live = new Map([
+    ["/", "2026-11-01"],
+    ["/kategori/x", "2026-11-01"],
+    ["/watch/old", "2026-11-01"],
+    ["/watch/new", "2026-11-10"],
+  ]);
+  assert.deepEqual(seedIndexNowPaths(live, { max: 3 }), ["/sitemap.xml", "/", "/watch/new"]);
+  assert.equal(seedIndexNowPaths(live, { max: 10 }).length, 5);
+});

@@ -47,6 +47,30 @@ Allow: /
 Disallow: /api/
 Disallow: /pemilik
 
+User-agent: Applebot
+Allow: /api/og
+Allow: /
+Disallow: /api/
+Disallow: /pemilik
+
+User-agent: MojeekBot
+Allow: /api/og
+Allow: /
+Disallow: /api/
+Disallow: /pemilik
+
+User-agent: SeznamBot
+Allow: /api/og
+Allow: /
+Disallow: /api/
+Disallow: /pemilik
+
+User-agent: Yeti
+Allow: /api/og
+Allow: /
+Disallow: /api/
+Disallow: /pemilik
+
 User-agent: *
 Allow: /
 Allow: /api/og
