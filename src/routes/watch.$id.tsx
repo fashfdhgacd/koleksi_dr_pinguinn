@@ -28,6 +28,19 @@ function ogImageType(url: string): string {
   return "image/jpeg";
 }
 
+/** BreadcrumbList (Beranda > Kategori > Video) so Google can show the path in the result. */
+function watchBreadcrumb(category: string | null | undefined, title: string, url: string) {
+  const slug = categorySlugFor(category);
+  const crumbs: Array<{ name: string; url: string }> = [{ name: "Beranda", url: SITE_ORIGIN }];
+  if (slug && category) crumbs.push({ name: String(category), url: `${SITE_ORIGIN}/kategori/${slug}` });
+  crumbs.push({ name: title, url });
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: crumbs.map((c, i) => ({ "@type": "ListItem", position: i + 1, name: c.name, item: c.url })),
+  };
+}
+
 export type WatchSearch = {
   /** Multi-server: id of the server (host copy) to play; absent = the page's default server. */
   s?: string;

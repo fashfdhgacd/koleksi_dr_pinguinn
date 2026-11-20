@@ -60,4 +60,7 @@ test("watch pages and seoVideoThumbnail point at same-origin /og/<id>.jpg", () =
   assert.match(seo, /\/og\/\$\{encodeURIComponent\(idClean\)\}\.jpg/);
   assert.match(watch, /seoVideoThumbnail\(item\.id/);
   assert.doesNotMatch(watch, /shareCardImage\(/);
+  // head() calls this helper; if it is missing the route falls back to the site-wide OG title.
+  assert.match(watch, /function watchBreadcrumb\(/);
+  assert.match(watch, /jsonLdString\(watchBreadcrumb\(/);
 });
