@@ -378,7 +378,7 @@ async function handlePost(request: Request): Promise<Response> {
   // Bare Videy ids (no https) count too: parseMessage turns them into Videy links.
   const hasUploadLink =
     (/https?:\/\//i.test(text) &&
-    (/streamtape\.com|strcloud|putarin\.com|puterin\.|panel\.putarin|luluvdo|lulustream|luluvid|lulu\.st|indoav\.|userbokep|videy\.co/i.test(
+    (/streamtape\.com|strcloud|putarin\.com|puterin\.|panel\.putarin|luluvdo|lulustream|luluvid|lulu\.st|lplaygo|indoav\.|userbokep|videy\.co/i.test(
       text,
     ) ||
       parseMessage(text).videos.length > 0)) ||

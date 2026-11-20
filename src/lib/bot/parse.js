@@ -5,6 +5,7 @@ import {
   DRP_SOURCES,
   drpCodeFromUrl,
   drpKindOfHost,
+  luluEmbedUrl,
 } from "../catalog/drp-hosts.js";
 const STREAMTAPE_HOST = /(^|\.)(streamtape\.com|strcloud[a-z0-9]*)$/i;
 const PUTARIN_HOST = /(^|\.)(putarin\.com|puterin\.[a-z]+)$/i;
@@ -289,7 +290,7 @@ function parseDrpLink(kind, parsed) {
   const code = drpCodeFromUrl(parsed.href);
   if (!code || DRP_NOT_A_CODE.has(code.toLowerCase())) return null;
   let embed;
-  if (kind === "lulu") embed = `https://luluvdo.com/e/${code}`;
+  if (kind === "lulu") embed = luluEmbedUrl(code);
   else if (kind === "dood" || kind === "mxdrop" || kind === "vidara") embed = `https://${host}/e/${code}`;
   else embed = `${parsed.origin}/e/${code}`;
   return {

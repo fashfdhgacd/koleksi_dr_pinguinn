@@ -324,6 +324,8 @@ export function cleanUploadTitle(raw = "") {
   const before = t;
   t = t
     .replace(/[\(\[][^\(\)\[\]]*pinguin[^\(\)\[\]]*[\)\]]/gi, " ")
+    // Host file names lose the dot: "… Episode 9 - koleksidrpinguin com" (LuluStream/Dood/Byse, Nov 17 2026).
+    .replace(/(?:https?:\/\/)?(?:www\.)?koleksi_?dr_?pinguin(?:\.|\s+|_)(?:com|site)\b\/?/gi, " ")
     .replace(/(?:https?:\/\/)?(?:www\.)?koleksidrpinguin\.(?:com|site)\/?/gi, " ")
     .replace(PINGUIN_ANY_RE, " ")
     .replace(/[\(\[]\s*[\)\]]/g, " ")

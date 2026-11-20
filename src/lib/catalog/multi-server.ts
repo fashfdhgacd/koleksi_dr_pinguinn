@@ -104,8 +104,16 @@ const NUMBERED_BRAND =
   /^(?:ai bokep dr\.? pinguin|videy|koleksi dr\.? pinguin|bokep indo pilihan)\b/i;
 const CJK = /[\u3040-\u30ff\u3400-\u9fff]/;
 
+/**
+ * " com" left over from a host file name "… - koleksidrpinguin com" before the site suffix
+ * ("The Silence of the Lambs Episode 9 com - koleksidrpinguin.com", Dood/Byse Nov 17 2026): the
+ * Vidara/MXDrop/Streamtape copies of the same episode have no " com", so it split the page in two.
+ */
+const STRAY_COM = /\s+(?:koleksi\s*dr\.?\s*pinguin\s+)?com(?=\s*(?:[-–—|:·]\s*(?:https?:\/\/)?(?:www\.)?koleksi\s*dr\.?\s*pinguin(?:\.(?:com|site))?)?\s*$)/i;
+const stripStrayCom = (t: unknown): string => String(t || "").replace(STRAY_COM, "");
+
 function cleanTitle(t: unknown): string {
-  let s = String(cleanUploadTitle(String(t || "")) || "")
+  let s = String(cleanUploadTitle(stripStrayCom(t)) || "")
     .normalize("NFKC")
     // A file name pasted as the title ("! STEPFATHERS CUM INSIDE ME.mp4", MXDrop uploads Nov 13
     // 2026) is the same video as the copy titled without the extension.
@@ -147,7 +155,7 @@ export function mergeKeyOf(it: ServerItem): {
   // Short titles are too common to trust alone: their group also needs one known duration (mergeServers).
   if ((!cjk && (k.length < 16 || words.length < 3)) || (cjk && k.length < 6))
     return { key: `s:${flatKey(lower)}`, why: "short" };
-  const s = parseSeries(String(it.title || ""));
+  const s = parseSeries(stripStrayCom(it.title));
   return s
     ? { key: `${s.key}#${s.ep}.${s.sub}`, why: "series" }
     : { key: `x:${flatKey(lower)}`, why: "title" };

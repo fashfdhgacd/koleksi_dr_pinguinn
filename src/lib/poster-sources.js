@@ -11,6 +11,7 @@
  *   thumb-health treated that URL as a source, /thumb fetched it, and stored nothing.
  * - Dood's splash only appears as og:image; a Cloudflare challenge leaves dd- without a URL.
  */
+import { LULU_IMG_HOST } from "./catalog/drp-hosts.js";
 
 const DEAD_URL = /anipop\.xyz\/poster\/|cdnhlsplayer\.lat|placeholder|brand-poster|now_printing|noimage|no[-_]image|data:image/i;
 
@@ -74,7 +75,7 @@ export function metaImage(html) {
 export function luluPosterUrls(code) {
   const c = String(code || "");
   if (!/^[A-Za-z0-9]{4,40}$/.test(c)) return [];
-  return [`https://img.lulucdn.com/${c}_xt.jpg`, `https://img.lulucdn.com/${c}_t.jpg`];
+  return [`https://${LULU_IMG_HOST}/${c}_xt.jpg`, `https://${LULU_IMG_HOST}/${c}.jpg`];
 }
 
 export function bysePosterUrls(code) {
@@ -93,7 +94,7 @@ export function hostKind(item) {
   const blob = `${item?.source || ""} ${item?.embed || ""} ${item?.direct || ""}`;
   if (id.startsWith("mx-") || /mxdrop/i.test(blob)) return "mx";
   if (id.startsWith("dd-") || /doodstream|playmogo|\bdood\b/i.test(blob)) return "dd";
-  if (id.startsWith("lu-") || /lulustream|luluvdo|luluvid/i.test(blob)) return "lu";
+  if (id.startsWith("lu-") || /lulustream|luluvdo|luluvid|lplaygo/i.test(blob)) return "lu";
   if (id.startsWith("by-") || /\bbyse\b/i.test(blob)) return "by";
   if (id.startsWith("vd-") || id.startsWith("g1") || /vidara/i.test(blob)) return "vidara";
   if (/indoav/i.test(blob)) return "indoav";

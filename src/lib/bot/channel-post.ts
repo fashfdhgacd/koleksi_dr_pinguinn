@@ -174,7 +174,7 @@ async function hostPoster(id: string): Promise<string> {
   const [, kind, code] = m;
   let urls: string[] = [];
   if (kind === "by") urls = [`https://img-place.com/${code}_xt.jpg`, `https://img-place.com/${code}_t.jpg`];
-  else if (kind === "lu") urls = [`https://img.lulucdn.com/${code}_xt.jpg`, `https://img.lulucdn.com/${code}_t.jpg`];
+  else if (kind === "lu") urls = [`https://img.lulustream.co/${code}_xt.jpg`, `https://img.lulustream.co/${code}.jpg`];
   else {
     try {
       const res = await fetch(`https://playmogo.com/e/${code}`, {

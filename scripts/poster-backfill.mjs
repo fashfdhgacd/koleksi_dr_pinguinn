@@ -301,7 +301,7 @@ async function resolveItem(item) {
   if (kind === "dd") {
     return pageImage([`https://playmogo.com/e/${code}`, embed].filter(Boolean));
   }
-  if (kind === "lu") return firstImage(luluPosterUrls(code), "https://luluvdo.com/");
+  if (kind === "lu") return firstImage(luluPosterUrls(code), "https://lplaygo.com/");
   if (kind === "by") return firstImage(bysePosterUrls(code), embed || "https://byse.sx/");
   if (kind === "indoav" || kind === "userbokep") {
     const hosts = kind === "userbokep"
