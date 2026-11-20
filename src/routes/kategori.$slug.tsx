@@ -24,7 +24,7 @@ import {
 import { DEFAULT_PAGE_SIZE, type VideoCard } from "@/lib/catalog/types";
 import { useCatalogFeed } from "../hooks/use-catalog";
 import { jsonLdString } from "@/lib/json-ld";
-import { DEFAULT_OG, HOME_CANONICAL, SITE_NAME, SITE_ORIGIN, breadcrumbJsonLd, collectionPageJsonLd, homeSeo } from "@/lib/seo";
+import { DEFAULT_OG, HOME_CANONICAL, SITE_NAME, SITE_ORIGIN, breadcrumbJsonLd, collectionPageJsonLd, homeSeo, loaderItems } from "@/lib/seo";
 import { ReturnVisitor } from "@/components/return-visitor";
 
 function parsePage(value: unknown): number | undefined {
@@ -123,7 +123,8 @@ export const Route = createFileRoute("/kategori/$slug")({
     // Halaman 2+: judul & deskripsi unik per halaman (hindari duplikat judul di GSC).
     const pageTitle = page > 1 && !emptyPeriod ? seo.title.replace(/ \| koleksidrpinguin\.com$/, ` – Halaman ${page} | koleksidrpinguin.com`) : seo.title;
     const pageDesc = page > 1 && !emptyPeriod ? `Halaman ${page}: ${seo.description}` : seo.description;
-    const crumbName = (cat?.label || rank?.label || params.slug).trim();
+    // Breadcrumb shows the page heading ("Bokep Videy Indo Terbaru"), not the internal label ("drpinguin videy").
+    const crumbName = (rank?.label || ("h1" in seo ? seo.h1 : "") || cat?.label || params.slug).trim();
     const indexable = !(emptyPeriod || emptyCategory || hiddenFromSearch || page > DEEP_PAGE_NOINDEX);
     // rel prev/next between pagination pages of a plain category (each page keeps its own canonical).
     const pageUrl = (n: number) => `${SITE_ORIGIN}${categoryHref(params.slug, n)}`;
@@ -155,7 +156,15 @@ export const Route = createFileRoute("/kategori/$slug")({
         ? [
             {
               type: "application/ld+json",
-              children: jsonLdString(collectionPageJsonLd({ name: pageTitle, url, description: pageDesc })),
+              children: jsonLdString(
+                collectionPageJsonLd({
+                  name: pageTitle,
+                  url,
+                  description: pageDesc,
+                  items: loaderItems(loaderData),
+                  startPosition: (page - 1) * ((ld as { limit?: number } | undefined)?.limit || DEFAULT_PAGE_SIZE) + 1,
+                }),
+              ),
             },
             {
               type: "application/ld+json",
