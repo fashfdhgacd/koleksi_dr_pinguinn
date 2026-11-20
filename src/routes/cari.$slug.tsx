@@ -74,7 +74,9 @@ export function landingHead(slug: string, page: number, loaderData: unknown) {
             children: jsonLdString(
               breadcrumbJsonLd([
                 { name: SITE_NAME, url: HOME_CANONICAL },
-                { name: cat?.label || "Kategori", url: `${SITE_ORIGIN}/kategori/${def.category}` },
+                cat
+                  ? { name: cat.label, url: `${SITE_ORIGIN}/kategori/${def.category}` }
+                  : { name: "Pencarian populer", url: `${SITE_ORIGIN}/cari` },
                 { name: def.h1, url },
               ]),
             ),
@@ -130,7 +132,7 @@ export function CariExperience({
           <EmptyState title="Video segera hadir" description="Belum ada video untuk halaman ini. Cek lagi nanti ya." />
         ) : (
           <SafeBoundary>
-            <VideoGrid items={items} ads />
+            <VideoGrid items={items} ads adFree={Boolean(def.adFree)} />
           </SafeBoundary>
         )}
 
@@ -138,10 +140,10 @@ export function CariExperience({
 
         <div className="mt-6 space-y-3">
           <a
-            href={`/kategori/${def.category}`}
+            href={cat ? `/kategori/${def.category}` : "/"}
             className="inline-flex h-10 items-center rounded-full border border-teal-400/50 px-4 text-sm text-teal-300 hover:border-teal-300 hover:text-teal-200"
           >
-            Lihat semua video {cat?.label || def.category} (terbaru) →
+            {cat ? `Lihat semua video ${cat.label} (terbaru) →` : "Lihat semua video terbaru →"}
           </a>
           <nav aria-label="Pencarian populer lain">
             <p className="mb-2 text-xs text-zinc-500">Pencarian populer lain</p>

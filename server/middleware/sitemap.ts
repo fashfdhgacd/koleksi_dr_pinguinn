@@ -5,7 +5,7 @@
  */
 import { DEFAULT_PAGE_SIZE, type CategoryInfo } from "../../src/lib/catalog/types";
 import { listCategory, listLatest, listListedCategories } from "../../src/lib/catalog/local";
-import { LANDINGS, LANDING_INDEX_PAGES, LANDING_MIN_VIDEOS, LANDING_PAGE_SIZE, LANDING_POOL, acceptLandingCard } from "../../src/lib/catalog/landing";
+import { ALL_CATEGORIES, LANDINGS, LANDING_INDEX_PAGES, LANDING_MIN_VIDEOS, LANDING_PAGE_SIZE, LANDING_POOL, SOURCE_POOL, acceptLandingCard } from "../../src/lib/catalog/landing";
 import { enHref } from "../../src/lib/catalog/halaman";
 import { indexableEnLandings } from "../../src/lib/catalog/en-landing-query";
 import { isMinorContentTitle } from "../../src/lib/catalog/minor-detector.js";
@@ -69,7 +69,7 @@ async function indexableLandings(): Promise<Array<{ slug: string; pages: number 
   const out: Array<{ slug: string; pages: number }> = [];
   for (const l of LANDINGS) {
     try {
-      const pool = await listCategory(l.category, 1, LANDING_POOL);
+      const pool = l.category === ALL_CATEGORIES ? await listLatest(1, SOURCE_POOL) : await listCategory(l.category, 1, LANDING_POOL);
       const clean = pool.items.filter(
         (c) => acceptLandingCard(c, l) && !isMinorContentTitle(c.title) && !isSeoBlockedId(c.id),
       );

@@ -46,15 +46,18 @@ export function VideoGrid({
   items,
   eagerCount = 4,
   ads = false,
+  adFree = false,
 }: {
   items: VideoCardType[];
   eagerCount?: number;
   /** Catalog layout (1 / 3 / 4 columns, 300:250 thumbs). Also enables the TrafficStars grid card. */
   ads?: boolean;
+  /** Keep the catalog layout but render no ad slots and no card-click popunder (IndoAV source pages). */
+  adFree?: boolean;
 }) {
   const shown = visibleCards(items);
   // Up to 4 slots, every 8th card; each lazy-loads (an unfilled slot keeps its footprint, showing the penguin card).
-  const slots = ads
+  const slots = ads && !adFree
     ? AD_POSITIONS.map((at, slot) => ({ at, slot })).filter((x) => x.at < shown.length)
     : [];
   const cells = shown.length + slots.length;
@@ -67,7 +70,7 @@ export function VideoGrid({
     <div
       className={ads ? CATALOG_GRID + trimClass(cells) : DEFAULT_GRID}
       // Catalog grids only: first video-card click per session also opens the popunder.
-      onClickCapture={ads ? (e) => onCatalogCardClick(e, (id) => String(shown.find((v) => v.id === id)?.creator || "")) : undefined}
+      onClickCapture={ads && !adFree ? (e) => onCatalogCardClick(e, (id) => String(shown.find((v) => v.id === id)?.creator || "")) : undefined}
     >
       {shown.map((video, index) => {
         const s = slots.find((x) => x.at === index);
