@@ -641,7 +641,7 @@ function RemoveDialog({
         <p className="mt-1 font-mono text-[12px] text-zinc-500">{row.id}</p>
         <p className="mt-3 text-sm leading-relaxed text-zinc-400">
           Video ini akan hilang dari data katalog, kategori, daftar, pencarian, sitemap, dan video terkait.
-          Halaman tonton membalas {plan?.found === false ? "404" : "410"}. Ingest dan sync tidak akan memasukkan id ini lagi.
+          Halaman tonton {plan?.found === false ? "menampilkan 404" : "mengarahkan ke beranda (302, noindex)"}. Ingest dan sync tidak akan memasukkan id ini lagi.
         </p>
         {plan?.locked ? <p className="mt-2 text-[13px] text-red-200">Status: terkunci. Tetap dikeluarkan satu per satu.</p> : null}
         {err ? <p className="mt-3 text-sm text-red-300">{err}</p> : null}
@@ -875,7 +875,7 @@ function VideoRows({
           secret={secret}
           onClose={() => setRemoveRow(null)}
           onRemoved={() => {
-            setNote("Dikeluarkan dari katalog. Halaman tonton membalas 410.");
+            setNote("Dikeluarkan dari katalog. Pengunjung halaman tonton diarahkan ke beranda.");
             onChanged();
           }}
         />

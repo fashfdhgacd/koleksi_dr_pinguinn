@@ -1,8 +1,8 @@
 /**
  * Catalog removal blocklist (pure). An id here is gone from every catalog surface:
  * data files are skipped while the catalog is built, and categories, listings, search,
- * sitemap and related lists never see it. /watch answers 410 (or 404 when the id was
- * never in the catalog). Ingest and sync import the same rules and skip the id.
+ * sitemap and related lists never see it. /watch and /v for a blocked id 302 to the
+ * homepage with noindex (or 404 when the id was never in the catalog). Ingest and sync import the same rules and skip the id.
  *
  * The durable copy lives in catalog-blocklist.json (repo file, same kind of moderation
  * store as hidden-ids / image-blocklist). Live owner deletes also mirror the id into
@@ -127,7 +127,7 @@ export function singleRemoveId(body) {
 }
 
 /**
- * What a delete will do. `found` false → watch 404 (unknown id). Found → 410 once blocked.
+ * What a delete will do. `found` false → watch 404 (unknown id). Found → 302 to the homepage, noindex.
  * @param {string} id
  * @param {boolean} found
  */
@@ -136,6 +136,6 @@ export function removalPlan(id, found) {
     id,
     found: Boolean(found),
     surfaces: REMOVAL_SURFACES.slice(),
-    watch: found ? 410 : 404,
+    watch: found ? 302 : 404,
   };
 }

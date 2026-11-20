@@ -35,8 +35,8 @@ test("one id only — bulk and the locked set are refused", () => {
   assert.equal(singleRemoveId({ id: "ab" }).error, "bad_id");
 });
 
-test("removal plan is 410 when the video exists and 404 when it does not", () => {
-  assert.equal(removalPlan("video1", true).watch, 410);
+test("removal plan is 302 when the video exists and 404 when it does not", () => {
+  assert.equal(removalPlan("video1", true).watch, 302);
   assert.equal(removalPlan("video1", false).watch, 404);
   assert.ok(removalPlan("video1", true).surfaces.includes("sitemap"));
   assert.ok(removalPlan("video1", true).surfaces.includes("data-files"));

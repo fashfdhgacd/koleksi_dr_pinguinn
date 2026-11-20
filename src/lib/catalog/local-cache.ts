@@ -536,7 +536,7 @@ export function applyUnhidden(
   }
 }
 
-/** Owner delete: apply the KV blocklist on this isolate and rebuild so /watch 410s immediately. */
+/** Owner delete: apply the KV blocklist on this isolate and rebuild so /watch 302s to the homepage immediately. */
 export function applyCatalogBlock(ids: Iterable<string>): void {
   applyUnhidden(UNHIDDEN, null, null, null, null, ids);
 }
@@ -1130,12 +1130,12 @@ export async function publicIdBeforeBuild(id: string): Promise<boolean | null> {
   return !HIDDEN_IDS.has(key);
 }
 
-/** True for hidden ids (minor/school-themed content); /watch answers 404 + noindex for them. */
+/** True for hidden ids (minor/school-themed, owner hide, catalog block); middleware 302s to the homepage with noindex. */
 export async function isPublicHidden(id: string): Promise<boolean> {
   const key = String(id || "").trim();
   if (!key) return false;
   const cache = (await loadItemsRaw()) as BuiltCache;
-  // Removed from the catalog: /watch answers 410 (middleware) even after Unhide.
+  // Removed from the catalog: middleware 302s to the homepage (noindex) even after Unhide.
   if (isBlockedId(key, BLOCKED)) return true;
   if (OWNER_HIDDEN.has(key)) return true;
   if (REVIEW_KEPT.has(key)) return false;
