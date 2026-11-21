@@ -293,11 +293,11 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
   // ranking prefix and only appends "Videyindo"; h1 now matches the head query exactly.
   videy: {
     h1: "Bokep Videy Indo Terbaru",
-    intro: "Kumpulan bokep videy indo terbaru dan link videy viral (videyindo), langsung diputar di sini tanpa buka link videy satu-satu. Selalu nambah tiap ada video videy indo baru yang lagi rame, jadi cek halaman ini tiap hari.",
+    intro: "Telusuri koleksi Videy Indo mulai dari unggahan terbaru. Pilih judul untuk membuka halaman tonton, atau lihat pilihan paling ditonton jika belum tahu mau mulai dari mana.",
     title: `Bokep Videy Indo Viral Terbaru ${YEAR} - Videyindo & Link Videy | ${TITLE_SUFFIX}`,
     // CTR experiment 2026-11-02: GSC "bokep videy indo" / "videy indo bokep" (pos 10-15). Title already
     // leads with the query, so only the snippet changes: query wording first, then what the page does.
-    description: `Bokep videy indo terbaru ${YEAR}: video videy viral yang langsung diputar di sini, tanpa buka link videy satu-satu. Nambah tiap ada video videy baru.`,
+    description: "Buka koleksi Videy Indo di Dr. Pinguin. Jelajahi unggahan terbaru atau temukan judul paling banyak ditonton dalam koleksi Videy. Khusus 18+.",
   },
   bokep: {
     h1: "Koleksi Dr. Pinguin Bokep",
