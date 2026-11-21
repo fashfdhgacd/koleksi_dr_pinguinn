@@ -261,6 +261,7 @@ export function HomeExperience({
             )}
           </div>
 
+          <div id={mode === "home" && page === 1 ? "terbaru" : undefined} className="scroll-mt-20">
           {feed.loading && !feed.items.length ? (
             <VideoGridSkeleton count={12} ads />
           ) : feed.error && !feed.items.length ? (
@@ -279,6 +280,7 @@ export function HomeExperience({
               <VideoGrid items={gridItems} ads />
             </SafeBoundary>
           )}
+          </div>
 
           <CatalogPager
             pageHref={(n) =>
