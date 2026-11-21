@@ -674,8 +674,8 @@ export function homeJsonLd() {
 
 /**
  * SEO title for watch pages whose stored title says nothing to a searcher: bot placeholders
- * ("Koleksi Dr. Pinguin Bokep 18"), bare "videy"/"video N" names, or titles that are mostly
- * non-Latin (Chinese Byse uploads). Only <title>, meta description and og/twitter title use it; the
+ * ("Koleksi Dr. Pinguin Bokep 18") and bare "videy"/"video N" names. Meaningful titles in
+ * any script keep their original wording. The
  * visible H1/card title and the data files keep the stored title. Deterministic per video id, so
  * every page gets a stable, (practically) unique title. No minor-related words, ever.
  */
@@ -686,32 +686,13 @@ const WEAK_TITLE_RES = [
   /^[\w-]{0,3}$/,
 ];
 
-function mostlyNonLatin(s: string): boolean {
-  const letters = s.replace(/[\s\d\p{P}\p{S}]/gu, "");
-  if (!letters) return false;
-  const latin = (letters.match(/[A-Za-z\u00C0-\u024F]/g) || []).length;
-  return latin / letters.length < 0.5;
-}
-
 export function isWeakVideoTitle(raw?: string | null): boolean {
   const t = withoutDomainSuffix(cleanDisplayTitle(raw)).trim();
   if (!t || t === "Video") return true;
-  if (WEAK_TITLE_RES.some((re) => re.test(t))) return true;
-  return mostlyNonLatin(t);
+  return WEAK_TITLE_RES.some((re) => re.test(t)) || !/[\p{L}\p{N}]/u.test(t);
 }
 
-function generatedPhrases(raw: string, category?: string | null): string[] {
-  const t = String(raw || "");
-  const cjk = /[\u3040-\u30FF\u3400-\u9FFF\uAC00-\uD7AF]/.test(t);
-  if (cjk && /(ai短剧|短剧|\bai\b|ＡＩ)/i.test(t)) {
-    return [
-      "Bokep AI China Short Drama Terbaru",
-      "Video AI China Short Drama Hot",
-      "Film Pendek AI China Dewasa Terbaru",
-      "Bokep AI China Viral Terbaru",
-    ];
-  }
-  if (cjk) return ["Bokep China Terbaru", "Video Bokep China Viral", "Bokep Asia China Hot Terbaru"];
+function generatedPhrases(category?: string | null): string[] {
   const key = (category || "").trim().toLowerCase();
   if (key === "videy") return ["Video Viral Videy Terbaru", "Bokep Videy Viral Terbaru", "Video Videy Indo Viral"];
   if (!key || key === "bokep" || key === "lainnya") {
@@ -726,7 +707,7 @@ export type GeneratedVideoSeo = { title: string; ogTitle: string; description: s
 export function generatedVideoSeo(item: { id?: string | null; title: string; category?: string | null }): GeneratedVideoSeo | null {
   if (!isWeakVideoTitle(item.title)) return null;
   const id = String(item.id || item.title || "");
-  const phrases = generatedPhrases(item.title, item.category);
+  const phrases = generatedPhrases(item.category);
   const phrase = phrases[stablePick(`${id}|p`, phrases.length)]!;
   const n = 100 + stablePick(`${id}|n`, 9900);
   const ogTitle = `${phrase} #${n}`;
