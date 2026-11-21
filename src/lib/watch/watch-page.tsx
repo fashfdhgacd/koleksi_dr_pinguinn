@@ -9,7 +9,7 @@ import { PosterIdContext } from "@/components/video/thumb";
 import { VideyPlayer } from "@/components/video/videy-player";
 import { PopTapLayer } from "@/components/tap-popunder";
 import { AdblockGate } from "@/components/adblock-gate";
-import { hostLabel } from "@/lib/catalog/embed";
+import { hostLabel, isVideyItem } from "@/lib/catalog/embed";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
@@ -33,10 +33,6 @@ function shareUrl(id: string): string {
 
 const VIDEY_LABEL = "drpinguin videy";
 
-/** Videy plays in VideyPlayer (own HTML5 player) and has no "Buka Sumber". Only Videy is adblock-gated. */
-function isVideyItem(item: VideoDetail): boolean {
-  return item.creator === "Videy" || item.category === "videy";
-}
 
 const DRP_LABELS = new Set<string>(Object.values(DRP_SOURCES));
 

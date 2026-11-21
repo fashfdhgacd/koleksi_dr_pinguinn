@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { VideoDetail } from "@/lib/catalog/types";
+import { videyFileOf } from "@/lib/catalog/embed";
 import { sendPlayerLog } from "@/lib/player-log-client";
 import { popTap } from "@/components/ts-videy-popunder";
 import { PopTapLayer } from "@/components/tap-popunder";
@@ -37,16 +38,6 @@ import { loadVast, ping, prerollDue, VAST_TIMEOUT_MS, type VastAd } from "@/comp
 const SLOW_MS = 20000;
 /** Visitor stayed this long without a first frame: slow, not failed (player.tsx STAYED_MS). */
 const STAYED_MS = 60000;
-
-function videyFileOf(item: VideoDetail): string {
-  const urls = [item.video_url, ...item.qualities.map((q) => q.url)].filter((u): u is string => Boolean(u));
-  const direct = urls.find((u) => /^https:\/\/cdn\d*\.videy\.co\/[A-Za-z0-9]+\.(mp4|mov)$/i.test(u));
-  if (direct) return direct.replace(/^https:\/\/cdn\d*\./i, "https://cdn.");
-  // Videy mirror file (cdn2.aceimg.com/<id>.mp4): played exactly as stored.
-  const mirror = urls.find((u) => /^https:\/\/cdn\d*\.aceimg\.com\/[A-Za-z0-9]+\.mp4$/i.test(u));
-  if (mirror) return mirror;
-  return `https://cdn.videy.co/${encodeURIComponent(item.id)}.mp4`;
-}
 
 type OrientationLock = ScreenOrientation & { lock?: (o: string) => Promise<void>; unlock?: () => void };
 
@@ -483,7 +474,9 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
         poster={poster}
         controls={phase === "main"}
         controlsList="nodownload"
-      />
+      >
+        <source src={file} />
+      </video>
       {phase === "main" ? (
         // Re-armed popunder tap during playback (shared per-video cap); removes itself after firing.
         <PopTapLayer
