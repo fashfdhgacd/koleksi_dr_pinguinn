@@ -243,16 +243,19 @@ export function HomeExperience({
               // Plain crawlable links to the categories that bring search traffic (SEO internal linking).
               <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
                 <a href="/kategori/videy" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
-                  Video viral Videy terbaru →
+                  Video Videy Indo terbaru →
                 </a>
                 <a href="/kategori/ai-plus" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
-                  Bokep AI+ terbaru →
+                  Semua video AI+ →
                 </a>
                 <a href="/kategori/malaysia" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
-                  Bokep Malaysia viral →
+                  Video Malaysia dan Melayu →
                 </a>
                 <a href="/kategori/ai-indo" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
-                  Bokep Indo AI →
+                  Koleksi video AI Indonesia →
+                </a>
+                <a href="/kategori/percakapan" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
+                  Video dengan percakapan →
                 </a>
                 <a href="/kategori/paling-ditonton" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
                   Paling ditonton →
