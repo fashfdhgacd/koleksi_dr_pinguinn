@@ -1,3 +1,4 @@
+import { isVideyItem, videyFileOf } from "@/lib/catalog/embed";
 import { curatedSeoTitle } from "@/lib/catalog/video-descriptions";
 import { createFileRoute, notFound, redirect } from "@tanstack/react-router";
 import { categorySlugFor } from "@/lib/catalog/category-seo";
@@ -105,8 +106,9 @@ export const Route = createFileRoute("/watch/$id")({
     const embedUrl = item
       ? (item.video_url || item.qualities?.[0]?.url || "").trim() || null
       : null;
-    const contentUrl =
-      embedUrl && /\.(mp4|webm|mov)($|\?)/i.test(embedUrl) ? embedUrl : null;
+    const contentUrl = item && isVideyItem(item)
+      ? videyFileOf(item)
+      : embedUrl && /\.(mp4|webm|mov)($|\?)/i.test(embedUrl) ? embedUrl : null;
     // Direct mp4 (Videy) only: lets WhatsApp/Telegram/iMessage render a playable video
     // preview instead of a static thumbnail. Iframe embeds can't be og:video.
     const videoMetas =
@@ -114,7 +116,7 @@ export const Route = createFileRoute("/watch/$id")({
         [
           { property: "og:video", content: contentUrl },
           { property: "og:video:secure_url", content: contentUrl },
-          { property: "og:video:type", content: "video/mp4" },
+          { property: "og:video:type", content: /\.mov(?:$|\?)/i.test(contentUrl) ? "video/quicktime" : /\.webm(?:$|\?)/i.test(contentUrl) ? "video/webm" : "video/mp4" },
         ]
       : [];
     const jsonLd = item
