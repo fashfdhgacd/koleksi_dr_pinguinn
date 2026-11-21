@@ -424,6 +424,11 @@ function PlainCategoryPage({
           {typeof feed.total === "number" ? (
             <p className="mt-1 text-sm text-zinc-500">{feed.total.toLocaleString("id-ID")} video</p>
           ) : null}
+          {cat.slug === "videy" ? (
+            <a href="/cari/bokep-videy-indo" className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-teal-300 underline underline-offset-2">
+              Lihat Videy Indo paling ditonton →
+            </a>
+          ) : null}
           {categoryRelated(cat.slug).length ? (
             <nav className="mt-3 flex flex-wrap gap-2" aria-label="Kategori terkait">
               {categoryRelated(cat.slug).map((c) => (

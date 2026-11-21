@@ -87,6 +87,12 @@ function CoverInner({ label, count, cover, coverId }: { label: string; count?: n
   );
 }
 
+const directoryLabels: Record<string, string> = {
+  videy: "Videy Indo",
+  "ai-indo": "AI Indonesia",
+  "ai-plus": "AI+ · Drama pendek China 18+",
+};
+
 /** A category or ranking card (/kategori/<slug>). */
 function CoverCard({ slug, label, count, cover, coverId }: CategoryInfo) {
   return (
@@ -123,7 +129,7 @@ function CategoriesPage() {
             </Link>
           </li>
           {categories.map((cat) => (
-            <CoverCard key={cat.slug} {...cat} />
+            <CoverCard key={cat.slug} {...cat} label={directoryLabels[cat.slug] ?? cat.label} />
           ))}
         </ul>
 
