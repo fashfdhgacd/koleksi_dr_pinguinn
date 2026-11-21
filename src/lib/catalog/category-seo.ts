@@ -26,9 +26,9 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
   // (ai-plus, malaysia, doggy, bokep, jav); improve intro/description instead.
   "ai-plus": {
     h1: "Bokep AI+ Terbaru",
-    intro: "Video AI+ terbaru yang lagi banyak dicari: bokep AI indo dan Asia buatan AI, gambar jernih dan streaming lancar di HP. Video baru masuk hampir tiap hari. Kalau mau yang rekaman asli, cek juga kategori Viral, Amatir atau Videy di bawah.",
+    intro: "Drama pendek China 18+ jadi salah satu pilihan utama di koleksi AI+ Dr. Pinguin. Ceritanya hadir dalam episode singkat. Kalau judulnya berseri, pilih episode dari halaman tonton. Di sini juga ada video AI Indonesia dan Asia lainnya.",
     title: `Bokep AI+ Terbaru ${YEAR} - Video AI Viral | ${TITLE_SUFFIX}`,
-    description: `Bokep AI+ terbaru ${YEAR}: video AI viral dan bokep AI indo yang lagi banyak dicari, jernih dan lancar diputar langsung di HP.`,
+    description: "Temukan drama pendek China 18+ di koleksi AI+ Dr. Pinguin. Pilih judul berseri, telusuri episodenya, atau jelajahi video AI Indonesia dan Asia lainnya.",
   },
   // AI Indo (2026-11-02): rising Google query "bokep indo ai". Only AI+ videos whose own title is
   // Indonesian (title-tags.ts isIndoAiTitle), so the page matches the query without invented content.
