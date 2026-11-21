@@ -1,44 +1,44 @@
 {
-  "date": "2026-11-20",
+  "date": "2026-11-21",
   "counts": {
-    "Vidara": 106,
+    "Vidara": 114,
+    "LuluStream": 1273,
+    "Streamtape": 959,
+    "Byse": 762,
     "DoodStream": 285,
     "MXDrop": 239,
-    "Byse": 754,
-    "Streamtape": 951,
-    "LuluStream": 1265,
     "Videy": 639,
     "IndoAV": 6113,
     "Userbokep": 855,
     "Putarin": 1629
   },
   "recent3d": {
-    "Vidara": 69,
-    "DoodStream": 68,
-    "MXDrop": 69,
-    "Byse": 68,
-    "Streamtape": 69,
-    "LuluStream": 72,
-    "Putarin": 69
+    "Vidara": 20,
+    "LuluStream": 23,
+    "Streamtape": 20,
+    "Byse": 19,
+    "DoodStream": 12,
+    "MXDrop": 12,
+    "Putarin": 12
   },
   "topHosts": {
     "Vidara": [
       "vidara.to"
+    ],
+    "LuluStream": [
+      "lplaygo.com"
+    ],
+    "Streamtape": [
+      "streamtape.com"
+    ],
+    "Byse": [
+      "bysejikuar.com"
     ],
     "DoodStream": [
       "playmogo.com"
     ],
     "MXDrop": [
       "mxdrop.sx"
-    ],
-    "Byse": [
-      "bysejikuar.com"
-    ],
-    "Streamtape": [
-      "streamtape.com"
-    ],
-    "LuluStream": [
-      "lplaygo.com"
     ],
     "Videy": [
       "videy.co",
