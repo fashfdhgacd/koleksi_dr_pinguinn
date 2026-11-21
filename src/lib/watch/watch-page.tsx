@@ -584,6 +584,9 @@ export function WatchPage() {
                 Buka Sumber
               </button>}
               <CatalogBackLink item={item} />
+              <a href="/#terbaru" className="inline-flex min-h-12 items-center rounded-xl px-4 text-base font-medium text-teal-300 underline-offset-2 hover:underline">
+                Lihat unggahan terbaru
+              </a>
               <button
                 type="button"
                 className="h-12 min-w-[120px] rounded-xl border border-border px-5 text-base font-medium text-muted active:scale-[0.98]"
