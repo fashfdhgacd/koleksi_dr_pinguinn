@@ -292,6 +292,39 @@ export const EN_LANDINGS: EnLandingDef[] = [
     intro:
       "These Indonesian titles mention a selebgram, influencer, or public figure; we list the recordings we already host rather than promising celebrity leaks. The order is by views. All performers are adults.",
   },
+  // Foreign-visitor long tail (2026-11-22): GSC non-ID queries (MYS/SGP/USA/DEU) "tudung mesum",
+  // "bokep bertudung", "bokep kelas bintang", "kelas bintang porn", "bokep percakapan".
+  // IndoAV/UserBokep only, like every /en page here; no ads.
+  {
+    slug: "malaysian-hijab",
+    match: /^(?=[\s\S]*\b(?:malaysia|malay|melayu|awek|tudung|bertudung)\b)(?=[\s\S]*\b(?:tudung|bertudung|hijab|jilbab|kerudung)\b)/i,
+    h1: "Malaysian Tudung and Hijab Videos",
+    title: "Malaysian Tudung & Hijab Videos",
+    description:
+      "Malaysian tudung and hijab amateur videos, Malay awek clips and bertudung titles from our catalog. Stream on your phone. 18+ only.",
+    intro:
+      "Malay viewers search for tudung and bertudung clips, so this list keeps only titles that are both Malaysian and hijab-themed. Most are amateur recordings shared by adult couples, sorted by how often they are watched. Tap a card to play it in the browser without an account.",
+  },
+  {
+    slug: "indonesian-softcore-films",
+    match: /\bkelas-bintang\b|\bkelas\s*bintang\b/i,
+    h1: "Indonesian Softcore Films (Kelas Bintang)",
+    title: "Indonesian Softcore Films – Kelas Bintang Movies",
+    description:
+      "Kelas bintang: Indonesian softcore films and adult movie scenes with professional actors, ranked by views. 18+ only.",
+    intro:
+      "Kelas bintang is the Indonesian name for softcore feature films and their steamy scenes, shot with professional adult actors rather than phones. We list the ones already in our catalog, most watched first. Each title streams straight in the browser.",
+  },
+  {
+    slug: "indonesian-dirty-talk",
+    match: /\bpercakapan\b/i,
+    h1: "Indonesian Dirty Talk Videos",
+    title: "Indonesian Dirty Talk Videos – With Conversation",
+    description:
+      "Indonesian dirty talk videos where adult couples keep talking in Indonesian during the scene. Ranked by views. 18+ only.",
+    intro:
+      "Indonesian viewers tag these clips percakapan because the couple keeps chatting in Indonesian throughout the scene. If you like hearing the language, start here. Everyone shown is an adult, and every video plays in the browser.",
+  },
 ];
 
 const bySlug = new Map(EN_LANDINGS.map((l) => [l.slug, l]));

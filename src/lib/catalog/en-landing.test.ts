@@ -16,7 +16,7 @@ import { findLanding } from "./landing.ts";
 
 describe("english koleksidrpinguin landings", () => {
   it("has a focused set of unique slugs, H1s and titles", () => {
-    assert.ok(EN_LANDINGS.length >= 15 && EN_LANDINGS.length <= 25, String(EN_LANDINGS.length));
+    assert.ok(EN_LANDINGS.length >= 15 && EN_LANDINGS.length <= 35, String(EN_LANDINGS.length));
     for (const key of ["slug", "h1", "title"] as const) {
       const vals = EN_LANDINGS.map((l) => l[key].toLowerCase());
       assert.equal(new Set(vals).size, vals.length, `duplicate ${key}`);
