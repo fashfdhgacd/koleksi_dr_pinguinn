@@ -21,6 +21,7 @@ import { hasJavCode, uploadRejectReason, uploadWarnReason } from "@/lib/bot/titl
 import { HOLD_REASON, explainTerm, holdReplyLines, isHeldDraftReason, titleHold, uploadAction } from "@/lib/bot/title-hold.js";
 import { isGenericTitle } from "@/lib/catalog/generic-title.js";
 import { guardGivenCategory } from "@/lib/bot/category-guard.js";
+import { hasEpisodeMarker } from "@/lib/catalog/series";
 import { embedDomainOf, readEmbedHosts } from "@/lib/embed-hosts.js";
 
 /** Title is clean for the hard checks too (reject list + minor-lock). Used for hold suggestions. */
@@ -497,7 +498,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
         : video.host === "putarin" || video.host === "putarin-folder"
         ? given || "jav"
         : video.host === "streamtape"
-          ? given || "ai-plus"
+          ? given || (hasEpisodeMarker(baseTitle) ? "ai-plus" : detected !== "lainnya" ? detected : "lainnya")
           : !generic
             ? given
             : detected !== "lainnya"

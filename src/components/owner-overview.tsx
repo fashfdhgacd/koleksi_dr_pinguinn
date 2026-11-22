@@ -487,6 +487,7 @@ function EditRow({
       <div className="basis-full">
         <p className="mb-1 text-[13px] text-zinc-400">
           Tampil juga di kategori (opsional, maks. 6): <span className="tabular-nums">{extra.length}/{MAX_EXTRA}</span>
+          {" "}AI Drama otomatis untuk judul yang ada Episode/Eps/EP/Part. Salah masuk? Ganti kategori utama, atau centang AI Drama di bawah.
         </p>
         <div className="flex flex-wrap gap-1.5">
           {EXTRA_CHOICES.filter((c) => c.slug !== cat).map((c) => (

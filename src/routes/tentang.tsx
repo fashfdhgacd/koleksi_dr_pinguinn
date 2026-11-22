@@ -61,7 +61,7 @@ function Page() {
       <p>
         <strong>Koleksi Dr. Pinguin</strong> (juga dikenal sebagai Dr. Pinguin, Koleksi Dr Pinguin, atau Koleksi Dr.
         Pinguin Bokep, M.S.B.) adalah situs resmi di <strong>koleksidrpinguin.com</strong>. Kami mengkurasi katalog video
-        dewasa 18+ sendiri: bokep indo viral, video viral videy, JAV, dan AI+, yang bisa langsung ditonton di HP.
+        dewasa 18+ sendiri: bokep indo viral, video viral videy, JAV, dan AI Drama, yang bisa langsung ditonton di HP.
       </p>
       <h2 className="pt-2 text-lg font-semibold text-foreground">Situs asli vs. situs penyalin</h2>
       <p>

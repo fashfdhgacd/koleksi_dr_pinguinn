@@ -15,7 +15,7 @@ const QUICK_CATS = [
   { slug: "paling-ditonton", label: "Paling Banyak Ditonton" },
   { slug: "jav", label: "Jav" },
   { slug: "hentai", label: "Hentai" },
-  { slug: "ai-plus", label: "AI+" },
+  { slug: "ai-plus", label: "AI Drama" },
   { slug: "videy", label: "drpinguin videy" },
   { slug: "paling-disukai", label: "Paling Banyak Disukai" },
 ] as const;

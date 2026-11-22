@@ -12,6 +12,7 @@ import { EXTRA_CATEGORY_RULES, normCategoryText } from "./title-category.js";
 import { MAX_TAGS as MAX_ALL_TAGS, extraTags } from "./tag-dictionary.js";
 import { findCategory } from "./categories";
 import { MINOR_WORDS, stripTemplate } from "./title-text";
+import { hasEpisodeMarker } from "./series";
 
 /** Cap of the original rules (kept so their output is unchanged); tag-dictionary.js then adds up to MAX_ALL_TAGS. */
 export const MAX_TAGS = 8;
@@ -152,7 +153,10 @@ export function titleTags(title: string | undefined, primary: string, opts: TagO
     extraTags(t, base, { sourceText: opts.sourceText, storedTags: opts.storedTags, allowed: (s: string) => findCategory(s)?.slug === s }),
   );
   // JAV and hentai are never listed under Amatir as an extra tag (their main category is unchanged).
-  return primary === "jav" || primary === "hentai" ? all.filter((s) => s !== "amatir") : all;
+  const noAmatir = primary === "jav" || primary === "hentai" ? all.filter((s) => s !== "amatir") : all;
+  // AI Drama (ai-plus / ai-indo) is only an auto-tag when the title has an episode marker.
+  if (primary === "ai-plus" || primary === "ai-indo" || hasEpisodeMarker(title)) return noAmatir;
+  return noAmatir.filter((s) => s !== "ai-plus" && s !== "ai-indo");
 }
 
 /** Tag options for a catalog item (source flags + popularity). */

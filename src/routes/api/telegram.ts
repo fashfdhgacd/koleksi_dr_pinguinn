@@ -27,7 +27,7 @@ const MAIN_KEYBOARD = {
   keyboard: [
     [{ text: "Minta 10" }, { text: "Minta 25" }, { text: "Minta 100" }],
     [{ text: "Terbaru" }, { text: "Semua" }, { text: "Amatir" }, { text: "Videy" }],
-    [{ text: "Jav" }, { text: "AI+" }, { text: "Lulu" }],
+    [{ text: "Jav" }, { text: "AI Drama" }, { text: "Lulu" }],
     [{ text: "Jilbab" }, { text: "Teen 18+" }, { text: "Streamtape" }],
     [{ text: "Lagi" }, { text: "Menu" }],
   ],
@@ -188,6 +188,9 @@ function parseCat(text: string): string {
     "cantik": "cantik",
     ai: "ai-plus",
     "ai+": "ai-plus",
+    "ai drama": "ai-plus",
+    "ai-drama": "ai-plus",
+    aidrama: "ai-plus",
     jav: "jav",
     puterin: "jav",
     putarin: "jav",
