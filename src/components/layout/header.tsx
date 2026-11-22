@@ -225,6 +225,16 @@ export function Header({
               Terbaru
             </Link>
           </li>
+          <li className="shrink-0">
+            <a
+              href="https://www.indoav.com/"
+              target="_blank"
+              rel="noopener"
+              className={chipClass(false)}
+            >
+              IndoAV
+            </a>
+          </li>
           {QUICK_CATS.map((cat) => (
             <li key={cat.slug} className="shrink-0">
               <Link
