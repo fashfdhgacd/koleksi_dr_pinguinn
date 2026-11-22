@@ -4,7 +4,7 @@
  */
 export const POPULAR_CATEGORY_LINKS: ReadonlyArray<{ slug: string; label: string; href?: string }> = [
   { slug: "paling-ditonton", label: "Paling Ditonton" },
-  { slug: "ai-plus", label: "AI+ · Drama pendek China 18+" },
+  { slug: "ai-plus", label: "AI Drama" },
   { slug: "ai-indo", label: "Bokep Indo AI" },
   { slug: "videy", label: "Bokep Videy Indo" },
   { slug: "malaysia", label: "Bokep Malaysia" },

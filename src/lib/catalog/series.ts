@@ -34,7 +34,7 @@ const WORDS = "episode|episod|epiose|epsiode|eps|ep|part|bagian";
 // After the word: optional "." and/or "#", spaces optional ("EP02", "Eps.3", "Part #2"), number
 // 1–99 with leading zeros allowed, then not another digit / "x" / "k" / "p" ("5x", "4k", "720p")
 // and not a letter ("Part 2nd"); CJK noise right after the number is fine.
-const NUM = String.raw`\.?\s*[#:]?\s*0*(\d{1,2})(?![\d])(?![xX×kKpP](?![a-zA-Z]))(?=$|[^\p{L}\p{N}]|[\u3040-\u30ff\u3400-\u9fff])`;
+const NUM = String.raw`\.?\s*[-–—#:]?\s*0*(\d{1,2})(?![\d])(?![xX×kKpP](?![a-zA-Z]))(?=$|[^\p{L}\p{N}]|[\u3040-\u30ff\u3400-\u9fff])`;
 // (1) Whole-word marker, any case: "Eps 04", "EP02", "Ep. 3", "bagian 2". "(?<![\p{L}\p{N}])" keeps
 //     "Part" in "Apartemen" or "ep" in "Keep 2" out.
 const MARKER = new RegExp(String.raw`(?<![\p{L}\p{N}])(?:${WORDS})${NUM}`, "iu");
@@ -132,6 +132,21 @@ export function parseSeries(rawTitle: string): SeriesInfo | null {
   const key = words.replace(/ /g, "");
   if (key.length < 3) return null;
   return se || m ? { key: "m:" + key, ep, sub } : { key: "t:" + key, ep, sub, words };
+}
+
+
+/** True when the title has an explicit episode marker (Episode/Eps/EP/Part/Bagian/第N集/S01E02),
+ *  not a bare trailing number like "Judul 3" or "Judul (3)". Used to decide AI Drama membership. */
+const BARE_MARKER = new RegExp(String.raw`(?<![\p{L}\p{N}])(?:${WORDS})[.!]*\s*$`, "iu");
+const BEFORE_MARKER = new RegExp(String.raw`(?<![\p{L}\p{N}])\d{1,2}\s+(?:${WORDS})(?![\p{L}\p{N}])`, "iu");
+const EP_THEN_CJK = new RegExp(String.raw`(?<![\p{L}\p{N}])(?:${WORDS})(?=\s*[\u3400-\u9fff])`, "iu");
+
+export function hasEpisodeMarker(title: string | undefined): boolean {
+  const parsed = parseSeries(String(title || ""));
+  if (parsed && parsed.key.startsWith("m:")) return true;
+  const t = stripTail(String(title || ""));
+  if (!t) return false;
+  return BARE_MARKER.test(t) || BEFORE_MARKER.test(t) || EP_THEN_CJK.test(t);
 }
 
 /**

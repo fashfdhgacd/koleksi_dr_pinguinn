@@ -25,16 +25,16 @@ const COPY: Record<string, { h1: string; intro: string; title?: string; descript
   // landings, so they were restored. Do NOT reword title/h1 of ranked categories
   // (ai-plus, malaysia, doggy, bokep, jav); improve intro/description instead.
   "ai-plus": {
-    h1: "Bokep AI+ Terbaru",
-    intro: "Drama pendek China 18+ jadi salah satu pilihan utama di koleksi AI+ Dr. Pinguin. Ceritanya hadir dalam episode singkat. Kalau judulnya berseri, pilih episode dari halaman tonton. Di sini juga ada video AI Indonesia dan Asia lainnya.",
-    title: `Bokep AI+ Terbaru ${YEAR} - Video AI Viral | ${TITLE_SUFFIX}`,
-    description: "Temukan drama pendek China 18+ di koleksi AI+ Dr. Pinguin. Pilih judul berseri, telusuri episodenya, atau jelajahi video AI Indonesia dan Asia lainnya.",
+    h1: "Bokep AI Drama Terbaru",
+    intro: "Kumpulan AI Drama: video AI yang judulnya berseri (Episode, Eps, EP, Part). Ceritanya hadir dalam episode singkat; pilih episode dari halaman tonton. Video tanpa penanda episode tidak masuk kategori ini.",
+    title: `Bokep AI Drama Terbaru ${YEAR} - Video AI Viral | ${TITLE_SUFFIX}`,
+    description: "Temukan AI Drama di koleksi Dr. Pinguin: video AI berseri dengan episode. Pilih judul, telusuri episodenya, atau jelajahi video AI Indonesia dan Asia lainnya.",
   },
   // AI Indo (2026-11-02): rising Google query "bokep indo ai". Only AI+ videos whose own title is
   // Indonesian (title-tags.ts isIndoAiTitle), so the page matches the query without invented content.
   "ai-indo": {
     h1: "Bokep Indo AI Terbaru",
-    intro: "Kumpulan bokep indo AI: video AI+ dengan judul dan cerita Indonesia, semua pemeran dewasa buatan AI. Diurutkan dari yang baru masuk dan bisa langsung diputar di HP. Mau semua video AI? Buka kategori AI+ di bawah.",
+    intro: "Kumpulan bokep indo AI: AI Drama dengan judul dan cerita Indonesia, semua pemeran dewasa buatan AI. Diurutkan dari yang baru masuk dan bisa langsung diputar di HP. Mau semua AI Drama? Buka kategori AI Drama di bawah.",
     title: `Bokep Indo AI Terbaru ${YEAR} - Video AI Indonesia | ${TITLE_SUFFIX}`,
     description: `Bokep indo AI terbaru ${YEAR}: video AI dengan cerita Indonesia, pemeran dewasa buatan AI, tonton langsung di HP tanpa download.`,
   },

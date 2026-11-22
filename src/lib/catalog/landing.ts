@@ -167,7 +167,7 @@ export const LANDINGS: LandingDef[] = [
     description:
       "Bokep indo AI paling banyak ditonton: video buatan AI berbahasa Indonesia. Streaming di HP tanpa VPN. Khusus 18+.",
     intro:
-      "Bokep indo AI adalah video buatan kecerdasan buatan dengan judul dan cerita berbahasa Indonesia, bukan rekaman orang sungguhan. Halaman ini menampilkan yang paling banyak ditonton di koleksidrpinguin.com dari kategori AI Indo, hanya yang sumbernya IndoAV atau UserBokep, diurutkan dari tayangan terbanyak. Gambarnya hasil generate dewasa, jadi tidak ada identitas pribadi di dalamnya. Videonya ringan dibuka di HP dan langsung bisa diputar tanpa VPN, tanpa aplikasi tambahan, dan tanpa login. Kalau ingin seluruh unggahan dalam urutan terbaru, buka kategori AI Indo lewat tautan di bawah. Simpan alamat situs ini supaya koleksi yang sama mudah ditemukan lagi nanti.",
+      "Bokep indo AI adalah video buatan kecerdasan buatan dengan judul dan cerita berbahasa Indonesia, bukan rekaman orang sungguhan. Halaman ini menampilkan yang paling banyak ditonton di koleksidrpinguin.com dari kategori AI Drama Indo, hanya yang sumbernya IndoAV atau UserBokep, diurutkan dari tayangan terbanyak. Gambarnya hasil generate dewasa, jadi tidak ada identitas pribadi di dalamnya. Videonya ringan dibuka di HP dan langsung bisa diputar tanpa VPN, tanpa aplikasi tambahan, dan tanpa login. Kalau ingin seluruh unggahan dalam urutan terbaru, buka kategori AI Drama Indo lewat tautan di bawah. Simpan alamat situs ini supaya koleksi yang sama mudah ditemukan lagi nanti.",
     queries: ["bokep indo ai", "video ai indonesia", "bokep ai indo"],
   },
   {

@@ -1,6 +1,7 @@
 import { DEFAULT_PAGE_SIZE } from "./types";
 import { popularIds, tagOptions, titleTags } from "./title-tags";
 import { isIndoAiTitle } from "./title-text";
+import { hasEpisodeMarker } from "./series";
 import { findCategory } from "./categories";
 import type { PagedVideos } from "./types";
 import {
@@ -838,16 +839,35 @@ export function catalogSlugs(it: RawItem, popular: ReadonlySet<string>, multi?: 
   return slugs;
 }
 
+function ownerAiDramaOverride(it: RawItem): "in" | "out" | null {
+  const main = findCategory(typeof it.ownerCategory === "string" ? it.ownerCategory : "")?.slug;
+  const extras = Array.isArray(it.ownerExtraCategories) ? it.ownerExtraCategories : [];
+  const extraIn = extras.some((x) => {
+    const slug = typeof x === "string" ? findCategory(x)?.slug : undefined;
+    return slug === "ai-plus" || slug === "ai-indo";
+  });
+  if (main === "ai-plus" || main === "ai-indo" || extraIn) return "in";
+  if (main) return "out";
+  return null;
+}
+
 function ownSlugs(it: RawItem, popular: ReadonlySet<string>): string[] {
   // Multi-category (title-tags.ts): the video joins its primary category and every tag category.
-  const slugs = titleTags(it.title, slugOf(it), tagOptions(it, popular));
+  let slugs = titleTags(it.title, slugOf(it), tagOptions(it, popular));
   // Owner-chosen extra categories (/pemilik > Edit): the video also shows up in each of them.
   const extra = Array.isArray(it.ownerExtraCategories) ? (it.ownerExtraCategories as unknown[]) : [];
   for (const x of extra) {
     const cat = typeof x === "string" ? findCategory(x) : undefined;
     if (cat && !slugs.includes(cat.slug)) slugs.push(cat.slug);
   }
-  // AI Indo: AI+ videos with an Indonesian title also sit in /kategori/ai-indo (never AI GAY ones).
+  // AI Drama: auto membership needs an episode marker. /pemilik can force a video in or out.
+  const aiOv = ownerAiDramaOverride(it);
+  if (aiOv === "in") {
+    if (!slugs.includes("ai-plus")) slugs.push("ai-plus");
+  } else if (aiOv === "out" || !hasEpisodeMarker(it.title)) {
+    slugs = slugs.filter((s) => s !== "ai-plus" && s !== "ai-indo");
+  }
+  // AI Drama Indo: AI Drama videos with an Indonesian title also sit in /kategori/ai-indo (never AI GAY ones).
   if (slugs.includes("ai-plus") && !slugs.includes("ai-gay") && !slugs.includes("ai-indo") && isIndoAiTitle(it.title)) {
     slugs.push("ai-indo");
   }

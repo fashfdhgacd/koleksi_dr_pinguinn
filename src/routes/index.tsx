@@ -246,13 +246,13 @@ export function HomeExperience({
                   Video Videy Indo terbaru →
                 </a>
                 <a href="/kategori/ai-plus" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
-                  Semua video AI+ →
+                  Semua video AI Drama →
                 </a>
                 <a href="/kategori/malaysia" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
                   Video Malaysia dan Melayu →
                 </a>
                 <a href="/kategori/ai-indo" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
-                  Koleksi video AI Indonesia →
+                  Koleksi AI Drama Indonesia →
                 </a>
                 <a href="/kategori/percakapan" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
                   Video dengan percakapan →

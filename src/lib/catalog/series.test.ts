@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { episodeLabel, parseSeries, seriesIndex } from "./series.ts";
+import { episodeLabel, hasEpisodeMarker, parseSeries, seriesIndex } from "./series.ts";
 
 const key = (t: string) => parseSeries(t)?.key;
 const ep = (t: string) => parseSeries(t)?.ep;
@@ -18,6 +18,7 @@ describe("parseSeries", () => {
     const base = key("Judul Drama Episode 1");
     for (const [t, n] of [
       ["Judul Drama EP02", 2],
+      ["Judul Drama EP-1", 1],
       ["judul drama eps. 3", 3],
       ["Judul Drama Ep.04 | KoleksiDrPinguin", 4],
       ["Judul DramaEps 5", 5],
@@ -103,5 +104,37 @@ describe("episode ranges", () => {
     assert.equal(episodeLabel(`${B}Episode 1 2${S}`, 1), "1"); // ambiguous, no dash: left alone
     assert.equal(episodeLabel(`${B}Episode 3${S}`, 3), "3");
     assert.equal(episodeLabel("Judul Episode 2-1", 2), "2"); // second number not bigger
+  });
+});
+
+describe("hasEpisodeMarker", () => {
+  it("accepts explicit episode words, typo forms, CJK and S01E02", () => {
+    for (const t of [
+      "The Silence of the Lambs Episode 2 - koleksidrpinguin.com",
+      "Judul Drama Eps 04",
+      "Judul Drama EP-1",
+      "Judul Drama Part 2",
+      "Judul Drama Bagian 3",
+      "双向欲臣 第1集 双向欲望 ai短剧",
+      "Show S01E03",
+      "menampilkan adegan seks nyata, original 4K HD, semua 11 episode - koleksidrpinguin.com",
+      "Versi tahun 1991 dari Love Apartment Episode - koleksidrpinguin.com",
+      "我的绝色女友给我的绿帽回忆录 EP 绿帽回忆 ai短剧",
+    ]) {
+      assert.equal(hasEpisodeMarker(t), true, t);
+    }
+  });
+
+  it("rejects bare trailing numbers and titles with no episode word", () => {
+    for (const t of [
+      "Cewek Bispak Ngentot Minta Gaya 69",
+      "HIDUP PENCINTA BOKEP (3)",
+      "AI Bokep koleksi_dr_pinguin.com (10)",
+      "Campur Y6XxXjZ3lrSvAmR",
+      "Tinggi Banget Cowoknya Cewenya Minta Ampun",
+      "Bokep Indo Andini Viral Di Ewe Ber Gilir (Koleksi Dr. Pinguin Bokep, M.S.B.) AI",
+    ]) {
+      assert.equal(hasEpisodeMarker(t), false, t);
+    }
   });
 });

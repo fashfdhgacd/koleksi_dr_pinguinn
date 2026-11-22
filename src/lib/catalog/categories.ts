@@ -7,12 +7,12 @@ export type CategoryDef = CategoryInfo & {
 export const CATEGORIES: CategoryDef[] = [
   { slug: "jav", label: "Jav", query: "jav" },
   { slug: "hentai", label: "Hentai", query: "hentai" },
-  { slug: "ai-plus", label: "AI+", query: "ai-plus" },
+  { slug: "ai-plus", label: "AI Drama", query: "ai-plus" },
   // Gay AI videos; tagged on upload with #aigay or "kategori: ai gay" (src/lib/bot/parse.js).
   { slug: "ai-gay", label: "AI GAY", query: "ai-gay" },
-  // AI+ videos with an Indonesian title ("Bokep Indo ..."): landing page for the rising Google query
-  // "bokep indo ai" (2026-11-02). Members come only from title-tags.ts isIndoAiTitle on AI+ videos.
-  { slug: "ai-indo", label: "AI Indo", query: "ai-indo" },
+  // AI Drama videos with an Indonesian title ("Bokep Indo ..."): landing page for the rising Google query
+  // "bokep indo ai" (2026-11-02). Members come only from title-tags.ts isIndoAiTitle on AI Drama videos.
+  { slug: "ai-indo", label: "AI Drama Indo", query: "ai-indo" },
   { slug: "jilbab", label: "Jilbab", query: "jilbab" },
   { slug: "tante", label: "Tante", query: "tante" },
   { slug: "amatir", label: "Amatir", query: "amatir" },
@@ -167,7 +167,7 @@ export function findCategory(slug: string | null | undefined): CategoryDef | und
   if (!slug) return undefined;
   const key = slug.trim().toLowerCase();
   if (AI_GAY_KEYS.has(key)) return CATEGORIES.find((c) => c.slug === "ai-gay");
-  if (key === "ai" || key === "ai+") {
+  if (key === "ai" || key === "ai+" || key === "ai drama" || key === "ai-drama" || key === "aidrama") {
     return CATEGORIES.find((c) => c.slug === "ai-plus");
   }
   if (key === "anime" || key === "animasi") {

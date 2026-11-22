@@ -89,8 +89,8 @@ function CoverInner({ label, count, cover, coverId }: { label: string; count?: n
 
 const directoryLabels: Record<string, string> = {
   videy: "Videy Indo",
-  "ai-indo": "AI Indonesia",
-  "ai-plus": "AI+ · Drama pendek China 18+",
+  "ai-indo": "AI Drama Indo",
+  "ai-plus": "AI Drama",
 };
 
 /** A category or ranking card (/kategori/<slug>). */
