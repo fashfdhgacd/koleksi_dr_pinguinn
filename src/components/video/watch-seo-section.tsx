@@ -1,3 +1,4 @@
+import { usePublicLanguage } from "@/lib/public-ui";
 import { longWatchDescription } from "@/lib/catalog/watch-description";
 import type { VideoDetail } from "@/lib/catalog/types";
 import { cleanDisplayTitle } from "@/lib/seo";
@@ -7,6 +8,7 @@ type Props = {
 };
 
 export function WatchSeoSection({ item }: Props) {
+  const language = usePublicLanguage();
   const longText = longWatchDescription(item);
   const title = cleanDisplayTitle(item.title);
   const cat = item.category.trim() || "video";
@@ -19,6 +21,14 @@ export function WatchSeoSection({ item }: Props) {
     { q: "Untuk semua umur?", a: "Tidak. Khusus untuk usia 18 tahun ke atas." },
   ];
 
+  if (language !== "id") {
+    const ms = language === "ms";
+    return <section className="max-w-3xl space-y-2 text-sm text-muted">
+      <h2 className="font-semibold text-foreground">{ms ? "Maklumat tontonan" : "Viewing information"}</h2>
+      <p>{ms ? `Tonton “${title}”. Khas untuk penonton berumur 18 tahun ke atas.` : `Watch “${title}”. For viewers aged 18 and over.`}</p>
+      {duration && <p>{ms ? "Tempoh" : "Duration"} · {duration}</p>}
+    </section>;
+  }
   return (
     <div className="max-w-3xl space-y-6">
       <p className="text-sm leading-relaxed text-muted">{longText}</p>

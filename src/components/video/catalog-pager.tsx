@@ -1,3 +1,4 @@
+import { usePublicLanguage } from "@/lib/public-ui";
 function windowPages(current: number, totalPages: number, span = 2): number[] {
   const size = span * 2 + 1;
   let start = Math.max(1, current - span);
@@ -18,7 +19,7 @@ export function CatalogPager({
   onPage,
   basePath,
   pageHref,
-  lang = "id",
+  lang: explicitLanguage,
 }: {
   page: number;
   total: number;
@@ -33,10 +34,12 @@ export function CatalogPager({
   pageHref?: (page: number) => string;
   lang?: "id" | "en";
 }) {
+  const selectedLanguage = usePublicLanguage();
+  const lang = explicitLanguage ?? selectedLanguage;
   const totalPages = Math.max(1, Math.ceil((total || 0) / Math.max(1, limit)));
   if (totalPages <= 1) {
     return total > 0 ? (
-      <p className="pixel mt-8 text-center text-xs text-muted">{total.toLocaleString("id-ID")} judul</p>
+      <p className="pixel mt-8 text-center text-xs text-muted">{total.toLocaleString(lang)} {lang === "en" ? "titles" : lang === "ms" ? "tajuk" : "judul"}</p>
     ) : null;
   }
 
@@ -86,15 +89,15 @@ export function CatalogPager({
   return (
     <nav className="relative z-10 mt-10 flex flex-col items-center gap-5 sm:mt-14 sm:gap-7" aria-label={lang === "en" ? "Catalog pages" : "Halaman katalog"}>
       <p className="pixel text-center text-xs text-white/85 sm:text-base">
-        {lang === "en" ? "Page" : "Halaman"} {page.toLocaleString(lang === "en" ? "en" : "id-ID")} {lang === "en" ? "of" : "dari"} {totalPages.toLocaleString(lang === "en" ? "en" : "id-ID")}
+        {lang === "en" ? "Page" : "Halaman"} {page.toLocaleString(lang)} {lang === "en" ? "of" : lang === "ms" ? "daripada" : "dari"} {totalPages.toLocaleString(lang)}
         {" · "}
-        {total.toLocaleString(lang === "en" ? "en" : "id-ID")} video
+        {total.toLocaleString(lang)} video
       </p>
       <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-3.5">
         <a
           {...(page > 1 ? { ...linkProps(page - 1), rel: "prev" } : { "aria-disabled": true })}
           className={`${btn} px-3 text-white sm:px-5`}
-          aria-label={lang === "en" ? "Previous page" : "Halaman sebelumnya"}
+          aria-label={lang === "en" ? "Previous page" : lang === "ms" ? "Halaman sebelumnya" : "Halaman sebelumnya"}
         >
           <span aria-hidden="true" className="text-lg leading-none sm:text-2xl">←</span>
         </a>
@@ -130,9 +133,9 @@ export function CatalogPager({
         <a
           {...(page < totalPages ? { ...linkProps(page + 1), rel: "next" } : { "aria-disabled": true })}
           className={`${btn} gap-2 px-3 text-white sm:gap-3 sm:px-5`}
-          aria-label={lang === "en" ? "Next page" : "Halaman berikutnya"}
+          aria-label={lang === "en" ? "Next page" : lang === "ms" ? "Halaman seterusnya" : "Halaman berikutnya"}
         >
-          <span>Next</span>
+          <span>{lang === "ms" ? "Seterusnya" : lang === "en" ? "Next" : "Berikutnya"}</span>
           <span aria-hidden="true" className="text-lg leading-none sm:text-2xl">→</span>
         </a>
       </div>

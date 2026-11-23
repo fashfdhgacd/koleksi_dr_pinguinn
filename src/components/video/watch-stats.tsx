@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 import { useEffect, useState } from "react";
 import { Clock, Eye, Heart } from "lucide-react";
 import { noteSiteLike } from "@/lib/live-likes";
@@ -44,6 +45,7 @@ export function WatchStats({
   durationLabel?: string | null;
   sourceLikes?: number | null;
 }) {
+  const localText = usePublicText();
   const base = typeof sourceLikes === "number" && sourceLikes > 0 ? sourceLikes : 0;
   const [ours, setOurs] = useState(0);
   const [liked, setLiked] = useState(false);
@@ -114,7 +116,7 @@ export function WatchStats({
         </span>
       ) : null}
       {showDuration ? (
-        <span className="inline-flex items-center gap-1" aria-label="Durasi">
+        <span className="inline-flex items-center gap-1" aria-label={localText("Durasi")}>
           <Clock className="size-3.5" aria-hidden="true" />
           {durationLabel}
         </span>
@@ -123,7 +125,7 @@ export function WatchStats({
         type="button"
         onClick={toggle}
         aria-pressed={liked}
-        aria-label={liked ? "Batal suka" : "Suka video ini"}
+        aria-label={liked ? localText("Batal suka") : localText("Suka video ini")}
         className={`-my-1 inline-flex touch-manipulation items-center gap-1 rounded-full px-2 py-1 transition-colors ${
           liked ? "text-rose-400" : "hover:text-foreground"
         }`}

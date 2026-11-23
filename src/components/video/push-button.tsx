@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 import { useEffect, useState } from "react";
 
 /**
@@ -45,6 +46,7 @@ function keyBytes(b64u: string): Uint8Array<ArrayBuffer> {
 }
 
 export function PushButton() {
+  const localText = usePublicText();
   const [state, setState] = useState<State>("hidden");
 
   useEffect(() => {
@@ -109,10 +111,10 @@ export function PushButton() {
 
   if (state === "hidden") return null;
   if (state === "on") {
-    return <p className="text-xs text-muted">🔔 Notifikasi aktif.</p>;
+    return <p className="text-xs text-muted">{localText("🔔 Notifikasi aktif.")}</p>;
   }
   if (state === "denied") {
-    return <p className="text-xs text-muted">Notifikasi diblokir browser. Aktifkan lewat pengaturan situs kalau mau.</p>;
+    return <p className="text-xs text-muted">{localText("Notifikasi diblokir browser. Aktifkan lewat pengaturan situs kalau mau.")}</p>;
   }
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -122,11 +124,11 @@ export function PushButton() {
         disabled={state === "busy"}
         className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-2 disabled:opacity-60"
       >
-        🔔 {state === "busy" ? "Mengaktifkan…" : state === "error" ? "Gagal, coba lagi" : "Aktifkan notifikasi"}
+        🔔 {state === "busy" ? localText("Mengaktifkan…") : state === "error" ? localText("Gagal, coba lagi") : localText("Aktifkan notifikasi")}
       </button>
       {state !== "busy" && (
         <button type="button" onClick={dismiss} className="text-xs text-muted underline-offset-2 hover:underline">
-          Nanti saja
+          {localText("Nanti saja")}
         </button>
       )}
     </div>

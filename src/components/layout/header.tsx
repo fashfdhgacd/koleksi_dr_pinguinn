@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { LayoutGrid, Search, X } from "lucide-react";
@@ -7,7 +8,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { BRAND_LOGO_SRC } from "@/lib/brand-logo";
 import { prefetchCatalog } from "@/lib/catalog/client";
-import { langSwitchForPath } from "@/lib/catalog/en-landing";
+import { LanguageSwitcher } from "./language-switcher";
 import { DEFAULT_PAGE_SIZE } from "@/lib/catalog/types";
 
 const QUICK_CATS = [
@@ -20,34 +21,6 @@ const QUICK_CATS = [
   { slug: "paling-disukai", label: "Paling Banyak Disukai" },
 ] as const;
 
-function LangSwitcher() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const { lang, idHref, enHref } = langSwitchForPath(pathname);
-  const item = (href: string, label: string, current: boolean, hrefLang: string) => (
-    <a
-      href={href}
-      hrefLang={hrefLang}
-      lang={hrefLang}
-      aria-current={current ? "page" : undefined}
-      className={
-        current
-          ? "pixel rounded-none px-1.5 py-0.5 text-[11px] text-foreground"
-          : "pixel rounded-none px-1.5 py-0.5 text-[11px] text-white/70 hover:text-white"
-      }
-    >
-      {label}
-    </a>
-  );
-  return (
-    <nav aria-label="Language" className="flex shrink-0 items-center gap-0.5 border-l border-white/30 pl-2 sm:pl-3">
-      {item(idHref, "ID", lang === "id", "id")}
-      <span aria-hidden="true" className="text-[11px] text-white/40">
-        /
-      </span>
-      {item(enHref, "EN", lang === "en", "en")}
-    </nav>
-  );
-}
 
 export function Header({
   query,
@@ -56,6 +29,7 @@ export function Header({
   query?: string;
   category?: string;
 }) {
+  const localText = usePublicText();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const onCategoriesPage = pathname === "/kategori" || pathname.startsWith("/kategori/");
@@ -141,12 +115,12 @@ export function Header({
         <Link
           to="/"
           search={{ q: undefined, category: undefined }}
-          aria-label="Koleksi Dr. Pinguin Bokep, M.S.B. (beranda)"
+          aria-label={localText("Koleksi Dr. Pinguin Bokep, M.S.B. (beranda)")}
           className="flex shrink-0 items-center gap-2"
         >
           <img
             src={BRAND_LOGO_SRC}
-            alt="Koleksi Dr. Pinguin Bokep"
+            alt={localText("Koleksi Dr. Pinguin Bokep")}
             width={32}
             height={32}
             style={{ imageRendering: "pixelated" }}
@@ -175,28 +149,28 @@ export function Header({
           <Input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Cari judul…"
+            placeholder={localText("Cari judul…")}
             className="pixel h-10 rounded-none border border-white/40 bg-black pl-9 pr-9 text-xs shadow-none placeholder:text-white/45 focus-visible:border-white/80 focus-visible:ring-0 sm:h-11 sm:pl-10 sm:pr-10 sm:text-sm"
             type="search"
             enterKeyHint="search"
             autoComplete="off"
-            aria-label="Cari judul"
+            aria-label={localText("Cari judul")}
           />
           {draft ? (
             <button
               type="button"
               className="absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center text-muted"
               onClick={() => setDraft("")}
-              aria-label="Hapus pencarian"
+              aria-label={localText("Hapus pencarian")}
             >
               <X className="size-4" />
             </button>
           ) : null}
         </form>
 
-        <LangSwitcher />
+        <LanguageSwitcher />
 
-        <Button variant="ghost" size="icon" asChild aria-label="Semua kategori" className="size-10 shrink-0 rounded-none border border-white/40 hover:border-white/80 hover:bg-transparent sm:size-11">
+        <Button variant="ghost" size="icon" asChild aria-label={localText("Semua kategori")} className="size-10 shrink-0 rounded-none border border-white/40 hover:border-white/80 hover:bg-transparent sm:size-11">
           <Link to="/kategori">
             <LayoutGrid className="size-5" />
           </Link>
@@ -211,7 +185,7 @@ export function Header({
           "mx-auto max-w-[1600px] overflow-hidden px-3 [overflow-anchor:none] transition-[max-height,opacity] duration-200 ease-out sm:px-6",
           navHidden ? "max-h-0 opacity-0" : "max-h-20 opacity-100",
         )}
-        aria-label="Navigasi cepat"
+        aria-label={localText("Navigasi cepat")}
         // Clipped chips must leave the tab order and AT tree while hidden.
         inert={navHidden}
       >
@@ -222,7 +196,7 @@ export function Header({
               search={{ q: undefined, category: undefined }}
               className={chipClass(!query && !category && !onCategoriesPage)}
             >
-              Terbaru
+              {localText("Terbaru")}
             </Link>
           </li>
           <li className="shrink-0">
@@ -258,13 +232,13 @@ export function Header({
                   })
                 }
               >
-                {cat.label}
+                {localText(cat.label)}
               </Link>
             </li>
           ))}
           <li className="shrink-0">
             <Link to="/kategori" className={chipClass(onCategoriesPage && !quickActive)}>
-              Kategori
+              {localText("Kategori")}
             </Link>
           </li>
         </ul>

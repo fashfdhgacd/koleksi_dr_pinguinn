@@ -1,3 +1,5 @@
+import { usePublicHref } from "@/lib/public-ui";
+import { usePublicText } from "@/lib/public-ui";
 /**
  * Site-wide crawlable links to the top landing pages (SEO internal linking, 2026-11-02).
  * Static list: plain <a href> in the SSR HTML, no data fetch, so it costs nothing per visit.
@@ -27,20 +29,22 @@ export const POPULAR_CATEGORY_LINKS: ReadonlyArray<{ slug: string; label: string
 ];
 
 export function PopularCategories() {
+  const publicHref = usePublicHref();
+  const localText = usePublicText();
   return (
-    <nav aria-label="Kategori populer" className="space-y-2">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">Kategori populer</p>
+    <nav aria-label={localText("Kategori populer")} className="space-y-2">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/70">{localText("Kategori populer")}</p>
       <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm">
         {POPULAR_CATEGORY_LINKS.map((c) => (
           <li key={c.slug}>
-            <a href={c.href || `/kategori/${c.slug}`} className="text-white/80 underline-offset-2 hover:text-white hover:underline">
-              {c.label}
+            <a href={publicHref(c.href || `/kategori/${c.slug}`)} className="text-white/80 underline-offset-2 hover:text-white hover:underline">
+              {localText(c.label)}
             </a>
           </li>
         ))}
         <li>
-          <a href="/kategori" className="font-medium text-white underline-offset-2 hover:underline">
-            Semua kategori →
+          <a href={publicHref("/kategori")} className="font-medium text-white underline-offset-2 hover:underline">
+            {localText("Semua kategori →")}
           </a>
         </li>
       </ul>

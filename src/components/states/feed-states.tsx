@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 import { AlertTriangle, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -24,14 +25,15 @@ export function ErrorState({
   message: string;
   onRetry: () => void;
 }) {
+  const localText = usePublicText();
   return (
     <div className="flex flex-col items-center justify-center gap-4 px-6 py-20 text-center">
       <AlertTriangle className="size-8 text-destructive" />
       <div>
-        <h2 className="font-display text-2xl text-foreground">Katalog sedang bermasalah</h2>
+        <h2 className="font-display text-2xl text-foreground">{localText("Katalog sedang bermasalah")}</h2>
         <p className="mt-2 max-w-sm text-sm text-muted">{message}</p>
       </div>
-      <Button onClick={onRetry}>Coba lagi</Button>
+      <Button onClick={onRetry}>{localText("Coba lagi")}</Button>
     </div>
   );
 }

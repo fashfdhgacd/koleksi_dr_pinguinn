@@ -1,3 +1,4 @@
+import { usePublicHref } from "@/lib/public-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { enHref } from "@/lib/catalog/halaman";
@@ -55,6 +56,7 @@ export const Route = createFileRoute("/en/")({
 });
 
 function EnIndex() {
+  const publicHref = usePublicHref();
   const { pages } = Route.useLoaderData();
   return (
     <Shell>
@@ -71,7 +73,7 @@ function EnIndex() {
         <ul className="grid gap-3 sm:grid-cols-2">
           {pages.map((l) => (
             <li key={l.slug}>
-              <a href={enHref(l.slug, 1)} className="text-base font-semibold text-teal-200 hover:underline">
+              <a href={publicHref(enHref(l.slug, 1))} className="text-base font-semibold text-teal-200 hover:underline">
                 {l.h1}
               </a>
               <span className="ml-2 text-xs text-zinc-500">{l.count.toLocaleString("en")} videos</span>

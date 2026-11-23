@@ -1,3 +1,4 @@
+import { usePublicHref } from "@/lib/public-ui";
 import { Outlet, createFileRoute, notFound, useMatches, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
@@ -99,6 +100,7 @@ export function EnExperience({
   data: CatalogResponse;
   onPage: (next: number) => void;
 }) {
+  const publicHref = usePublicHref();
   const def = findEnLanding(slug);
   if (!def) return null;
   const items = data && data.ok && data.type === "landing" ? (data.items as VideoCard[]) : [];
@@ -143,7 +145,7 @@ export function EnExperience({
               {others.map((l) => (
                 <a
                   key={l.slug}
-                  href={enHref(l.slug, 1)}
+                  href={publicHref(enHref(l.slug, 1))}
                   className="inline-flex h-10 items-center rounded-full border border-white/10 px-3 text-sm text-zinc-300 hover:border-white/40 hover:text-white"
                 >
                   {l.h1}

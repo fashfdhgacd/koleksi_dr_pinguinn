@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 import { useEffect, useState } from "react";
 
 type Comment = {
@@ -25,6 +26,7 @@ function fmtDate(ts: number): string {
  * rather than an error box.
  */
 export function Comments({ videoId }: { videoId: string }) {
+  const localText = usePublicText();
   const [items, setItems] = useState<Comment[] | null>(null);
   const [name, setName] = useState("");
   const [body, setBody] = useState("");
@@ -80,27 +82,27 @@ export function Comments({ videoId }: { videoId: string }) {
       } else {
         setError(
           j.error === "limit"
-            ? "Batas komentar harian tercapai, coba lagi besok."
+            ? localText("Batas komentar harian tercapai, coba lagi besok.")
             : j.error === "captcha"
-              ? "Verifikasi gagal, coba lagi."
-              : "Gagal mengirim, coba lagi.",
+              ? localText("Verifikasi gagal, coba lagi.")
+              : localText("Gagal mengirim, coba lagi."),
         );
       }
     } catch {
-      setError("Gagal mengirim, coba lagi.");
+      setError(localText("Gagal mengirim, coba lagi."));
     } finally {
       setSending(false);
     }
   }
 
   return (
-    <section aria-label="Komentar" className="space-y-4">
+    <section aria-label={localText("Komentar")} className="space-y-4">
       <h2 className="font-display text-2xl text-foreground sm:text-3xl">
-        Komentar{items && items.length ? ` (${items.length})` : ""}
+        {localText("Komentar")}{items && items.length ? ` (${items.length})` : ""}
       </h2>
 
       {items === null ? null : items.length === 0 ? (
-        <p className="text-sm text-muted">Belum ada komentar. Jadilah yang pertama.</p>
+        <p className="text-sm text-muted">{localText("Belum ada komentar. Jadilah yang pertama.")}</p>
       ) : (
         <ul className="space-y-3">
           {items.map((c) => (
@@ -121,22 +123,22 @@ export function Comments({ videoId }: { videoId: string }) {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="Nama"
+          placeholder={localText("Nama")}
           maxLength={40}
           required
           autoComplete="nickname"
           className="h-10 w-full rounded-md border border-white/15 bg-black/40 px-3 text-sm text-foreground placeholder:text-muted focus:border-white/50 focus:outline-none"
-          aria-label="Nama"
+          aria-label={localText("Nama")}
         />
         <textarea
           value={body}
           onChange={(e) => setBody(e.target.value)}
-          placeholder="Tulis komentar…"
+          placeholder={localText("Tulis komentar…")}
           maxLength={1000}
           required
           rows={3}
           className="w-full resize-y rounded-md border border-white/15 bg-black/40 px-3 py-2 text-sm text-foreground placeholder:text-muted focus:border-white/50 focus:outline-none"
-          aria-label="Komentar"
+          aria-label={localText("Komentar")}
         />
         {error ? <p className="text-xs text-red-400">{error}</p> : null}
         {notice ? <p className="text-xs text-emerald-400">{notice}</p> : null}
@@ -145,7 +147,7 @@ export function Comments({ videoId }: { videoId: string }) {
           disabled={sending || !name.trim() || !body.trim()}
           className="inline-flex h-10 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity disabled:opacity-50"
         >
-          {sending ? "Mengirim…" : "Kirim komentar"}
+          {sending ? localText("Mengirim…") : localText("Kirim komentar")}
         </button>
       </form>
     </section>

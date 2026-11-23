@@ -1,3 +1,5 @@
+import { usePublicHref } from "@/lib/public-ui";
+import { usePublicText } from "@/lib/public-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { LegalPage } from "@/components/legal-page";
 import { jsonLdString } from "@/lib/json-ld";
@@ -66,16 +68,17 @@ export const Route = createFileRoute("/teman")({
 });
 
 function Page() {
+  const publicHref = usePublicHref();
+  const localText = usePublicText();
   return (
-    <LegalPage title="Situs Teman & Direktori">
+    <LegalPage title={localText("Situs Teman & Direktori")}>
       <p>
-        Situs saudara dan direktori di bawah ini terhubung dengan <strong>koleksidrpinguin.com</strong>. Semuanya khusus untuk
-        pengunjung 18+.
+        {localText("Situs saudara dan direktori di bawah ini terhubung dengan")} <strong>koleksidrpinguin.com</strong>{localText(". Semuanya khusus untuk pengunjung 18+.")}
       </p>
       <ul className="space-y-3">
         {TEMAN_LINKS.map((l) => (
           <li key={l.href} className="border border-white/15 p-3">
-            <a className="font-semibold text-teal-400 underline-offset-2 hover:underline" href={l.href} target="_blank" rel="noopener">
+            <a className="font-semibold text-teal-400 underline-offset-2 hover:underline" href={publicHref(l.href)} target="_blank" rel="noopener">
               {l.name}
             </a>
             <p className="text-xs text-white/65">{l.note}</p>
@@ -83,9 +86,9 @@ function Page() {
         ))}
       </ul>
       <p>
-        Punya situs dewasa dan mau tukar link? Hubungi kami lewat halaman{" "}
-        <a className="underline" href="/kontak">
-          Kontak
+        {localText("Punya situs dewasa dan mau tukar link? Hubungi kami lewat halaman")}{" "}
+        <a className="underline" href={publicHref("/kontak")}>
+          {localText("Kontak")}
         </a>
         .
       </p>

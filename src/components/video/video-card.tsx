@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 import { cleanDisplayTitle } from "@/lib/seo";
 import { Link } from "@tanstack/react-router";
 import { Clock, Eye, Heart, Play } from "lucide-react";
@@ -23,6 +24,7 @@ export function VideoCard({
   eager?: boolean;
   preload?: VideoCardPreload;
 }) {
+  const localText = usePublicText();
   // 0 is shown too (own-pageview sources start at 0); null = no count known.
   const views = typeof video.views === "number" && video.views >= 0 ? video.views : null;
   // Likes = source likes (folder stats) + our own D1 likes, 0 when none. Our likes start from the
@@ -50,7 +52,7 @@ export function VideoCard({
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent opacity-80" />
         {video.isNew ? (
           <span className="pointer-events-none absolute left-2 top-2 rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground sm:text-[11px]">
-            Baru
+            {localText("Baru")}
           </span>
         ) : null}
         <div className="pointer-events-none absolute inset-0 hidden items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 sm:flex">
@@ -70,7 +72,7 @@ export function VideoCard({
               aria-label={`${video.periodViews} kali ditonton ${video.periodLabel}`}
             >
               <Eye className="size-3.5" aria-hidden="true" />
-              {video.periodViews.toLocaleString("id-ID")} tayangan {video.periodLabel}
+              {video.periodViews.toLocaleString("id-ID")} {localText("tayangan")} {video.periodLabel}
             </span>
           ) : views != null ? (
             <span className="inline-flex items-center gap-1" aria-label={`${views} kali ditonton`}>
@@ -79,7 +81,7 @@ export function VideoCard({
             </span>
           ) : null}
           {showDuration ? (
-            <span className="inline-flex items-center gap-1" aria-label="Durasi">
+            <span className="inline-flex items-center gap-1" aria-label={localText("Durasi")}>
               <Clock className="size-3.5" aria-hidden="true" />
               {video.durationLabel}
             </span>

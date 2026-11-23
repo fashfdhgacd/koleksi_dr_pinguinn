@@ -1,3 +1,7 @@
+import { usePublicHref } from "@/lib/public-ui";
+import { collectionLabel } from "@/lib/page-copy";
+import { usePublicLanguage } from "@/lib/public-ui";
+import { usePublicText } from "@/lib/public-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { LANDINGS } from "@/lib/catalog/landing";
@@ -44,12 +48,15 @@ export const Route = createFileRoute("/cari/")({
 });
 
 function SearchHub() {
+  const publicHref = usePublicHref();
+  const language = usePublicLanguage();
+  const localText = usePublicText();
   return (
     <Shell>
       <section className="space-y-4">
-        <h1 className="font-display text-4xl leading-none text-foreground sm:text-6xl">Pencarian Populer</h1>
+        <h1 className="font-display text-4xl leading-none text-foreground sm:text-6xl">{localText("Pencarian Populer")}</h1>
         <p className="text-sm text-zinc-400">
-          Topik yang paling sering dicari pengunjung. Semua konten khusus dewasa 18+; video yang belum terverifikasi tidak ditampilkan.
+          {localText("Topik yang paling sering dicari pengunjung. Semua konten khusus dewasa 18+; video yang belum terverifikasi tidak ditampilkan.")}
         </p>
         <p className="text-sm text-zinc-500">
           English collections:{" "}
@@ -60,16 +67,16 @@ function SearchHub() {
         <ul className="grid gap-3 sm:grid-cols-2">
           {LANDINGS.map((l) => (
             <li key={l.slug} className="rounded-lg border border-white/10 p-3">
-              <a href={`/cari/${l.slug}`} className="text-base font-semibold text-teal-200 hover:underline">
-                {l.h1}
+              <a href={publicHref(`/cari/${l.slug}`)} className="text-base font-semibold text-teal-200 hover:underline">
+                {language === "id" ? l.h1 : collectionLabel(l.slug, language)}
               </a>
               <p className="mt-1 line-clamp-2 text-[13px] text-zinc-400">{l.description}</p>
             </li>
           ))}
         </ul>
         <p className="text-sm">
-          <a href="/kategori" className="text-teal-200 hover:underline">
-            Lihat semua kategori
+          <a href={publicHref("/kategori")} className="text-teal-200 hover:underline">
+            {localText("Lihat semua kategori")}
           </a>
         </p>
       </section>

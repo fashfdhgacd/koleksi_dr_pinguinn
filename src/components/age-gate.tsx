@@ -1,3 +1,5 @@
+import { usePublicHref } from "@/lib/public-ui";
+import { usePublicText } from "@/lib/public-ui";
 import { useEffect, useState, type ReactNode } from "react";
 
 const STORAGE_KEY = "dp_age_ok";
@@ -36,6 +38,8 @@ function registerPosterSw() {
 }
 
 export function AgeGate({ children }: { children: ReactNode }) {
+  const publicHref = usePublicHref();
+  const localText = usePublicText();
   const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
@@ -57,20 +61,19 @@ export function AgeGate({ children }: { children: ReactNode }) {
       {children}
       <noscript>
         <p>
-          Katalog video dewasa 18+ Dr. Pinguin. Aktifkan JavaScript untuk menonton.{" "}
-          <a href="/kategori/jav">JAV</a> · <a href="/kategori/jilbab">Jilbab</a> ·{" "}
-          <a href="/syarat">Syarat</a> · <a href="/privasi">Privasi</a> · <a href="/dmca">DMCA</a> ·{" "}
-          <a href="/2257">2257</a> · <a href="/kontak">Kontak</a>
+          {localText("Katalog video dewasa 18+ Dr. Pinguin. Aktifkan JavaScript untuk menonton.")}{" "}
+          <a href={publicHref("/kategori/jav")}>JAV</a> · <a href={publicHref("/kategori/jilbab")}>{localText("Jilbab")}</a> ·{" "}
+          <a href={publicHref("/syarat")}>{localText("Syarat")}</a> · <a href={publicHref("/privasi")}>{localText("Privasi")}</a> · <a href={publicHref("/dmca")}>DMCA</a> ·{" "}
+          <a href={publicHref("/2257")}>2257</a> · <a href={publicHref("/kontak")}>{localText("Kontak")}</a>
         </p>
       </noscript>
       {blocked ? (
         <div data-kdp-noad="" className="fixed inset-0 z-[80] flex items-center justify-center bg-background px-6">
           <div className="w-full max-w-md rounded-2xl border border-border bg-surface p-6 text-center shadow-2xl">
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted">DR. PINGUIN</p>
-            <h1 className="mt-3 font-display text-3xl text-foreground">Konten 18+</h1>
+            <h1 className="mt-3 font-display text-3xl text-foreground">{localText("Konten 18+")}</h1>
             <p className="mt-3 text-sm leading-relaxed text-muted">
-              Situs ini menampilkan materi dewasa. Masuk hanya jika Anda berusia 18 tahun atau lebih
-              dan setuju dengan syarat layanan.
+              {localText("Situs ini menampilkan materi dewasa. Masuk hanya jika Anda berusia 18 tahun atau lebih dan setuju dengan syarat layanan.")}
             </p>
             <div className="mt-6 grid gap-3">
               <button
@@ -78,13 +81,13 @@ export function AgeGate({ children }: { children: ReactNode }) {
                 className="h-12 rounded-xl bg-primary px-4 text-base font-semibold text-primary-foreground"
                 onClick={accept}
               >
-                Saya 18+ dan setuju
+                {localText("Saya 18+ dan setuju")}
               </button>
               <a
                 href="https://www.google.com"
                 className="flex h-12 items-center justify-center rounded-xl border border-border text-sm text-muted"
               >
-                Keluar
+                {localText("Keluar")}
               </a>
             </div>
           </div>
