@@ -567,7 +567,11 @@ async function syncUnhidden(force = false): Promise<void> {
   const startedAt = now;
   unhideReadAt = startedAt;
   try {
-    const lists = await fetchUnhiddenIds();
+    // Middleware and SSR can both be cold on the same watch request.
+    // Owner-forced refreshes always read the source directly.
+    const lists = import.meta.env.SSR && !force
+      ? await (await import("../../../server/lib/watch-request-reads")).readWatchListsOnce(fetchUnhiddenIds)
+      : await fetchUnhiddenIds();
     if (lists) applyUnhidden(lists.unhidden, lists.ownerHidden, lists.edits, lists.merges, lists.released, lists.blocked, lists.kept);
     else unhideCheckedAt = Date.now(); // keep the previous list; retry after the TTL
   } finally {
