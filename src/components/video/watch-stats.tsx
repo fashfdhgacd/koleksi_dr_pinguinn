@@ -110,7 +110,7 @@ export function WatchStats({
   return (
     <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1 normal-case tracking-normal tabular-nums">
       {showViews ? (
-        <span className="inline-flex items-center gap-1" aria-label={`${views} kali ditonton`}>
+        <span className="inline-flex items-center gap-1" aria-label={`${views} ${localText("kali ditonton")}`}>
           <Eye className="size-3.5" aria-hidden="true" />
           {compactNumber(views as number)}
         </span>

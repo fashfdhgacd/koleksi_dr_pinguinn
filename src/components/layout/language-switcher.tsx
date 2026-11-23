@@ -1,7 +1,7 @@
+import { usePublicLanguage } from "@/lib/public-ui";
 import { useRouterState } from "@tanstack/react-router";
 import { languageFamily } from "@/lib/language-family";
 import { languageCodes } from "@/lib/public-locale";
-import { usePublicLanguage } from "@/lib/public-ui";
 
 export function LanguageSwitcher() {
   const language = usePublicLanguage();

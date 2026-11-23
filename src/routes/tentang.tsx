@@ -1,5 +1,4 @@
-import { usePublicHref } from "@/lib/public-ui";
-import { usePublicText } from "@/lib/public-ui";
+import { usePublicHref, usePublicText } from "@/lib/public-ui";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { LegalPage } from "@/components/legal-page";
 import { jsonLdString } from "@/lib/json-ld";

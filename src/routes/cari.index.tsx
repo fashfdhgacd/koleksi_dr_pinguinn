@@ -1,7 +1,5 @@
-import { usePublicHref } from "@/lib/public-ui";
+import { usePublicHref, usePublicLanguage, usePublicText } from "@/lib/public-ui";
 import { collectionLabel } from "@/lib/page-copy";
-import { usePublicLanguage } from "@/lib/public-ui";
-import { usePublicText } from "@/lib/public-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { LANDINGS } from "@/lib/catalog/landing";
@@ -59,7 +57,7 @@ function SearchHub() {
           {localText("Topik yang paling sering dicari pengunjung. Semua konten khusus dewasa 18+; video yang belum terverifikasi tidak ditampilkan.")}
         </p>
         <p className="text-sm text-zinc-500">
-          English collections:{" "}
+          {language === "ms" ? "Koleksi bahasa Inggeris" : language === "id" ? "Koleksi berbahasa Inggris" : "English collections"}{" "}
           <a href="/en" hrefLang="en" className="text-teal-200 underline-offset-2 hover:underline">
             /en
           </a>
@@ -70,7 +68,7 @@ function SearchHub() {
               <a href={publicHref(`/cari/${l.slug}`)} className="text-base font-semibold text-teal-200 hover:underline">
                 {language === "id" ? l.h1 : collectionLabel(l.slug, language)}
               </a>
-              <p className="mt-1 line-clamp-2 text-[13px] text-zinc-400">{l.description}</p>
+              <p className="mt-1 line-clamp-2 text-[13px] text-zinc-400">{language === "id" ? l.description : language === "ms" ? `Pilihan video dalam koleksi ${collectionLabel(l.slug, language)}.` : `Explore the ${collectionLabel(l.slug, language)} collection.`}</p>
             </li>
           ))}
         </ul>

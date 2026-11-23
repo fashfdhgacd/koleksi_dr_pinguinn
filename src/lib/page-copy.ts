@@ -11,6 +11,10 @@ const sections: Record<string, [string, string]> = {
 };
 
 export function pageCopy(path: string, language: PublicLanguage, originalTitle: string, query?: string | null) {
+  if (path.startsWith("/en/") && language !== "en") {
+    const label = collectionHeading(path.split("/")[2], language, originalTitle.split(" | ")[0]);
+    return { label, title: label + " | " + (originalTitle.split(" | ").at(-1) || label), description: collectionIntro(label, language) };
+  }
   if (language === "id" || /^\/en(?:\/|$)/.test(path)) return null;
   const ms = language === "ms";
   const [, section, slug] = path.split("/");
@@ -38,4 +42,78 @@ export function pageCopy(path: string, language: PublicLanguage, originalTitle: 
 export function collectionLabel(slug: string, language: PublicLanguage) {
   const key = slug.replace(/-/g, " ");
   return translate(language, key[0]?.toUpperCase() + key.slice(1));
+}
+
+const collectionNames: Record<string, [string, string]> = {
+  "indo-viral": [
+    "Video tular Indonesia",
+    "Video viral Indonesia"
+  ],
+  "indo-western": [
+    "Pasangan Indonesia dan Barat",
+    "Pasangan Indonesia dan Barat"
+  ],
+  "indonesian-tiktok": [
+    "Video Indonesia gaya TikTok",
+    "Video Indonesia bergaya TikTok"
+  ],
+  "indonesian-outdoor": [
+    "Rakaman luar Indonesia",
+    "Video luar ruangan Indonesia"
+  ],
+  "indonesian-bathroom": [
+    "Video bilik mandi Indonesia",
+    "Video kamar mandi Indonesia"
+  ],
+  "indonesian-couple": [
+    "Pasangan Indonesia",
+    "Pasangan Indonesia"
+  ],
+  "indonesian-ex": [
+    "Bekas pasangan Indonesia",
+    "Mantan pasangan Indonesia"
+  ],
+  "indonesian-neighbor": [
+    "Kisah jiran Indonesia",
+    "Kisah tetangga Indonesia"
+  ],
+  "indonesian-office": [
+    "Video pejabat Indonesia",
+    "Video kantor Indonesia"
+  ],
+  "indonesian-famous": [
+    "Gaya pempengaruh Indonesia",
+    "Gaya kreator Indonesia"
+  ],
+  "malaysian-hijab": [
+    "Wanita bertudung Malaysia",
+    "Wanita berhijab Malaysia"
+  ],
+  "indonesian-softcore-films": [
+    "Filem dewasa Indonesia",
+    "Film dewasa Indonesia"
+  ],
+  "indonesian-dirty-talk": [
+    "Video Indonesia dengan dialog dewasa",
+    "Video Indonesia dengan percakapan dewasa"
+  ],
+  "asian-ai": [
+    "Video AI Asia",
+    "Video AI Asia"
+  ],
+  "chinese-ai-drama": [
+    "Drama AI Cina",
+    "Drama AI Tiongkok"
+  ]
+};
+
+export function collectionHeading(slug: string, language: PublicLanguage, original: string) {
+  if (language === "en") return original;
+  return collectionNames[slug]?.[language === "ms" ? 0 : 1] ?? original;
+}
+
+export function collectionIntro(label: string, language: PublicLanguage) {
+  return language === "ms" ? `Terokai koleksi ${label}. Pilih tajuk untuk melihat butiran dan menonton. Khas untuk dewasa.` :
+    language === "id" ? `Jelajahi koleksi ${label}. Pilih judul untuk melihat detail dan menonton. Khusus dewasa.` :
+    `Browse the ${label} collection. Choose a title to see details and watch. Adults only.`;
 }

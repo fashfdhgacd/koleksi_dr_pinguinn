@@ -1,5 +1,6 @@
-import { usePublicHref } from "@/lib/public-ui";
-import { usePublicText } from "@/lib/public-ui";
+import { usePublicLanguage } from "@/lib/public-ui";
+import { collectionLabel } from "@/lib/page-copy";
+import { usePublicHref, usePublicText } from "@/lib/public-ui";
 import { useCallback, useEffect, useState } from "react";
 import { Link, getRouteApi } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
@@ -113,7 +114,7 @@ function ServerButtons({ item, current }: { item: VideoDetail; current: string }
             // Exact search match: the main copy's link (no ?s) is not "active" while ?s=<copy> plays.
             activeOptions={{ exact: true, includeSearch: true }}
             aria-current={active ? "true" : undefined}
-            title={gone ? `${label} (sumber sudah tidak tersedia)` : label}
+            title={gone ? `${label} (${localText("sumber sudah tidak tersedia")})` : label}
             className={
               "inline-flex h-10 items-center rounded-full border px-4 text-sm font-medium " +
               (active
@@ -180,7 +181,7 @@ function ShareSheet({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      prompt("Salin link ini:", url);
+      prompt(localText("Salin link ini:"), url);
     }
   }
 
@@ -252,7 +253,7 @@ function ShareSheet({
             onClick={() => void copyLink()}
             className={btn + " bg-secondary font-medium text-foreground"}
           >
-            {copied ? "\u2713 Link disalin" : localText("Salin link")}
+            {copied ? "✓ " + localText("Link disalin") : localText("Salin link")}
           </button>
           {typeof navigator !== "undefined" && typeof navigator.share === "function" ? (
             <button
@@ -279,17 +280,18 @@ function ShareSheet({
 }
 
 /** Tanggal unggah yang bisa dibaca (id-ID, WIB). Kosong kalau tidak valid. */
-function uploadDateLabel(raw: string | number | null | undefined): string {
+function uploadDateLabel(raw: string | number | null | undefined, locale: string): string {
   if (raw == null || raw === "") return "";
   const d = new Date(typeof raw === "number" && raw < 1e12 ? raw * 1000 : raw);
   if (Number.isNaN(d.getTime()) || d.getFullYear() < 2015) return "";
-  return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" });
+  return d.toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" });
 }
 
 /** Fakta singkat per video (durasi, tanggal, sumber). Kategori sudah tampil sebagai chip di atasnya. */
 function VideoFacts({ item }: { item: VideoDetail }) {
   const localText = usePublicText();
-  const date = uploadDateLabel(item.uploadDate);
+  const locale = usePublicLanguage();
+  const date = uploadDateLabel(item.uploadDate, locale);
   const host = isVideyItem(item) || isDrpHostItem(item) ? "" : hostLabel(catalogPlayUrl(item)).replace("Puterin", "Putarin");
   const rows: Array<[string, string]> = [];
   if (item.durationLabel) rows.push([localText("Durasi"), item.durationLabel]);
@@ -312,6 +314,7 @@ function VideoFacts({ item }: { item: VideoDetail }) {
 }
 
 export function WatchPage() {
+  const language = usePublicLanguage();
   const publicHref = usePublicHref();
   const localText = usePublicText();
   const { id } = routeApi.useParams();
@@ -499,7 +502,7 @@ export function WatchPage() {
                 const slug = categorySlugFor(item.category);
                 return slug ? (
                   <a href={publicHref(`/kategori/${slug}`)} className="hover:text-foreground hover:underline">
-                    {item.category}
+                    {localText(item.category || "")}
                   </a>
                 ) : (
                   item.category
@@ -527,11 +530,11 @@ export function WatchPage() {
                   <>
                     {slug ? (
                       <a href={publicHref(`/kategori/${slug}`)} className="underline underline-offset-2 hover:text-foreground">
-                        {localText("Kategori")} {item.category}
+                        {localText("Kategori")} {localText(item.category || "")}
                       </a>
                     ) : null}
                     <a href={publicHref(landing ? `/cari/${landing.slug}` : "/cari")} className="underline underline-offset-2 hover:text-foreground">
-                      {landing ? landing.h1 : localText("Pencarian populer")}
+                      {landing ? (language === "id" ? landing.h1 : collectionLabel(landing.slug, language)) : localText("Pencarian populer")}
                     </a>
                   </>
                 );
@@ -558,7 +561,7 @@ export function WatchPage() {
             {item.sameCategory && item.sameCategory.length ? (
               <nav aria-label={localText("Video lain di kategori ini")} className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
-                  {localText("Lainnya di")} {item.category || "kategori ini"}
+                  {localText("Lainnya di")} {localText(item.category || "kategori ini")}
                 </p>
                 <ul className="space-y-1 text-sm">
                   {item.sameCategory.filter((v) => !isSeoBlockedId(v.id)).map((v) => (

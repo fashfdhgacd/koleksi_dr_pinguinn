@@ -1,7 +1,5 @@
-import { usePublicHref } from "@/lib/public-ui";
+import { usePublicHref, usePublicLanguage, usePublicText } from "@/lib/public-ui";
 import { collectionLabel } from "@/lib/page-copy";
-import { usePublicLanguage } from "@/lib/public-ui";
-import { usePublicText } from "@/lib/public-ui";
 import { categoryHref } from "@/lib/catalog/halaman";
 import { categoryRelated, categorySeo } from "@/lib/catalog/category-seo";
 import { useEffect } from "react";

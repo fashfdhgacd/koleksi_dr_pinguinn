@@ -131,7 +131,7 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
           to="/watch/$id"
           params={{ id: current.id }}
           className="absolute inset-0 z-10 flex items-center justify-center touch-manipulation md:hidden"
-          aria-label={`Putar ${heroTitle}`}
+          aria-label={`${localText("Putar")} ${heroTitle}`}
         >
           <span
             className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_0_1px_color-mix(in_oklab,#f3efe6_12%,transparent)]"

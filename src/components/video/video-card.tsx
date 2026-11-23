@@ -69,13 +69,13 @@ export function VideoCard({
           {typeof video.periodViews === "number" && video.periodLabel ? (
             <span
               className="inline-flex items-center gap-1"
-              aria-label={`${video.periodViews} kali ditonton ${video.periodLabel}`}
+              aria-label={`${video.periodViews} ${localText("kali ditonton")} ${localText(video.periodLabel || "")}`}
             >
               <Eye className="size-3.5" aria-hidden="true" />
               {video.periodViews.toLocaleString("id-ID")} {localText("tayangan")} {video.periodLabel}
             </span>
           ) : views != null ? (
-            <span className="inline-flex items-center gap-1" aria-label={`${views} kali ditonton`}>
+            <span className="inline-flex items-center gap-1" aria-label={`${views} ${localText("kali ditonton")}`}>
               <Eye className="size-3.5" aria-hidden="true" />
               {compactNumber(views)}
             </span>
@@ -86,7 +86,7 @@ export function VideoCard({
               {video.durationLabel}
             </span>
           ) : null}
-          <span className="inline-flex items-center gap-1" aria-label={`${likes} suka`}>
+          <span className="inline-flex items-center gap-1" aria-label={`${likes} ${localText("suka")}`}>
             <Heart className="size-3.5" aria-hidden="true" />
             {compactNumber(likes)}
           </span>

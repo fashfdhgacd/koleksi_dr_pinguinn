@@ -1,7 +1,5 @@
-import { usePublicHref } from "@/lib/public-ui";
+import { usePublicHref, usePublicLanguage, usePublicText } from "@/lib/public-ui";
 import { collectionLabel } from "@/lib/page-copy";
-import { usePublicLanguage } from "@/lib/public-ui";
-import { usePublicText } from "@/lib/public-ui";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { PUBLIC_CATEGORY_LIST } from "@/lib/catalog/categories";
@@ -99,10 +97,11 @@ const directoryLabels: Record<string, string> = {
 
 /** A category or ranking card (/kategori/<slug>). */
 function CoverCard({ slug, label, count, cover, coverId }: CategoryInfo) {
+  const language = usePublicLanguage();
   return (
     <li>
       <Link to="/kategori/$slug" params={{ slug }} search={{ page: undefined, periode: undefined }} className={coverCardClass}>
-        <CoverInner label={label} count={count} cover={cover} coverId={coverId} />
+        <CoverInner label={language === "id" ? label : collectionLabel(slug, language)} count={count} cover={cover} coverId={coverId} />
       </Link>
     </li>
   );

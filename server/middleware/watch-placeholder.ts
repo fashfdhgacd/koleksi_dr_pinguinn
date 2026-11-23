@@ -54,5 +54,13 @@ export default async function watchPlaceholderMiddleware(
   }
 
   const decision = decideWatchPlaceholder(path, method, event.url.search, info);
-  return decisionResponse(decision) ?? next();
+  const response = decisionResponse(decision);
+  if (!response) return next();
+  const location = response.headers.get("location");
+  if (location) {
+    const target = new URL(location, event.url);
+    target.pathname = localizedPath(target.pathname, language);
+    response.headers.set("location", target.href);
+  }
+  return response;
 }

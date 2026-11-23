@@ -1,5 +1,4 @@
-import { usePublicHref } from "@/lib/public-ui";
-import { usePublicText } from "@/lib/public-ui";
+import { usePublicHref, usePublicText } from "@/lib/public-ui";
 /**
  * Site-wide crawlable links to the top landing pages (SEO internal linking, 2026-11-02).
  * Static list: plain <a href> in the SSR HTML, no data fetch, so it costs nothing per visit.

@@ -8,6 +8,9 @@ export function languageFamily(href: string) {
   const pair = landing ? langSwitchForPath(path) : null;
   const page = path.match(/\/halaman\/([1-9]\d*)$/)?.[0] ?? "";
   const suffix = url.search + url.hash;
+  if (path.startsWith("/en/") && pair && /^\/(cari|genre)\/?$/.test(pair.idHref)) {
+    return { ms: localizedPath(path, "ms") + suffix, id: localizedPath(path, "id") + suffix, en: path + suffix };
+  }
   const base = path.startsWith("/en") && pair ? pair.idHref + (pair.idHref.split("/").length > 2 ? page : "") : path;
   const english = path.startsWith("/en") ? path :
     pair && (pair.enHref !== "/en" || /^\/(cari|genre)\/?$/.test(path)) ? pair.enHref + page : localizedPath(base, "en");
