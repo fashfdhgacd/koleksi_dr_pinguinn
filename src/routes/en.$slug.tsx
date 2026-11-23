@@ -1,3 +1,6 @@
+import { collectionHeading, collectionIntro } from "@/lib/page-copy";
+import { languageFamily } from "@/lib/language-family";
+import { usePublicLanguage } from "@/lib/public-ui";
 import { Outlet, createFileRoute, notFound, useMatches, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { EmptyState, ErrorState } from "@/components/states/feed-states";
@@ -99,22 +102,24 @@ export function EnExperience({
   data: CatalogResponse;
   onPage: (next: number) => void;
 }) {
+  const language = usePublicLanguage();
   const def = findEnLanding(slug);
   if (!def) return null;
   const items = data && data.ok && data.type === "landing" ? (data.items as VideoCard[]) : [];
   const total = data && data.ok && data.type === "landing" ? data.total : 0;
   const page = data && data.ok && data.type === "landing" ? data.page : 1;
   const limit = data && data.ok && data.type === "landing" ? data.limit : LANDING_PAGE_SIZE;
+  const heading = collectionHeading(def.slug, language, def.h1);
   const others = EN_LANDINGS.filter((l) => l.slug !== def.slug);
 
   return (
     <Shell>
       <section>
         <div className="mb-4">
-          <h1 className="text-xl font-semibold text-zinc-100">{def.h1}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{def.intro}</p>
-          {total ? <p className="mt-1 text-sm text-zinc-500">{total.toLocaleString("en")} videos · page {page}</p> : null}
-          {def.idSlug ? (
+          <h1 className="text-xl font-semibold text-zinc-100">{heading}</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{language === "en" ? def.intro : collectionIntro(heading, language)}</p>
+          {total ? <p className="mt-1 text-sm text-zinc-500">{total.toLocaleString(language)} {language === "en" ? "videos · page" : "video · halaman"} {page}</p> : null}
+          {language === "en" && def.idSlug ? (
             <p className="mt-2 text-sm text-zinc-500">
               Indonesian page:{" "}
               <a href={cariHref(def.idSlug, 1)} hrefLang="id" className="text-teal-200 underline-offset-2 hover:underline">
@@ -127,26 +132,26 @@ export function EnExperience({
         {data && !data.ok ? (
           <ErrorState message={(data as { error?: string }).error || "Could not load this page"} onRetry={() => window.location.reload()} />
         ) : !items.length ? (
-          <EmptyState title="Videos coming soon" description="Nothing matches this collection yet. Please check back later." />
+          <EmptyState title={language === "ms" ? "Video akan datang" : language === "id" ? "Video segera hadir" : "Videos coming soon"} description={language === "ms" ? "Belum ada video dalam koleksi ini. Sila singgah lagi." : language === "id" ? "Belum ada video dalam koleksi ini." : "Nothing matches this collection yet. Please check back later."} />
         ) : (
           <SafeBoundary>
             <VideoGrid items={items} />
           </SafeBoundary>
         )}
 
-        <CatalogPager lang="en" page={page} total={total} limit={limit} onPage={onPage} pageHref={(n) => enHref(def.slug, n)} />
+        <CatalogPager page={page} total={total} limit={limit} onPage={onPage} pageHref={(n) => enHref(def.slug, n)} />
 
         <div className="mt-6 space-y-3">
-          <nav aria-label="Other English collections">
-            <p className="mb-2 text-xs text-zinc-500">Other English collections</p>
+          <nav aria-label={language === "ms" ? "Koleksi lain" : language === "id" ? "Koleksi lainnya" : "Other English collections"}>
+            <p className="mb-2 text-xs text-zinc-500">{language === "ms" ? "Koleksi lain" : language === "id" ? "Koleksi lainnya" : "Other English collections"}</p>
             <div className="flex flex-wrap gap-2">
               {others.map((l) => (
                 <a
                   key={l.slug}
-                  href={enHref(l.slug, 1)}
+                  href={languageFamily(enHref(l.slug, 1))[language]}
                   className="inline-flex h-10 items-center rounded-full border border-white/10 px-3 text-sm text-zinc-300 hover:border-white/40 hover:text-white"
                 >
-                  {l.h1}
+                  {language === "en" ? l.h1 : collectionHeading(l.slug, language, l.h1)}
                 </a>
               ))}
             </div>

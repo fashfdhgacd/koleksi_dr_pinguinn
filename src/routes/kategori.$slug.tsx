@@ -1,3 +1,5 @@
+import { usePublicHref, usePublicLanguage, usePublicText } from "@/lib/public-ui";
+import { collectionLabel } from "@/lib/page-copy";
 import { categoryHref } from "@/lib/catalog/halaman";
 import { categoryRelated, categorySeo } from "@/lib/catalog/category-seo";
 import { useEffect } from "react";
@@ -247,6 +249,8 @@ function RankingPage({
   loaderData: unknown;
   onPage: (next: number) => void;
 }) {
+  const language = usePublicLanguage();
+  const localText = usePublicText();
   const period = periodFromKey(periode);
   const available = rankPeriodAvailable(rank.kind, period.period);
   const key = rankingKey(rank.slug, periode);
@@ -277,9 +281,9 @@ function RankingPage({
     <Shell>
       <section>
         <div className="mb-4">
-          <h1 className="text-xl font-semibold text-zinc-100">{seo.h1}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{seo.intro}</p>
-          <nav className="mt-3 flex flex-wrap gap-2" aria-label="Periode">
+          <h1 className="text-xl font-semibold text-zinc-100">{language === "id" ? seo.h1 : collectionLabel(rank.slug, language)}</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{language === "id" ? seo.intro : language === "ms" ? `Terokai koleksi ${collectionLabel(rank.slug, language)} dan pilih video untuk ditonton.` : `Browse the ${collectionLabel(rank.slug, language)} collection.`}</p>
+          <nav className="mt-3 flex flex-wrap gap-2" aria-label={localText("Periode")}>
             {RANK_PERIODS.map((p) => {
               const active = p.key === period.key;
               const ok = rankPeriodAvailable(rank.kind, p.period);
@@ -288,8 +292,8 @@ function RankingPage({
               }`;
               if (!ok) {
                 return (
-                  <span key={p.period} className={`${cls} cursor-not-allowed opacity-50`} title="Data belum cukup">
-                    {p.label} · segera
+                  <span key={p.period} className={`${cls} cursor-not-allowed opacity-50`} title={localText("Data belum cukup")}>
+                    {localText(p.label)} {localText("· segera")}
                   </span>
                 );
               }
@@ -301,14 +305,14 @@ function RankingPage({
                   search={{ page: undefined, periode: p.key || undefined }}
                   className={cls}
                 >
-                  {p.label}
+                  {localText(p.label)}
                 </Link>
               );
             })}
           </nav>
           {info ? (
             <p className="mt-2 text-xs text-zinc-500">
-              Pertambahan {rank.kind === "views" ? "tayangan" : "suka"} {fmtDay(info.from)} – {fmtDay(info.to)}
+              {localText("Pertambahan")} {rank.kind === "views" ? localText("tayangan") : "suka"} {fmtDay(info.from)} – {fmtDay(info.to)}
             </p>
           ) : null}
           {available && typeof feed.total === "number" ? (
@@ -330,7 +334,7 @@ function RankingPage({
         ) : feed.error && !feed.items.length ? (
           <ErrorState message={feed.error} onRetry={feed.retry} />
         ) : !feed.items.length ? (
-          <EmptyState title="Kosong" description="Belum ada data untuk periode ini." />
+          <EmptyState title={localText("Kosong")} description={localText("Belum ada data untuk periode ini.")} />
         ) : (
           <SafeBoundary>
             <VideoGrid items={feed.items} ads />
@@ -364,6 +368,9 @@ function PlainCategoryPage({
   loaderData: unknown;
   onPage: (next: number) => void;
 }) {
+  const publicHref = usePublicHref();
+  const language = usePublicLanguage();
+  const localText = usePublicText();
   const cat = findCategory(slug);
 
   const seed =
@@ -397,7 +404,7 @@ function PlainCategoryPage({
   if (!cat || UNLISTED_CATEGORY_SLUGS.has(cat.slug)) {
     return (
       <Shell>
-        <EmptyState title="Kategori tidak ada" description="Coba pilih kategori lain." />
+        <EmptyState title={localText("Kategori tidak ada")} description={localText("Coba pilih kategori lain.")} />
       </Shell>
     );
   }
@@ -417,27 +424,27 @@ function PlainCategoryPage({
     <Shell>
       <section>
         <div className="mb-4">
-          <h1 className="text-xl font-semibold text-zinc-100">{categorySeo(cat.slug).h1}</h1>
+          <h1 className="text-xl font-semibold text-zinc-100">{language === "id" ? categorySeo(cat.slug).h1 : collectionLabel(cat.slug, language)}</h1>
           {categorySeo(cat.slug).intro ? (
-            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{categorySeo(cat.slug).intro}</p>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{language === "id" ? categorySeo(cat.slug).intro : language === "ms" ? `Terokai koleksi ${collectionLabel(cat.slug, language)} dan pilih video untuk ditonton.` : `Browse the ${collectionLabel(cat.slug, language)} collection.`}</p>
           ) : null}
           {typeof feed.total === "number" ? (
             <p className="mt-1 text-sm text-zinc-500">{feed.total.toLocaleString("id-ID")} video</p>
           ) : null}
           {cat.slug === "videy" ? (
-            <a href="/cari/bokep-videy-indo" className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-teal-300 underline underline-offset-2">
-              Lihat Videy Indo paling ditonton →
+            <a href={publicHref("/cari/bokep-videy-indo")} className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-teal-300 underline underline-offset-2">
+              {localText("Lihat Videy Indo paling ditonton →")}
             </a>
           ) : null}
           {categoryRelated(cat.slug).length ? (
-            <nav className="mt-3 flex flex-wrap gap-2" aria-label="Kategori terkait">
+            <nav className="mt-3 flex flex-wrap gap-2" aria-label={localText("Kategori terkait")}>
               {categoryRelated(cat.slug).map((c) => (
                 <a
                   key={c.slug}
-                  href={`/kategori/${c.slug}`}
+                  href={publicHref(`/kategori/${c.slug}`)}
                   className="inline-flex h-10 items-center rounded-full border border-white/10 px-3 text-sm text-zinc-300 hover:border-white/40 hover:text-white"
                 >
-                  {c.label}
+                  {localText(c.label)}
                 </a>
               ))}
             </nav>
@@ -450,12 +457,12 @@ function PlainCategoryPage({
           <ErrorState message={feed.error} onRetry={feed.retry} />
         ) : !feed.items.length ? (
           page > 1 ? (
-            <EmptyState title="Kosong" description="Belum ada video di halaman ini." />
+            <EmptyState title={localText("Kosong")} description={localText("Belum ada video di halaman ini.")} />
           ) : (
             <div>
               <EmptyState
-                title="Video segera hadir"
-                description="Kategori ini baru dibuka. Videonya lagi disiapin, cek lagi sebentar lagi ya."
+                title={localText("Video segera hadir")}
+                description={localText("Kategori ini baru dibuka. Videonya lagi disiapin, cek lagi sebentar lagi ya.")}
               />
               <div className="-mt-12 flex justify-center pb-12">
                 <Link
@@ -463,7 +470,7 @@ function PlainCategoryPage({
                   search={{ q: undefined, category: undefined }}
                   className="pixel inline-flex h-10 items-center rounded-none border border-white/35 px-3 text-[11px] text-white/80 hover:border-white/80 hover:text-white sm:text-xs"
                 >
-                  Tonton video terbaru dulu
+                  {localText("Tonton video terbaru dulu")}
                 </Link>
               </div>
             </div>

@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { LegalPage } from "@/components/legal-page";
 import { SITE_ORIGIN } from "@/lib/seo";
@@ -22,15 +23,16 @@ export const Route = createFileRoute("/kontak")({
 });
 
 function Page() {
+  const localText = usePublicText();
   return (
-    <LegalPage title="Kontak">
-      <p>Untuk DMCA, privasi, atau laporan tautan rusak, tulis ke:</p>
+    <LegalPage title={localText("Kontak")}>
+      <p>{localText("Untuk DMCA, privasi, atau laporan tautan rusak, tulis ke:")}</p>
       <p>
         <a className="underline" href="mailto:dmca@koleksidrpinguin.com">
           dmca@koleksidrpinguin.com
         </a>
       </p>
-      <p>Sertakan URL halaman dan ringkasan singkat. Jangan kirim berkas video.</p>
+      <p>{localText("Sertakan URL halaman dan ringkasan singkat. Jangan kirim berkas video.")}</p>
     </LegalPage>
   );
 }

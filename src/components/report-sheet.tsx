@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 "use client";
 
 import { useEffect, useState } from "react";
@@ -28,6 +29,7 @@ export function ReportSheet({
   title: string;
   onClose: () => void;
 }) {
+  const localText = usePublicText();
   const [reason, setReason] = useState<string>("");
   const [detail, setDetail] = useState("");
   const [contact, setContact] = useState("");
@@ -71,10 +73,10 @@ export function ReportSheet({
       }
       setErr(
         j?.error === "limit"
-          ? "Batas laporan harian tercapai. Coba lagi besok."
+          ? localText("Batas laporan harian tercapai. Coba lagi besok.")
           : j?.error === "captcha"
-            ? "Verifikasi gagal. Muat ulang halaman lalu coba lagi."
-            : "Gagal mengirim laporan. Coba lagi.",
+            ? localText("Verifikasi gagal. Muat ulang halaman lalu coba lagi.")
+            : localText("Gagal mengirim laporan. Coba lagi."),
       );
       setState("error");
     } catch {
@@ -88,39 +90,38 @@ export function ReportSheet({
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
       role="dialog"
       aria-modal="true"
-      aria-label="Laporkan video"
+      aria-label={localText("Laporkan video")}
     >
-      <button type="button" className="absolute inset-0 bg-black/70" onClick={onClose} aria-label="Tutup" />
+      <button type="button" className="absolute inset-0 bg-black/70" onClick={onClose} aria-label={localText("Tutup")} />
       <div className="relative z-10 max-h-[85dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-border bg-background p-5 shadow-2xl sm:rounded-2xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted">Laporkan konten</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted">{localText("Laporkan konten")}</p>
             <p className="mt-1 line-clamp-2 text-base font-medium text-foreground">{title}</p>
           </div>
           <button type="button" onClick={onClose} className="shrink-0 rounded-md px-2 py-1 text-sm text-muted hover:bg-secondary">
-            Tutup
+            {localText("Tutup")}
           </button>
         </div>
 
         {state === "done" ? (
           <div className="space-y-3 py-4 text-center">
-            <p className="text-base font-medium text-foreground">Laporan diterima.</p>
+            <p className="text-base font-medium text-foreground">{localText("Laporan diterima.")}</p>
             <p className="text-sm leading-relaxed text-muted">
-              Tim kami akan meninjau video ini. Laporan tidak langsung menyembunyikan video —
-              tindakan hanya diambil setelah terbukti.
+              {localText("Tim kami akan meninjau video ini. Laporan tidak langsung menyembunyikan video — tindakan hanya diambil setelah terbukti.")}
             </p>
             <button
               type="button"
               onClick={onClose}
               className="mt-2 h-11 w-full rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground active:scale-[0.98]"
             >
-              Mengerti
+              {localText("Mengerti")}
             </button>
           </div>
         ) : (
           <div className="space-y-4">
             <fieldset className="space-y-2">
-              <legend className="text-sm font-medium text-foreground">Apa masalahnya?</legend>
+              <legend className="text-sm font-medium text-foreground">{localText("Apa masalahnya?")}</legend>
               {REASONS.map((r) => (
                 <label
                   key={r.key}
@@ -137,31 +138,31 @@ export function ReportSheet({
                     className="mt-1"
                   />
                   <span>
-                    <span className="block text-sm font-medium text-foreground">{r.label}</span>
-                    <span className="block text-xs text-muted">{r.hint}</span>
+                    <span className="block text-sm font-medium text-foreground">{localText(r.label)}</span>
+                    <span className="block text-xs text-muted">{localText(r.hint)}</span>
                   </span>
                 </label>
               ))}
             </fieldset>
 
             <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-foreground">Detail (opsional)</span>
+              <span className="text-sm font-medium text-foreground">{localText("Detail (opsional)")}</span>
               <textarea
                 value={detail}
                 onChange={(e) => setDetail(e.target.value.slice(0, 1000))}
                 rows={3}
-                placeholder="Jelaskan singkat — mis. timestamp bagian yang bermasalah"
+                placeholder={localText("Jelaskan singkat — mis. timestamp bagian yang bermasalah")}
                 className="w-full rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm text-foreground placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </label>
 
             <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-foreground">Kontak (opsional)</span>
+              <span className="text-sm font-medium text-foreground">{localText("Kontak (opsional)")}</span>
               <input
                 type="text"
                 value={contact}
                 onChange={(e) => setContact(e.target.value.slice(0, 120))}
-                placeholder="Email/telegram kalau hasilnya mau dikabari"
+                placeholder={localText("Email/telegram kalau hasilnya mau dikabari")}
                 className="w-full rounded-xl border border-border bg-secondary/40 px-3 py-2 text-sm text-foreground placeholder:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />
             </label>
@@ -174,7 +175,7 @@ export function ReportSheet({
                 onClick={onClose}
                 className="h-11 flex-1 rounded-xl border border-border px-4 text-sm font-medium text-foreground active:scale-[0.98]"
               >
-                Batal
+                {localText("Batal")}
               </button>
               <button
                 type="button"
@@ -182,11 +183,11 @@ export function ReportSheet({
                 onClick={() => void submit()}
                 className="h-11 flex-1 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground active:scale-[0.98] disabled:opacity-40"
               >
-                {state === "busy" ? "Mengirim…" : "Kirim laporan"}
+                {state === "busy" ? localText("Mengirim…") : localText("Kirim laporan")}
               </button>
             </div>
             <p className="text-center text-[11px] leading-relaxed text-muted">
-              Laporan palsu atau iseng dapat ditindaklanjuti. Laporkan hanya jika yakin.
+              {localText("Laporan palsu atau iseng dapat ditindaklanjuti. Laporkan hanya jika yakin.")}
             </p>
           </div>
         )}

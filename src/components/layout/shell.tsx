@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 import type { ReactNode } from "react";
 import { Link } from "@tanstack/react-router";
 import { AgeGate } from "@/components/age-gate";
@@ -13,6 +14,7 @@ export function Shell({
   query?: string;
   category?: string;
 }) {
+  const localText = usePublicText();
   return (
     <AgeGate>
       <div className="flex min-h-dvh flex-col bg-background text-foreground">
@@ -33,39 +35,39 @@ export function Shell({
                 </a>{" "}
                 · 18+
               </p>
-              <p className="text-xs text-white/80 sm:text-sm">Koleksi Dr. Pinguin — situs resmi koleksidrpinguin.com</p>
+              <p className="text-xs text-white/80 sm:text-sm">{localText("Koleksi Dr. Pinguin — situs resmi koleksidrpinguin.com")}</p>
               <p className="text-[11px] text-white/65 sm:text-xs">
-                Koleksi ini dimaksudkan untuk pengguna dewasa. Pastikan Anda berusia 18+ sebelum melanjutkan.
+                {localText("Koleksi ini dimaksudkan untuk pengguna dewasa. Pastikan Anda berusia 18+ sebelum melanjutkan.")}
               </p>
               <p className="text-[11px] text-white/65 sm:text-xs">
-                Konten dan gambar disediakan oleh pihak ketiga. Kami tidak bertanggung jawab atas materi eksternal.
+                {localText("Konten dan gambar disediakan oleh pihak ketiga. Kami tidak bertanggung jawab atas materi eksternal.")}
               </p>
             </div>
             <div className="flex items-center justify-between gap-6 sm:justify-end sm:gap-8">
               <nav className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm" aria-label="Legal">
                 <Link to="/tentang" className="hover:text-white hover:underline">
-                  Tentang
+                  {localText("Tentang")}
                 </Link>
                 <Link to="/2257" className="hover:text-white hover:underline">
                   2257
                 </Link>
                 <Link to="/privasi" className="hover:text-white hover:underline">
-                  Privasi
+                  {localText("Privasi")}
                 </Link>
                 <Link to="/syarat" className="hover:text-white hover:underline">
-                  Syarat
+                  {localText("Syarat")}
                 </Link>
                 <Link to="/dmca" className="hover:text-white hover:underline">
                   DMCA
                 </Link>
                 <Link to="/kontak" className="hover:text-white hover:underline">
-                  Kontak
+                  {localText("Kontak")}
                 </Link>
                 <Link to="/laporan" className="hover:text-white hover:underline">
-                  Laporan
+                  {localText("Laporan")}
                 </Link>
                 <Link to="/teman" className="hover:text-white hover:underline">
-                  Teman
+                  {localText("Teman")}
                 </Link>
                 <a href="/en" hrefLang="en" lang="en" className="hover:text-white hover:underline">
                   English

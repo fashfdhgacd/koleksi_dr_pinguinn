@@ -1,3 +1,6 @@
+import { usePublicLanguage } from "@/lib/public-ui";
+import { collectionLabel } from "@/lib/page-copy";
+import { usePublicHref, usePublicText } from "@/lib/public-ui";
 import { useCallback, useEffect, useState } from "react";
 import { Link, getRouteApi } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
@@ -87,11 +90,12 @@ function itemForServer(item: VideoDetail, server: Server | null): VideoDetail {
 
 /** Server buttons under the player (outside it). Plain links: ?s=<copy id>, the main copy without. */
 function ServerButtons({ item, current }: { item: VideoDetail; current: string }) {
+  const localText = usePublicText();
   const list = item.servers || [];
   if (list.length < 2) return null;
   const seen = new Map<string, number>();
   return (
-    <nav aria-label="Pilih server" className="mt-3 flex flex-wrap items-center gap-2">
+    <nav aria-label={localText("Pilih server")} className="mt-3 flex flex-wrap items-center gap-2">
       <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Server</span>
       {list.map((sv) => {
         const n = (seen.get(sv.host) || 0) + 1;
@@ -110,7 +114,7 @@ function ServerButtons({ item, current }: { item: VideoDetail; current: string }
             // Exact search match: the main copy's link (no ?s) is not "active" while ?s=<copy> plays.
             activeOptions={{ exact: true, includeSearch: true }}
             aria-current={active ? "true" : undefined}
-            title={gone ? `${label} (sumber sudah tidak tersedia)` : label}
+            title={gone ? `${label} (${localText("sumber sudah tidak tersedia")})` : label}
             className={
               "inline-flex h-10 items-center rounded-full border px-4 text-sm font-medium " +
               (active
@@ -151,6 +155,8 @@ function ShareSheet({
   id: string;
   onClose: () => void;
 }) {
+  const publicHref = usePublicHref();
+  const localText = usePublicText();
   const [copied, setCopied] = useState(false);
   const url = shareUrl(id);
 
@@ -175,7 +181,7 @@ function ShareSheet({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      prompt("Salin link ini:", url);
+      prompt(localText("Salin link ini:"), url);
     }
   }
 
@@ -200,23 +206,23 @@ function ShareSheet({
       className="fixed inset-0 z-50 flex items-end justify-center sm:items-center"
       role="dialog"
       aria-modal="true"
-      aria-label="Bagikan video"
+      aria-label={localText("Bagikan video")}
     >
-      <button type="button" className="absolute inset-0 bg-black/70" onClick={onClose} aria-label="Tutup" />
+      <button type="button" className="absolute inset-0 bg-black/70" onClick={onClose} aria-label={localText("Tutup")} />
       <div className="relative z-10 w-full max-w-md rounded-t-2xl border border-border bg-background p-5 shadow-2xl sm:rounded-2xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <p className="text-xs font-medium uppercase tracking-wider text-muted">Bagikan</p>
+            <p className="text-xs font-medium uppercase tracking-wider text-muted">{localText("Bagikan")}</p>
             <p className="mt-1 line-clamp-2 text-base font-medium text-foreground">{title}</p>
-            <p className="mt-1 text-xs text-muted">Link anti blokir / tanpa VPN</p>
+            <p className="mt-1 text-xs text-muted">{localText("Link anti blokir / tanpa VPN")}</p>
           </div>
           <button type="button" onClick={onClose} className="shrink-0 rounded-md px-2 py-1 text-sm text-muted hover:bg-secondary">
-            Tutup
+            {localText("Tutup")}
           </button>
         </div>
         <div className="grid gap-2">
           <a
-            href={intents.telegram}
+            href={publicHref(intents.telegram)}
             target="_blank"
             rel="noopener noreferrer"
             onClick={onClose}
@@ -225,7 +231,7 @@ function ShareSheet({
             Telegram
           </a>
           <a
-            href={intents.x}
+            href={publicHref(intents.x)}
             target="_blank"
             rel="noopener noreferrer"
             onClick={onClose}
@@ -234,7 +240,7 @@ function ShareSheet({
             X
           </a>
           <a
-            href={intents.reddit}
+            href={publicHref(intents.reddit)}
             target="_blank"
             rel="noopener noreferrer"
             onClick={onClose}
@@ -247,7 +253,7 @@ function ShareSheet({
             onClick={() => void copyLink()}
             className={btn + " bg-secondary font-medium text-foreground"}
           >
-            {copied ? "\u2713 Link disalin" : "Salin link"}
+            {copied ? "✓ " + localText("Link disalin") : localText("Salin link")}
           </button>
           {typeof navigator !== "undefined" && typeof navigator.share === "function" ? (
             <button
@@ -255,17 +261,17 @@ function ShareSheet({
               onClick={() => void nativeShare()}
               className={btn + " border border-border font-medium text-foreground"}
             >
-              Bagikan via sistem
+              {localText("Bagikan via sistem")}
             </button>
           ) : null}
         </div>
         <p className="mt-4 break-all text-center text-xs text-muted">{url}</p>
         {intents.whatsapp ? (
           <p className="mt-2 text-center text-[11px] text-muted">
-            <a href={intents.whatsapp} target="_blank" rel="noopener noreferrer" onClick={onClose} className="underline-offset-2 hover:underline">
+            <a href={publicHref(intents.whatsapp)} target="_blank" rel="noopener noreferrer" onClick={onClose} className="underline-offset-2 hover:underline">
               WhatsApp
             </a>
-            <span> (link anti blokir)</span>
+            <span> {localText("(link anti blokir)")}</span>
           </p>
         ) : null}
       </div>
@@ -274,24 +280,26 @@ function ShareSheet({
 }
 
 /** Tanggal unggah yang bisa dibaca (id-ID, WIB). Kosong kalau tidak valid. */
-function uploadDateLabel(raw: string | number | null | undefined): string {
+function uploadDateLabel(raw: string | number | null | undefined, locale: string): string {
   if (raw == null || raw === "") return "";
   const d = new Date(typeof raw === "number" && raw < 1e12 ? raw * 1000 : raw);
   if (Number.isNaN(d.getTime()) || d.getFullYear() < 2015) return "";
-  return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" });
+  return d.toLocaleDateString(locale, { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Jakarta" });
 }
 
 /** Fakta singkat per video (durasi, tanggal, sumber). Kategori sudah tampil sebagai chip di atasnya. */
 function VideoFacts({ item }: { item: VideoDetail }) {
-  const date = uploadDateLabel(item.uploadDate);
+  const localText = usePublicText();
+  const locale = usePublicLanguage();
+  const date = uploadDateLabel(item.uploadDate, locale);
   const host = isVideyItem(item) || isDrpHostItem(item) ? "" : hostLabel(catalogPlayUrl(item)).replace("Puterin", "Putarin");
   const rows: Array<[string, string]> = [];
-  if (item.durationLabel) rows.push(["Durasi", item.durationLabel]);
-  if (date) rows.push(["Diunggah", date]);
-  if (host) rows.push(["Sumber", host]);
+  if (item.durationLabel) rows.push([localText("Durasi"), item.durationLabel]);
+  if (date) rows.push([localText("Diunggah"), date]);
+  if (host) rows.push([localText("Sumber"), host]);
   if (!rows.length) return null;
   return (
-    <section aria-label="Info video" className="space-y-2">
+    <section aria-label={localText("Info video")} className="space-y-2">
       <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Info</p>
       <dl className="flex flex-wrap gap-2 text-sm">
         {rows.map(([k, v]) => (
@@ -306,6 +314,9 @@ function VideoFacts({ item }: { item: VideoDetail }) {
 }
 
 export function WatchPage() {
+  const language = usePublicLanguage();
+  const publicHref = usePublicHref();
+  const localText = usePublicText();
   const { id } = routeApi.useParams();
   const { s: wantedServer } = routeApi.useSearch();
   const loaderData = routeApi.useLoaderData();
@@ -434,7 +445,7 @@ export function WatchPage() {
       ) : status === "error" && !item ? (
         <ErrorState message={error ?? "Gagal memuat video."} onRetry={retry} />
       ) : status === "empty" || (!item && !softLoading) ? (
-        <EmptyState title="Video tidak ditemukan" description="Judul ini tidak ada di katalog atau sudah dihapus." />
+        <EmptyState title={localText("Video tidak ditemukan")} description={localText("Judul ini tidak ada di katalog atau sudah dihapus.")} />
       ) : (
         <article className="space-y-8" onContextMenu={(e) => e.preventDefault()}>
           {item ? (() => {
@@ -484,14 +495,14 @@ export function WatchPage() {
           <header className="max-w-3xl space-y-3">
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
               {isVideyItem(item) ? (
-                <a href="/kategori/videy" className="hover:text-foreground hover:underline">
+                <a href={publicHref("/kategori/videy")} className="hover:text-foreground hover:underline">
                   {VIDEY_LABEL}
                 </a>
               ) : (() => {
                 const slug = categorySlugFor(item.category);
                 return slug ? (
-                  <a href={`/kategori/${slug}`} className="hover:text-foreground hover:underline">
-                    {item.category}
+                  <a href={publicHref(`/kategori/${slug}`)} className="hover:text-foreground hover:underline">
+                    {localText(item.category || "")}
                   </a>
                 ) : (
                   item.category
@@ -511,19 +522,19 @@ export function WatchPage() {
             <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{cleanDisplayTitle(item.title)}</h1>
             {item.episodes && item.episodes.length > 1 ? <EpisodeStrip episodes={item.episodes} currentId={item.id} /> : null}
             <p className="text-sm leading-relaxed text-muted">{publicWatchDescription(item)}</p>
-            <nav aria-label="Kategori dan pencarian" className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+            <nav aria-label={localText("Kategori dan pencarian")} className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
               {(() => {
                 const slug = categorySlugFor(item.category);
                 const landing = slug ? landingForCategory(slug) : undefined;
                 return (
                   <>
                     {slug ? (
-                      <a href={`/kategori/${slug}`} className="underline underline-offset-2 hover:text-foreground">
-                        Kategori {item.category}
+                      <a href={publicHref(`/kategori/${slug}`)} className="underline underline-offset-2 hover:text-foreground">
+                        {localText("Kategori")} {localText(item.category || "")}
                       </a>
                     ) : null}
-                    <a href={landing ? `/cari/${landing.slug}` : "/cari"} className="underline underline-offset-2 hover:text-foreground">
-                      {landing ? landing.h1 : "Pencarian populer"}
+                    <a href={publicHref(landing ? `/cari/${landing.slug}` : "/cari")} className="underline underline-offset-2 hover:text-foreground">
+                      {landing ? (language === "id" ? landing.h1 : collectionLabel(landing.slug, language)) : localText("Pencarian populer")}
                     </a>
                   </>
                 );
@@ -531,16 +542,16 @@ export function WatchPage() {
             </nav>
             <PushButton />
             {item.categories && item.categories.length ? (
-              <nav aria-label="Kategori" className="space-y-2">
-                <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Kategori</p>
+              <nav aria-label={localText("Kategori")} className="space-y-2">
+                <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">{localText("Kategori")}</p>
                 <ul className="flex flex-wrap gap-2">
                   {item.categories.map((c) => (
                     <li key={c.slug}>
                       <a
-                        href={`/kategori/${c.slug}`}
+                        href={publicHref(`/kategori/${c.slug}`)}
                         className="inline-flex h-10 items-center rounded-full bg-secondary px-4 text-sm font-medium text-foreground hover:bg-primary hover:text-primary-foreground"
                       >
-                        {c.label}
+                        {localText(c.label)}
                       </a>
                     </li>
                   ))}
@@ -548,14 +559,14 @@ export function WatchPage() {
               </nav>
             ) : null}
             {item.sameCategory && item.sameCategory.length ? (
-              <nav aria-label="Video lain di kategori ini" className="space-y-2">
+              <nav aria-label={localText("Video lain di kategori ini")} className="space-y-2">
                 <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
-                  Lainnya di {item.category || "kategori ini"}
+                  {localText("Lainnya di")} {localText(item.category || "kategori ini")}
                 </p>
                 <ul className="space-y-1 text-sm">
                   {item.sameCategory.filter((v) => !isSeoBlockedId(v.id)).map((v) => (
                     <li key={v.id}>
-                      <a href={`/watch/${v.id}`} className="text-foreground/80 underline-offset-2 hover:text-primary hover:underline">
+                      <a href={publicHref(`/watch/${v.id}`)} className="text-foreground/80 underline-offset-2 hover:text-primary hover:underline">
                         {cleanDisplayTitle(v.title)}
                       </a>
                     </li>
@@ -570,7 +581,7 @@ export function WatchPage() {
                 className="h-12 min-w-[140px] rounded-xl bg-primary px-5 text-base font-semibold text-primary-foreground active:scale-[0.98]"
                 onClick={() => setShareOpen(true)}
               >
-                Bagikan
+                {localText("Bagikan")}
               </button>
               {isVideyItem(playItem) || isDrpHostItem(playItem) ? null : <button
                 type="button"
@@ -581,18 +592,18 @@ export function WatchPage() {
                   if (src) window.open(src, "_blank", "noopener"); // keep referrer so hoster sees koleksidrpinguin.com
                 }}
               >
-                Buka Sumber
+                {localText("Buka Sumber")}
               </button>}
               <CatalogBackLink item={item} />
-              <a href="/#terbaru" className="inline-flex min-h-12 items-center rounded-xl px-4 text-base font-medium text-teal-300 underline-offset-2 hover:underline">
-                Lihat unggahan terbaru
+              <a href={publicHref("/#terbaru")} className="inline-flex min-h-12 items-center rounded-xl px-4 text-base font-medium text-teal-300 underline-offset-2 hover:underline">
+                {localText("Lihat unggahan terbaru")}
               </a>
               <button
                 type="button"
                 className="h-12 min-w-[120px] rounded-xl border border-border px-5 text-base font-medium text-muted active:scale-[0.98]"
                 onClick={() => setReportOpen(true)}
               >
-                Laporkan
+                {localText("Laporkan")}
               </button>
             </div>
           </header>
@@ -607,7 +618,7 @@ export function WatchPage() {
           )}
           {related.length ? (
             <section>
-              <h2 className="mb-5 font-display text-3xl text-foreground">Tonton juga</h2>
+              <h2 className="mb-5 font-display text-3xl text-foreground">{localText("Tonton juga")}</h2>
               <VideoGrid items={related} eagerCount={0} />
             </section>
           ) : item ? null : (
@@ -631,9 +642,10 @@ const EP_ACCENT = "#2dd4bf"; // site teal accent (bg-primary is gray in this the
 const EP_WINDOW = 24;
 
 function EpisodeLink({ id, ep, label, current }: { id: string; ep: number; label?: string; current: boolean }) {
+  const publicHref = usePublicHref();
   return (
     <a
-      href={`/watch/${id}`}
+      href={publicHref(`/watch/${id}`)}
       aria-current={current ? "page" : undefined}
       style={current ? { backgroundColor: EP_ACCENT, borderColor: EP_ACCENT, color: "#09090b" } : undefined}
       className={
@@ -658,6 +670,8 @@ function EpisodeStrip({
   episodes: Array<{ id: string; ep: number; label?: string }>;
   currentId: string;
 }) {
+  const publicHref = usePublicHref();
+  const localText = usePublicText();
   const at = episodes.findIndex((e) => e.id === currentId);
   const next = at >= 0 && at + 1 < episodes.length ? episodes[at + 1] : null;
   const many = episodes.length > EP_WINDOW;
@@ -677,7 +691,7 @@ function EpisodeStrip({
       {many ? (
         <details className="sm:max-w-3xl">
           <summary className="cursor-pointer select-none text-sm font-medium text-[#2dd4bf]">
-            Semua episode ({episodes.length})
+            {localText("Semua episode (")}{episodes.length})
           </summary>
           <div className={EP_GRID + " mt-2"}>
             {episodes.map((e) => (
@@ -688,11 +702,11 @@ function EpisodeStrip({
       ) : null}
       {next ? (
         <a
-          href={`/watch/${next.id}`}
+          href={publicHref(`/watch/${next.id}`)}
           style={{ backgroundColor: EP_ACCENT, color: "#09090b" }}
           className="inline-flex h-10 w-full items-center justify-center rounded-md px-4 text-sm font-semibold hover:opacity-90 active:scale-[0.98] sm:w-auto"
         >
-          Episode selanjutnya (Episode {next.label ?? next.ep}) →
+          {localText("Episode selanjutnya (Episode")} {next.label ?? next.ep}) →
         </a>
       ) : null}
     </nav>

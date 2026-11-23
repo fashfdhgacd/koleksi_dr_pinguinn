@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 import { cleanDisplayTitle } from "@/lib/seo";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
@@ -34,6 +35,7 @@ function cleanHeroTitle(raw: string): string {
 }
 
 export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
+  const localText = usePublicText();
   const incoming = videos && videos.length > 0 ? videos : video ? [video] : [];
   const list = useMemo(() => incoming.filter((v) => isUsableThumb(v.thumbnail) && !isRealMinor({ title: v.title, tags: v.category })), [incoming]);
   const listKey = list.map((v) => v.id).join("|");
@@ -129,7 +131,7 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
           to="/watch/$id"
           params={{ id: current.id }}
           className="absolute inset-0 z-10 flex items-center justify-center touch-manipulation md:hidden"
-          aria-label={`Putar ${heroTitle}`}
+          aria-label={`${localText("Putar")} ${heroTitle}`}
         >
           <span
             className="flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-[0_0_0_1px_color-mix(in_oklab,#f3efe6_12%,transparent)]"
@@ -144,7 +146,7 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
         {/* Desktop (md+): same copy stack as before (label, title, meta, Putar sekarang). */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden flex-col gap-4 p-8 pb-12 md:flex lg:max-w-2xl lg:p-10 lg:pb-14">
           <p className="w-fit rounded-full bg-black/50 px-2.5 py-1 text-xs font-medium uppercase tracking-[0.18em] text-white/90 backdrop-blur-sm">
-            Pilihan koleksi
+            {localText("Pilihan koleksi")}
             {usable.length > 1 ? (
               <span className="ml-2 tabular-nums text-white/70">
                 {displayIndex + 1}/{usable.length}
@@ -168,7 +170,7 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
             <Button asChild size="default" className="h-11 rounded-lg px-5 text-base">
               <Link to="/watch/$id" params={{ id: current.id }}>
                 <Play className="size-4 fill-current" style={{ marginLeft: 2 }} />
-                Putar sekarang
+                {localText("Putar sekarang")}
               </Link>
             </Button>
           </div>

@@ -57,7 +57,15 @@ export default async function cacheHeadersMiddleware(
   const result = await next();
   if (!(result instanceof Response)) return result;
 
+  if (event.url.pathname === "/") {
+    const response = withHeaders(result, "private, no-store");
+    response.headers.append("vary", "Cookie");
+    return response;
+  }
   const path = event.url.pathname;
+  // Owner moderation purges the legacy watch URL. Locale variants must not outlive that purge.
+  if (/^\/(ms|en)\/(watch|v)\//.test(path)) return withHeaders(result, "private, no-store");
+
   const type = result.headers.get("content-type") || "";
 
   // Owner dashboard + owner APIs: never cached (browser/CDN), never indexed. A cached /pemilik

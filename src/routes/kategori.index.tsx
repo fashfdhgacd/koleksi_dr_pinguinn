@@ -1,3 +1,5 @@
+import { usePublicHref, usePublicLanguage, usePublicText } from "@/lib/public-ui";
+import { collectionLabel } from "@/lib/page-copy";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { PUBLIC_CATEGORY_LIST } from "@/lib/catalog/categories";
@@ -95,16 +97,20 @@ const directoryLabels: Record<string, string> = {
 
 /** A category or ranking card (/kategori/<slug>). */
 function CoverCard({ slug, label, count, cover, coverId }: CategoryInfo) {
+  const language = usePublicLanguage();
   return (
     <li>
       <Link to="/kategori/$slug" params={{ slug }} search={{ page: undefined, periode: undefined }} className={coverCardClass}>
-        <CoverInner label={label} count={count} cover={cover} coverId={coverId} />
+        <CoverInner label={language === "id" ? label : collectionLabel(slug, language)} count={count} cover={cover} coverId={coverId} />
       </Link>
     </li>
   );
 }
 
 function CategoriesPage() {
+  const publicHref = usePublicHref();
+  const language = usePublicLanguage();
+  const localText = usePublicText();
   const { categories, extra, specials } = Route.useLoaderData();
   const special = (slug: string) => {
     const s = specials.find((x) => x.slug === slug);
@@ -114,18 +120,18 @@ function CategoriesPage() {
     <Shell>
       <section className="relative space-y-6">
         <div className="relative">
-          <h1 className="font-display text-5xl leading-none text-foreground sm:text-7xl">Kategori</h1>
-          <p className="pixel mt-2 text-[11px] text-white/55 sm:text-sm">Jelajahi koleksi video berdasarkan kategori</p>
+          <h1 className="font-display text-5xl leading-none text-foreground sm:text-7xl">{localText("Kategori")}</h1>
+          <p className="pixel mt-2 text-[11px] text-white/55 sm:text-sm">{localText("Jelajahi koleksi video berdasarkan kategori")}</p>
           <PixelSparkle className="absolute right-0 top-2 hidden h-[18px] w-[128px] sm:block" />
         </div>
 
         <ul className="grid grid-cols-2 gap-2.5 sm:gap-4 md:grid-cols-4">
           {RANKINGS.map((r) => (
-            <CoverCard key={r.slug} {...special(r.slug)} slug={r.slug} label={r.label} count={extra?.[r.slug]} />
+            <CoverCard key={r.slug} {...special(r.slug)} slug={r.slug} label={localText(r.label)} count={extra?.[r.slug]} />
           ))}
           <li>
             <Link to="/" search={{ q: undefined, category: undefined }} className={coverCardClass}>
-              <CoverInner label="Terbaru" count={extra?.terbaru} {...special("terbaru")} />
+              <CoverInner label={localText("Terbaru")} count={extra?.terbaru} {...special("terbaru")} />
             </Link>
           </li>
           {categories.map((cat) => (
@@ -133,16 +139,16 @@ function CategoriesPage() {
           ))}
         </ul>
 
-        <nav aria-label="Pencarian populer">
-          <h2 className="mb-2 text-sm font-semibold text-zinc-300">Pencarian populer</h2>
+        <nav aria-label={localText("Pencarian populer")}>
+          <h2 className="mb-2 text-sm font-semibold text-zinc-300">{localText("Pencarian populer")}</h2>
           <div className="flex flex-wrap gap-2">
             {LANDINGS.map((l) => (
               <a
                 key={l.slug}
-                href={`/cari/${l.slug}`}
+                href={publicHref(`/cari/${l.slug}`)}
                 className="inline-flex h-10 items-center rounded-full border border-white/10 px-3 text-sm text-zinc-300 hover:border-teal-400/60 hover:text-teal-200"
               >
-                {l.h1}
+                {language === "id" ? l.h1 : collectionLabel(l.slug, language)}
               </a>
             ))}
           </div>

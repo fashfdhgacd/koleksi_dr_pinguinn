@@ -1,3 +1,4 @@
+import { usePublicHref, usePublicLanguage, usePublicText } from "@/lib/public-ui";
 import { useEffect } from "react";
 import { SafeBoundary } from "@/components/safe-boundary";
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
@@ -172,6 +173,9 @@ export function HomeExperience({
   loaderData: Awaited<ReturnType<typeof loadHome>>;
   onPage: (next: number) => void;
 }) {
+  const publicHref = usePublicHref();
+  const language = usePublicLanguage();
+  const localText = usePublicText();
   const seed = seedFromLoader(loaderData);
   const mode = q ? "search" : category ? "category" : "home";
   const feed = useCatalogFeed({ mode, q, category, page }, seed);
@@ -180,18 +184,11 @@ export function HomeExperience({
   const heroIds = new Set(heroVideos.map((v) => v.id));
   const gridItems = heroIds.size ? feed.items.filter((item) => !heroIds.has(item.id)) : feed.items;
 
-  const title = q ? `Hasil untuk “${q}”` : cat ? cat.label : HOME_H1;
-  const subtitle = q
-    ? feed.loading && !feed.items.length
-      ? "Mencari…"
-      : `${(gridItems.length ? feed.total : 0).toLocaleString("id-ID")} hasil`
-    : feed.total
-    ? `${feed.total.toLocaleString("id-ID")} judul · koleksidrpinguin.com`
-    : "koleksidrpinguin.com";
-  const intro =
-    q
-      ? `Hasil pencarian “${q}” di katalog Dr. Pinguin. Konten dewasa 18+.`
-      : HOME_INTRO;
+  const ms = language === "ms";
+  const title = q ? (ms ? `Hasil carian untuk “${q}”` : language === "en" ? `Results for “${q}”` : `Hasil untuk “${q}”`) : ms ? "Video terkini" : language === "en" ? "Latest videos" : HOME_H1;
+  const count = (q && !gridItems.length ? 0 : feed.total).toLocaleString(language);
+  const subtitle = q && feed.loading && !gridItems.length ? (ms ? "Sedang mencari…" : language === "en" ? "Searching…" : "Mencari…") : count + " " + (q ? ms ? "hasil carian" : language === "en" ? "results" : "hasil" : ms ? "tajuk" : language === "en" ? "titles" : "judul");
+  const intro = language === "id" ? (q ? `Hasil pencarian “${q}”. Khusus dewasa 18+.` : HOME_INTRO) : ms ? "Terokai koleksi video untuk penonton berumur 18 tahun ke atas." : "Explore the collection for viewers aged 18 and over.";
 
   // Search result pages past the end (e.g. stale ?page=N kept in the URL) jump back to page 1,
   // so the count and the grid always come from the same result array.
@@ -220,7 +217,7 @@ export function HomeExperience({
   }
 
   return (
-    <Shell>
+    <Shell query={q}>
       <div className="space-y-6">
         {heroVideos.length ? (
           <SafeBoundary>
@@ -242,23 +239,23 @@ export function HomeExperience({
             {q ? null : (
               // Plain crawlable links to the categories that bring search traffic (SEO internal linking).
               <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-                <a href="/kategori/videy" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
-                  Video Videy Indo terbaru →
+                <a href={publicHref("/kategori/videy")} className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
+                  {localText("Video Videy Indo terbaru →")}
                 </a>
-                <a href="/kategori/ai-plus" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
-                  Semua video AI Drama →
+                <a href={publicHref("/kategori/ai-plus")} className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
+                  {localText("Semua video AI Drama →")}
                 </a>
-                <a href="/kategori/malaysia" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
-                  Video Malaysia dan Melayu →
+                <a href={publicHref("/kategori/malaysia")} className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
+                  {localText("Video Malaysia dan Melayu →")}
                 </a>
-                <a href="/kategori/ai-indo" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
-                  Koleksi AI Drama Indonesia →
+                <a href={publicHref("/kategori/ai-indo")} className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
+                  {localText("Koleksi AI Drama Indonesia →")}
                 </a>
-                <a href="/kategori/percakapan" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
-                  Video dengan percakapan →
+                <a href={publicHref("/kategori/percakapan")} className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
+                  {localText("Video dengan percakapan →")}
                 </a>
-                <a href="/kategori/paling-ditonton" className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
-                  Paling ditonton →
+                <a href={publicHref("/kategori/paling-ditonton")} className="font-medium text-zinc-200 underline underline-offset-2 hover:text-white">
+                  {localText("Paling ditonton →")}
                 </a>
               </p>
             )}
@@ -271,11 +268,11 @@ export function HomeExperience({
             <ErrorState message={feed.error} onRetry={feed.retry} />
           ) : !gridItems.length ? (
             <EmptyState
-              title={q ? `Belum ada video untuk “${q}”` : "Kosong"}
+              title={q && language !== "id" ? (ms ? `Tiada video untuk “${q}”` : `No videos found for “${q}”`) : q ? `Belum ada video untuk “${q}”` : localText("Kosong")}
               description={
                 q
-                  ? "Coba kata kunci yang lebih pendek atau umum, misalnya “jilbab”, “indo”, atau “jav”. Bisa juga cek kategori di menu."
-                  : "Belum ada video."
+                  ? localText("Coba kata kunci yang lebih pendek atau umum, misalnya “jilbab”, “indo”, atau “jav”. Bisa juga cek kategori di menu.")
+                  : localText("Belum ada video.")
               }
             />
           ) : (

@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 import { useEffect, useState } from "react";
 import type { VideoCard } from "@/lib/catalog/types";
 import { VideoCard as VideoCardItem } from "./video-card";
@@ -48,6 +49,7 @@ export function rememberWatched(video: VideoCard): void {
 }
 
 export function RecentlyWatched() {
+  const localText = usePublicText();
   const [items, setItems] = useState<VideoCard[]>([]);
 
   useEffect(() => {
@@ -78,14 +80,14 @@ export function RecentlyWatched() {
     <section aria-labelledby="recent-watched-title">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h2 id="recent-watched-title" className="text-lg font-semibold tracking-tight text-zinc-100">
-          Baru ditonton
+          {localText("Baru ditonton")}
         </h2>
         <button
           type="button"
           onClick={clear}
           className="text-xs text-zinc-500 underline underline-offset-2 hover:text-zinc-300"
         >
-          Hapus riwayat
+          {localText("Hapus riwayat")}
         </button>
       </div>
       {/* One swipeable row (not a grid) so it never pushes the main feed far down. */}

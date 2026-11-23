@@ -1,3 +1,4 @@
+import { languageFamily } from "../../src/lib/language-family";
 /**
  * Dynamic sitemap for Google Search Console.
  * Nitro middleware (Cloudflare) — do not keep static public/sitemap*.xml or they shadow this.
@@ -193,8 +194,24 @@ function watchEntries(
   });
 }
 
+function localizedEntries(entries: string[]) {
+  const seen = new Set<string>();
+  return entries.flatMap(entry => {
+    const value = /<loc>([^<]+)<\/loc>/.exec(entry)?.[1];
+    if (!value) return [entry];
+    const base = new URL(value.replaceAll("&amp;", "&"));
+    const urls = languageFamily(base.pathname + base.search);
+    return [...new Set(Object.values(urls))].flatMap(path => {
+      const url = new URL(path, base.origin).href;
+      if (seen.has(url)) return [];
+      seen.add(url);
+      return [entry.replace("<loc>" + value + "</loc>", "<loc>" + escapeXml(url) + "</loc>")];
+    });
+  });
+}
+
 function wrapUrlset(body: string[]): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n${body.join("\n")}\n</urlset>\n`;
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n${localizedEntries(body).join("\n")}\n</urlset>\n`;
 }
 
 function wrapIndex(locs: Array<{ loc: string; lastmod?: string }>): string {

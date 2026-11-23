@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 import { useEffect, useState } from "react";
 import { InstallApp } from "@/components/install-app";
 import { PushButton } from "@/components/video/push-button";
@@ -23,6 +24,7 @@ function bumpViews(): number {
 }
 
 export function ReturnVisitor() {
+  const localText = usePublicText();
   const [views, setViews] = useState(0);
   const [bookmark, setBookmark] = useState(false);
 
@@ -53,8 +55,7 @@ export function ReturnVisitor() {
       {bookmark ? (
         <div className="flex items-start justify-between gap-3 rounded-lg border border-teal-400/30 bg-teal-400/[0.06] p-3 text-sm text-zinc-200">
           <p>
-            <strong className="text-teal-300">Simpan alamat ini:</strong> koleksidrpinguin.com. Tekan ☆ / Ctrl+D atau menu
-            browser → Bookmark. Kalau susah dibuka, pakai alamat cadangan{" "}
+            <strong className="text-teal-300">{localText("Simpan alamat ini:")}</strong> {localText("koleksidrpinguin.com. Tekan ☆ / Ctrl+D atau menu browser → Bookmark. Kalau susah dibuka, pakai alamat cadangan")}{" "}
             <a href="https://koleksidrpinguin.site" className="text-teal-300 underline underline-offset-2">
               koleksidrpinguin.site
             </a>
@@ -63,7 +64,7 @@ export function ReturnVisitor() {
           <button
             type="button"
             onClick={closeBookmark}
-            aria-label="Tutup"
+            aria-label={localText("Tutup")}
             className="shrink-0 px-1 text-lg leading-none text-zinc-400 hover:text-white"
           >
             ×

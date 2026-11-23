@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { LegalPage } from "@/components/legal-page";
 import { SITE_ORIGIN } from "@/lib/seo";
@@ -23,95 +24,77 @@ function H2({ children }: { children: string }) {
 }
 
 function Page() {
+  const localText = usePublicText();
   return (
-    <LegalPage title="Kebijakan Privasi">
-      <p className="text-xs text-muted/70">Terakhir diperbarui: 7 Oktober 2026</p>
+    <LegalPage title={localText("Kebijakan Privasi")}>
+      <p className="text-xs text-muted/70">{localText("Terakhir diperbarui: 7 Oktober 2026")}</p>
       <p>
-        Kebijakan ini menjelaskan data apa yang dikumpulkan saat Anda mengakses
-        koleksidrpinguin.com (&ldquo;Dr. Pinguin&rdquo;, &ldquo;Situs&rdquo;) dan bagaimana data
-        tersebut digunakan. Situs ini hanya untuk pengguna berusia 18 tahun ke atas.
+        {localText("Kebijakan ini menjelaskan data apa yang dikumpulkan saat Anda mengakses koleksidrpinguin.com (“Dr. Pinguin”, “Situs”) dan bagaimana data tersebut digunakan. Situs ini hanya untuk pengguna berusia 18 tahun ke atas.")}
       </p>
 
-      <H2>1. Tanpa akun, tanpa data pribadi</H2>
+      <H2>{localText("1. Tanpa akun, tanpa data pribadi")}</H2>
       <p>
-        Pengunjung tidak perlu membuat akun, dan kami tidak meminta nama, email, nomor telepon,
-        atau data pembayaran. Kami tidak menjual, menyewakan, atau membagikan data pribadi kepada
-        pihak lain untuk tujuan pemasaran.
+        {localText("Pengunjung tidak perlu membuat akun, dan kami tidak meminta nama, email, nomor telepon, atau data pembayaran. Kami tidak menjual, menyewakan, atau membagikan data pribadi kepada pihak lain untuk tujuan pemasaran.")}
       </p>
 
-      <H2>2. Analitik anonim</H2>
-      <p>Untuk memahami trafik dan memperbaiki situs, kami mencatat data analitik anonim berikut:</p>
+      <H2>{localText("2. Analitik anonim")}</H2>
+      <p>{localText("Untuk memahami trafik dan memperbaiki situs, kami mencatat data analitik anonim berikut:")}</p>
       <ul className="list-disc space-y-1 pl-5">
-        <li>halaman yang dibuka (page view) dan waktu kunjungan;</li>
+        <li>{localText("halaman yang dibuka (page view) dan waktu kunjungan;")}</li>
         <li>
-          ID pengunjung acak dan anonim yang disimpan di localStorage browser Anda (tidak terkait
-          dengan identitas Anda);
+          {localText("ID pengunjung acak dan anonim yang disimpan di localStorage browser Anda (tidak terkait dengan identitas Anda);")}
         </li>
-        <li>jenis perangkat dan browser (diturunkan dari user-agent);</li>
-        <li>referrer (situs asal kunjungan) dan perkiraan negara bila tersedia.</li>
+        <li>{localText("jenis perangkat dan browser (diturunkan dari user-agent);")}</li>
+        <li>{localText("referrer (situs asal kunjungan) dan perkiraan negara bila tersedia.")}</li>
       </ul>
       <p>
-        Data ini disimpan di Cloudflare D1/KV (infrastruktur Cloudflare) dan hanya dipakai dalam
-        bentuk statistik agregat. Alamat IP dapat diproses sementara oleh server untuk pembatasan
-        laju (anti-spam/bot), tetapi tidak disimpan di database analitik kami. Kami juga dapat
-        memakai layanan analitik pihak ketiga yang tidak memakai cookie (Umami) untuk statistik
-        agregat.
+        {localText("Data ini disimpan di Cloudflare D1/KV (infrastruktur Cloudflare) dan hanya dipakai dalam bentuk statistik agregat. Alamat IP dapat diproses sementara oleh server untuk pembatasan laju (anti-spam/bot), tetapi tidak disimpan di database analitik kami. Kami juga dapat memakai layanan analitik pihak ketiga yang tidak memakai cookie (Umami) untuk statistik agregat.")}
       </p>
 
-      <H2>3. Cookie dan penyimpanan lokal</H2>
+      <H2>{localText("3. Cookie dan penyimpanan lokal")}</H2>
       <ul className="list-disc space-y-1 pl-5">
         <li>
-          <strong>Gerbang usia 18+</strong>: cookie <code>dp_age_ok</code> dan localStorage
-          menyimpan konfirmasi bahwa Anda berusia 18+ agar gerbang usia tidak muncul setiap
-          kunjungan (berlaku hingga 1 tahun).
+          <strong>{localText("Gerbang usia 18+")}</strong>{localText(": cookie")} <code>dp_age_ok</code> {localText("dan localStorage menyimpan konfirmasi bahwa Anda berusia 18+ agar gerbang usia tidak muncul setiap kunjungan (berlaku hingga 1 tahun).")}
         </li>
         <li>
-          <strong>ID pengunjung anonim</strong>: localStorage untuk menghitung pengunjung unik dan
-          pengunjung online.
+          <strong>{localText("ID pengunjung anonim")}</strong>{localText(": localStorage untuk menghitung pengunjung unik dan pengunjung online.")}
         </li>
         <li>
-          <strong>Cache poster</strong>: service worker dapat menyimpan thumbnail di cache browser
-          agar halaman lebih cepat.
+          <strong>{localText("Cache poster")}</strong>{localText(": service worker dapat menyimpan thumbnail di cache browser agar halaman lebih cepat.")}
         </li>
       </ul>
       <p>
-        Anda dapat menghapus cookie dan data situs kapan saja melalui pengaturan browser. Thumbnail
-        diproksi dari host yang diizinkan agar poster tampil tanpa membuka sumber langsung.
+        {localText("Anda dapat menghapus cookie dan data situs kapan saja melalui pengaturan browser. Thumbnail diproksi dari host yang diizinkan agar poster tampil tanpa membuka sumber langsung.")}
       </p>
 
-      <H2>4. Embed dan layanan pihak ketiga</H2>
+      <H2>{localText("4. Embed dan layanan pihak ketiga")}</H2>
       <p>
-        Video diputar melalui pemutar embed dari layanan hosting pihak ketiga (misalnya Streamtape
-        dan host embed lainnya). Saat Anda memutar video, layanan tersebut dapat mengumpulkan data
-        (termasuk cookie, alamat IP, dan iklan) sesuai kebijakan privasi mereka sendiri. Kami tidak
-        mengendalikan dan tidak bertanggung jawab atas praktik privasi pihak ketiga tersebut. Font
-        dimuat dari Google Fonts.
+        {localText("Video diputar melalui pemutar embed dari layanan hosting pihak ketiga (misalnya Streamtape dan host embed lainnya). Saat Anda memutar video, layanan tersebut dapat mengumpulkan data (termasuk cookie, alamat IP, dan iklan) sesuai kebijakan privasi mereka sendiri. Kami tidak mengendalikan dan tidak bertanggung jawab atas praktik privasi pihak ketiga tersebut. Font dimuat dari Google Fonts.")}
       </p>
 
-      <H2>5. Usia pengguna</H2>
+      <H2>{localText("5. Usia pengguna")}</H2>
       <p>
-        Situs ini tidak ditujukan untuk siapa pun di bawah 18 tahun. Jika Anda belum berusia 18
-        tahun, segera tinggalkan situs ini.
+        {localText("Situs ini tidak ditujukan untuk siapa pun di bawah 18 tahun. Jika Anda belum berusia 18 tahun, segera tinggalkan situs ini.")}
       </p>
 
-      <H2>6. Kontak</H2>
+      <H2>{localText("6. Kontak")}</H2>
       <p>
-        Pertanyaan tentang privasi atau permintaan penghapusan data dapat dikirim melalui halaman{" "}
+        {localText("Pertanyaan tentang privasi atau permintaan penghapusan data dapat dikirim melalui halaman")}{" "}
         <Link to="/kontak" className="underline">
-          Kontak
+          {localText("Kontak")}
         </Link>
-        . Lihat juga{" "}
+        {localText(". Lihat juga")}{" "}
         <Link to="/syarat" className="underline">
-          Syarat &amp; Ketentuan
+          {localText("Syarat & Ketentuan")}
         </Link>{" "}
-        dan{" "}
+        {localText("dan")}{" "}
         <Link to="/2257" className="underline">
-          pernyataan 2257
+          {localText("pernyataan 2257")}
         </Link>
         .
       </p>
 
-      <H2>English summary</H2>
+      <H2>{localText("English summary")}</H2>
       <p>
         No accounts and no personal data are collected or sold. We record anonymous analytics (page
         views, a random anonymous visitor ID stored in localStorage, device/browser type, referrer,

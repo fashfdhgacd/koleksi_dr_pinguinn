@@ -1,3 +1,4 @@
+import { decodePublicPath, localizedPath } from "../../src/lib/public-locale.ts";
 /**
  * URL template /watch/$id (atau /watch/:id, /watch/{id}) yang sempat terindeks → 302 ke beranda + noindex.
  * Hidden / blocked / rejected ids (minor/school, owner hide, catalog block) → 302 ke beranda + noindex
@@ -37,7 +38,7 @@ export default async function watchPlaceholderMiddleware(
     });
   }
 
-  const path = event.url.pathname;
+  const { path, language } = decodePublicPath(event.url.pathname);
   const method = event.req.method;
   let info: WatchIdInfo | null = null;
   const m = path.match(WATCH_ID_RE);
@@ -53,5 +54,13 @@ export default async function watchPlaceholderMiddleware(
   }
 
   const decision = decideWatchPlaceholder(path, method, event.url.search, info);
-  return decisionResponse(decision) ?? next();
+  const response = decisionResponse(decision);
+  if (!response) return next();
+  const location = response.headers.get("location");
+  if (location) {
+    const target = new URL(location, event.url);
+    target.pathname = localizedPath(target.pathname, language);
+    response.headers.set("location", target.href);
+  }
+  return response;
 }
