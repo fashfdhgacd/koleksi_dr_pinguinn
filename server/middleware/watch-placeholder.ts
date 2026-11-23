@@ -16,12 +16,25 @@ import {
   type WatchIdInfo,
 } from "../lib/watch-placeholder-decide";
 
+import { withWatchRequestReads } from "../lib/watch-request-reads";
+
 interface WatchPlaceholderEvent {
   url: URL;
   req: { method: string; headers: Headers };
 }
 
 export default async function watchPlaceholderMiddleware(
+  event: WatchPlaceholderEvent,
+  next: () => unknown | Promise<unknown>,
+): Promise<unknown> {
+  const { path } = decodePublicPath(event.url.pathname);
+  if (WATCH_ID_RE.test(path) && (event.req.method === "GET" || event.req.method === "HEAD")) {
+    return withWatchRequestReads(() => handlePlaceholder(event, next));
+  }
+  return handlePlaceholder(event, next);
+}
+
+async function handlePlaceholder(
   event: WatchPlaceholderEvent,
   next: () => unknown | Promise<unknown>,
 ): Promise<unknown> {
