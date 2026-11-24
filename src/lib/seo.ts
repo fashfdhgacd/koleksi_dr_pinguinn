@@ -1,3 +1,4 @@
+import { publicationDate } from "./catalog/publication-date.js";
 import { findCategory } from "@/lib/catalog/categories";
 import { curatedDescription } from "@/lib/catalog/video-descriptions";
 
@@ -449,28 +450,6 @@ function normalizeEmbedUrl(url: string): string {
   }
 }
 
-/** createdAt (detik/ms/ISO) -> ISO 8601 dengan zona WIB; undefined kalau tidak valid. */
-function realUploadDate(raw?: string | number | null): string | undefined {
-  if (raw == null || raw === "") return undefined;
-  let ms: number;
-  if (typeof raw === "number") ms = raw < 1e12 ? raw * 1000 : raw;
-  else if (/^\d+$/.test(raw.trim())) {
-    const n = Number(raw.trim());
-    ms = n < 1e12 ? n * 1000 : n;
-  } else ms = Date.parse(raw);
-  if (!Number.isFinite(ms) || ms < Date.UTC(2015, 0, 1) || ms > Date.now() + 86_400_000) return undefined;
-  return new Date(ms).toISOString().replace(/\.\d{3}Z$/, "Z");
-}
-
-function uploadDateFromId(id: string): string {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-  const day = (Math.abs(h) % 28) + 1;
-  const month = (Math.abs(h >> 5) % 12) + 1;
-  const year = 2025 + (Math.abs(h >> 9) % 2);
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}T00:00:00+07:00`;
-}
-
 export function videoJsonLd(input: {
   id: string;
   title: string;
@@ -490,6 +469,8 @@ export function videoJsonLd(input: {
   const thumb = seoVideoThumbnail(input.id, input.thumbnail);
   const pageUrl = `${SITE_ORIGIN}/watch/${input.id}`;
   const label = videoTextLabel(input.category);
+  const uploaded = publicationDate(input.uploadDate);
+  if (!uploaded) return null;
 
   return {
     "@context": "https://schema.org",
@@ -497,7 +478,7 @@ export function videoJsonLd(input: {
     name: String(input.title || "Video").trim(),
     description: (input.description || "").trim().slice(0, 300),
     thumbnailUrl: thumb,
-    uploadDate: realUploadDate(input.uploadDate) || uploadDateFromId(input.id),
+    uploadDate: uploaded,
     inLanguage: "id",
     isPartOf: { "@id": `${HOME_CANONICAL}#website` },
     copyrightHolder: { "@id": `${HOME_CANONICAL}#organization` },
@@ -530,7 +511,7 @@ export function videoJsonLd(input: {
           },
         }
       : {}),
-    ...(embed ? { embedUrl: normalizeEmbedUrl(embed) } : {}),
+    ...(embed && embed !== content ? { embedUrl: normalizeEmbedUrl(embed) } : {}),
     ...(content ? { contentUrl: content } : {}),
     ...(input.durationSec && input.durationSec > 0
       ? { duration: `PT${Math.round(input.durationSec)}S` }

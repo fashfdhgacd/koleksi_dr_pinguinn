@@ -148,7 +148,6 @@ function pageEntries(
 }
 
 function videoBlock(item: Awaited<ReturnType<typeof listSitemapWatchEntries>>[number]): string {
-  const pageUrl = `${SITE_ORIGIN}/watch/${encodeURIComponent(item.id)}`;
   const title = cleanDisplayTitle(item.title || "") || "Video";
   const desc = publicWatchDescription({
     id: item.id,
@@ -160,21 +159,23 @@ function videoBlock(item: Awaited<ReturnType<typeof listSitemapWatchEntries>>[nu
     source: item.source || null,
   });
   const thumb = seoVideoThumbnail(item.id, item.thumbnail);
-  const player = item.embed || pageUrl;
+
   // File video langsung (Videy mp4, embed .mp4) → video:content_loc supaya Google bisa
   // mengindeks file aslinya, bukan cuma halaman player iframe.
   const fileRe = /\.(mp4|webm|mov|m4v)($|\?)/i;
   const content = [item.direct, item.embed].find((u) => u && fileRe.test(u));
+  const player = item.embed && !fileRe.test(item.embed) ? item.embed : undefined;
+  if (!content && !player) return "";
   const parts = [
     `    <video:video>`,
     `      <video:thumbnail_loc>${escapeXml(thumb)}</video:thumbnail_loc>`,
     `      <video:title>${escapeXml(title.slice(0, 100))}</video:title>`,
     `      <video:description>${escapeXml(desc.slice(0, 2048))}</video:description>`,
     ...(content ? [`      <video:content_loc>${escapeXml(content)}</video:content_loc>`] : []),
-    `      <video:player_loc>${escapeXml(player)}</video:player_loc>`,
+    ...(player ? [`      <video:player_loc>${escapeXml(player)}</video:player_loc>`] : []),
   ];
   if (item.duration && item.duration <= 28800) parts.push(`      <video:duration>${item.duration}</video:duration>`);
-  if (item.lastmod) parts.push(`      <video:publication_date>${escapeXml(item.lastmod)}</video:publication_date>`);
+  if (item.published) parts.push(`      <video:publication_date>${escapeXml(item.published)}</video:publication_date>`);
   parts.push(`      <video:family_friendly>no</video:family_friendly>`, `    </video:video>`);
   return parts.join("\n");
 }
