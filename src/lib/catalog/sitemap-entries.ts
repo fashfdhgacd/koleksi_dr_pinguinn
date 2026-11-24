@@ -1,3 +1,4 @@
+import { publicationDate } from "./publication-date.js";
 import { loadItems } from "./local";
 import { slugOf, sourceLabel } from "./local-shared";
 import { significantLastmod } from "./lastmod.js";
@@ -8,6 +9,7 @@ import { isGoneVideo } from "./dead-ids";
 export type SitemapWatchEntry = {
   id: string;
   lastmod?: string;
+  published?: string;
   title?: string;
   category?: string;
   embed?: string;
@@ -78,7 +80,7 @@ async function listBaseEntries(): Promise<SitemapWatchEntry[]> {
     if (!it?.id || seen.has(it.id) || isSeoBlockedId(it.id) || isGoneVideo(it.id)) continue;
     seen.add(it.id);
     const lastmod = significantLastmod(it.createdAt ?? it.date, undefined) ?? toSitemapLastmod(it.createdAt ?? it.date);
-    const entry: SitemapWatchEntry = { id: it.id };
+    const entry: SitemapWatchEntry = { id: it.id, published: publicationDate(it.createdAt) ?? publicationDate(it.date) };
     if (lastmod) entry.lastmod = lastmod;
     const title = str(it.title);
     if (title) entry.title = title;
@@ -125,7 +127,7 @@ export async function uploadDateOf(id: string): Promise<string | number | undefi
     map = new Map();
     for (const it of items) {
       if (!it?.id || map.has(it.id)) continue;
-      const raw = it.createdAt ?? it.date;
+      const raw = publicationDate(it.createdAt) ?? publicationDate(it.date);
       if (typeof raw === "number" || (typeof raw === "string" && raw.trim())) map.set(it.id, raw);
     }
     dateMemo.set(items, map);

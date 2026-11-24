@@ -163,12 +163,12 @@ export const Route = createFileRoute("/watch/$id")({
         ...videoMetas,
       ],
       links: [{ rel: "canonical", href: url }],
-      scripts: jsonLd
+      scripts: item
         ? [
-            { type: "application/ld+json", children: jsonLdString(jsonLd) },
+            ...(jsonLd ? [{ type: "application/ld+json", children: jsonLdString(jsonLd) }] : []),
             {
               type: "application/ld+json",
-              children: jsonLdString(watchBreadcrumb(item!.category, cleanDisplayTitle(item!.title), url)),
+              children: jsonLdString(watchBreadcrumb(item.category, cleanDisplayTitle(item.title), url)),
             },
           ]
         : [],
