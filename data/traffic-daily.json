@@ -1,6 +1,6 @@
 {
   "description": "Pengunjung harian per sumber (AKTUAL dari D1 koleksi-analytics, hari WIB). sources = visitor_id unik per hari menurut referrer kunjungan pertama hari itu; 'internal' = referrer domain sendiri. Bukan request Cloudflare. Data mulai 2026-10-05 11:03 WIB (sebelumnya tidak tercatat). Diisi .github/workflows/traffic-monitor.yml.",
-  "updatedAt": "2026-11-22T23:34:35Z",
+  "updatedAt": "2026-11-24T03:56:29Z",
   "timezone": "Asia/Jakarta (WIB)",
   "days": {
     "2026-10-05": {
@@ -1251,40 +1251,69 @@
       },
       "unique_visitors": 1173,
       "pageviews": 16309,
-      "new": 845,
-      "returning": 328,
+      "new": 846,
+      "returning": 327,
       "landing_visitors": 1173
     },
     "2026-11-23": {
       "sources": {
-        "brave": 9,
-        "direct": 8,
+        "brave": 38,
+        "direct": 15,
         "duckduckgo": 1,
-        "google": 71,
-        "internal": 156,
-        "justpaste": 163,
-        "other": 22,
+        "google": 218,
+        "internal": 452,
+        "justpaste": 511,
+        "other": 83,
         "telegram": 1,
-        "tube_ref": 4,
-        "x": 1,
-        "yandex": 9
+        "tube_ref": 11,
+        "x": 2,
+        "yandex": 28
       },
       "sources_id": {
-        "brave": 9,
-        "direct": 1,
-        "google": 4,
-        "internal": 83,
-        "justpaste": 125,
-        "other": 9,
+        "brave": 37,
+        "direct": 2,
+        "google": 16,
+        "internal": 268,
+        "justpaste": 388,
+        "other": 43,
         "telegram": 1,
         "x": 1,
-        "yandex": 5
+        "yandex": 8
       },
-      "unique_visitors": 315,
-      "pageviews": 3637,
-      "new": 326,
-      "returning": 119,
-      "landing_visitors": 445,
+      "unique_visitors": 1360,
+      "pageviews": 16525,
+      "new": 1041,
+      "returning": 319,
+      "landing_visitors": 1360
+    },
+    "2026-11-24": {
+      "sources": {
+        "brave": 19,
+        "direct": 7,
+        "google": 115,
+        "internal": 295,
+        "justpaste": 205,
+        "other": 47,
+        "tube_ref": 7,
+        "x": 3,
+        "yandex": 15
+      },
+      "sources_id": {
+        "brave": 16,
+        "direct": 1,
+        "google": 6,
+        "internal": 175,
+        "justpaste": 161,
+        "other": 32,
+        "tube_ref": 1,
+        "x": 1,
+        "yandex": 1
+      },
+      "unique_visitors": 674,
+      "pageviews": 8148,
+      "new": 546,
+      "returning": 167,
+      "landing_visitors": 713,
       "partial": true
     }
   }
