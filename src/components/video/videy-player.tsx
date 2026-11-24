@@ -483,7 +483,9 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
         poster={poster}
         controls={phase === "main"}
         controlsList="nodownload"
-      />
+      >
+        <source src={file} />
+      </video>
       {phase === "main" ? (
         // Re-armed popunder tap during playback (shared per-video cap); removes itself after firing.
         <PopTapLayer

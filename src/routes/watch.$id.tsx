@@ -105,18 +105,17 @@ export const Route = createFileRoute("/watch/$id")({
     const embedUrl = item
       ? (item.video_url || item.qualities?.[0]?.url || "").trim() || null
       : null;
-    const contentUrl =
-      embedUrl && /\.(mp4|webm|mov)($|\?)/i.test(embedUrl) ? embedUrl : null;
-    // Direct mp4 (Videy) only: lets WhatsApp/Telegram/iMessage render a playable video
-    // preview instead of a static thumbnail. Iframe embeds can't be og:video.
-    const videoMetas =
-      contentUrl ?
-        [
-          { property: "og:video", content: contentUrl },
-          { property: "og:video:secure_url", content: contentUrl },
-          { property: "og:video:type", content: "video/mp4" },
-        ]
-      : [];
+    const mediaExtension = embedUrl?.match(/\.(mp4|m4v|webm|mov)(?:$|[?#])/i)?.[1]?.toLowerCase();
+    const contentUrl = mediaExtension ? embedUrl : null;
+    const videoType = mediaExtension === "webm" ? "video/webm"
+      : mediaExtension === "mov" ? "video/quicktime"
+      : mediaExtension ? "video/mp4" : "text/html";
+    const videoMetas = embedUrl && /^https?:\/\//i.test(embedUrl) ? [
+      { property: "og:video", content: embedUrl },
+      ...(/^https:\/\//i.test(embedUrl) ? [{ property: "og:video:secure_url", content: embedUrl }] : []),
+      { property: "og:video:type", content: videoType },
+      { property: "og:video:image", content: image },
+    ] : [];
     const jsonLd = item
       ? videoJsonLd({
           id: item.id,
