@@ -1530,5 +1530,17 @@
   "percobaan": [
     "percubaan",
     "attempt"
+  ],
+  "Tonton “{title}” dalam koleksi {category}{detail}.": [
+    "Tonton “{title}” dalam koleksi {category}{detail}.",
+    "Watch “{title}” in the {category} collection{detail}."
+  ],
+  "Tonton “{title}”{detail}.": [
+    "Tonton “{title}”{detail}.",
+    "Watch “{title}”{detail}."
+  ],
+  "Pilih episode lain dari daftar seri di halaman ini.": [
+    "Pilih episod lain daripada senarai siri di halaman ini.",
+    "Browse the episode list on this page for more from this series."
   ]
 }

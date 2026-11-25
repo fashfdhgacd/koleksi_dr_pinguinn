@@ -16,7 +16,7 @@ import { hostLabel } from "@/lib/catalog/embed";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
-import { cleanDisplayTitle, editorialWatchDescription, withoutDomainSuffix } from "@/lib/seo";
+import { cleanDisplayTitle, withoutDomainSuffix } from "@/lib/seo";
 import { shareIntentUrls, videoShareUrl } from "@/lib/share-url";
 import { landingForCategory } from "@/lib/catalog/landing";
 import { isSeoBlockedId } from "@/lib/catalog/seo-block";
@@ -28,6 +28,8 @@ import { ReportSheet } from "@/components/report-sheet";
 import { rememberWatched } from "@/components/video/recently-watched";
 import { DRP_CATEGORY, DRP_SOURCES, drpKindOfUrl } from "@/lib/catalog/drp-hosts.js";
 import deadSources from "@/lib/catalog/dead-sources.json";
+
+import { watchSummary } from "./summary";
 
 const routeApi = getRouteApi("/watch/$id");
 function shareUrl(id: string): string {
@@ -430,7 +432,7 @@ export function WatchPage() {
     };
   }, [id, status]);
 
-  const description = item ? editorialWatchDescription(item) : "";
+  const description = item && watchSummary(item, language, localText);
   const softLoading = status === "loading" && related.length > 0;
   const coldLoading = status === "loading" && related.length === 0;
 
