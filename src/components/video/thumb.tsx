@@ -153,7 +153,7 @@ export function VideoThumb({
   const poster = isPosterSrc(current);
   // Penguin painted under the image while it loads (slow /thumb resolve, stalled host, blocked
   // domain): a card is never an empty box; the real poster covers it as soon as it arrives.
-  const placeholder = poster ? undefined : PLACEHOLDER_STYLE;
+  const placeholder = portrait || poster ? undefined : PLACEHOLDER_STYLE;
 
   return (
     <img
