@@ -1486,5 +1486,61 @@
   "Genre": [
     "Genre",
     "Genres"
+  ],
+  "Iklan dari penyedia video ({host}) bisa muncul saat diputar.": [
+    "Iklan daripada {host} mungkin dipaparkan semasa video dimainkan.",
+    "Ads from {host} may appear during playback."
+  ],
+  "Buka di {host}": [
+    "Buka di {host}",
+    "Open on {host}"
+  ],
+  "{host} melaporkan error untuk video ini.": [
+    "{host} melaporkan ralat pada video ini.",
+    "{host} reported an error for this video."
+  ],
+  "Player {host} lambat merespons. Tunggu sebentar, atau:": [
+    "Pemain {host} lambat memberikan respons. Tunggu sebentar atau pilih tindakan di bawah.",
+    "The {host} player is responding slowly. Wait a moment or try an option below."
+  ],
+  "Video ini sudah tidak tersedia di {host}.": [
+    "Video ini tidak lagi tersedia di {host}.",
+    "This video is no longer available on {host}."
+  ],
+  "Memuat ulang player {host}…": [
+    "Memuatkan semula pemain {host}…",
+    "Reloading the {host} player…"
+  ],
+  "Sedang memuat player {host}…": [
+    "Memuatkan pemain {host}…",
+    "Loading the {host} player…"
+  ],
+  "Server {host} sedang lambat, masih menunggu…": [
+    "Pelayan {host} lambat memberikan respons…",
+    "Still waiting for {host} to respond…"
+  ],
+  "Masih memuat dari {host}…": [
+    "Masih memuatkan video daripada {host}…",
+    "Still loading from {host}…"
+  ],
+  "dtk": [
+    "s",
+    "s"
+  ],
+  "percobaan": [
+    "percubaan",
+    "attempt"
+  ],
+  "Tonton “{title}” dalam koleksi {category}{detail}.": [
+    "Tonton “{title}” dalam koleksi {category}{detail}.",
+    "Watch “{title}” in the {category} collection{detail}."
+  ],
+  "Tonton “{title}”{detail}.": [
+    "Tonton “{title}”{detail}.",
+    "Watch “{title}”{detail}."
+  ],
+  "Pilih episode lain dari daftar seri di halaman ini.": [
+    "Pilih episod lain daripada senarai siri di halaman ini.",
+    "Browse the episode list on this page for more from this series."
   ]
 }

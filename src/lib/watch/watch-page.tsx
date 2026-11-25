@@ -16,7 +16,7 @@ import { hostLabel } from "@/lib/catalog/embed";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
-import { cleanDisplayTitle, publicWatchDescription } from "@/lib/seo";
+import { cleanDisplayTitle, withoutDomainSuffix } from "@/lib/seo";
 import { shareIntentUrls, videoShareUrl } from "@/lib/share-url";
 import { landingForCategory } from "@/lib/catalog/landing";
 import { isSeoBlockedId } from "@/lib/catalog/seo-block";
@@ -28,6 +28,8 @@ import { ReportSheet } from "@/components/report-sheet";
 import { rememberWatched } from "@/components/video/recently-watched";
 import { DRP_CATEGORY, DRP_SOURCES, drpKindOfUrl } from "@/lib/catalog/drp-hosts.js";
 import deadSources from "@/lib/catalog/dead-sources.json";
+
+import { watchSummary } from "./summary";
 
 const routeApi = getRouteApi("/watch/$id");
 function shareUrl(id: string): string {
@@ -430,6 +432,7 @@ export function WatchPage() {
     };
   }, [id, status]);
 
+  const description = item && watchSummary(item, language, localText);
   const softLoading = status === "loading" && related.length > 0;
   const coldLoading = status === "loading" && related.length === 0;
 
@@ -437,7 +440,7 @@ export function WatchPage() {
     <Shell>
       {coldLoading ? (
         <div className="space-y-8">
-          <Skeleton className="aspect-video rounded-2xl" />
+          <Skeleton className="aspect-video rounded-none" />
           <Skeleton className="h-10 w-2/3 rounded-md" />
           <Skeleton className="h-20 w-full rounded-md" />
           <VideoGridSkeleton count={6} />
@@ -447,13 +450,13 @@ export function WatchPage() {
       ) : status === "empty" || (!item && !softLoading) ? (
         <EmptyState title={localText("Video tidak ditemukan")} description={localText("Judul ini tidak ada di katalog atau sudah dihapus.")} />
       ) : (
-        <article className="space-y-8" onContextMenu={(e) => e.preventDefault()}>
+        <article className="space-y-3 sm:space-y-8" onContextMenu={(e) => e.preventDefault()}>
           {item ? (() => {
             const server = pickServer(item, wantedServer);
             const playItem = itemForServer(item, server);
             return (
             <>
-          <div className="-mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0">
+          <div className="-mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0 [&_.overflow-hidden:has(>_.aspect-video)]:rounded-none [&_.aspect-video.overflow-hidden]:rounded-none [&_.inset-0.z-20]:rounded-none">
             {isVideyItem(item) ? (
               <AdblockGate key={`gate-${item.id}`} videoId={item.id}>
                 <VideyPlayer key={item.id} item={item} />
@@ -492,7 +495,8 @@ export function WatchPage() {
               );
             })()}
           </div>
-          <header className="max-w-3xl space-y-3">
+          <header className="max-w-3xl space-y-2 sm:space-y-3">
+            <h1 className="break-words font-display text-2xl leading-tight text-foreground sm:text-5xl">{cleanDisplayTitle(withoutDomainSuffix(item.title))}</h1>
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
               {isVideyItem(item) ? (
                 <a href={publicHref("/kategori/videy")} className="hover:text-foreground hover:underline">
@@ -519,9 +523,8 @@ export function WatchPage() {
                 />
               </span>
             </p>
-            <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{cleanDisplayTitle(item.title)}</h1>
             {item.episodes && item.episodes.length > 1 ? <EpisodeStrip episodes={item.episodes} currentId={item.id} /> : null}
-            <p className="text-sm leading-relaxed text-muted">{publicWatchDescription(item)}</p>
+            {description && <p className="text-sm leading-relaxed text-muted">{description}</p>}
             <nav aria-label={localText("Kategori dan pencarian")} className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
               {(() => {
                 const slug = categorySlugFor(item.category);
@@ -611,7 +614,7 @@ export function WatchPage() {
             );
           })() : (
             <div className="space-y-8">
-              <Skeleton className="aspect-video rounded-2xl" />
+              <Skeleton className="aspect-video rounded-none" />
               <Skeleton className="h-10 w-2/3 rounded-md" />
               <Skeleton className="h-20 w-full rounded-md" />
             </div>

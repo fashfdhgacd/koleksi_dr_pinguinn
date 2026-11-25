@@ -1,3 +1,4 @@
+import { excludedFromOverview } from "./overview-exclusions";
 /**
  * Build /en landing grids once per catalog object (WeakMap), then paginate.
  * In-memory only: no KV writes, no per-visit work beyond a memoized scan.
@@ -41,7 +42,7 @@ function cardsForAllEn(
       continue;
     }
     const title = String(item.title || "");
-    if (!title || hasBannedWord(title) || isMinorContentTitle(title)) {
+    if (!title || hasBannedWord(title) || excludedFromOverview(item.id, title) || isMinorContentTitle(title)) {
       i++;
       continue;
     }
@@ -60,6 +61,21 @@ function cardsForAllEn(
   }
   memo.set(items, out);
   return out;
+}
+
+const totals = new WeakMap<Map<string, VideoCard[]>, number>();
+
+export async function enCollectionVideoCount() {
+  const cache = await loadItems();
+  const all = cardsForAllEn(cache.items, cache.posters, cache.videyNo);
+  const cached = totals.get(all);
+  if (cached !== undefined) return cached;
+  const ids = new Set<string>();
+  for (const cards of all.values()) {
+    if (cards.length >= LANDING_MIN_VIDEOS) for (const card of cards) ids.add(card.id);
+  }
+  totals.set(all, ids.size);
+  return ids.size;
 }
 
 export async function enLandingCounts(): Promise<Map<string, number>> {

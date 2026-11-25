@@ -107,7 +107,7 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
       // Card-click popunder (card-popunder.ts): same once-per-session flag and popc_* counters as the
       // catalog grid; opens in this click and never prevents or delays the navigation.
       onClickCapture={(e) => onCatalogCardClick(e, (id) => String(usable.find((v) => v.id === id)?.creator || ""))}
-      className="relative z-0 isolate overflow-hidden rounded-2xl bg-surface sm:rounded-[28px]"
+      className="relative z-0 isolate overflow-hidden bg-surface"
       aria-roledescription="carousel"
     >
       <div className="relative aspect-[16/10] sm:aspect-[16/9] lg:aspect-[21/9]">
@@ -118,7 +118,8 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
             src={current.thumbnail}
             alt={heroTitle}
             eager
-            className="size-full object-cover object-center transition-opacity duration-300"
+            catalog
+            className="transition-opacity duration-300"
             onUnavailable={onThumbUnavailable}
           />
         </div>
@@ -126,7 +127,7 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
         {/* Text-legibility gradient: desktop only. Mobile is image + play, no overlay copy. */}
         <div className="pointer-events-none absolute inset-0 hidden bg-gradient-to-t from-background via-background/50 to-background/10 md:block" />
 
-        {/* Mobile (< md): whole hero tappable, centered modest play (48px). Title kept as sr-only for SEO/a11y. */}
+        {/* Mobile (< md): whole hero tappable, centered modest play (48px). */}
         <Link
           to="/watch/$id"
           params={{ id: current.id }}
@@ -140,8 +141,6 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
             <Play className="size-4 fill-current" style={{ marginLeft: 2 }} />
           </span>
         </Link>
-        {/* h2, not h1: the page H1 is the brand heading below the hero (one H1 per page). */}
-        <h2 className="sr-only md:hidden">{heroTitle}</h2>
 
         {/* Desktop (md+): same copy stack as before (label, title, meta, Putar sekarang). */}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 hidden flex-col gap-4 p-8 pb-12 md:flex lg:max-w-2xl lg:p-10 lg:pb-14">
@@ -176,6 +175,9 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
           </div>
         </div>
       </div>
+      <h2 className="break-words px-3 py-2 text-base font-semibold leading-snug text-foreground md:hidden">
+        <Link to="/watch/$id" params={{ id: current.id }}>{heroTitle}</Link>
+      </h2>
     </section>
   );
 }

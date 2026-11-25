@@ -1,3 +1,4 @@
+import { excludedFromOverview } from "./overview-exclusions";
 import { DEFAULT_PAGE_SIZE } from "./types";
 import type { PagedVideos, VideoCard, VideoDetail } from "./types";
 import { CATEGORY_LIST, MIN_LISTED_CATEGORY_COUNT, NOINDEX_CATEGORY_SLUGS, SEO_MIN_COUNT, findCategory } from "./categories";
@@ -126,9 +127,19 @@ function mixIndoHeavy(items: RawItem[], excludeId: string, limit: number, seed: 
   return shuffleSlot(picked, seed + 71).slice(0, limit);
 }
 
+const overviewLists = new WeakMap<RawItem[], RawItem[]>();
+function overviewList(items: RawItem[]) {
+  let list = overviewLists.get(items);
+  if (!list) {
+    list = items.filter(item => !excludedFromOverview(item.id, item.title));
+    overviewLists.set(items, list);
+  }
+  return list;
+}
+
 export async function listLatest(page = 1, limit = DEFAULT_PAGE_SIZE, _signal?: AbortSignal): Promise<PagedVideos> {
   const { terbaruSorted, posters, videyNo } = await loadItems();
-  return pageOf(terbaruSorted, page, limit, posters, videyNo);
+  return pageOf(overviewList(terbaruSorted), page, limit, posters, videyNo);
 }
 
 /**
@@ -152,7 +163,7 @@ export async function listFeatured(page = 1, limit = 8, _signal?: AbortSignal): 
   const memoKey = `${seed}:${want}:${limit}`;
   let pool = perBuild.get(memoKey);
   if (!pool) {
-    pool = mixIndoHeavy(items, "", want, seed).filter((x) => !isGoneVideo(x.id));
+    pool = mixIndoHeavy(overviewList(items), "", want, seed).filter((x) => !isGoneVideo(x.id));
     const withArt = pool.filter((x) => Boolean(thumbOf(x, posters)));
     if (withArt.length >= limit) pool = withArt;
     if (perBuild.size > 16) perBuild.clear();
@@ -183,7 +194,7 @@ export async function listCategory(
 ): Promise<PagedVideos> {
   const cache = await loadItems();
   const { posters, videyNo } = cache;
-  return pageOf(categoryPool(cache, category), page, limit, posters, videyNo);
+  return pageOf(overviewList(categoryPool(cache, category)), page, limit, posters, videyNo);
 }
 
 /**
@@ -395,7 +406,7 @@ function listedSlugs(cache: CatalogCache): Set<string> {
   for (const c of CATEGORY_LIST) {
     if (NOINDEX_CATEGORY_SLUGS.has(c.slug)) continue;
     if (!cache.bySlug.get(c.slug)?.length) continue;
-    const n = categoryPool(cache, c.slug).length;
+    const n = overviewList(categoryPool(cache, c.slug)).length;
     const seoMin = SEO_MIN_COUNT[c.slug];
     if (seoMin ? n >= seoMin : n >= MIN_LISTED_CATEGORY_COUNT || (c.slug === "videy" && n > 0)) set.add(c.slug);
   }

@@ -76,16 +76,18 @@ describe("watch page", () => {
     assert.equal(typeof WatchPage, "function");
   });
 
-  it("renders one generated description and video controls without the added FAQ", async () => {
+  it("renders the clean heading before the duration and includes a compact fallback description", async () => {
     const { publicWatchDescription } = await vite.ssrLoadModule("/src/lib/seo.ts");
     const desc = publicWatchDescription(video);
-    const html = await renderWatch(video);
-    assert.match(html, /Judul Contoh/);
+    const html = await renderWatch({ ...video, title: video.title + " - koleksidrpinguin.com" });
+    assert.match(html, /<h1[^>]*>Judul Contoh<\/h1>/);
+    const header = html.slice(html.indexOf("<h1"), html.indexOf("</header>", html.indexOf("<h1")));
+    assert.ok(header.indexOf("1m 0s") > header.indexOf("</h1>"));
     assert.match(html, /href="\/cari"/);
     assert.match(desc, /1 menit/);
     assert.match(desc, /Contoh/);
-    assert.equal(html.split(desc).length - 1, 1);
-    assert.equal(html.split("Judul Contoh").length - 1, 2);
+    assert.ok(!html.includes(desc));
+    assert.match(html, /Tonton “Judul Contoh” dalam koleksi contoh \(1 menit, HD\)\./);
     assert.match(html, /Bagikan/);
     assert.match(html, /1m 0s/);
     assert.doesNotMatch(html, /Pertanyaan Umum/);
@@ -97,6 +99,7 @@ describe("watch page", () => {
     const manual = "Deskripsi manual dari pemilik untuk video contoh ini, ditulis sendiri.";
     const html = await renderWatch({ ...video, description: manual });
     assert.ok(html.includes(manual));
+    assert.doesNotMatch(html, /dalam koleksi contoh/);
     assert.doesNotMatch(html, /ada di kategori/);
   });
 });
