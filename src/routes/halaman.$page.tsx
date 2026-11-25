@@ -12,8 +12,19 @@ export const Route = createFileRoute("/halaman/$page")({
     if (params.page === "1") throw redirect({ href: HOME_CANONICAL, statusCode: 301 });
     if (!parseHalamanParam(params.page)) throw notFound();
   },
-  loader: ({ params }) => loadHome({ search: { page: parseHalamanParam(params.page) || 2 } }),
-  head: ({ params }) => {
+  loader: async ({ params }) => {
+    const page = parseHalamanParam(params.page);
+    if (!page) throw notFound();
+    const data = await loadHome({ search: { page } });
+    if (data.ok && data.type === "home" && page > Math.ceil(data.latest.total / data.latest.limit)) {
+      throw notFound();
+    }
+    return data;
+  },
+  head: ({ params, loaderData }) => {
+    if (!loaderData?.ok || loaderData.type !== "home") {
+      return { meta: [{ name: "robots", content: "noindex,follow" }] };
+    }
     const page = parseHalamanParam(params.page) || 2;
     const title = `Bokep Indo Terbaru Halaman ${page} | Dr. Pinguin`;
     const description = `Halaman ${page}: bokep indo terbaru, update setiap hari, streaming tanpa VPN di koleksidrpinguin.com. Khusus 18+.`;
@@ -31,7 +42,7 @@ export const Route = createFileRoute("/halaman/$page")({
       links: [
         { rel: "canonical", href: url },
         { rel: "prev", href: page === 2 ? HOME_CANONICAL : `${SITE_ORIGIN}${homeHref(page - 1)}` },
-        { rel: "next", href: `${SITE_ORIGIN}${homeHref(page + 1)}` },
+        ...(loaderData.latest.hasMore ? [{ rel: "next", href: `${SITE_ORIGIN}${homeHref(page + 1)}` }] : []),
       ],
       scripts: [{ type: "application/ld+json", children: jsonLdString(homeJsonLd()) }],
     };
