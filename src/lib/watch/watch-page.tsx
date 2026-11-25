@@ -430,7 +430,10 @@ export function WatchPage() {
     };
   }, [id, status]);
 
-  const description = item ? editorialWatchDescription(item) : "";
+  const category = item?.category?.trim();
+  const description = item && (editorialWatchDescription(item) || (category
+    ? localText("Bagian dari koleksi {category} di Dr. Pinguin.").replace("{category}", () => localText(category))
+    : localText("Video dari koleksi Dr. Pinguin.")));
   const softLoading = status === "loading" && related.length > 0;
   const coldLoading = status === "loading" && related.length === 0;
 

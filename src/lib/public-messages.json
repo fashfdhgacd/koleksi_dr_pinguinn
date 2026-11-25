@@ -1530,5 +1530,13 @@
   "percobaan": [
     "percubaan",
     "attempt"
+  ],
+  "Bagian dari koleksi {category} di Dr. Pinguin.": [
+    "Sebahagian daripada koleksi {category} di Dr. Pinguin.",
+    "Part of the {category} collection on Dr. Pinguin."
+  ],
+  "Video dari koleksi Dr. Pinguin.": [
+    "Video daripada koleksi Dr. Pinguin.",
+    "A video from the Dr. Pinguin collection."
   ]
 }
