@@ -57,13 +57,13 @@ export function VideoThumb({
   eager = false,
   className,
   onUnavailable,
-  portrait = false,
+  catalog = false,
 }: {
   src: string;
   alt: string;
   videoId?: string;
   eager?: boolean;
-  portrait?: boolean;
+  catalog?: boolean;
   className?: string;
   onUnavailable?: () => void;
 }) {
@@ -82,6 +82,7 @@ export function VideoThumb({
   const r2 = posterId && (local || !real) ? r2PosterUrl(posterId) : "";
   const first = r2 || local || real || dmm || FALLBACK_POSTER;
   const [current, setCurrent] = useState(first);
+  const [portraitSrc, setPortraitSrc] = useState("");
   const [step, setStep] = useState(0);
   const imgRef = useRef<HTMLImageElement | null>(null);
   // Poster-warm state lives in localStorage, so it differs between the SSR pass
@@ -104,6 +105,7 @@ export function VideoThumb({
   }, [step, onUnavailable]);
 
   const handleError = useCallback(() => {
+    setPortraitSrc("");
     // Not in R2 yet: the Worker route fetches the source poster (and stores it for next time).
     if (r2 && current === r2 && local) {
       setCurrent(local);
@@ -131,21 +133,23 @@ export function VideoThumb({
   // browsers keep showing the broken-image icon. Check once mounted and on every src change.
   useEffect(() => {
     const img = imgRef.current;
-    if (img && img.complete && img.naturalWidth === 0) handleError();
+    if (!img?.complete) return;
+    if (img.naturalWidth === 0) handleError();
+    else if (catalog && !isPosterSrc(current) && img.naturalHeight > img.naturalWidth) setPortraitSrc(current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
 
-  const fit = portrait ? "object-cover object-center" : undefined;
+  const layered = catalog && current === portraitSrc && !isPosterSrc(current);
   if (!current || step > 3) {
     return (
       <img
         src={FALLBACK_POSTER}
         alt={alt}
-        width={portrait ? 240 : 320}
-        height={portrait ? 320 : 180}
+        width={320}
+        height={180}
         loading="lazy"
         decoding="async"
-        className={cn(FALLBACK_CLASS, fit, className)}
+        className={cn(FALLBACK_CLASS, className)}
       />
     );
   }
@@ -153,19 +157,19 @@ export function VideoThumb({
   const poster = isPosterSrc(current);
   // Penguin painted under the image while it loads (slow /thumb resolve, stalled host, blocked
   // domain): a card is never an empty box; the real poster covers it as soon as it arrives.
-  const placeholder = portrait || poster ? undefined : PLACEHOLDER_STYLE;
+  const placeholder = catalog || poster ? undefined : PLACEHOLDER_STYLE;
 
-  return (
+  const foreground = (
     <img
       ref={imgRef}
       src={poster ? FALLBACK_POSTER : current}
       alt={alt}
-      width={portrait ? 240 : 320}
-      height={portrait ? 320 : 180}
+      width={320}
+      height={180}
       loading={eager || warm ? "eager" : "lazy"}
       decoding="async"
       fetchPriority={eager ? "high" : "low"}
-      className={cn(poster ? FALLBACK_CLASS : "media-thumb size-full object-cover", fit, className)}
+      className={cn(poster ? FALLBACK_CLASS : "media-thumb size-full object-cover", layered && "relative object-contain object-center", className)}
       style={placeholder}
       onError={handleError}
       onLoad={(e) => {
@@ -177,8 +181,10 @@ export function VideoThumb({
           setCurrent(FALLBACK_POSTER);
           return;
         }
-        if (img.naturalWidth > 2) markPosterWarm(current);
-        else if (!isPosterSrc(current)) {
+        if (img.naturalWidth > 2) {
+          markPosterWarm(current);
+          if (catalog) setPortraitSrc(!poster && img.naturalHeight > img.naturalWidth ? current : "");
+        } else if (!isPosterSrc(current)) {
           setStep(3);
           setCurrent(FALLBACK_POSTER);
         } else {
@@ -186,5 +192,19 @@ export function VideoThumb({
         }
       }}
     />
+  );
+
+  return (
+    <>
+      {layered && (
+        <img
+          src={current}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 size-full scale-110 object-cover blur-xl"
+        />
+      )}
+      {foreground}
+    </>
   );
 }
