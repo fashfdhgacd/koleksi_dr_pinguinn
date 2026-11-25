@@ -82,7 +82,6 @@ export function VideoThumb({
   const r2 = posterId && (local || !real) ? r2PosterUrl(posterId) : "";
   const first = r2 || local || real || dmm || FALLBACK_POSTER;
   const [current, setCurrent] = useState(first);
-  const [loadedCatalogSrc, setLoadedCatalogSrc] = useState("");
   const [step, setStep] = useState(0);
   const imgRef = useRef<HTMLImageElement | null>(null);
   // Poster-warm state lives in localStorage, so it differs between the SSR pass
@@ -105,7 +104,6 @@ export function VideoThumb({
   }, [step, onUnavailable]);
 
   const handleError = useCallback(() => {
-    setLoadedCatalogSrc("");
     // Not in R2 yet: the Worker route fetches the source poster (and stores it for next time).
     if (r2 && current === r2 && local) {
       setCurrent(local);
@@ -135,11 +133,9 @@ export function VideoThumb({
     const img = imgRef.current;
     if (!img?.complete) return;
     if (img.naturalWidth === 0) handleError();
-    else if (catalog && !isPosterSrc(current)) setLoadedCatalogSrc(current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
 
-  const layered = catalog && current === loadedCatalogSrc && !isPosterSrc(current);
   if (!current || step > 3) {
     return (
       <img
@@ -183,7 +179,6 @@ export function VideoThumb({
         }
         if (img.naturalWidth > 2) {
           markPosterWarm(current);
-          if (catalog) setLoadedCatalogSrc(!poster ? current : "");
         } else if (!isPosterSrc(current)) {
           setStep(3);
           setCurrent(FALLBACK_POSTER);
@@ -196,11 +191,13 @@ export function VideoThumb({
 
   return (
     <>
-      {layered && (
+      {catalog && !poster && (
         <img
           src={current}
           alt=""
           aria-hidden="true"
+          loading={eager || warm ? "eager" : "lazy"}
+          decoding="async"
           className="pointer-events-none absolute inset-0 size-full scale-110 object-cover blur-xl opacity-60"
         />
       )}
