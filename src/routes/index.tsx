@@ -1,3 +1,4 @@
+import { overviewCopy } from "@/lib/catalog/overview-copy";
 import { usePublicHref, usePublicLanguage, usePublicText } from "@/lib/public-ui";
 import { useEffect } from "react";
 import { SafeBoundary } from "@/components/safe-boundary";
@@ -171,6 +172,7 @@ export function HomeExperience({
   const mode = q ? "search" : category ? "category" : "home";
   const feed = useCatalogFeed({ mode, q, category, page }, seed);
   const cat = findCategory(category);
+  const overview = mode === "home" && page === 1 ? overviewCopy("/", language, seed?.total) : null;
   const heroVideos = !q && !category && page === 1 ? feed.featured : [];
   const heroIds = new Set(heroVideos.map((v) => v.id));
   const gridItems = heroIds.size ? feed.items.filter((item) => !heroIds.has(item.id)) : feed.items;
@@ -224,9 +226,9 @@ export function HomeExperience({
 
         <section>
           <div className="mb-3">
-            <h1 className="text-xl font-semibold tracking-tight text-zinc-100">{title}</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-zinc-100">{overview?.heading ?? title}</h1>
             <p className="mt-1 text-sm text-zinc-500">{subtitle}</p>
-            <p className="mt-1 max-w-2xl text-sm text-zinc-600">{intro}</p>
+            <p className="mt-1 max-w-2xl text-sm text-zinc-600">{overview?.intro ?? intro}</p>
             {q ? null : (
               // Plain crawlable links to the categories that bring search traffic (SEO internal linking).
               <p className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
