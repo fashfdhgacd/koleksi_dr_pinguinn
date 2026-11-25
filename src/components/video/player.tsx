@@ -1,3 +1,4 @@
+import { usePublicText } from "@/lib/public-ui";
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { AlertTriangle, LoaderCircle } from "lucide-react";
@@ -188,6 +189,7 @@ function PixelPlayButton() {
 }
 
 export function VideoPlayer({ item }: { item: VideoDetail }) {
+  const localText = usePublicText();
   const videoRef = useRef<HTMLVideoElement>(null);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const list = useMemo(() => sourcesFromItem(item), [item]);
@@ -503,8 +505,8 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
 
   /** Our poster + spinner + status text (used above the iframe as a cover, or under it). */
   function loadingLayer(pos: string) {
-    let line = attempt > 0 ? `Memuat ulang player ${hostName}…` : `Sedang memuat player ${hostName}…`;
-    if (waitSec >= 12) line = `Server ${hostName} sedang lambat, masih menunggu…`;
+    let line = attempt > 0 ? localText("Memuat ulang player {host}…").replace("{host}", hostName) : localText("Sedang memuat player {host}…").replace("{host}", hostName);
+    if (waitSec >= 12) line = localText("Server {host} sedang lambat, masih menunggu…").replace("{host}", hostName);
     return (
       <div className={`pointer-events-none ${pos} bg-background`} aria-hidden="true">
         <VideoThumb src={item.thumbnail} alt="" eager className="size-full object-cover opacity-50" />
@@ -513,7 +515,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
           <p className="text-xs text-white sm:text-sm">{line}</p>
           {waitSec >= 3 ? (
             <p className="text-[11px] tabular-nums text-zinc-300">
-              {waitSec} dtk{attempt > 0 ? ` · percobaan ${attempt + 1}` : ""}
+              {waitSec} {localText("dtk")}{attempt > 0 ? ` · ${localText("percobaan")} ${attempt + 1}` : ""}
             </p>
           ) : null}
         </div>
@@ -540,9 +542,9 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
             ) : null}
             {showGone ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-background/80 px-6 text-center">
-                <p className="text-sm font-medium text-foreground">Dihapus oleh sumber</p>
+                <p className="text-sm font-medium text-foreground">{localText("Dihapus oleh sumber")}</p>
                 <p className="max-w-sm text-xs text-muted">
-                  Video ini sudah tidak tersedia di {displayHost(gone?.host || host)}.
+                  {localText("Video ini sudah tidak tersedia di {host}.").replace("{host}", displayHost(gone?.host || host))}
                 </p>
                 <button
                   type="button"
@@ -552,7 +554,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
                     start();
                   }}
                 >
-                  Tetap coba putar
+                  {localText("Tetap coba putar")}
                 </button>
               </div>
             ) : (
@@ -564,7 +566,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
                 onTouchStart={() => preconnect(playUrl)}
                 onFocus={() => preconnect(playUrl)}
                 disabled={!current}
-                aria-label={current ? `Putar ${item.title}` : "Video tidak tersedia"}
+                aria-label={current ? `${localText("Putar")} ${item.title}` : localText("Video tidak tersedia")}
               >
                 <PixelPlayButton />
               </button>
@@ -593,7 +595,7 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
             {cover ? loadingLayer("absolute inset-0 z-10") : null}
             {!cover && !docReady ? (
               <span className="pointer-events-none absolute left-2 top-2 z-10 rounded bg-black/70 px-2 py-1 text-[11px] text-zinc-100">
-                Masih memuat dari {hostName}… {waitSec} dtk
+                {localText("Masih memuat dari {host}…").replace("{host}", hostName)} {waitSec} {localText("dtk")}
               </span>
             ) : null}
           </>
@@ -643,26 +645,26 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
         {failed ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/85 px-6 text-center">
             <AlertTriangle className="size-7 text-destructive" />
-            <p className="max-w-sm text-sm text-muted">Pemutar gagal. Coba lagi atau buka di situs sumbernya.</p>
+            <p className="max-w-sm text-sm text-muted">{localText("Pemutar gagal. Coba lagi atau buka di situs sumbernya.")}</p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button size="sm" onClick={retryQuiet}>
-                Coba lagi
+                {localText("Coba lagi")}
               </Button>
               {playUrl ? (
                 <Button size="sm" variant="outline" onClick={openSource}>
-                  Buka di {hostName}
+                  {localText("Buka di {host}").replace("{host}", hostName)}
                 </Button>
               ) : null}
               {alt ? (
                 <Button size="sm" variant="outline" asChild>
                   <Link to="/watch/$id" params={{ id: alt.id }} onClick={() => acted("alt2")}>
-                    Coba server lain
+                    {localText("Coba server lain")}
                   </Link>
                 </Button>
               ) : null}
               {current ? (
                 <Button size="sm" variant="ghost" onClick={report} disabled={reported}>
-                  {reported ? "Laporan terkirim" : "Laporkan"}
+                  {localText(reported ? "Laporan terkirim" : "Laporkan")}
                 </Button>
               ) : null}
             </div>
@@ -671,28 +673,28 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
 
         {!current && !started ? (
           <div className="absolute inset-x-0 bottom-0 p-4 text-center text-sm text-muted">
-            Video tidak tersedia untuk judul ini.
+            {localText("Video tidak tersedia untuk judul ini.")}
           </div>
         ) : null}
       </div>
       {!started && current && current.mode === "iframe" && !showGone ? (
         <p className="px-3 py-2 text-[11px] leading-snug text-muted sm:text-xs">
-          Iklan dari penyedia video ({hostName}) bisa muncul saat diputar.
+          {localText("Iklan dari penyedia video ({host}) bisa muncul saat diputar.").replace("{host}", hostName)}
         </p>
       ) : null}
       {showHint ? (
         <div className="border-l-2 border-[#ecb43c] px-3 py-2" role="status">
           <p className="text-[11px] leading-snug text-foreground sm:text-xs">
             {stError
-              ? `${hostName} melaporkan error untuk video ini.`
-              : `Player ${hostName} lambat merespons. Tunggu sebentar, atau:`}
+              ? localText("{host} melaporkan error untuk video ini.").replace("{host}", hostName)
+              : localText("Player {host} lambat merespons. Tunggu sebentar, atau:").replace("{host}", hostName)}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             <button type="button" className={hintBtn} onClick={retryCurrent}>
-              Coba lagi
+              {localText("Coba lagi")}
             </button>
             <button type="button" className={hintBtn} onClick={openSource}>
-              Buka di {hostName}
+              {localText("Buka di {host}").replace("{host}", hostName)}
             </button>
             {alt ? (
               <Link
@@ -701,35 +703,35 @@ export function VideoPlayer({ item }: { item: VideoDetail }) {
                 className={hintBtn}
                 onClick={() => acted("alt2")}
               >
-                Coba server lain ({displayHost(alt.host)})
+                {localText("Coba server lain")} ({displayHost(alt.host)})
               </Link>
             ) : null}
             <button type="button" className={hintBtn} onClick={report} disabled={reported}>
-              {reported ? "Laporan terkirim" : "Lapor"}
+              {localText(reported ? "Laporan terkirim" : "Lapor")}
             </button>
           </div>
         </div>
       ) : started && playUrl && !failed ? (
         <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 px-3 py-2 text-[11px] leading-snug text-muted sm:text-xs">
-          <span>Belum jalan?</span>
+          <span>{localText("Belum jalan?")}</span>
           <button type="button" className={linkBtn} onClick={retryCurrent}>
-            Coba lagi
+            {localText("Coba lagi")}
           </button>
           <span aria-hidden="true">·</span>
           <button type="button" className={linkBtn} onClick={openSource}>
-            Buka sumber
+            {localText("Buka sumber")}
           </button>
           {alt ? (
             <>
               <span aria-hidden="true">·</span>
               <Link to="/watch/$id" params={{ id: alt.id }} className={linkBtn} onClick={() => acted("alt2")}>
-                Coba server lain
+                {localText("Coba server lain")}
               </Link>
             </>
           ) : null}
           <span aria-hidden="true">·</span>
           <button type="button" className={linkBtn} onClick={report} disabled={reported}>
-            {reported ? "Laporan terkirim" : "Lapor"}
+            {localText(reported ? "Laporan terkirim" : "Lapor")}
           </button>
         </p>
       ) : null}
