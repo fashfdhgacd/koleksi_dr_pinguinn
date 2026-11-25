@@ -1,3 +1,4 @@
+import { overviewCopy } from "@/lib/catalog/overview-copy";
 import { Asset, useRouter, useRouterState, useTags } from "@tanstack/react-router";
 import { SITE_ORIGIN } from "@/lib/seo";
 import { languageFamily } from "@/lib/language-family";
@@ -9,6 +10,13 @@ export function LocaleHead() {
   const nonce = useRouter().options.ssr?.nonce;
   const href = useRouterState({ select: s => s.location.publicHref });
   const { language, path } = decodePublicPath(href.split(/[?#]/)[0]);
+  const total = useRouterState({ select: s => {
+    const data = s.matches.at(-1)?.loaderData;
+    if (!data || !("ok" in data) || !data.ok) return undefined;
+    if (data.type === "home") return data.latest.total;
+    if (data.type === "category") return data.total;
+    return undefined;
+  } });
   const canonical = tags.find(t => t.tag === "link" && t.attrs?.rel === "canonical");
   if (!canonical?.attrs?.href || path.startsWith("/pemilik")) {
     return <>{tags.map(t => <Asset {...t} nonce={nonce} key={JSON.stringify(t)} />)}</>;
@@ -17,7 +25,9 @@ export function LocaleHead() {
   const urls = languageFamily(base.pathname + base.search);
   const url = new URL(urls[language], base.origin).href;
   const original = tags.find(t => t.tag === "title")?.children;
-  const copy = pageCopy(path, language, String(original ?? ""), new URL(href, base.origin).searchParams.get("q"));
+  const params = new URL(href, base.origin).searchParams;
+  const overview = !params.get("q") && !params.get("page") ? overviewCopy(path, language, total) : null;
+  const copy = overview ?? pageCopy(path, language, String(original ?? ""), params.get("q"));
   const codes = { ms: "ms_MY", id: "id_ID", en: "en_US" };
   return <>
     {tags.map(t => {

@@ -1,3 +1,4 @@
+import { overviewCopy } from "@/lib/catalog/overview-copy";
 import { usePublicHref, usePublicLanguage, usePublicText } from "@/lib/public-ui";
 import { collectionLabel } from "@/lib/page-copy";
 import { categoryHref } from "@/lib/catalog/halaman";
@@ -401,6 +402,7 @@ function PlainCategoryPage({
     onPage(next);
   }
 
+  const overview = page === 1 ? overviewCopy("/kategori/" + slug, language, seed?.total) : null;
   if (!cat || UNLISTED_CATEGORY_SLUGS.has(cat.slug)) {
     return (
       <Shell>
@@ -424,9 +426,9 @@ function PlainCategoryPage({
     <Shell>
       <section>
         <div className="mb-4">
-          <h1 className="text-xl font-semibold text-zinc-100">{language === "id" ? categorySeo(cat.slug).h1 : collectionLabel(cat.slug, language)}</h1>
+          <h1 className="text-xl font-semibold text-zinc-100">{overview?.heading ?? (language === "id" ? categorySeo(cat.slug).h1 : collectionLabel(cat.slug, language))}</h1>
           {categorySeo(cat.slug).intro ? (
-            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{language === "id" ? categorySeo(cat.slug).intro : language === "ms" ? `Terokai koleksi ${collectionLabel(cat.slug, language)} dan pilih video untuk ditonton.` : `Browse the ${collectionLabel(cat.slug, language)} collection.`}</p>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{overview?.intro ?? (language === "id" ? categorySeo(cat.slug).intro : language === "ms" ? `Terokai koleksi ${collectionLabel(cat.slug, language)} dan pilih video untuk ditonton.` : `Browse the ${collectionLabel(cat.slug, language)} collection.`)}</p>
           ) : null}
           {typeof feed.total === "number" ? (
             <p className="mt-1 text-sm text-zinc-500">{feed.total.toLocaleString("id-ID")} video</p>

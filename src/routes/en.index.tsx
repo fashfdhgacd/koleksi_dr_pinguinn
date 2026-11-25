@@ -3,18 +3,19 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
 import { enHref } from "@/lib/catalog/halaman";
 import { EN_LANDINGS, LANDING_MIN_VIDEOS, hreflangLinks } from "@/lib/catalog/en-landing";
-import { enLandingCounts } from "@/lib/catalog/en-landing-query";
+import { enLandingCounts, enCollectionVideoCount } from "@/lib/catalog/en-landing-query";
 import { jsonLdString } from "@/lib/json-ld";
-import { DEFAULT_OG, HOME_CANONICAL, SITE_NAME, SITE_ORIGIN, TITLE_SUFFIX, breadcrumbJsonLd, collectionPageJsonLd } from "@/lib/seo";
+import { DEFAULT_OG, HOME_CANONICAL, SITE_NAME, SITE_ORIGIN, breadcrumbJsonLd, collectionPageJsonLd } from "@/lib/seo";
 
-const TITLE = `English Indonesian Video Collections | ${TITLE_SUFFIX}`;
-const DESCRIPTION =
-  `English-language collections of Indonesian amateur videos on ${TITLE_SUFFIX}: hijab, couples, homemade, Malay, and more. 18+ only.`;
+const HEADING = "Indonesian Video Collections";
+const TITLE = HEADING + " | Koleksi Dr. Pinguin";
+const description = (count: number) => `Explore ${count.toLocaleString("en")} videos in Indonesian collections, with English guides to the latest titles. The catalogue is updated daily. Pick a theme to browse the listings.`;
 
 export const Route = createFileRoute("/en/")({
   loader: async () => {
-    const counts = await enLandingCounts();
+    const [counts, total] = await Promise.all([enLandingCounts(), enCollectionVideoCount()]);
     return {
+      total,
       pages: EN_LANDINGS.filter((l) => (counts.get(l.slug) || 0) >= LANDING_MIN_VIDEOS).map((l) => ({
         slug: l.slug,
         h1: l.h1,
@@ -22,7 +23,8 @@ export const Route = createFileRoute("/en/")({
       })),
     };
   },
-  head: () => {
+  head: ({ loaderData }) => {
+    const DESCRIPTION = loaderData ? description(loaderData.total) : "Browse Indonesian video collections by theme.";
     const url = `${SITE_ORIGIN}/en`;
     return {
       meta: [
@@ -61,8 +63,8 @@ function EnIndex() {
   return (
     <Shell>
       <section className="space-y-4">
-        <h1 className="font-display text-4xl leading-none text-foreground sm:text-6xl">English collections</h1>
-        <p className="max-w-2xl text-sm text-zinc-400">{DESCRIPTION}</p>
+        <h1 className="font-display text-4xl leading-none text-foreground sm:text-6xl">{HEADING}</h1>
+        <p className="max-w-2xl text-sm text-zinc-400">Choose a collection to see its videos and how many titles it contains. The English guides group related Indonesian titles by theme.</p>
         <p className="text-sm text-zinc-500">
           Looking for the Indonesian pages?{" "}
           <a href="/cari" hrefLang="id" className="text-teal-200 underline-offset-2 hover:underline">
