@@ -1,5 +1,6 @@
-// 36 videos per page: full rows at 1, 3 and 4 columns (video-grid.tsx).
-export const DEFAULT_PAGE_SIZE = 36;
+// Desktop shows three cells per row. Thirty videos fill ten rows without ads,
+// or twelve rows with one ad per five videos (column three of each odd row).
+export const DEFAULT_PAGE_SIZE = 30;
 export const MAX_PAGE_SIZE = 48;
 
 export type CatalogType =
