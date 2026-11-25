@@ -22,6 +22,13 @@ export function LocaleHead() {
   return <>
     {tags.map(t => {
       if (t.tag === "link" && (t.attrs?.rel === "canonical" || t.attrs?.hrefLang || t.attrs?.hreflang)) return null;
+      if (t.tag === "link" && (t.attrs?.rel === "prev" || t.attrs?.rel === "next") && t.attrs.href) {
+        const target = new URL(t.attrs.href, base);
+        if (target.origin === base.origin) {
+          const path = languageFamily(target.pathname + target.search)[language];
+          return <link key={t.attrs.rel} {...t.attrs} href={new URL(path, base).href} />;
+        }
+      }
       if (copy && t.tag === "title") return <title key="title">{copy.title}</title>;
       if (t.tag === "meta") {
         const field = t.attrs?.property || t.attrs?.name;
