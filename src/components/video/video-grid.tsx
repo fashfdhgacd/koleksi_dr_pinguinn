@@ -64,7 +64,7 @@ export function VideoGridSkeleton({ count = 12, ads = false }: { count?: number;
     <div className={ads ? CATALOG_GRID : DEFAULT_GRID}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="p-1 sm:p-1.5">
-          <Skeleton className={ads ? "aspect-[16/10] rounded-xl" : "aspect-video rounded-xl"} />
+          <Skeleton className={ads ? "aspect-[16/10] rounded-none" : "aspect-video rounded-xl"} />
           <Skeleton className="mt-3 h-4 w-4/5 rounded-sm" />
           <Skeleton className="mt-2 h-3 w-1/3 rounded-sm" />
         </div>
