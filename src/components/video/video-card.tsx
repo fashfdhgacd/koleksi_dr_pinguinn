@@ -19,12 +19,10 @@ export function VideoCard({
   video,
   eager = false,
   preload = false,
-  catalog = false,
 }: {
   video: VideoCardType;
   eager?: boolean;
   preload?: VideoCardPreload;
-  catalog?: boolean;
 }) {
   const localText = usePublicText();
   // 0 is shown too (own-pageview sources start at 0); null = no count known.
@@ -49,7 +47,6 @@ export function VideoCard({
           src={typeof video.thumbnail === "string" ? video.thumbnail : ""}
           alt={video.title}
           videoId={video.id}
-          catalog={catalog}
           eager={eager}
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent opacity-80" />
