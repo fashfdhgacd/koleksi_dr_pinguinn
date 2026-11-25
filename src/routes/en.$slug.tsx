@@ -135,7 +135,7 @@ export function EnExperience({
           <EmptyState title={language === "ms" ? "Video akan datang" : language === "id" ? "Video segera hadir" : "Videos coming soon"} description={language === "ms" ? "Belum ada video dalam koleksi ini. Sila singgah lagi." : language === "id" ? "Belum ada video dalam koleksi ini." : "Nothing matches this collection yet. Please check back later."} />
         ) : (
           <SafeBoundary>
-            <VideoGrid items={items} />
+            <VideoGrid items={items} portrait />
           </SafeBoundary>
         )}
 

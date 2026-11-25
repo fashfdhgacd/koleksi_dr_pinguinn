@@ -57,11 +57,13 @@ export function VideoThumb({
   eager = false,
   className,
   onUnavailable,
+  portrait = false,
 }: {
   src: string;
   alt: string;
   videoId?: string;
   eager?: boolean;
+  portrait?: boolean;
   className?: string;
   onUnavailable?: () => void;
 }) {
@@ -133,16 +135,17 @@ export function VideoThumb({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
 
+  const fit = portrait ? "object-cover object-center" : undefined;
   if (!current || step > 3) {
     return (
       <img
         src={FALLBACK_POSTER}
         alt={alt}
-        width={320}
-        height={180}
+        width={portrait ? 240 : 320}
+        height={portrait ? 320 : 180}
         loading="lazy"
         decoding="async"
-        className={cn(FALLBACK_CLASS, className)}
+        className={cn(FALLBACK_CLASS, fit, className)}
       />
     );
   }
@@ -150,19 +153,19 @@ export function VideoThumb({
   const poster = isPosterSrc(current);
   // Penguin painted under the image while it loads (slow /thumb resolve, stalled host, blocked
   // domain): a card is never an empty box; the real poster covers it as soon as it arrives.
-  const placeholder = poster ? undefined : PLACEHOLDER_STYLE;
+  const placeholder = portrait || poster ? undefined : PLACEHOLDER_STYLE;
 
   return (
     <img
       ref={imgRef}
       src={poster ? FALLBACK_POSTER : current}
       alt={alt}
-      width={320}
-      height={180}
+      width={portrait ? 240 : 320}
+      height={portrait ? 320 : 180}
       loading={eager || warm ? "eager" : "lazy"}
       decoding="async"
       fetchPriority={eager ? "high" : "low"}
-      className={cn(poster ? FALLBACK_CLASS : "media-thumb size-full object-cover", className)}
+      className={cn(poster ? FALLBACK_CLASS : "media-thumb size-full object-cover", fit, className)}
       style={placeholder}
       onError={handleError}
       onLoad={(e) => {

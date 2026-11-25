@@ -19,10 +19,12 @@ export function VideoCard({
   video,
   eager = false,
   preload = false,
+  portrait = false,
 }: {
   video: VideoCardType;
   eager?: boolean;
   preload?: VideoCardPreload;
+  portrait?: boolean;
 }) {
   const localText = usePublicText();
   // 0 is shown too (own-pageview sources start at 0); null = no count known.
@@ -42,11 +44,12 @@ export function VideoCard({
       onClick={() => rememberCatalog()}
       className="group block rounded-xl p-1 transition-colors duration-150 ease-out hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-1.5"
     >
-      <div className="relative aspect-video overflow-hidden rounded-xl bg-surface-2">
+      <div className={`relative overflow-hidden rounded-xl bg-surface-2 ${portrait ? "aspect-[3/4]" : "aspect-video"}`}>
         <VideoThumb
           src={typeof video.thumbnail === "string" ? video.thumbnail : ""}
           alt={video.title}
           videoId={video.id}
+          portrait={portrait}
           eager={eager}
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent opacity-80" />
