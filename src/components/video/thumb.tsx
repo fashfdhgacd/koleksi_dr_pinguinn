@@ -82,7 +82,7 @@ export function VideoThumb({
   const r2 = posterId && (local || !real) ? r2PosterUrl(posterId) : "";
   const first = r2 || local || real || dmm || FALLBACK_POSTER;
   const [current, setCurrent] = useState(first);
-  const [portraitSrc, setPortraitSrc] = useState("");
+  const [loadedCatalogSrc, setLoadedCatalogSrc] = useState("");
   const [step, setStep] = useState(0);
   const imgRef = useRef<HTMLImageElement | null>(null);
   // Poster-warm state lives in localStorage, so it differs between the SSR pass
@@ -105,7 +105,7 @@ export function VideoThumb({
   }, [step, onUnavailable]);
 
   const handleError = useCallback(() => {
-    setPortraitSrc("");
+    setLoadedCatalogSrc("");
     // Not in R2 yet: the Worker route fetches the source poster (and stores it for next time).
     if (r2 && current === r2 && local) {
       setCurrent(local);
@@ -135,11 +135,11 @@ export function VideoThumb({
     const img = imgRef.current;
     if (!img?.complete) return;
     if (img.naturalWidth === 0) handleError();
-    else if (catalog && !isPosterSrc(current) && img.naturalHeight > img.naturalWidth) setPortraitSrc(current);
+    else if (catalog && !isPosterSrc(current)) setLoadedCatalogSrc(current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
 
-  const layered = catalog && current === portraitSrc && !isPosterSrc(current);
+  const layered = catalog && current === loadedCatalogSrc && !isPosterSrc(current);
   if (!current || step > 3) {
     return (
       <img
@@ -169,7 +169,7 @@ export function VideoThumb({
       loading={eager || warm ? "eager" : "lazy"}
       decoding="async"
       fetchPriority={eager ? "high" : "low"}
-      className={cn(poster ? FALLBACK_CLASS : "media-thumb size-full object-cover", layered && "relative object-contain object-center", className)}
+      className={cn(poster ? FALLBACK_CLASS : "media-thumb size-full object-cover", catalog && !poster && "relative object-contain object-center", className)}
       style={placeholder}
       onError={handleError}
       onLoad={(e) => {
@@ -183,7 +183,7 @@ export function VideoThumb({
         }
         if (img.naturalWidth > 2) {
           markPosterWarm(current);
-          if (catalog) setPortraitSrc(!poster && img.naturalHeight > img.naturalWidth ? current : "");
+          if (catalog) setLoadedCatalogSrc(!poster ? current : "");
         } else if (!isPosterSrc(current)) {
           setStep(3);
           setCurrent(FALLBACK_POSTER);
@@ -201,7 +201,7 @@ export function VideoThumb({
           src={current}
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 size-full scale-110 object-cover blur-xl"
+          className="pointer-events-none absolute inset-0 size-full scale-110 object-cover blur-xl opacity-60"
         />
       )}
       {foreground}
