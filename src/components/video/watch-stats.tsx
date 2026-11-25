@@ -134,7 +134,7 @@ export function WatchStats({
           className={`size-4 transition-transform duration-300 ${liked ? "fill-current" : ""} ${pop ? "scale-125" : "scale-100"}`}
           aria-hidden="true"
         />
-        {total > 0 ? compactNumber(total) : "Suka"}
+        {total > 0 ? compactNumber(total) : localText("Suka")}
       </button>
     </span>
   );

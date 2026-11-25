@@ -16,7 +16,7 @@ import { hostLabel } from "@/lib/catalog/embed";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchCatalog } from "@/lib/catalog/client";
 import type { VideoCard, VideoDetail } from "@/lib/catalog/types";
-import { cleanDisplayTitle, publicWatchDescription } from "@/lib/seo";
+import { cleanDisplayTitle, editorialWatchDescription, withoutDomainSuffix } from "@/lib/seo";
 import { shareIntentUrls, videoShareUrl } from "@/lib/share-url";
 import { landingForCategory } from "@/lib/catalog/landing";
 import { isSeoBlockedId } from "@/lib/catalog/seo-block";
@@ -430,6 +430,7 @@ export function WatchPage() {
     };
   }, [id, status]);
 
+  const description = item ? editorialWatchDescription(item) : "";
   const softLoading = status === "loading" && related.length > 0;
   const coldLoading = status === "loading" && related.length === 0;
 
@@ -447,7 +448,7 @@ export function WatchPage() {
       ) : status === "empty" || (!item && !softLoading) ? (
         <EmptyState title={localText("Video tidak ditemukan")} description={localText("Judul ini tidak ada di katalog atau sudah dihapus.")} />
       ) : (
-        <article className="space-y-8" onContextMenu={(e) => e.preventDefault()}>
+        <article className="space-y-3 sm:space-y-8" onContextMenu={(e) => e.preventDefault()}>
           {item ? (() => {
             const server = pickServer(item, wantedServer);
             const playItem = itemForServer(item, server);
@@ -492,7 +493,8 @@ export function WatchPage() {
               );
             })()}
           </div>
-          <header className="max-w-3xl space-y-3">
+          <header className="max-w-3xl space-y-2 sm:space-y-3">
+            <h1 className="break-words font-display text-2xl leading-tight text-foreground sm:text-5xl">{cleanDisplayTitle(withoutDomainSuffix(item.title))}</h1>
             <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">
               {isVideyItem(item) ? (
                 <a href={publicHref("/kategori/videy")} className="hover:text-foreground hover:underline">
@@ -519,9 +521,8 @@ export function WatchPage() {
                 />
               </span>
             </p>
-            <h1 className="font-display text-3xl leading-tight text-foreground sm:text-5xl">{cleanDisplayTitle(item.title)}</h1>
             {item.episodes && item.episodes.length > 1 ? <EpisodeStrip episodes={item.episodes} currentId={item.id} /> : null}
-            <p className="text-sm leading-relaxed text-muted">{publicWatchDescription(item)}</p>
+            {description && <p className="text-sm leading-relaxed text-muted">{description}</p>}
             <nav aria-label={localText("Kategori dan pencarian")} className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
               {(() => {
                 const slug = categorySlugFor(item.category);

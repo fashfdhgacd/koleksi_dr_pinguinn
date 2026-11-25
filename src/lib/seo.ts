@@ -215,12 +215,12 @@ export function manualDescription(item: Pick<SeoVideoInput, "description">): str
  * beda tiap video (judul sekali, kategori, durasi, sumber). Judul halaman tidak diubah.
  */
 export function publicWatchDescription(item: SeoVideoInput, max = 0): string {
-  const manual = manualDescription(item);
-  if (manual) return max > 0 ? clipAtWord(manual, max) : manual;
-  const curated = curatedWatchText(item.id);
-  if (curated) return max > 0 ? clipAtWord(curated, max) : curated;
-  const text = generatedWatchDescription(item);
+  const text = editorialWatchDescription(item) || generatedWatchDescription(item);
   return max > 0 ? clipAtWord(text, max) : text;
+}
+
+export function editorialWatchDescription(item: SeoVideoInput): string {
+  return manualDescription(item) || curatedWatchText(item.id);
 }
 
 export type SeoVideoInput = {
