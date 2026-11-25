@@ -1,5 +1,5 @@
 // ExoClick 300x250 banners (zones AD_ZONES, one per slot) as cards in catalog grids.
-// - Same shell as a video card (rounded box 300:250, "iklan" / "sponsor" where the title goes).
+// - Same shell as a video card (portrait frame, "iklan" / "sponsor" where the title goes).
 // - The 300x250 banner is centred in the box; when the card is narrower it is scaled down to fit.
 // - Server + client render identical markup (hydration safe); no layout shift.
 // - ad-provider.js loaded once, async, only when the slot nears the viewport.
@@ -86,7 +86,7 @@ export function AdSlot({ className = "", zoneId = AD_ZONES[0] }: { className?: s
     <div data-kdp-ad="exoclick" className={`block rounded-xl p-1 sm:p-1.5 ${className}`} aria-label="Iklan">
       <div
         ref={ref}
-        className="relative flex aspect-[300/250] items-center justify-center overflow-hidden rounded-xl bg-surface-2"
+        className="relative flex aspect-[3/4] items-center justify-center overflow-hidden rounded-xl bg-surface-2"
         // No-fill (ExoClick often returns nothing, ad blockers): the penguin card shows instead of an
         // empty dark box that looks like a broken poster. A served banner is drawn on top of it.
         style={UNFILLED_STYLE}
@@ -99,7 +99,7 @@ export function AdSlot({ className = "", zoneId = AD_ZONES[0] }: { className?: s
         </div>
       </div>
       <div className="px-1 pb-1 pt-2.5 sm:px-1.5 sm:pt-3">
-        <h3 className="line-clamp-2 min-h-[2.5em] text-[13px] font-medium leading-snug text-foreground sm:text-[15px]">
+        <h3 className="line-clamp-2 min-h-[2.75em] text-[13px] font-medium leading-snug text-foreground sm:text-[15px]">
           iklan
         </h3>
         <div className="mt-1.5 text-[11px] text-muted sm:text-xs">sponsor</div>
