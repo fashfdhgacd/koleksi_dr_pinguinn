@@ -1,0 +1,65 @@
+name: Catalog screenshot review
+on: pull_request
+permissions:
+  contents: read
+jobs:
+  capture:
+    if: github.head_ref == 'fix/portrait-catalog-grid'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        revision: [before, after]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.revision == 'before' && github.event.pull_request.base.sha || github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm install --prefix "$RUNNER_TEMP/browser" playwright@1.56.1 && "$RUNNER_TEMP/browser/node_modules/.bin/playwright" install chromium
+      - name: Capture catalog at phone and laptop sizes
+        env:
+          REVISION: ${{ matrix.revision }}
+        run: |
+          npm run dev > "$RUNNER_TEMP/catalog-dev.log" 2>&1 &
+          for n in $(seq 1 90); do curl -fsS http://localhost:8080/ms -o /dev/null && break; sleep 2; done
+          mkdir -p captures
+          node --input-type=commonjs <<'JS'
+          const {chromium} = require(process.env.RUNNER_TEMP + '/browser/node_modules/playwright');
+          (async () => {
+            const browser = await chromium.launch();
+            try {
+              for (const width of [390,1280]) {
+                const page = await browser.newPage({viewport:{width,height:width===390?844:900}});
+                await page.route(/magsrv|trafficstars|exoclick/,route=>route.abort());
+                for (const path of ['/ms','/en','/en/home','/ms/kategori/hentai','/ms/kategori/jav','/kategori/videy']) {
+                  const response = await page.goto('http://localhost:8080'+path,{waitUntil:'domcontentloaded',timeout:90000});
+                  if (!response.ok()) throw Error(path+' HTTP '+response.status());
+                  const cards = page.locator('a.group:has(img.media-thumb)');
+                  if(path !== '/en'){
+                    await cards.first().waitFor({timeout:20000});
+                    await cards.first().evaluate(el=>el.scrollIntoView({block:'start'}));
+                    if (process.env.REVISION === 'after') {
+                      const report=await cards.evaluateAll(els=>els.map(el=>{
+                        const img=el.querySelector('img.media-thumb'), box=img.parentElement.getBoundingClientRect();
+                        return {w:box.width,h:box.height,card:el.getBoundingClientRect().height,fit:getComputedStyle(img).objectFit,bg:getComputedStyle(img).backgroundImage};
+                      }));
+                      if(report.some(r=>r.w<=0||Math.abs(r.h-r.w*4/3)>1||r.fit!=='cover'||r.bg!=='none'||Math.abs(r.card-report[0].card)>1)) throw Error(path+' '+JSON.stringify(report));
+                    }
+                  }
+                  await page.waitForTimeout(900);
+                  await page.screenshot({path:'captures/'+path.slice(1).replaceAll('/','-')+'-'+width+'.png'});
+                }
+                await page.close();
+              }
+            } finally {await browser.close();}
+          })().catch(e=>{console.error(e);process.exitCode=1});
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: catalog-${{ matrix.revision }}
+          path: captures/*.png
