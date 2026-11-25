@@ -21,7 +21,7 @@ export function VideoGrid({
   eagerCount = 4,
   ads = false,
   adFree = false,
-  portrait = ads,
+  catalog = ads,
 }: {
   items: VideoCardType[];
   eagerCount?: number;
@@ -29,10 +29,10 @@ export function VideoGrid({
   ads?: boolean;
   /** Keep the catalog layout but render no ad slots and no card-click popunder (IndoAV source pages). */
   adFree?: boolean;
-  portrait?: boolean;
+  catalog?: boolean;
 }) {
   const shown = visibleCards(items);
-  // Up to 4 slots, every 8th card; each lazy-loads (an unfilled slot keeps its footprint, showing the penguin card).
+  // Up to 4 slots, every 8th card; each lazy-loads (an unfilled slot keeps its footprint).
   const slots = ads && !adFree
     ? AD_POSITIONS.map((at, slot) => ({ at, slot })).filter((x) => x.at < shown.length)
     : [];
@@ -43,7 +43,7 @@ export function VideoGrid({
   }, [ads, hasItems]);
   return (
     <div
-      className={portrait ? CATALOG_GRID : DEFAULT_GRID}
+      className={catalog ? CATALOG_GRID : DEFAULT_GRID}
       // Catalog grids only: first video-card click per session also opens the popunder.
       onClickCapture={ads && !adFree ? (e) => onCatalogCardClick(e, (id) => String(shown.find((v) => v.id === id)?.creator || "")) : undefined}
     >
@@ -54,7 +54,7 @@ export function VideoGrid({
             key={video.id}
             ad={s ? <AdSlot key={`exo-ad-${s.slot}`} /> : null}
           >
-            <VideoCard portrait={portrait} video={video} eager={index < eagerCount} />
+            <VideoCard catalog={catalog} video={video} eager={index < eagerCount} />
           </Cell>
         );
       })}
@@ -78,7 +78,7 @@ export function VideoGridSkeleton({ count = 12, ads = false }: { count?: number;
     <div className={ads ? CATALOG_GRID : DEFAULT_GRID}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="p-1 sm:p-1.5">
-          <Skeleton className={ads ? "aspect-[3/4] rounded-xl" : "aspect-video rounded-xl"} />
+          <Skeleton className="aspect-video rounded-xl" />
           <Skeleton className="mt-3 h-4 w-4/5 rounded-sm" />
           <Skeleton className="mt-2 h-3 w-1/3 rounded-sm" />
         </div>
