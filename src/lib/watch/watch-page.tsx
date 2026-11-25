@@ -437,7 +437,7 @@ export function WatchPage() {
     <Shell>
       {coldLoading ? (
         <div className="space-y-8">
-          <Skeleton className="aspect-video rounded-2xl" />
+          <Skeleton className="aspect-video rounded-none" />
           <Skeleton className="h-10 w-2/3 rounded-md" />
           <Skeleton className="h-20 w-full rounded-md" />
           <VideoGridSkeleton count={6} />
@@ -453,7 +453,7 @@ export function WatchPage() {
             const playItem = itemForServer(item, server);
             return (
             <>
-          <div className="-mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0">
+          <div className="-mx-4 bg-background px-4 py-2 sm:mx-0 sm:px-0 [&_.overflow-hidden:has(>_.aspect-video)]:rounded-none [&_.aspect-video.overflow-hidden]:rounded-none [&_.inset-0.z-20]:rounded-none">
             {isVideyItem(item) ? (
               <AdblockGate key={`gate-${item.id}`} videoId={item.id}>
                 <VideyPlayer key={item.id} item={item} />
@@ -611,7 +611,7 @@ export function WatchPage() {
             );
           })() : (
             <div className="space-y-8">
-              <Skeleton className="aspect-video rounded-2xl" />
+              <Skeleton className="aspect-video rounded-none" />
               <Skeleton className="h-10 w-2/3 rounded-md" />
               <Skeleton className="h-20 w-full rounded-md" />
             </div>
