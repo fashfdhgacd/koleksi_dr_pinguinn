@@ -101,17 +101,8 @@ export const Route = createFileRoute("/")({
       }
     }
   },
-  loader: async ({ location }) => {
-    const raw = location.search as Record<string, unknown>;
-    const search: HomeSearch = {
-      q: typeof raw.q === "string" && raw.q.trim() ? raw.q.trim() : undefined,
-      category:
-        typeof raw.category === "string" && raw.category.trim() ? raw.category.trim() : undefined,
-      page: parsePage(raw.page),
-    };
-    if (isSchemaPlaceholder(search.q)) {
-      throw redirect({ href: HOME_CANONICAL, statusCode: 301 });
-    }
+  loaderDeps: ({ search }) => ({ q: search.q, page: search.page }),
+  loader: async ({ deps: search }) => {
     const res = await loadHome({ search });
     // Past the last page (e.g. ?page=9999): redirect to the real last page instead of an empty grid.
     const page = search.page || 1;
