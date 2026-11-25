@@ -87,7 +87,7 @@ describe("watch page", () => {
     assert.match(desc, /1 menit/);
     assert.match(desc, /Contoh/);
     assert.ok(!html.includes(desc));
-    assert.match(html, /Bagian dari koleksi contoh di Dr\. Pinguin\./);
+    assert.match(html, /Tonton “Judul Contoh” dalam koleksi contoh \(1 menit, HD\)\./);
     assert.match(html, /Bagikan/);
     assert.match(html, /1m 0s/);
     assert.doesNotMatch(html, /Pertanyaan Umum/);
@@ -99,7 +99,7 @@ describe("watch page", () => {
     const manual = "Deskripsi manual dari pemilik untuk video contoh ini, ditulis sendiri.";
     const html = await renderWatch({ ...video, description: manual });
     assert.ok(html.includes(manual));
-    assert.doesNotMatch(html, /Bagian dari koleksi contoh/);
+    assert.doesNotMatch(html, /dalam koleksi contoh/);
     assert.doesNotMatch(html, /ada di kategori/);
   });
 });
