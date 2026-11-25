@@ -1,3 +1,4 @@
+import { decodePublicPath } from "../../src/lib/public-locale";
 import { languageFamily } from "../../src/lib/language-family";
 /**
  * Dynamic sitemap for Google Search Console.
@@ -195,7 +196,7 @@ function watchEntries(
   });
 }
 
-function localizedEntries(entries: string[]) {
+function localizedEntries(entries: string[], indexableCollections?: Set<string>) {
   const seen = new Set<string>();
   return entries.flatMap(entry => {
     const value = /<loc>([^<]+)<\/loc>/.exec(entry)?.[1];
@@ -204,6 +205,11 @@ function localizedEntries(entries: string[]) {
     const urls = languageFamily(base.pathname + base.search);
     return [...new Set(Object.values(urls))].flatMap(path => {
       const url = new URL(path, base.origin).href;
+      // Paired English and Indonesian collections have independent item counts.
+      if (indexableCollections) {
+        const route = decodePublicPath(new URL(url).pathname).path;
+        if (/^\/(?:en|cari)\/[^/]+/.test(route) && !indexableCollections.has(route)) return [];
+      }
       if (seen.has(url)) return [];
       seen.add(url);
       return [entry.replace("<loc>" + value + "</loc>", "<loc>" + escapeXml(url) + "</loc>")];
@@ -211,8 +217,8 @@ function localizedEntries(entries: string[]) {
   });
 }
 
-function wrapUrlset(body: string[]): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n${localizedEntries(body).join("\n")}\n</urlset>\n`;
+function wrapUrlset(body: string[], indexableCollections?: Set<string>): string {
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1">\n${localizedEntries(body, indexableCollections).join("\n")}\n</urlset>\n`;
 }
 
 function wrapIndex(locs: Array<{ loc: string; lastmod?: string }>): string {
@@ -252,7 +258,16 @@ async function buildPagesXml(): Promise<string> {
     listLatest(1, 1).catch(() => ({ total: 0 })),
   ]);
   const homePages = Math.min(5, Math.max(1, Math.ceil((latest.total || 0) / DEFAULT_PAGE_SIZE)));
-  return wrapUrlset(pageEntries(categories, listingLastmods(entries), landings, homePages, enLandings));
+  const pages = pageEntries(categories, listingLastmods(entries), landings, homePages, enLandings);
+  const indexableCollections = new Set<string>();
+  for (const [prefix, list] of [["/cari", landings], ["/en", enLandings]] as const) {
+    for (const { slug, pages: count } of list) {
+      for (let n = 1; n <= count; n++) {
+        indexableCollections.add(prefix + "/" + slug + (n > 1 ? "/halaman/" + n : ""));
+      }
+    }
+  }
+  return wrapUrlset(pages, indexableCollections);
 }
 
 async function buildWatchXml(chunkIndex?: number): Promise<{ xml: string; total: number; chunks: number }> {
