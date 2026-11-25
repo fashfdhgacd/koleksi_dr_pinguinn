@@ -5,8 +5,9 @@ permissions:
 jobs:
   capture:
     if: github.head_ref == 'fix/portrait-catalog-grid'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         revision: [before, after]
     steps:
@@ -19,18 +20,19 @@ jobs:
           node-version: '24'
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npm install --prefix "$RUNNER_TEMP/browser" playwright@1.56.1 && "$RUNNER_TEMP/browser/node_modules/.bin/playwright" install chromium
+      - run: npm install --prefix "$RUNNER_TEMP/browser" playwright@1.56.1
       - name: Capture catalog at phone and laptop sizes
         env:
           REVISION: ${{ matrix.revision }}
         run: |
           npm run dev > "$RUNNER_TEMP/catalog-dev.log" 2>&1 &
-          for n in $(seq 1 90); do curl -fsS http://localhost:8080/ms -o /dev/null && break; sleep 2; done
+          for n in $(seq 1 90); do curl -sS http://localhost:8080/ms -o /dev/null && break; sleep 2; done
+          tail -15 "$RUNNER_TEMP/catalog-dev.log"
           mkdir -p captures
           node --input-type=commonjs <<'JS'
           const {chromium} = require(process.env.RUNNER_TEMP + '/browser/node_modules/playwright');
           (async () => {
-            const browser = await chromium.launch();
+            const browser = await chromium.launch({channel:'chrome'});
             try {
               for (const width of [390,1280]) {
                 const page = await browser.newPage({viewport:{width,height:width===390?844:900}});
