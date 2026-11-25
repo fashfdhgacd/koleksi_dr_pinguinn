@@ -1,5 +1,5 @@
 // ExoClick 300x250 banners (zones AD_ZONES, one per slot) as cards in catalog grids.
-// - Same shell as a video card (rounded 16:10 box, "iklan" / "sponsor" where the title goes).
+// - Same shell as a video card (16:10 box, "iklan" / "sponsor" where the title goes).
 // - The 300x250 banner is centred in the box; when the card is narrower it is scaled down to fit.
 // - Server + client render identical markup (hydration safe); no layout shift.
 // - ad-provider.js loaded once, async, only when the slot nears the viewport.
@@ -81,10 +81,10 @@ export function AdSlot({ className = "", zoneId = AD_ZONES[0] }: { className?: s
   }, [zoneId]);
 
   return (
-    <div data-kdp-ad="exoclick" className={`rounded-xl p-1 sm:p-1.5 ${className}`} aria-label="Iklan">
+    <div data-kdp-ad="exoclick" className={`rounded-none p-1 sm:p-1.5 ${className}`} aria-label="Iklan">
       <div
         ref={ref}
-        className="relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-xl bg-surface-2"
+        className="relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-none bg-surface-2"
       >
         <div
           className="flex h-[250px] w-[300px] shrink-0 items-center justify-center"

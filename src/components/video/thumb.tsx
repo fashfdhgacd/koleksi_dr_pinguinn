@@ -83,6 +83,11 @@ export function VideoThumb({
   const first = r2 || local || real || dmm || FALLBACK_POSTER;
   const [current, setCurrent] = useState(first);
   const [step, setStep] = useState(0);
+  const [portraitSource, setPortraitSource] = useState("");
+  const portrait = catalog && !isPosterSrc(current) && portraitSource === current;
+  const measurePoster = useCallback((img: HTMLImageElement) => {
+    if (catalog) setPortraitSource(img.naturalHeight > img.naturalWidth ? current : "");
+  }, [catalog, current]);
   const imgRef = useRef<HTMLImageElement | null>(null);
   // Poster-warm state lives in localStorage, so it differs between the SSR pass
   // (always cold -> lazy) and the hydration pass (warm -> eager): React reports a
@@ -133,8 +138,9 @@ export function VideoThumb({
     const img = imgRef.current;
     if (!img?.complete) return;
     if (img.naturalWidth === 0) handleError();
+    else measurePoster(img);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current]);
+  }, [current, measurePoster]);
 
   if (!current || step > 3) {
     return (
@@ -165,7 +171,7 @@ export function VideoThumb({
       loading={eager || warm ? "eager" : "lazy"}
       decoding="async"
       fetchPriority={eager ? "high" : "low"}
-      className={cn(poster ? FALLBACK_CLASS : "media-thumb size-full object-cover", catalog && !poster && "relative object-contain object-center", className)}
+      className={cn(poster ? FALLBACK_CLASS : "media-thumb size-full object-cover", portrait && "relative object-contain object-center", className)}
       style={placeholder}
       onError={handleError}
       onLoad={(e) => {
@@ -178,6 +184,7 @@ export function VideoThumb({
           return;
         }
         if (img.naturalWidth > 2) {
+          measurePoster(img);
           markPosterWarm(current);
         } else if (!isPosterSrc(current)) {
           setStep(3);
@@ -191,7 +198,7 @@ export function VideoThumb({
 
   return (
     <>
-      {catalog && !poster && (
+      {portrait && (
         <img
           src={current}
           alt=""

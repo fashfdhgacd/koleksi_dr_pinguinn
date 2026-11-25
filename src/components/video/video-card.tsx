@@ -42,9 +42,9 @@ export function VideoCard({
       params={{ id: video.id }}
       preload={preload}
       onClick={() => rememberCatalog()}
-      className="group block rounded-xl p-1 transition-colors duration-150 ease-out hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-1.5"
+      className={`group block p-1 transition-colors duration-150 ease-out hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:p-1.5 ${catalog ? "rounded-none" : "rounded-xl"}`}
     >
-      <div className={`relative overflow-hidden rounded-xl bg-surface-2 ${catalog ? "aspect-[16/10]" : "aspect-video"}`}>
+      <div className={`relative overflow-hidden bg-surface-2 ${catalog ? "aspect-[16/10] rounded-none" : "aspect-video rounded-xl"}`}>
         <VideoThumb
           src={typeof video.thumbnail === "string" ? video.thumbnail : ""}
           alt={video.title}
