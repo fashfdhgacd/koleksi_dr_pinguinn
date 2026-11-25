@@ -57,11 +57,13 @@ export function VideoThumb({
   eager = false,
   className,
   onUnavailable,
+  catalog = false,
 }: {
   src: string;
   alt: string;
   videoId?: string;
   eager?: boolean;
+  catalog?: boolean;
   className?: string;
   onUnavailable?: () => void;
 }) {
@@ -129,7 +131,8 @@ export function VideoThumb({
   // browsers keep showing the broken-image icon. Check once mounted and on every src change.
   useEffect(() => {
     const img = imgRef.current;
-    if (img && img.complete && img.naturalWidth === 0) handleError();
+    if (!img?.complete) return;
+    if (img.naturalWidth === 0) handleError();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
 
@@ -139,7 +142,7 @@ export function VideoThumb({
         src={FALLBACK_POSTER}
         alt={alt}
         width={320}
-        height={180}
+        height={catalog ? 200 : 180}
         loading="lazy"
         decoding="async"
         className={cn(FALLBACK_CLASS, className)}
@@ -150,19 +153,19 @@ export function VideoThumb({
   const poster = isPosterSrc(current);
   // Penguin painted under the image while it loads (slow /thumb resolve, stalled host, blocked
   // domain): a card is never an empty box; the real poster covers it as soon as it arrives.
-  const placeholder = poster ? undefined : PLACEHOLDER_STYLE;
+  const placeholder = catalog || poster ? undefined : PLACEHOLDER_STYLE;
 
-  return (
+  const foreground = (
     <img
       ref={imgRef}
       src={poster ? FALLBACK_POSTER : current}
       alt={alt}
       width={320}
-      height={180}
+      height={catalog ? 200 : 180}
       loading={eager || warm ? "eager" : "lazy"}
       decoding="async"
       fetchPriority={eager ? "high" : "low"}
-      className={cn(poster ? FALLBACK_CLASS : "media-thumb size-full object-cover", className)}
+      className={cn(poster ? FALLBACK_CLASS : "media-thumb size-full object-cover", catalog && !poster && "relative object-contain object-center", className)}
       style={placeholder}
       onError={handleError}
       onLoad={(e) => {
@@ -174,8 +177,9 @@ export function VideoThumb({
           setCurrent(FALLBACK_POSTER);
           return;
         }
-        if (img.naturalWidth > 2) markPosterWarm(current);
-        else if (!isPosterSrc(current)) {
+        if (img.naturalWidth > 2) {
+          markPosterWarm(current);
+        } else if (!isPosterSrc(current)) {
           setStep(3);
           setCurrent(FALLBACK_POSTER);
         } else {
@@ -183,5 +187,21 @@ export function VideoThumb({
         }
       }}
     />
+  );
+
+  return (
+    <>
+      {catalog && !poster && (
+        <img
+          src={current}
+          alt=""
+          aria-hidden="true"
+          loading={eager || warm ? "eager" : "lazy"}
+          decoding="async"
+          className="pointer-events-none absolute inset-0 size-full scale-110 object-cover blur-xl opacity-60"
+        />
+      )}
+      {foreground}
+    </>
   );
 }
