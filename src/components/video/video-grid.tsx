@@ -1,6 +1,6 @@
 // Grid: 2 / 3 / 4 kolom (mobile / tablet / desktop) for the watch page; catalog grids 1 / 3 / 4.
 // Catalog grids (home, kategori; `ads` prop): 1 / 3 / 4 columns (cards sized for a 300x250 ad),
-// card thumbs 300:250, and an ExoClick 300x250 card (ad-slot.tsx, zone 6053864) as every 8th card
+// square card thumbs, and an ExoClick 300x250 card (ad-slot.tsx, zone 6053864) as every 8th card
 // (cells 8, 16, 24, 32; max 4), each one card footprint, lazy-loaded. Pages hold 36 videos; trailing videos are trimmed so rows stay full at 3 and 4 columns.
 // The watch page ("Tonton juga") keeps the default grid, no ads.
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
@@ -15,7 +15,7 @@ import { restoreCatalogScroll } from "@/lib/catalog/last-catalog";
 const DEFAULT_GRID =
   "grid grid-cols-2 gap-x-2.5 gap-y-5 sm:grid-cols-3 sm:gap-x-4 sm:gap-y-7 lg:grid-cols-4";
 const CATALOG_GRID =
-  "grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-3 sm:gap-y-7 lg:grid-cols-4 [&>a>div:first-child]:aspect-[300/250] [&>a_img.media-thumb]:object-contain";
+  "grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-3 sm:gap-y-7 lg:grid-cols-4 [&>a>div:first-child]:aspect-square [&>a_img.media-thumb]:object-contain";
 
 /**
  * Rows full: hide trailing videos so the cell count (videos + ads) is a multiple of the column
@@ -50,7 +50,7 @@ export function VideoGrid({
 }: {
   items: VideoCardType[];
   eagerCount?: number;
-  /** Catalog layout (1 / 3 / 4 columns, 300:250 thumbs). Also enables the TrafficStars grid card. */
+  /** Catalog layout (1 / 3 / 4 columns, square thumbs). Also enables the TrafficStars grid card. */
   ads?: boolean;
   /** Keep the catalog layout but render no ad slots and no card-click popunder (IndoAV source pages). */
   adFree?: boolean;
@@ -103,7 +103,7 @@ export function VideoGridSkeleton({ count = 12, ads = false }: { count?: number;
     <div className={ads ? CATALOG_GRID : DEFAULT_GRID}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="p-1 sm:p-1.5">
-          <Skeleton className={ads ? "aspect-[300/250] rounded-xl" : "aspect-video rounded-xl"} />
+          <Skeleton className={ads ? "aspect-square rounded-xl" : "aspect-video rounded-xl"} />
           <Skeleton className="mt-3 h-4 w-4/5 rounded-sm" />
           <Skeleton className="mt-2 h-3 w-1/3 rounded-sm" />
         </div>
