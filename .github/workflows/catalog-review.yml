@@ -4,12 +4,12 @@ permissions:
   contents: read
 jobs:
   capture:
-    if: github.head_ref == 'fix/adaptive-widescreen-posters'
+    if: github.head_ref == 'fix/catalog-thumbnail-first-paint'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
-        revision: [before, after]
+        revision: [after]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -63,7 +63,7 @@ jobs:
                     const urls=await cards.locator('img.media-thumb').evaluateAll(els=>els.map(img=>img.src));
                     const targets=new Set(urls.filter(url=>!url.includes('brand-poster')));
                     for(const [w,h] of [[240,320],[480,200]]){
-                      const handler=route=> targets.has(route.request().url()) ? route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'"><rect width="100%" height="100%" fill="teal"/></svg>'}) : route.continue();
+                      const handler=route=> (targets.has(route.request().url()) || /\/posters\/typed\/|\/thumb\//.test(route.request().url())) ? route.fulfill({contentType:'image/svg+xml',body:'<svg xmlns="http://www.w3.org/2000/svg" width="'+w+'" height="'+h+'"><rect width="100%" height="100%" fill="teal"/></svg>'}) : route.continue();
                       await page.route('**/*',handler);
                       await page.reload({waitUntil:'domcontentloaded'});
                       await first.scrollIntoViewIfNeeded();
