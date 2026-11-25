@@ -4,7 +4,6 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { LayoutGrid, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { BRAND_LOGO_SRC } from "@/lib/brand-logo";
 import { prefetchCatalog } from "@/lib/catalog/client";
@@ -34,7 +33,8 @@ export function Header({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const onCategoriesPage = pathname === "/kategori" || pathname.startsWith("/kategori/");
   const [draft, setDraft] = useState(query ?? "");
-  const debounced = useDebounce(draft, 400);
+  const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const submitted = useRef<string | undefined>(undefined);
   const quickActive = Boolean(category && QUICK_CATS.some((c) => c.slug === category));
   // Quick-nav row collapses on scroll-down and returns on scroll-up (or near the
   // top), so the sticky header stops eating ~17-30% of a phone viewport. The row
@@ -86,28 +86,31 @@ export function Header({
     };
   }, []);
 
-  useEffect(() => {
-    setDraft(query ?? "");
-  }, [query]);
+  useEffect(() => () => clearTimeout(timer.current), []);
 
   useEffect(() => {
-    const next = debounced.trim();
-    const current = (query ?? "").trim();
-    if (next === current) return;
-    if (next.length === 1) return;
-    void navigate({
-      to: "/",
-      search: (prev) => {
-        if ((prev.q ?? "").trim() === next) return prev;
-        return {
-          ...prev,
-          q: next || undefined,
-          category: undefined,
-          page: undefined,
-        };
-      },
-    });
-  }, [debounced, navigate, query]);
+    const current = query ?? "";
+    if (submitted.current !== current) {
+      clearTimeout(timer.current);
+      setDraft(current);
+    }
+    submitted.current = undefined;
+  }, [query]);
+
+  function searchTitles(value: string) {
+    clearTimeout(timer.current);
+    const next = value.trim();
+    submitted.current = next;
+    void navigate({ to: "/", search: { q: next || undefined } });
+  }
+
+  function editSearch(value: string) {
+    setDraft(value);
+    clearTimeout(timer.current);
+    const next = value.trim();
+    if (next.length === 1 || next === (submitted.current ?? query ?? "")) return;
+    timer.current = setTimeout(() => searchTitles(value), 400);
+  }
 
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/95 pt-[env(safe-area-inset-top)] backdrop-blur-md">
@@ -138,17 +141,13 @@ export function Header({
           className="relative min-w-0 flex-1"
           onSubmit={(e) => {
             e.preventDefault();
-            const next = draft.trim();
-            void navigate({
-              to: "/",
-              search: next ? { q: next, category: undefined } : { q: undefined, category: undefined },
-            });
+            searchTitles(draft);
           }}
         >
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted sm:left-3" />
           <Input
             value={draft}
-            onChange={(e) => setDraft(e.target.value)}
+            onChange={(e) => editSearch(e.target.value)}
             placeholder={localText("Cari judul…")}
             className="pixel h-10 rounded-none border border-white/40 bg-black pl-9 pr-9 text-xs shadow-none placeholder:text-white/45 focus-visible:border-white/80 focus-visible:ring-0 sm:h-11 sm:pl-10 sm:pr-10 sm:text-sm"
             type="search"
@@ -160,7 +159,7 @@ export function Header({
             <button
               type="button"
               className="absolute right-1.5 top-1/2 flex size-8 -translate-y-1/2 items-center justify-center text-muted"
-              onClick={() => setDraft("")}
+              onClick={() => editSearch("")}
               aria-label={localText("Hapus pencarian")}
             >
               <X className="size-4" />
