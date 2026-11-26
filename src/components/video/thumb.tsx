@@ -57,6 +57,7 @@ export function VideoThumb({
   eager = false,
   className,
   onUnavailable,
+  onFallbackChange,
   catalog = false,
 }: {
   src: string;
@@ -66,6 +67,7 @@ export function VideoThumb({
   catalog?: boolean;
   className?: string;
   onUnavailable?: () => void;
+  onFallbackChange?: (fallback: boolean) => void;
 }) {
   const ctxId = useContext(PosterIdContext);
   const posterId = videoId || ctxId;
@@ -107,6 +109,10 @@ export function VideoThumb({
   useEffect(() => {
     if (step > 3) onUnavailable?.();
   }, [step, onUnavailable]);
+
+  useEffect(() => {
+    onFallbackChange?.(isPosterSrc(current) || step > 3);
+  }, [current, step, onFallbackChange]);
 
   const handleError = useCallback(() => {
     // Not in R2 yet: the Worker route fetches the source poster (and stores it for next time).
