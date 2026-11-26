@@ -14,14 +14,14 @@ test("Jakarta day flips at local midnight, not UTC midnight", () => {
   assert.equal(late + WIB, Date.parse("2026-11-05T23:30:00Z"));
 });
 
-test("page popunder allows 3 opens per Jakarta day across pages, then resets", () => {
+test("page popunder allows 6 opens per Jakarta day across pages, then resets", () => {
   const day = Date.parse("2026-11-05T10:00:00Z");
   let state = null as ReturnType<typeof nextPagePop> | null;
   for (let i = 0; i < PAGE_POP_MAX_PER_DAY; i++) {
     assert.equal(pagePopAllowed(state, day), true, `open ${i + 1}`);
     state = nextPagePop(state, day);
   }
-  assert.equal(state?.n, 3);
+  assert.equal(state?.n, 6);
   assert.equal(pagePopAllowed(state, day), false);
   const nextMorning = Date.parse("2026-11-05T18:00:00Z");
   assert.equal(pagePopAllowed(state, nextMorning), true);
