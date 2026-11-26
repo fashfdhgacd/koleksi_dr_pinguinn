@@ -1,8 +1,8 @@
 // TrafficStars direct-link popunder (spot 5210859), shared by every trigger: catalog card / hero click,
 // the one-shot tap layer over iframe players (tap-popunder.tsx) and the Videy player (ts-videy-popunder.tsx).
 // In-video taps keep the per-video cap below (sessionStorage, resets when another video is opened).
-// Catalog clicks and all player taps share one daily counter. Blocked tabs consume no slot.
-// Videy preroll uses a separate spot.
+// Catalog clicks and non-Videy player taps share one daily counter. Blocked tabs consume no slot.
+// Videy player taps use the per-video allowance only.
 // Counters: popc_fire / popc_ok / popc_block in player-log (once per video+event per session).
 // Each of the first three opens is also logged by its position for that video (pop_n1 / pop_n2 / pop_n3, one D1
 // upsert per opened tab, same beacon as today), so /pemilik can compare ALL our opens with
@@ -17,7 +17,7 @@ const HOSTS = new Set(["IndoAV", "UserBokep", "Streamtape", "Putarin", "Videy", 
 export const POP_MAX_PER_VIDEO = 3;
 /** Minimum time between two popunders on the SAME video (a newly opened video may pop at once). */
 export const POP_MIN_GAP_MS = 20_000;
-/** Videy popunder cap per video (also subject to the shared daily cap). */
+/** Videy popunder cap per video (independent of the shared daily cap). */
 export const POP_MAX_VIDEY = 6;
 /** Per-video cap for a host label. */
 export function popMaxFor(host: string): number {
@@ -51,9 +51,9 @@ function writeState(v: PopState): void {
 }
 
 /** Checks the daily allowance, per-video allowance, and minimum gap. */
-export function canPop(videoId: string, max: number = POP_MAX_PER_VIDEO): boolean {
+export function canPop(videoId: string, max: number = POP_MAX_PER_VIDEO, daily = true): boolean {
   if (typeof window === "undefined" || !videoId) return false;
-  if (!pagePopAllowed(readPagePop(), Date.now())) return false;
+  if (daily && !pagePopAllowed(readPagePop(), Date.now())) return false;
   const st = readState();
   if (st.id !== videoId) return true; // another video: fresh count, no gap
   return st.n < max && Date.now() - st.at >= POP_MIN_GAP_MS;
@@ -74,8 +74,9 @@ export function firePop(
   videoId: string,
   max: number = POP_MAX_PER_VIDEO,
   host?: PlayerLogHost,
+  daily = true,
 ): "ok" | "block" | "skip" {
-  if (!canPop(videoId, max)) return "skip";
+  if (!canPop(videoId, max, daily)) return "skip";
   let w: Window | null = null;
   try {
     w = window.open(DIRECT_LINK, "_blank");
@@ -88,7 +89,7 @@ export function firePop(
   const n = (st.id === videoId ? st.n : 0) + 1;
   writeState({ id: videoId, n, at: Date.now() });
   // Daily-capped triggers consume one slot of the shared Jakarta-day counter.
-  writePagePop(nextPagePop(readPagePop(), Date.now()));
+  if (daily) writePagePop(nextPagePop(readPagePop(), Date.now()));
   if (host && n >= 1 && n <= 3) sendPlayerLog(videoId, host, `pop_n${n}` as "pop_n1" | "pop_n2" | "pop_n3");
   return "ok";
 }

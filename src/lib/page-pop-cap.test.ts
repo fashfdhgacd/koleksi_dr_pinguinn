@@ -28,3 +28,9 @@ test("page popunder allows 6 opens per Jakarta day across pages, then resets", (
   assert.equal(nextPagePop(state, nextMorning).n, 1);
   assert.equal(nextPagePop(state, nextMorning).day, "2026-11-06");
 });
+
+test("a zero page allowance blocks the first open even after midnight", () => {
+  const now = Date.parse("2026-11-27T00:00:00+07:00");
+  assert.equal(pagePopAllowed(null, now, 0), false);
+  assert.equal(pagePopAllowed({ day: "2026-11-26", n: 1 }, now, 0), false);
+});
