@@ -1,4 +1,4 @@
-import type { CategoryInfo } from "./types";
+import type { CategoryInfo } from "./types.ts";
 
 export type CategoryDef = CategoryInfo & {
   query: string;

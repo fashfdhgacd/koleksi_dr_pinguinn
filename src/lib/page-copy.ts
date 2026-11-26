@@ -1,5 +1,5 @@
-import { type PublicLanguage } from "./public-locale";
-import { translate } from "./public-ui";
+import { type PublicLanguage } from "./public-locale.ts";
+import { translate } from "./public-ui.ts";
 
 const sections: Record<string, [string, string]> = {
   kategori: ["Kategori video", "Video categories"], cari: ["Carian popular", "Popular searches"],
@@ -30,13 +30,26 @@ export function pageCopy(path: string, language: PublicLanguage, originalTitle: 
     description = label + ".";
   } else if (["kategori","genre","cari"].includes(section) && slug) {
     label = collectionLabel(slug, language);
-    description = ms ? `Terokai koleksi ${label} dan pilih video untuk ditonton. Untuk penonton 18 tahun ke atas.` : `Browse the ${label} collection and choose a video to watch. For viewers aged 18 and over.`;
+    description = collectionBlurb(label, language);
   } else if (sections[section]) {
     description = ms ? `${label} — maklumat dan pautan di ${brand}.` : `${label} — information and links on ${brand}.`;
   }
   const page = /\/halaman\/(\d+)$/.exec(path)?.[1];
-  if (page) label += ms ? ` · Halaman ${page}` : ` · Page ${page}`;
+  if (page) {
+    label += ms ? ` – Halaman ${page}` : ` – Page ${page}`;
+    const listing = section === "kategori" || section === "genre" || section === "cari" || section === "halaman" || path.startsWith("/en/");
+    if (listing) return { label, title: `${label} | Koleksi Dr. Pinguin`, description };
+  }
   return { label, title: brand && brand !== label ? label + " | " + brand : label, description };
+}
+
+/** Category blurb. A label that already starts with "Koleksi" is not prefixed again. */
+export function collectionBlurb(label: string, language: PublicLanguage): string {
+  if (language === "ms") {
+    const name = /^koleksi\b/i.test(label) ? label : `koleksi ${label}`;
+    return `Terokai ${name} dan pilih video untuk ditonton. Untuk penonton 18 tahun ke atas.`;
+  }
+  return `Browse the ${label} collection and choose a video to watch. For viewers aged 18 and over.`;
 }
 
 export function collectionLabel(slug: string, language: PublicLanguage) {

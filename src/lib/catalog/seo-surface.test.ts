@@ -20,6 +20,12 @@ test("halaman paths replace query pagination", () => {
   assert.equal(legacyPageRedirect("/cari/bokep-ojol", "?page=2"), "/cari/bokep-ojol/halaman/2");
   assert.equal(legacyPageRedirect("/", "?q=jilbab&page=2"), null);
   assert.equal(legacyPageRedirect("/halaman/1", ""), "/");
+  assert.equal(legacyPageRedirect("/ms/kategori/malaysia", "?page=2"), "/ms/kategori/malaysia/halaman/2");
+  assert.equal(legacyPageRedirect("/id/kategori/malaysia", "?page=5"), "/id/kategori/malaysia/halaman/5");
+  assert.equal(legacyPageRedirect("/id/kategori/jilbab", "?page=2"), "/kategori/jilbab/halaman/2");
+  assert.equal(legacyPageRedirect("/en/kategori/videy", "?page=2"), "/en/kategori/videy/halaman/2");
+  assert.equal(legacyPageRedirect("/ms", "?page=2"), "/ms/halaman/2");
+  assert.equal(legacyPageRedirect("/ms/kategori/malaysia/halaman/2", ""), null);
 });
 
 test("genre landings accept only IndoAV and UserBokep; Videy landing stays Videy", () => {

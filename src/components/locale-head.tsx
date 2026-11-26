@@ -1,8 +1,8 @@
-import { overviewCopy } from "@/lib/catalog/overview-copy";
+import { hreflangAlternates, listingDocument } from "@/lib/catalog/listing-head";
 import { Asset, useRouter, useRouterState, useTags } from "@tanstack/react-router";
 import { SITE_ORIGIN } from "@/lib/seo";
 import { languageFamily } from "@/lib/language-family";
-import { decodePublicPath, languageCodes } from "@/lib/public-locale";
+import { decodePublicPath } from "@/lib/public-locale";
 import { pageCopy } from "@/lib/page-copy";
 
 export function LocaleHead() {
@@ -26,9 +26,14 @@ export function LocaleHead() {
   const url = new URL(urls[language], base.origin).href;
   const original = tags.find(t => t.tag === "title")?.children;
   const params = new URL(href, base.origin).searchParams;
-  const overview = !params.get("q") && !params.get("page") ? overviewCopy(path, language, total) : null;
-  const copy = overview ?? pageCopy(path, language, String(original ?? ""), params.get("q"));
+  const pageQuery = Number(params.get("page"));
+  const listedPath = pageQuery > 1 && !/\/halaman\/[1-9]\d*$/.test(path)
+    ? (path === "/" ? `/halaman/${pageQuery}` : `${path}/halaman/${pageQuery}`)
+    : path;
+  const listed = params.get("q") ? null : listingDocument(listedPath, language, total);
+  const copy = listed ?? pageCopy(path, language, String(original ?? ""), params.get("q"));
   const codes = { ms: "ms_MY", id: "id_ID", en: "en_US" };
+  const alternates = hreflangAlternates(base.pathname + base.search);
   return <>
     {tags.map(t => {
       if (t.tag === "link" && (t.attrs?.rel === "canonical" || t.attrs?.hrefLang || t.attrs?.hreflang)) return null;
@@ -50,7 +55,7 @@ export function LocaleHead() {
       return <Asset {...t} key={JSON.stringify(t)} nonce={nonce} />;
     })}
     <link rel="canonical" href={url} />
-    {(["ms","id","en"] as const).map(l => <link key={l} rel="alternate" hrefLang={languageCodes[l]} href={new URL(urls[l], base.origin).href} />)}
-    <link rel="alternate" hrefLang="x-default" href={new URL(urls.ms, base.origin).href} />
+    {/* React's hrefLang prop is serialized as hrefLang. Crawlers match the HTML attribute hreflang. */}
+    {alternates.map((link) => <link key={link.hreflang} rel="alternate" href={link.href} {...{ hreflang: link.hreflang }} />)}
   </>;
 }

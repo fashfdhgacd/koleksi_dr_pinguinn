@@ -1,4 +1,5 @@
 import { usePublicHref, usePublicLanguage, usePublicText } from "@/lib/public-ui";
+import { listingDocument, pageSuffix } from "@/lib/catalog/listing-head";
 import { collectionLabel } from "@/lib/page-copy";
 import { Outlet, createFileRoute, notFound, useMatches, useNavigate } from "@tanstack/react-router";
 import { Shell } from "@/components/layout/shell";
@@ -33,8 +34,9 @@ export function landingHead(slug: string, page: number, loaderData: unknown) {
   const ld = loaderData as { ok?: boolean; total?: number } | undefined;
   const enough = Boolean(ld && ld.ok && typeof ld.total === "number" && ld.total >= LANDING_MIN_VIDEOS);
   const indexable = enough && page <= LANDING_INDEX_PAGES;
-  const title = page > 1 ? def.title.replace(/ \| koleksidrpinguin\.com$/, ` – Halaman ${page} | koleksidrpinguin.com`) : def.title;
-  const description = page > 1 ? `Halaman ${page}: ${def.description}` : def.description;
+  const listed = listingDocument(cariHref(def.slug, page), "id");
+  const title = listed?.title ?? def.title;
+  const description = listed?.description ?? def.description;
   const cat = findCategory(def.category);
   const last = ld && ld.ok && typeof ld.total === "number" ? Math.max(1, Math.ceil(ld.total / LANDING_PAGE_SIZE)) : 1;
   const pageLinks = [
@@ -121,13 +123,15 @@ export function CariExperience({
   const page = data && data.ok && data.type === "landing" ? data.page : 1;
   const limit = data && data.ok && data.type === "landing" ? data.limit : LANDING_PAGE_SIZE;
   const others = LANDINGS.filter((l) => l.slug !== def.slug);
+  const label = language === "id" ? def.h1 : collectionLabel(def.slug, language);
+  const msName = /^koleksi\b/i.test(label) ? label : `koleksi ${label}`;
 
   return (
     <Shell>
       <section>
         <div className="mb-4">
-          <h1 className="text-xl font-semibold text-zinc-100">{language === "id" ? def.h1 : collectionLabel(def.slug, language)}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{language === "id" ? def.intro : language === "ms" ? `Terokai koleksi ${collectionLabel(def.slug, language)} dan pilih video untuk ditonton.` : `Browse the ${collectionLabel(def.slug, language)} collection.`}</p>
+          <h1 className="text-xl font-semibold text-zinc-100">{label + pageSuffix(language, page)}</h1>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{language === "id" ? def.intro : language === "ms" ? `Terokai ${msName} dan pilih video untuk ditonton.` : `Browse the ${label} collection.`}</p>
           {total ? <p className="mt-1 text-sm text-zinc-500">{total.toLocaleString("id-ID")} {localText("video · halaman")} {page}</p> : null}
         </div>
 

@@ -1,3 +1,5 @@
+import { localizedPath, type PublicLanguage } from "../public-locale.ts";
+
 /**
  * Crawlable pagination paths (/halaman/2), the same shape as a genre-site pager.
  * Page 1 is the bare URL. Search results keep ?page= because those URLs are noindex.
@@ -39,6 +41,21 @@ export function parseHalamanParam(raw: string | undefined | null): number | null
 export function legacyPageRedirect(pathname: string, search = ""): string | null {
   const url = new URL(pathname + (search || ""), "https://koleksidrpinguin.com");
   const path = url.pathname.replace(/\/+$/, "") || "/";
+
+  const prefixed = /^\/(ms|id|en)(\/.*)?$/.exec(path);
+  if (prefixed) {
+    const language = prefixed[1] as PublicLanguage;
+    const rest = prefixed[2] || "/";
+    const dedicatedEnglish = language === "en" && (rest === "/" || !/^\/(?:kategori|genre|cari|halaman|watch|v)(?:\/|$)/.test(rest));
+    if (!dedicatedEnglish) {
+      const inner = legacyPageRedirect(rest, search);
+      if (!inner) return null;
+      const cut = inner.indexOf("?");
+      const innerPath = cut === -1 ? inner : inner.slice(0, cut);
+      const innerQuery = cut === -1 ? "" : inner.slice(cut);
+      return localizedPath(innerPath, language) + innerQuery;
+    }
+  }
 
   const homeHal = /^\/halaman\/([1-9]\d*)$/.exec(path);
   if (homeHal && Number(homeHal[1]) < 2) return "/";

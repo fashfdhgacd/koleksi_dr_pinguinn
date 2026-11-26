@@ -1,4 +1,4 @@
-import type { PublicLanguage } from "../public-locale";
+import type { PublicLanguage } from "../public-locale.ts";
 
 type Copy = { heading: string; intro: string; description: string };
 const catalog: Record<string, Record<PublicLanguage, Copy>> = {

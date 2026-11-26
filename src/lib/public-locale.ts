@@ -2,7 +2,7 @@ export type PublicLanguage = "ms" | "id" | "en";
 export const languageCodes = { ms: "ms-MY", id: "id", en: "en" } as const;
 const publicPage = /^\/(?:$|(?:kategori|genre|cari|halaman|watch|v|tentang|kontak|syarat|terms|privacy|privasi|2257|dmca|teman|laporan|kirim|campur|putarin)(?:\/|$))/;
 
-const localizedCategory = /^\/kategori\/(?:videy|malaysia|jav|hentai)$/;
+const localizedCategory = /^\/kategori\/(?:videy|malaysia|jav|hentai)(?:\/halaman\/[1-9]\d*)?$/;
 
 export function decodePublicPath(path: string): { language: PublicLanguage; path: string } {
   const collection = /^\/(ms|id)\/collections\/([a-z0-9-]+(?:\/halaman\/[1-9]\d*)?)\/?$/.exec(path);

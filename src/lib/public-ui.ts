@@ -1,6 +1,6 @@
 import { useRouterState } from "@tanstack/react-router";
 import { decodePublicPath, localizedPath, type PublicLanguage } from "./public-locale.ts";
-import messages from "./public-messages.json";
+import messages from "./public-messages.json" with { type: "json" };
 
 const dictionary: Record<string, string[]> = messages;
 export function translate(language: PublicLanguage, original: string, english?: string) {

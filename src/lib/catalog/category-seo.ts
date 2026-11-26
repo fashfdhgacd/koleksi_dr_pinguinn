@@ -1,4 +1,4 @@
-import { CATEGORIES } from "./categories";
+import { CATEGORIES } from "./categories.ts";
 
 export type CategorySeo = { title: string; h1: string; description: string; intro: string };
 
