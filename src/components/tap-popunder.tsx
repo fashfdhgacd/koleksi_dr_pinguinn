@@ -1,7 +1,7 @@
 // One-shot popunder tap layer for the watch page (same pattern as the hosts' own players: the first
 // tap opens an ad tab, the next tap reaches the player). A transparent layer sits over the player
 // while the cap (card-popunder.ts: per-video count + POP_MIN_GAP_MS, plus the shared
-// PAGE_POP_MAX_PER_DAY Jakarta-day counter for every host) allows a pop.
+// PAGE_POP_MAX_PER_DAY Jakarta-day counter for non-Videy hosts) allows a pop.
 // Its tap fires our popunder and the layer removes itself, so the next tap goes to the player /
 // iframe (whose own ad then runs on its own tap, never in the same tap as ours).
 // Re-arming without timers: the layer comes back only on a page event (tab visible again, window
@@ -29,9 +29,10 @@ export function PopTapLayer({
   const [armed, setArmed] = useState(false);
   const [fails, setFails] = useState(0);
   const max = popMaxFor(host);
+  const daily = host !== "Videy";
   useEffect(() => {
     const check = () => {
-      setArmed(canPop(videoId, max));
+      setArmed(canPop(videoId, max, daily));
     };
     check();
     const vis = () => {
@@ -51,7 +52,7 @@ export function PopTapLayer({
       window.removeEventListener("blur", check);
       window.removeEventListener("scroll", check);
     };
-  }, [videoId, mediaRef, max]);
+  }, [videoId, mediaRef, max, daily]);
 
   if (!armed || fails >= MAX_FAILS) return null;
   const lh = popHost(host);
@@ -66,13 +67,13 @@ export function PopTapLayer({
       tabIndex={-1}
       className="absolute inset-0 z-10 cursor-pointer bg-transparent"
       onClick={() => {
-        if (!canPop(videoId, max)) {
+        if (!canPop(videoId, max, daily)) {
           setArmed(false);
           onPass?.();
           return;
         }
         sendPlayerLog(videoId, lh, "pop_fire");
-        const r = firePop(videoId, max, lh);
+        const r = firePop(videoId, max, lh, daily);
         if (r === "ok") {
           sendPlayerLog(videoId, lh, "pop_ok");
           setArmed(false);

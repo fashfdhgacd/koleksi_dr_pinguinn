@@ -13,7 +13,7 @@ const failures = new Map<string, number>();
 
 /** True while a tap on this video should go to the ad first. */
 export function owesAd(videoId: string): boolean {
-  return canPop(videoId, POP_MAX_VIDEY) && (failures.get(videoId) || 0) < MAX_FAILS;
+  return canPop(videoId, POP_MAX_VIDEY, false) && (failures.get(videoId) || 0) < MAX_FAILS;
 }
 
 /**
@@ -23,7 +23,7 @@ export function owesAd(videoId: string): boolean {
 export function popTap(videoId: string): boolean {
   if (!owesAd(videoId)) return false;
   sendPlayerLog(videoId, "Videy", "pop_fire");
-  const r = firePop(videoId, POP_MAX_VIDEY, "Videy");
+  const r = firePop(videoId, POP_MAX_VIDEY, "Videy", false);
   if (r === "ok") {
     sendPlayerLog(videoId, "Videy", "pop_ok");
     return true;

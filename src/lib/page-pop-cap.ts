@@ -1,6 +1,6 @@
 /**
  * Page popunder cap: 6 successful opens per calendar day in Asia/Jakarta, shared by every page.
- * Catalog clicks and player taps, including Videy, share this counter.
+ * Catalog clicks and non-Videy player taps share this counter.
  * A new Jakarta date starts the count at zero.
  */
 
@@ -19,8 +19,8 @@ export function jakartaDay(now: number): string {
 }
 
 export function pagePopAllowed(state: PagePopDay | null, now: number, max = PAGE_POP_MAX_PER_DAY): boolean {
-  if (!state || state.day !== jakartaDay(now)) return true;
-  return state.n < max;
+  const used = state?.day === jakartaDay(now) ? state.n : 0;
+  return used < max;
 }
 
 export function nextPagePop(state: PagePopDay | null, now: number): PagePopDay {
