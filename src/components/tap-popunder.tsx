@@ -1,7 +1,7 @@
 // One-shot popunder tap layer for the watch page (same pattern as the hosts' own players: the first
 // tap opens an ad tab, the next tap reaches the player). A transparent layer sits over the player
 // while the cap (card-popunder.ts: per-video count + POP_MIN_GAP_MS, plus the shared
-// PAGE_POP_MAX_PER_DAY Jakarta-day counter for every non-Videy host) allows a pop.
+// PAGE_POP_MAX_PER_DAY Jakarta-day counter for every host) allows a pop.
 // Its tap fires our popunder and the layer removes itself, so the next tap goes to the player /
 // iframe (whose own ad then runs on its own tap, never in the same tap as ours).
 // Re-arming without timers: the layer comes back only on a page event (tab visible again, window
@@ -29,13 +29,9 @@ export function PopTapLayer({
   const [armed, setArmed] = useState(false);
   const [fails, setFails] = useState(0);
   const max = popMaxFor(host);
-  // Every host except Videy shares the 3-per-Jakarta-day page popunder counter
-  // (catalog clicks + iframe player taps). Videy stays per-video only.
-  const daily = host !== "Videy";
-
   useEffect(() => {
     const check = () => {
-      if (canPop(videoId, max, daily)) setArmed(true);
+      setArmed(canPop(videoId, max));
     };
     check();
     const vis = () => {
@@ -55,7 +51,7 @@ export function PopTapLayer({
       window.removeEventListener("blur", check);
       window.removeEventListener("scroll", check);
     };
-  }, [videoId, mediaRef, max, daily]);
+  }, [videoId, mediaRef, max]);
 
   if (!armed || fails >= MAX_FAILS) return null;
   const lh = popHost(host);
@@ -70,13 +66,13 @@ export function PopTapLayer({
       tabIndex={-1}
       className="absolute inset-0 z-10 cursor-pointer bg-transparent"
       onClick={() => {
-        if (!canPop(videoId, max, daily)) {
+        if (!canPop(videoId, max)) {
           setArmed(false);
           onPass?.();
           return;
         }
         sendPlayerLog(videoId, lh, "pop_fire");
-        const r = firePop(videoId, max, lh, daily);
+        const r = firePop(videoId, max, lh);
         if (r === "ok") {
           sendPlayerLog(videoId, lh, "pop_ok");
           setArmed(false);
