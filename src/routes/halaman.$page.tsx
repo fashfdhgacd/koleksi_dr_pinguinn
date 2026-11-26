@@ -1,5 +1,6 @@
 import { createFileRoute, notFound, redirect, useNavigate } from "@tanstack/react-router";
 import { homeHref, parseHalamanParam } from "@/lib/catalog/halaman";
+import { listingDocument } from "@/lib/catalog/listing-head";
 import { HOME_CANONICAL, SITE_ORIGIN, homeJsonLd } from "@/lib/seo";
 import { jsonLdString } from "@/lib/json-ld";
 import { HomeExperience, loadHome } from "./index";
@@ -26,8 +27,9 @@ export const Route = createFileRoute("/halaman/$page")({
       return { meta: [{ name: "robots", content: "noindex,follow" }] };
     }
     const page = parseHalamanParam(params.page) || 2;
-    const title = `Bokep Indo Terbaru Halaman ${page} | Dr. Pinguin`;
-    const description = `Halaman ${page}: bokep indo terbaru, update setiap hari, streaming tanpa VPN di koleksidrpinguin.com. Khusus 18+.`;
+    const listed = listingDocument(`/halaman/${page}`, "id", loaderData.latest.total);
+    const title = listed?.title ?? `Bokep Indo Terbaru Halaman ${page} | Dr. Pinguin`;
+    const description = listed?.description ?? `Halaman ${page}: bokep indo terbaru, update setiap hari, streaming tanpa VPN di koleksidrpinguin.com. Khusus 18+.`;
     const url = `${SITE_ORIGIN}${homeHref(page)}`;
     const indexable = page <= DEEP_PAGE_NOINDEX;
     return {

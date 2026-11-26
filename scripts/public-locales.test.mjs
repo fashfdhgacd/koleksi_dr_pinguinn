@@ -15,6 +15,17 @@ test("each public locale preserves watch IDs, queries and pagination", () => {
   }
 });
 
+test("localized Indonesian categories keep /id on later pages", () => {
+  for (const path of ["/kategori/malaysia", "/kategori/malaysia/halaman/5", "/kategori/videy/halaman/2", "/kategori/jav", "/kategori/hentai/halaman/3"]) {
+    assert.equal(localizedPath(path, "id"), "/id" + path);
+    assert.deepEqual(decodePublicPath("/id" + path), { language: "id", path });
+    assert.equal(localizedPath(path, "ms"), "/ms" + path);
+    assert.deepEqual(decodePublicPath("/ms" + path), { language: "ms", path });
+  }
+  assert.equal(localizedPath("/kategori/jilbab/halaman/2", "id"), "/kategori/jilbab/halaman/2");
+  assert.notEqual(decodePublicPath("/id/kategori/jilbab/halaman/2").path, "/kategori/jilbab/halaman/2");
+});
+
 test("existing English collection and its translations resolve to the same loader", () => {
   const path = "/en/indo-viral/halaman/2";
   for (const language of ["ms", "id", "en"]) {

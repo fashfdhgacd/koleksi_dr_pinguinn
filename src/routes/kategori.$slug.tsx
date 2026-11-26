@@ -1,4 +1,4 @@
-import { overviewCopy } from "@/lib/catalog/overview-copy";
+import { listingDocument } from "@/lib/catalog/listing-head";
 import { usePublicHref, usePublicLanguage, usePublicText } from "@/lib/public-ui";
 import { collectionLabel } from "@/lib/page-copy";
 import { categoryHref } from "@/lib/catalog/halaman";
@@ -123,9 +123,9 @@ export const Route = createFileRoute("/kategori/$slug")({
     // Owner decision 2026-10-27: these stay reachable but out of search (no sitemap, noindex,follow).
     const hiddenFromSearch = Boolean(cat && NOINDEX_CATEGORY_SLUGS.has(cat.slug));
     const url = `${SITE_ORIGIN}${categoryHref(params.slug, emptyPeriod ? 1 : page, emptyPeriod ? undefined : periode)}`;
-    // Halaman 2+: judul & deskripsi unik per halaman (hindari duplikat judul di GSC).
-    const pageTitle = page > 1 && !emptyPeriod ? seo.title.replace(/ \| koleksidrpinguin\.com$/, ` – Halaman ${page} | koleksidrpinguin.com`) : seo.title;
-    const pageDesc = page > 1 && !emptyPeriod ? `Halaman ${page}: ${seo.description}` : seo.description;
+    const listed = !rank && page > 1 && !emptyPeriod ? listingDocument(categoryHref(params.slug, page), "id") : null;
+    const pageTitle = listed?.title ?? (page > 1 && !emptyPeriod ? seo.title.replace(/ \| koleksidrpinguin\.com$/, ` – Halaman ${page} | koleksidrpinguin.com`) : seo.title);
+    const pageDesc = listed?.description ?? (page > 1 && !emptyPeriod ? `Halaman ${page}: ${seo.description}` : seo.description);
     // Breadcrumb shows the page heading ("Bokep Videy Indo Terbaru"), not the internal label ("drpinguin videy").
     const crumbName = (rank?.label || ("h1" in seo ? seo.h1 : "") || cat?.label || params.slug).trim();
     const indexable = !(emptyPeriod || emptyCategory || hiddenFromSearch || page > DEEP_PAGE_NOINDEX);
@@ -402,7 +402,12 @@ function PlainCategoryPage({
     onPage(next);
   }
 
-  const overview = page === 1 ? overviewCopy("/kategori/" + slug, language, seed?.total) : null;
+  const total = seed?.total ?? (typeof feed.total === "number" ? feed.total : undefined);
+  const listed = listingDocument(page > 1 ? `/kategori/${slug}/halaman/${page}` : `/kategori/${slug}`, language, total);
+  const plainLabel = cat ? collectionLabel(cat.slug, language) : "";
+  const plainIntro = language === "ms"
+    ? `Terokai ${/^koleksi\b/i.test(plainLabel) ? plainLabel : `koleksi ${plainLabel}`} dan pilih video untuk ditonton.`
+    : `Browse the ${plainLabel} collection.`;
   if (!cat || UNLISTED_CATEGORY_SLUGS.has(cat.slug)) {
     return (
       <Shell>
@@ -426,9 +431,9 @@ function PlainCategoryPage({
     <Shell>
       <section>
         <div className="mb-4">
-          <h1 className="text-xl font-semibold text-zinc-100">{overview?.heading ?? (language === "id" ? categorySeo(cat.slug).h1 : collectionLabel(cat.slug, language))}</h1>
+          <h1 className="text-xl font-semibold text-zinc-100">{listed?.heading ?? (language === "id" ? categorySeo(cat.slug).h1 : plainLabel)}</h1>
           {categorySeo(cat.slug).intro ? (
-            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{overview?.intro ?? (language === "id" ? categorySeo(cat.slug).intro : language === "ms" ? `Terokai koleksi ${collectionLabel(cat.slug, language)} dan pilih video untuk ditonton.` : `Browse the ${collectionLabel(cat.slug, language)} collection.`)}</p>
+            <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{listed?.intro ?? (language === "id" ? categorySeo(cat.slug).intro : plainIntro)}</p>
           ) : null}
           {typeof feed.total === "number" ? (
             <p className="mt-1 text-sm text-zinc-500">{feed.total.toLocaleString("id-ID")} video</p>

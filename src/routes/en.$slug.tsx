@@ -1,3 +1,4 @@
+import { listingDocument, pageSuffix } from "@/lib/catalog/listing-head";
 import { collectionHeading, collectionIntro } from "@/lib/page-copy";
 import { languageFamily } from "@/lib/language-family";
 import { usePublicLanguage } from "@/lib/public-ui";
@@ -36,8 +37,9 @@ export function enLandingHead(slug: string, page: number, loaderData: unknown) {
   const ld = loaderData as { ok?: boolean; total?: number } | undefined;
   const enough = Boolean(ld && ld.ok && typeof ld.total === "number" && ld.total >= LANDING_MIN_VIDEOS);
   const indexable = enough && page <= LANDING_INDEX_PAGES;
-  const title = enDocumentTitle(def.title, page, TITLE_SUFFIX);
-  const description = page > 1 ? `Page ${page}: ${def.description}` : def.description;
+  const listed = listingDocument(enHref(def.slug, page), "en");
+  const title = listed?.title ?? enDocumentTitle(def.title, page, TITLE_SUFFIX);
+  const description = listed?.description ?? def.description;
   const last = ld && ld.ok && typeof ld.total === "number" ? Math.max(1, Math.ceil(ld.total / LANDING_PAGE_SIZE)) : 1;
   const pageLinks = [
     ...(page > 1 ? [{ rel: "prev", href: `${SITE_ORIGIN}${enHref(def.slug, page - 1)}` }] : []),
@@ -109,7 +111,8 @@ export function EnExperience({
   const total = data && data.ok && data.type === "landing" ? data.total : 0;
   const page = data && data.ok && data.type === "landing" ? data.page : 1;
   const limit = data && data.ok && data.type === "landing" ? data.limit : LANDING_PAGE_SIZE;
-  const heading = collectionHeading(def.slug, language, def.h1);
+  const baseHeading = collectionHeading(def.slug, language, def.h1);
+  const heading = baseHeading + pageSuffix(language, page);
   const others = EN_LANDINGS.filter((l) => l.slug !== def.slug);
 
   return (
@@ -117,7 +120,7 @@ export function EnExperience({
       <section>
         <div className="mb-4">
           <h1 className="text-xl font-semibold text-zinc-100">{heading}</h1>
-          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{language === "en" ? def.intro : collectionIntro(heading, language)}</p>
+          <p className="mt-2 max-w-3xl text-sm leading-relaxed text-zinc-400">{language === "en" ? def.intro : collectionIntro(baseHeading, language)}</p>
           {total ? <p className="mt-1 text-sm text-zinc-500">{total.toLocaleString(language)} {language === "en" ? "videos · page" : "video · halaman"} {page}</p> : null}
           {language === "en" && def.idSlug ? (
             <p className="mt-2 text-sm text-zinc-500">

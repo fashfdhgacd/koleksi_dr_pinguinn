@@ -2,6 +2,7 @@ import { createFileRoute, notFound, redirect, useNavigate } from "@tanstack/reac
 import { LEGACY_CATEGORY_SLUGS, NOINDEX_CATEGORY_SLUGS, findCategory, minIndexedCount } from "@/lib/catalog/categories";
 import { categorySeo } from "@/lib/catalog/category-seo";
 import { categoryHref, parseHalamanParam } from "@/lib/catalog/halaman";
+import { listingDocument } from "@/lib/catalog/listing-head";
 import { findRanking, periodFromKey, rankingKey, rankingSeo } from "@/lib/catalog/rankings";
 import { HOME_CANONICAL, SITE_NAME, SITE_ORIGIN, breadcrumbJsonLd, collectionPageJsonLd, loaderItems } from "@/lib/seo";
 import { jsonLdString } from "@/lib/json-ld";
@@ -62,8 +63,9 @@ export const Route = createFileRoute("/kategori/$slug/halaman/$page")({
     const rank = findRanking(params.slug);
     const cat = rank ? undefined : findCategory(params.slug);
     const seo = rank ? rankingSeo(rank, periodFromKey(periode).period) : categorySeo(params.slug);
-    const title = seo.title.replace(/ \| koleksidrpinguin\.com$/, ` – Halaman ${page} | koleksidrpinguin.com`);
-    const description = `Halaman ${page}: ${seo.description}`;
+    const listed = rank ? null : listingDocument(categoryHref(params.slug, page), "id");
+    const title = listed?.title ?? seo.title.replace(/ \| koleksidrpinguin\.com$/, ` – Halaman ${page} | koleksidrpinguin.com`);
+    const description = listed?.description ?? `Halaman ${page}: ${seo.description}`;
     const url = `${SITE_ORIGIN}${categoryHref(params.slug, page, periode)}`;
     const ld = loaderData as { ok?: boolean; type?: string; total?: number; limit?: number } | undefined;
     const total = ld && ld.ok && ld.type === "category" && typeof ld.total === "number" ? ld.total : undefined;
