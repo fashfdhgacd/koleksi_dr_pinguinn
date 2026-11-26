@@ -1,11 +1,11 @@
 /**
- * Page popunder cap: 3 successful opens per calendar day in Asia/Jakarta, shared by every page.
+ * Page popunder cap: 6 successful opens per calendar day in Asia/Jakarta, shared by every page.
  * Applies to every non-Videy popunder — catalog/hero clicks and iframe-player tap layers share
  * this one counter. The Videy popunder is per-video only and does not use this.
  * A new Jakarta date starts the count at zero.
  */
 
-export const PAGE_POP_MAX_PER_DAY = 3;
+export const PAGE_POP_MAX_PER_DAY = 6;
 
 export type PagePopDay = { day: string; n: number };
 

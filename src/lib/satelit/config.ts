@@ -48,7 +48,7 @@ export function effectiveSpots(host: SatelliteHost, spots: Record<SpotKey, strin
 }
 
 /** Same caps as the main site (page-pop-cap.ts PAGE_POP_MAX_PER_DAY, card-popunder.ts POP_MAX_VIDEY). */
-export const PAGE_POPUNDER_MAX_PER_DAY = 3;
+export const PAGE_POPUNDER_MAX_PER_DAY = 6;
 export const VIDEY_SKIP_POPUNDER_MAX_PER_VIDEO = 3;
 
 export const SPOT_KEYS = ["popunder", "preroll", "inpagePush", "videoSlider", "native300x250", "banner300x100"] as const;
