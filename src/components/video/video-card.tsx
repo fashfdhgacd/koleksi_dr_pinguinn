@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { usePublicText } from "@/lib/public-ui";
 import { cleanDisplayTitle } from "@/lib/seo";
 import { Link } from "@tanstack/react-router";
@@ -28,20 +28,7 @@ export function VideoCard({
   catalog?: boolean;
 }) {
   const [fallback, setFallback] = useState(false);
-  const [pendingId, setPendingId] = useState("");
   const checkReview = video.isNew && (video.creator === "IndoAV" || video.creator === "UserBokep");
-  useEffect(() => {
-    setPendingId("");
-    if (!checkReview || !fallback) return;
-    const controller = new AbortController();
-    fetch(`/api/provider-review/${encodeURIComponent(video.id)}`, { signal: controller.signal })
-      .then(async (response) => response.ok && (await response.json()).pending === true)
-      .then((pending) => {
-        if (pending && !controller.signal.aborted) setPendingId(video.id);
-      })
-      .catch(() => {});
-    return () => controller.abort();
-  }, [checkReview, fallback, video.id]);
   const localText = usePublicText();
   // 0 is shown too (own-pageview sources start at 0); null = no count known.
   const views = typeof video.views === "number" && video.views >= 0 ? video.views : null;
@@ -73,7 +60,7 @@ export function VideoCard({
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/80 via-transparent to-transparent opacity-80" />
         {video.isNew ? (
           <span className="pointer-events-none absolute left-2 top-2 rounded-md bg-primary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-foreground sm:text-[11px]">
-            {localText("Baru")}{checkReview && fallback && pendingId === video.id ? " (Pending Review)" : ""}
+            {localText("Baru")}{checkReview && fallback ? " (Pending Review)" : ""}
           </span>
         ) : null}
         <div className="pointer-events-none absolute inset-0 hidden items-center justify-center opacity-0 transition-opacity duration-150 group-hover:opacity-100 sm:flex">
