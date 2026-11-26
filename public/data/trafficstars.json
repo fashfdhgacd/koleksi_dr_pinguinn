@@ -1,9 +1,8 @@
 {
-  "updatedAt": "2026-11-25T12:33:46Z",
+  "updatedAt": "2026-11-26T00:30:07Z",
   "currency": "USD",
   "source": "TrafficStars publisher report (UTC days)",
   "days": [
-    { "date": "2026-11-12", "impressions": 2033, "clicks": 0, "earnings": 0.71 },
     { "date": "2026-11-13", "impressions": 2934, "clicks": 0, "earnings": 0.98 },
     { "date": "2026-11-14", "impressions": 2448, "clicks": 0, "earnings": 0.78 },
     { "date": "2026-11-15", "impressions": 2327, "clicks": 0, "earnings": 0.74 },
@@ -16,11 +15,11 @@
     { "date": "2026-11-22", "impressions": 1677, "clicks": 0, "earnings": 0.59 },
     { "date": "2026-11-23", "impressions": 2067, "clicks": 0, "earnings": 0.62 },
     { "date": "2026-11-24", "impressions": 2609, "clicks": 0, "earnings": 0.87 },
-    { "date": "2026-11-25", "impressions": 1075, "clicks": 0, "earnings": 0.37 }
+    { "date": "2026-11-25", "impressions": 2373, "clicks": 0, "earnings": 0.77 },
+    { "date": "2026-11-26", "impressions": 32, "clicks": 0, "earnings": 0.01 }
   ],
   "spotNames": {"5210853":"kdp grid 300x250 (300x100 A)","5210854":"kdp grid 300x250 (300x100 B)","5210855":"kdp grid 300x250 (Native)","5210856":"kdp grid 300x250 (300x250)","5210859":"kdp videy popunder","5210886":"kdp videy preroll","5211537":"kdp watch inpage push","5211538":"kdp watch video slider"},
   "spots": [
-    {"date":"2026-11-12","spots":[{"id":"5210859","impressions":1999,"clicks":0,"earnings":0.71},{"id":"5210886","impressions":34,"clicks":0,"earnings":0}]},
     {"date":"2026-11-13","spots":[{"id":"5210859","impressions":2857,"clicks":0,"earnings":0.98},{"id":"5210886","impressions":77,"clicks":0,"earnings":0}]},
     {"date":"2026-11-14","spots":[{"id":"5210859","impressions":2384,"clicks":0,"earnings":0.78},{"id":"5210886","impressions":64,"clicks":0,"earnings":0}]},
     {"date":"2026-11-15","spots":[{"id":"5210859","impressions":2285,"clicks":0,"earnings":0.74},{"id":"5210886","impressions":42,"clicks":0,"earnings":0}]},
@@ -33,6 +32,7 @@
     {"date":"2026-11-22","spots":[{"id":"5210859","impressions":1649,"clicks":0,"earnings":0.58},{"id":"5210886","impressions":28,"clicks":0,"earnings":0}]},
     {"date":"2026-11-23","spots":[{"id":"5210859","impressions":2024,"clicks":0,"earnings":0.62},{"id":"5210886","impressions":43,"clicks":0,"earnings":0}]},
     {"date":"2026-11-24","spots":[{"id":"5210859","impressions":2556,"clicks":0,"earnings":0.86},{"id":"5210886","impressions":53,"clicks":0,"earnings":0}]},
-    {"date":"2026-11-25","spots":[{"id":"5210859","impressions":1039,"clicks":0,"earnings":0.37},{"id":"5210886","impressions":36,"clicks":0,"earnings":0}]}
+    {"date":"2026-11-25","spots":[{"id":"5210859","impressions":2318,"clicks":0,"earnings":0.77},{"id":"5210886","impressions":55,"clicks":0,"earnings":0}]},
+    {"date":"2026-11-26","spots":[{"id":"5210859","impressions":33,"clicks":0,"earnings":0.01}]}
   ]
 }
