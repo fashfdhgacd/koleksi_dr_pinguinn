@@ -20,7 +20,7 @@ export type LandingDef = {
   sources?: string[];
   /** "latest" keeps feed order (newest first); default sorts by views. */
   order?: "views" | "latest";
-  /** No grid ad slots and no card-click popunder on this page (IndoAV source pages stay ad-free). */
+  /** No grid ad slots and no card-click popunder on this page (UserBokep source pages stay ad-free). */
   adFree?: boolean;
   /** Optional extra title filter inside the category (case-insensitive). */
   match?: RegExp;
@@ -295,19 +295,19 @@ export const LANDINGS: LandingDef[] = [
   // Source pages (2026-11-20, owner request): GSC 90 d "userbokep" 101 imp / 12 clicks (pos 10.4, lands
   // on /), "indoav" 27 imp / 10 clicks (pos 52), "bokep indoav" 8 imp, "indoav stw" 6 imp. Navigational
   // domain queries (indoav.com, userbokep.com) are not targeted. Copy says these are videos FROM the
-  // source, collected here; never that this site is IndoAV or UserBokep. Ad-free (IndoAV no-ads rule).
+  // source, collected here; never that this site is IndoAV or UserBokep.
+  // UserBokep source pages stay ad-free; IndoAV pages use the same banners as other catalog pages.
   {
     slug: "bokep-indoav-terbaru",
     category: ALL_CATEGORIES,
     sources: ["IndoAV"],
     order: "latest",
-    adFree: true,
     h1: "Bokep IndoAV Terbaru: Koleksi Video dari IndoAV",
     title: "Bokep IndoAV Terbaru – Koleksi Video dari IndoAV | koleksidrpinguin.com",
     description:
       "Bokep IndoAV terbaru: kumpulan video yang bersumber dari IndoAV, diurutkan dari yang baru masuk. Streaming di HP tanpa login. Khusus 18+.",
     intro:
-      "Halaman ini berisi kumpulan video terbaru di koleksidrpinguin.com yang bersumber dari IndoAV. Kami bukan situs IndoAV dan tidak berafiliasi dengan mereka; kami hanya mengumpulkan video dari sumber itu ke satu daftar supaya gampang ditonton. Urutannya dari video yang paling baru masuk, jadi tiap ada tambahan langsung muncul di atas. Isinya rekaman Indonesia dengan pemeran dewasa, dan judul yang tidak pantas sudah disaring. Video diputar langsung di browser HP tanpa daftar akun. Halaman ini tanpa iklan banner. Mau video dari sumber lain juga? Buka halaman UserBokep atau beranda lewat tautan di bawah.",
+      "Halaman ini berisi kumpulan video terbaru di koleksidrpinguin.com yang bersumber dari IndoAV. Kami bukan situs IndoAV dan tidak berafiliasi dengan mereka; kami hanya mengumpulkan video dari sumber itu ke satu daftar supaya gampang ditonton. Urutannya dari video yang paling baru masuk, jadi tiap ada tambahan langsung muncul di atas. Isinya rekaman Indonesia dengan pemeran dewasa, dan judul yang tidak pantas sudah disaring. Video diputar langsung di browser HP tanpa daftar akun. Mau video dari sumber lain juga? Buka halaman UserBokep atau beranda lewat tautan di bawah.",
     queries: ["indoav", "bokep indoav", "indoav terbaru", "indoav stw", "bokep indo av terbaru"],
   },
   {

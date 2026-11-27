@@ -461,11 +461,9 @@ export function WatchPage() {
               <AdblockGate key={`gate-${item.id}`} videoId={item.id}>
                 <VideyPlayer key={item.id} item={item} />
               </AdblockGate>
-            ) : hostLabel(catalogPlayUrl(playItem)) === "IndoAV" ? (
-              // IndoAV: never gated, and never a popunder (standing no-ads rule).
-              <VideoPlayer key={playItem.id} item={playItem} />
             ) : (
-              // Other hosts (UserBokep, Putarin/Jav, Streamtape, ...): no adblock gate, only Videy is gated.
+              // Non-Videy hosts (IndoAV, UserBokep, Putarin/Jav, Streamtape, ...): no adblock gate.
+              // IndoAV and the others get a 1x first-tap popunder via PopTapLayer.
               <div className="relative">
                 {/* Player poster = the card's cached poster (R2 / /thumb), so a down image host
                     (img.lulucdn.com) no longer turns it into the penguin. Iframe URLs unchanged. */}

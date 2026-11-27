@@ -127,10 +127,10 @@ test("a slot without a zone ID renders nothing and never borrows another zone", 
 });
 
 test("Wynq site tag is kept off ad-free source pages only", () => {
-  for (const p of ["/cari/bokep-indoav-terbaru", "/cari/bokep-indoav-terbaru/halaman/3", "/ms/cari/bokep-userbokep-indo", "/cari/bokep-userbokep-indo/?x=1"]) {
+  for (const p of ["/cari/bokep-userbokep-indo", "/ms/cari/bokep-userbokep-indo", "/cari/bokep-userbokep-indo/halaman/3", "/cari/bokep-userbokep-indo/?x=1"]) {
     assert.equal(isAdFreePath(p), true, p);
   }
-  for (const p of ["/", "/ms", "/kategori/bokep", "/watch/abc", "/cari/bokep-indo-stw", "/cari/bokep-indo-stw/halaman/2", "/en/indonesian-amateur", ""]) {
+  for (const p of ["/", "/ms", "/kategori/bokep", "/watch/abc", "/cari/bokep-indo-stw", "/cari/bokep-indo-stw/halaman/2", "/en/indonesian-amateur", "/cari/bokep-indoav-terbaru", "/cari/bokep-indoav-terbaru/halaman/3", "/ms/cari/bokep-indoav-terbaru", ""]) {
     assert.equal(isAdFreePath(p), false, p);
   }
 });

@@ -79,7 +79,6 @@ export function firePop(
   host?: PlayerLogHost,
   daily = true,
 ): "ok" | "block" | "skip" {
-  if (host === "IndoAV") return "skip";
   if (!canPop(videoId, max, daily)) return "skip";
   let w: Window | null = null;
   try {
@@ -164,7 +163,6 @@ export function onCatalogCardClick(event: { target: EventTarget | null }, hostOf
   const id = decodeURIComponent((a.getAttribute("href") || "").slice("/watch/".length).split(/[?#/]/)[0] || "");
   if (!id) return;
   const host = popHost(hostOf(id));
-  if (host === "IndoAV") return;
   if (!canPop(id, POP_MAX_PER_VIDEO)) return;
   sendPlayerLog(id, host, "popc_fire");
   const opened = firePop(id, POP_MAX_PER_VIDEO, host) === "ok";

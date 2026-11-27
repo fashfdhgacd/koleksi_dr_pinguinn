@@ -112,6 +112,7 @@ test("player tap caps: Videy 6 per video, other hosts 1", () => {
   assert.equal(popMaxFor("Videy"), POP_MAX_VIDEY);
   assert.equal(popMaxFor("UserBokep"), 1);
   assert.equal(popMaxFor("UserBokep"), POP_MAX_OTHER);
+  assert.equal(popMaxFor("IndoAV"), POP_MAX_OTHER);
   assert.equal(popMaxFor("Streamtape"), POP_MAX_OTHER);
   assert.equal(POP_MAX_PER_VIDEO, 3);
 });
@@ -150,13 +151,18 @@ test("a blocked window.open is not counted and can be retried", () => {
   assert.equal(opened.length, 1);
 });
 
-test("IndoAV never opens a popunder from firePop or a catalog card click", () => {
-  assert.equal(firePop("indoav00001", POP_MAX_OTHER, "IndoAV", true), "skip");
-  assert.equal(opened.length, 0);
+test("IndoAV player taps stop after 1 per video, same as other non-Videy hosts", () => {
+  const id = "indoav00001";
+  assert.equal(firePop(id, POP_MAX_OTHER, "IndoAV", true), "ok");
+  now += POP_MIN_GAP_MS + 1;
+  assert.equal(firePop(id, POP_MAX_OTHER, "IndoAV", true), "skip");
+  assert.equal(opened.length, 1);
+});
 
+test("IndoAV catalog card click can open a page popunder", () => {
   const Element = (globalThis as typeof globalThis & { Element: new () => Element }).Element;
   const a = Object.assign(new Element(), {
-    getAttribute: (name: string) => (name === "href" ? "/watch/indoav00001" : null),
+    getAttribute: (name: string) => (name === "href" ? "/watch/indoav00002" : null),
     closest(this: { getAttribute: (n: string) => string | null }, sel: string) {
       return sel === 'a[href^="/watch/"]' ? this : null;
     },
@@ -165,7 +171,7 @@ test("IndoAV never opens a popunder from firePop or a catalog card click", () =>
     closest: (sel: string) => (sel === "[data-kdp-cell]" ? null : a),
   });
   onCatalogCardClick({ target }, () => "IndoAV");
-  assert.equal(opened.length, 0);
+  assert.equal(opened.length, 1);
 });
 
 test("the 20s gap blocks a second open on the same video, not on a new video", () => {
