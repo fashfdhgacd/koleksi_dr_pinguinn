@@ -46,9 +46,9 @@ export const GRID_SLOTS: readonly GridSlot[] = [
 /** ExoClick 300x250 fallback zone per non-ExoClick slotIndex: when that slot's TrafficStars / Wynq ad is
  * still unfilled after the fill timeout, the cell is swapped ONCE to this ExoClick zone (never back, no
  * refresh). Every fallback zone must differ from each other and from EXO_ZONE_1/2, so no zone repeats on a
- * page. "" = not created yet: the cell then keeps its (empty) frame, it never disappears.
- * TODO: fill with the 4 new ExoClick zone IDs from the panel. */
-export const EXO_FALLBACK_ZONES: Readonly<Record<number, string>> = { 1: "", 2: "", 4: "", 5: "" };
+ * page. "" = none: the cell then keeps its (empty) frame, it never disappears. Zones created 27 Nov 2026
+ * on site 1115596. */
+export const EXO_FALLBACK_ZONES: Readonly<Record<number, string>> = { 1: "6111370", 2: "6111372", 4: "6111374", 5: "6111376" };
 
 /** ExoClick fallback zone for a slot, or null (no fallback configured / slot is already ExoClick). */
 export function fallbackZone(
