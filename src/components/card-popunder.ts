@@ -158,7 +158,7 @@ function writePagePop(state: PagePopDay): void {
 export function onCatalogCardClick(event: { target: EventTarget | null }, hostOf: (id: string) => string): void {
   if (typeof window === "undefined") return;
   const el = event.target instanceof Element ? event.target : null;
-  if (!el || el.closest("[data-kdp-ad]")) return;
+  if (!el || el.closest("[data-kdp-cell]")) return;
   const a = el.closest('a[href^="/watch/"]');
   if (!a) return;
   const id = decodeURIComponent((a.getAttribute("href") || "").slice("/watch/".length).split(/[?#/]/)[0] || "");

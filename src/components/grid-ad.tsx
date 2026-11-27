@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { fallbackZone, type GridSlot } from "@/lib/grid-ads";
-import { AdSlot } from "@/components/ad-slot";
+import { AdSlot } from "@/components/grid-cell";
 import { TsGridAd } from "@/components/ts-grid-ad";
 import { WynqGridAd } from "@/components/wynq-grid-ad";
 

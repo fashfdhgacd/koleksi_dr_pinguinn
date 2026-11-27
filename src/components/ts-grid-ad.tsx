@@ -5,7 +5,7 @@
 // swaps the cell once to an ExoClick fallback zone; without one the empty frame stays, never removed).
 // No refresh / rotation.
 import { useEffect, useRef, useState } from "react";
-import { AdCardShell, FILL_TIMEOUT_MS, onceNearViewport, useFitScale, useReportEmpty } from "@/components/ad-slot";
+import { AdCardShell, FILL_TIMEOUT_MS, onceNearViewport, useFitScale, useReportEmpty } from "@/components/grid-cell";
 
 const SDK_SRC = "https://cdn.gajukogyxywahu.com/sdk/v1/dd.ms.js";
 const DOMAIN = "gajukogyxywahu.com";

@@ -5,7 +5,7 @@
 // within 8s onEmpty fires (GridAd swaps once to an ExoClick fallback zone; without one the frame stays).
 // No refresh / rotation.
 import { useEffect, useRef, useState } from "react";
-import { AdCardShell, FILL_TIMEOUT_MS, onceNearViewport, useFitScale, useReportEmpty } from "@/components/ad-slot";
+import { AdCardShell, FILL_TIMEOUT_MS, onceNearViewport, useFitScale, useReportEmpty } from "@/components/grid-cell";
 
 function filled(el: HTMLElement): boolean {
   const slot = el.querySelector("[data-bpid]");

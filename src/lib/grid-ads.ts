@@ -26,10 +26,11 @@ export const WYNQ_ZONE_1 = "0SBV7RF557074";
 export const WYNQ_ZONE_2 = "0SBV80XGCJ8C1";
 /** Wynq grid slots on/off. */
 export const WYNQ_ENABLED = true;
-/** Wynq site tag (rapidfire.cc), loaded once per page in <head> by src/routes/__root.tsx, except on
- * ad-free pages (src/components/locale-head.tsx drops it there, see isAdFreePath). */
-export const WYNQ_SITE_SCRIPT_SRC = "https://rapidfire.cc/s.js";
-export const WYNQ_SITE_ID = "0SBV0CWY9FC1A";
+/** Wynq segment 0SBV0CWY9FC1A runs through the anti-adblock tag only (no standard rapidfire.cc s.js tag):
+ * the Worker serves a ~5 min fresh first-party copy at this path (src/lib/site-runtime-tag.js, segment
+ * bound server-side via sids), loaded once per page in <head> by src/routes/__root.tsx, except on ad-free
+ * pages (src/components/locale-head.tsx drops it there, see isAdFreePath). Must equal RUNTIME_TAG_PATH. */
+export const SITE_RUNTIME_SRC = "/static/qv8m3k.js";
 
 export const MAX_GRID_ADS = 6;
 
