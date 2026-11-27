@@ -194,7 +194,25 @@ export type RefPeriod = {
   /** Pageviews from moving between pages of the site (referrer = own domain). */
   internal: { views: number; prev: number };
   campaigns: (TopItem & { prev: number })[];
+  /**
+   * "Jumlah orang": distinct visitors and pageviews in the period and the period before. Hari ini /
+   * kemarin = distinct visitors that WIB day; 7/14 hari = distinct visitors over the whole period when
+   * `exact` (one owner-only query), else the per-day numbers added up (a returning visitor counts once
+   * per day).
+   */
+  people: { uniq: number; views: number; prevUniq: number; prevViews: number; exact: boolean };
+  /** "Asal pengunjung": every country (two-letter code, "" = unknown), most people first. */
+  countries: { key: string; uniq: number; views: number; prevUniq: number }[];
+  /** Popunder tabs opened (player-log pop_n1..n6), Videy vs other hosts; null when not read. */
+  pops: { videy: number; other: number; prevVidey: number; prevOther: number } | null;
 };
+
+/** Distinct visitors over a multi-day period (and the one before), from one aggregate read. */
+export type PeriodDistinct = Partial<Record<RefPeriod["key"], { cur: number; prev: number }>>;
+/** One player_errors aggregate: popunder tabs opened on a WIB day for a host. */
+export type PopDayRow = { day: string; host: string; n: number };
+/** Extra (optional) inputs for the per-period cards. */
+export type RefExtras = { dayTotals?: DayTotal[]; distinct?: PeriodDistinct; pops?: PopDayRow[] | null };
 
 /** Group a referrer host into Pencarian / Sosial / Tempel / Langsung / Lainnya. */
 export function refGroup(host: string): RefGroupKey {
@@ -244,8 +262,26 @@ function dayHosts(rows: BreakdownRow[]): Map<string, number> {
   return hosts;
 }
 
+export const PERIOD_KEYS = ["today", "yesterday", "7d", "14d"] as const;
+export type PeriodKey = (typeof PERIOD_KEYS)[number];
+export const PERIOD_LABELS: Record<PeriodKey, { label: string; prevLabel: string }> = {
+  today: { label: "Hari ini", prevLabel: "kemarin" },
+  yesterday: { label: "Kemarin", prevLabel: "2 hari lalu" },
+  "7d": { label: "7 hari", prevLabel: "7 hari sebelumnya" },
+  "14d": { label: "14 hari", prevLabel: "14 hari sebelumnya" },
+};
+
+/** WIB days of a period and of the period before it (same rule as buildRefPeriods), oldest first. */
+export function periodDays(today: string, key: PeriodKey): { cur: string[]; prev: string[] } {
+  const len = key === "7d" ? 7 : key === "14d" ? 14 : 1;
+  const all = wibDayList(today, STATS14_DAYS * 2);
+  const end = key === "yesterday" ? all.length - 1 : all.length;
+  return { cur: all.slice(end - len, end), prev: all.slice(Math.max(0, end - 2 * len), end - len) };
+}
+
 /** Build the per-period "Sumber" data from the 28 days of breakdown rows. */
-export function buildRefPeriods(today: string, rows: BreakdownRow[]): RefPeriod[] {
+export function buildRefPeriods(today: string, rows: BreakdownRow[], extras: RefExtras = {}): RefPeriod[] {
+  const totalsByDay = new Map((extras.dayTotals || []).map((d) => [d.day, d]));
   const all = wibDayList(today, STATS14_DAYS * 2);
   const byDay = new Map<string, BreakdownRow[]>();
   for (const r of rows) {
@@ -308,6 +344,38 @@ export function buildRefPeriods(today: string, rows: BreakdownRow[]): RefPeriod[
       .map(([key, e]) => ({ key, label: utmLabel(key), views: e.views, uniq: e.uniq, prev: cp.get(key)?.uniq || 0 }))
       .sort((a, b) => b.uniq - a.uniq || b.views - a.views)
       .slice(0, 20);
+    const sumTot = (days: string[], f: "views" | "uniq") => days.reduce((a, d) => a + (totalsByDay.get(d)?.[f] || 0), 0);
+    const dist = def.len > 1 ? extras.distinct?.[def.key] : undefined;
+    const people = {
+      uniq: Math.round(dist ? dist.cur : sumTot(cur, "uniq")),
+      views: Math.round(sumTot(cur, "views")),
+      prevUniq: Math.round(dist ? dist.prev : sumTot(prev, "uniq")),
+      prevViews: Math.round(sumTot(prev, "views")),
+      exact: def.len === 1 || Boolean(dist),
+    };
+    const kc = sumKind(cur, "country");
+    const kp = sumKind(prev, "country");
+    const countries = [...kc.entries()]
+      .map(([key, e]) => ({ key, uniq: Math.round(e.uniq), views: Math.round(e.views), prevUniq: Math.round(kp.get(key)?.uniq || 0) }))
+      .filter((c) => c.uniq > 0 || c.views > 0)
+      .sort((a, b) => b.uniq - a.uniq || b.views - a.views);
+    let pops: RefPeriod["pops"] = null;
+    if (extras.pops) {
+      const cs = new Set(cur);
+      const ps = new Set(prev);
+      pops = { videy: 0, other: 0, prevVidey: 0, prevOther: 0 };
+      for (const r of extras.pops) {
+        const n = Math.max(0, Number(r.n) || 0);
+        const v = r.host === "Videy";
+        if (cs.has(r.day)) {
+          if (v) pops.videy += n;
+          else pops.other += n;
+        } else if (ps.has(r.day)) {
+          if (v) pops.prevVidey += n;
+          else pops.prevOther += n;
+        }
+      }
+    }
     return {
       key: def.key,
       label: def.label,
@@ -316,6 +384,9 @@ export function buildRefPeriods(today: string, rows: BreakdownRow[]): RefPeriod[
       groups,
       internal: { views: Math.round(ic), prev: Math.round(ip) },
       campaigns,
+      people,
+      countries,
+      pops,
     };
   });
 }
@@ -378,6 +449,7 @@ export function buildStats14(
   rows: BreakdownRow[],
   dayTotals: DayTotal[],
   now = Date.now(),
+  extras: Omit<RefExtras, "dayTotals"> = {},
 ): Stats14 {
   const all = wibDayList(today, STATS14_DAYS * 2);
   const prevDays = all.slice(0, STATS14_DAYS);
@@ -415,7 +487,7 @@ export function buildStats14(
     countries: top(rows, "country", cur, 10, "uniq"),
     browsers: top(rows, "browser", cur, 8, "uniq"),
     campaigns: top(rows, "utm", cur, 20, "uniq").map((c) => ({ ...c, label: utmLabel(c.key) })),
-    refPeriods: buildRefPeriods(today, rows),
+    refPeriods: buildRefPeriods(today, rows, { ...extras, dayTotals }),
     updatedAt: new Date(now).toISOString(),
   };
 }

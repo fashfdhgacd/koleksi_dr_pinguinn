@@ -43,6 +43,7 @@ import { Route as ApiOwnerRecentRouteImport } from './routes/api/owner-recent'
 import { Route as ApiOwnerSatelitRouteImport } from './routes/api/owner-satelit'
 import { Route as ApiOwnerStats14RouteImport } from './routes/api/owner-stats14'
 import { Route as ApiOwnerToolsRouteImport } from './routes/api/owner-tools'
+import { Route as ApiOwnerVideosRouteImport } from './routes/api/owner-videos'
 import { Route as ApiOwnerVideyRouteImport } from './routes/api/owner-videy'
 import { Route as ApiPlayerLogRouteImport } from './routes/api/player-log'
 import { Route as ApiPushRouteImport } from './routes/api/push'
@@ -245,6 +246,11 @@ const ApiOwnerStats14Route = ApiOwnerStats14RouteImport.update({
 const ApiOwnerToolsRoute = ApiOwnerToolsRouteImport.update({
   id: '/api/owner-tools',
   path: '/api/owner-tools',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiOwnerVideosRoute = ApiOwnerVideosRouteImport.update({
+  id: '/api/owner-videos',
+  path: '/api/owner-videos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiOwnerVideyRoute = ApiOwnerVideyRouteImport.update({
@@ -450,6 +456,7 @@ export interface FileRoutesByFullPath {
   '/api/owner-satelit': typeof ApiOwnerSatelitRoute
   '/api/owner-stats14': typeof ApiOwnerStats14Route
   '/api/owner-tools': typeof ApiOwnerToolsRoute
+  '/api/owner-videos': typeof ApiOwnerVideosRoute
   '/api/owner-videy': typeof ApiOwnerVideyRoute
   '/api/player-log': typeof ApiPlayerLogRoute
   '/api/push': typeof ApiPushRoute
@@ -517,6 +524,7 @@ export interface FileRoutesByTo {
   '/api/owner-satelit': typeof ApiOwnerSatelitRoute
   '/api/owner-stats14': typeof ApiOwnerStats14Route
   '/api/owner-tools': typeof ApiOwnerToolsRoute
+  '/api/owner-videos': typeof ApiOwnerVideosRoute
   '/api/owner-videy': typeof ApiOwnerVideyRoute
   '/api/player-log': typeof ApiPlayerLogRoute
   '/api/push': typeof ApiPushRoute
@@ -587,6 +595,7 @@ export interface FileRoutesById {
   '/api/owner-satelit': typeof ApiOwnerSatelitRoute
   '/api/owner-stats14': typeof ApiOwnerStats14Route
   '/api/owner-tools': typeof ApiOwnerToolsRoute
+  '/api/owner-videos': typeof ApiOwnerVideosRoute
   '/api/owner-videy': typeof ApiOwnerVideyRoute
   '/api/player-log': typeof ApiPlayerLogRoute
   '/api/push': typeof ApiPushRoute
@@ -658,6 +667,7 @@ export interface FileRouteTypes {
     | '/api/owner-satelit'
     | '/api/owner-stats14'
     | '/api/owner-tools'
+    | '/api/owner-videos'
     | '/api/owner-videy'
     | '/api/player-log'
     | '/api/push'
@@ -725,6 +735,7 @@ export interface FileRouteTypes {
     | '/api/owner-satelit'
     | '/api/owner-stats14'
     | '/api/owner-tools'
+    | '/api/owner-videos'
     | '/api/owner-videy'
     | '/api/player-log'
     | '/api/push'
@@ -794,6 +805,7 @@ export interface FileRouteTypes {
     | '/api/owner-satelit'
     | '/api/owner-stats14'
     | '/api/owner-tools'
+    | '/api/owner-videos'
     | '/api/owner-videy'
     | '/api/player-log'
     | '/api/push'
@@ -864,6 +876,7 @@ export interface RootRouteChildren {
   ApiOwnerSatelitRoute: typeof ApiOwnerSatelitRoute
   ApiOwnerStats14Route: typeof ApiOwnerStats14Route
   ApiOwnerToolsRoute: typeof ApiOwnerToolsRoute
+  ApiOwnerVideosRoute: typeof ApiOwnerVideosRoute
   ApiOwnerVideyRoute: typeof ApiOwnerVideyRoute
   ApiPlayerLogRoute: typeof ApiPlayerLogRoute
   ApiPushRoute: typeof ApiPushRoute
@@ -1130,6 +1143,13 @@ declare module '@tanstack/react-router' {
       path: '/api/owner-tools'
       fullPath: '/api/owner-tools'
       preLoaderRoute: typeof ApiOwnerToolsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/owner-videos': {
+      id: '/api/owner-videos'
+      path: '/api/owner-videos'
+      fullPath: '/api/owner-videos'
+      preLoaderRoute: typeof ApiOwnerVideosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/owner-videy': {
@@ -1462,6 +1482,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiOwnerSatelitRoute: ApiOwnerSatelitRoute,
   ApiOwnerStats14Route: ApiOwnerStats14Route,
   ApiOwnerToolsRoute: ApiOwnerToolsRoute,
+  ApiOwnerVideosRoute: ApiOwnerVideosRoute,
   ApiOwnerVideyRoute: ApiOwnerVideyRoute,
   ApiPlayerLogRoute: ApiPlayerLogRoute,
   ApiPushRoute: ApiPushRoute,
