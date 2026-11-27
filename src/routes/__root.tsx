@@ -6,6 +6,7 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PresencePing } from "@/components/presence-ping";
 import { SwCleanup } from "@/components/sw-cleanup";
 import { DEFAULT_OG, HOME_DESCRIPTION, HOME_TITLE, OG_SITE_NAME } from "@/lib/seo";
+import { WYNQ_SITE_ID, WYNQ_SITE_SCRIPT_SRC } from "@/lib/grid-ads";
 import appCss from "../styles.css?url";
 import figtreeFont from "../assets/fonts/figtree-latin.woff2?url";
 import silkscreenFont from "../assets/fonts/silkscreen-latin-400.woff2?url";
@@ -86,6 +87,8 @@ export const Route = createRootRoute({
       { rel: "manifest", href: "/site.webmanifest" },
       { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png?v=3" },
     ],
+    // Wynq site tag (site verification), site-wide in <head>, async so it never blocks rendering.
+    scripts: [{ src: WYNQ_SITE_SCRIPT_SRC, async: true, "data-sid": WYNQ_SITE_ID }],
   }),
   component: RootComponent,
 });

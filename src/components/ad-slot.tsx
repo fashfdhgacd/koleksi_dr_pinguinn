@@ -6,13 +6,12 @@
 //   per mounted slot when it first nears the viewport. No refresh, no interval, no rotation.
 // - A slot hidden with display:none (other breakpoint) never intersects, so it never requests an ad.
 import { useEffect, useRef, useState } from "react";
-import { EXO_ZONES, WYNQ_ENABLED, WYNQ_SITE_ID, WYNQ_SITE_SCRIPT_SRC } from "@/lib/grid-ads";
+import { EXO_ZONES } from "@/lib/grid-ads";
 
 /** ExoClick zones wired into the grid (distinct, one slot each). Read by /pemilik. */
 export const AD_ZONES = EXO_ZONES;
 const SCRIPT_ID = "exo-ad-provider";
 const SCRIPT_SRC = "https://a.magsrv.com/ad-provider.js";
-const WYNQ_SCRIPT_ID = "wynq-site";
 
 type AdWindow = Window & { AdProvider?: Array<Record<string, unknown>> };
 
@@ -25,20 +24,6 @@ function ensureScript() {
   s.src = SCRIPT_SRC;
   s.onerror = () => {};
   document.head.appendChild(s);
-}
-
-/** Wynq site script, loaded once per page only while WYNQ_ENABLED is true (false for now). */
-export function useWynqSiteScript(active: boolean) {
-  useEffect(() => {
-    if (!WYNQ_ENABLED || !active || document.getElementById(WYNQ_SCRIPT_ID)) return;
-    const s = document.createElement("script");
-    s.id = WYNQ_SCRIPT_ID;
-    s.async = true;
-    s.src = WYNQ_SITE_SCRIPT_SRC;
-    s.setAttribute("data-sid", WYNQ_SITE_ID);
-    s.onerror = () => {};
-    document.head.appendChild(s);
-  }, [active]);
 }
 
 /** Scale factor that fits a 300x250 creative into the element (never up). */

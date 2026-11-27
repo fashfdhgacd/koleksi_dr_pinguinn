@@ -1,7 +1,6 @@
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { isRealMinor } from "@/lib/minor-terms";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useWynqSiteScript } from "@/components/ad-slot";
 import { GridAd } from "@/components/grid-ad";
 import { planGrid } from "@/lib/grid-ads";
 import { onCatalogCardClick } from "@/components/card-popunder";
@@ -33,7 +32,6 @@ export function VideoGrid({
 }) {
   const shown = visibleCards(items);
   const showAds = ads && !adFree;
-  useWynqSiteScript(showAds);
   // "Kembali ke katalog" with a full load: scroll back to where the card was clicked.
   const hasItems = shown.length > 0;
   useEffect(() => {
