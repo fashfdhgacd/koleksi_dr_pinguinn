@@ -103,7 +103,7 @@ export function adPositions(videoCount: number, bp: Breakpoint, max = MAX_GRID_A
 /** Cell order for a catalog grid. Every page gets exactly MAX_GRID_ADS ad cells per breakpoint (slotIndex
  * 0..5, all configured), ad cells carry stable keys (`ad-mobile-N` / `ad-desktop-N`, no re-request on
  * re-render), and trailing videos are hidden per breakpoint so the visible cell count is a multiple of the
- * columns: every row is full, no holes. Ad cells never disappear (unfilled TS/Wynq swap to an ExoClick
+ * columns: every row is full, no holes (except a last page of only 1-2 videos, which keeps them). Ad cells never disappear (unfilled TS/Wynq swap to an ExoClick
  * fallback zone, see EXO_FALLBACK_ZONES), so this count holds after load too. */
 export function planGrid(
   videoCount: number,
@@ -126,8 +126,9 @@ export function planGrid(
       after[bp].set(pos, list);
     });
     const k = Math.max(1, cols[bp]);
-    let visible = videoCount + ads;
-    for (let tail = videoCount - 1; visible % k !== 0 && tail >= 0; tail--, visible--) hidden[bp].add(tail);
+    const trim = (videoCount + ads) % k;
+    // Never trim a tiny last page down to no / almost no videos (1-2 videos: keep them, last row short).
+    if (videoCount - trim >= k) for (let i = 0; i < trim; i++) hidden[bp].add(videoCount - 1 - i);
   }
   const cells: GridCell[] = [];
   for (let index = 0; index < videoCount; index++) {

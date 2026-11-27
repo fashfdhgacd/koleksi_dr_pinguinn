@@ -45,10 +45,12 @@ test("every page shows exactly 6 ad cells per breakpoint, slotIndex 0..5 in orde
   }
 });
 
-test("rows are always full: visible cells are a multiple of the columns (3 on laptop, 1 on phone)", () => {
+test("rows are full (laptop cells % 3 == 0 for 3+ videos), tiny last pages keep their videos", () => {
   for (const n of COUNTS) {
     const cells = planGrid(n, true);
-    assert.equal(visibleCells(cells, "desktop").length % 3, 0, `desktop n=${n}`);
+    if (n >= 3) assert.equal(visibleCells(cells, "desktop").length % 3, 0, `desktop n=${n}`);
+    // a tiny last page keeps its videos visible on laptop
+    assert.ok(visibleCells(cells, "desktop").filter((c) => c.kind === "video").length >= Math.min(n, 3), `videos n=${n}`);
     // never trims more than 2 videos, and only from the end
     const hiddenDesk = cells.filter((c) => c.kind === "video" && c.hidden.desktop).map((c) => (c as { index: number }).index);
     assert.ok(hiddenDesk.length <= 2);
