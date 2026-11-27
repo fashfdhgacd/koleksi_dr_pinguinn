@@ -55,11 +55,9 @@ describe("source landings (IndoAV / UserBokep)", () => {
     const indoav = findLanding("bokep-indoav-terbaru");
     const ub = findLanding("bokep-userbokep-indo");
     assert.ok(indoav && ub);
-    assert.equal(indoav.adFree, undefined);
-    assert.equal(ub.adFree, true);
-    assert.doesNotMatch(indoav.intro, /tanpa iklan banner/);
-    assert.match(ub.intro, /tanpa iklan banner/);
     for (const l of [indoav, ub]) {
+      assert.equal(l.adFree, undefined);
+      assert.doesNotMatch(l.intro, /tanpa iklan banner/);
       assert.equal(l.order, "latest");
       assert.match(l.intro, /Kami bukan situs/);
       assert.match(l.title, /Koleksi Video dari/);
