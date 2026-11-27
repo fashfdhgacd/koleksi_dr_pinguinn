@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import cost from "@/lib/owner-cost.json";
 import tsStats from "../../public/data/trafficstars.json";
-import { AD_ZONES } from "@/components/ad-slot";
+import { AD_ZONES } from "@/components/grid-cell";
 import { fmt, ownerToast, wibDateTime } from "@/components/owner-dashboard-shared";
 import { tsDayWindowWib, tsPopunderSummary, type TsJson } from "@/lib/ts-popunder";
 
@@ -105,7 +105,7 @@ function tsEarnings() {
   };
 }
 
-/** Ad networks as actually wired in code: ExoClick is live whenever ad-slot.tsx has a grid zone. */
+/** Ad networks as actually wired in code: ExoClick is live whenever grid-cell.tsx has a grid zone. */
 function adsLive(): AdRow[] {
   return COST.ads.map((a) =>
     a.name === "ExoClick" && AD_ZONES.length
