@@ -45,7 +45,6 @@
 import nitroHandler from "../node_modules/nitro/dist/presets/cloudflare/runtime/cloudflare-module.mjs";
 import { brandUploadTitle } from "../src/lib/bot/title-brand.js";
 import { fetchJsonFromGithub, upsertVideosBatch } from "../src/lib/bot/github.js";
-import { RUNTIME_TAG_PATH, runtimeTagResponse } from "../src/lib/site-runtime-tag.js";
 
 /**
  * Longest time (s) a cached HTML page counts as fresh. 600 s (Oct 2026, cost cut, was 180): new uploads
@@ -829,12 +828,6 @@ export default {
       return new Response("forbidden", { status: 403, headers: { "cache-control": "private, no-store" } });
     }
     if (url.pathname === "/api/cron-status" && request.method === "GET") return cronStatus(env);
-    // First-party copy of the Wynq anti-adblock tag (src/lib/site-runtime-tag.js): ~5 min memo +
-    // Cache API, answered here without booting Nitro or the page edge cache.
-    if (url.pathname === RUNTIME_TAG_PATH && (request.method === "GET" || request.method === "HEAD")) {
-      const res = await runtimeTagResponse({ waitUntil: (p) => context?.waitUntil?.(p) });
-      return request.method === "HEAD" ? new Response(null, { status: res.status, headers: res.headers }) : res;
-    }
     if (request.method === "POST" && url.pathname === "/api/owner-satelit" && request.headers.has("x-online-key")) {
       const response = await nitroHandler.fetch(request, env, context);
       await purgeSatelitConfig(response, env, context).catch(() => undefined);

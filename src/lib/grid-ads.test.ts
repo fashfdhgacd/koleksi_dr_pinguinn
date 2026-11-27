@@ -5,6 +5,8 @@ import {
   EXO_ZONE_1,
   EXO_ZONE_2,
   GRID_SLOTS,
+  TS_SPOT_1,
+  TS_SPOT_2,
   MAX_GRID_ADS,
   adPositions,
   fallbackZone,
@@ -24,10 +26,10 @@ const ads = (cells: GridCell[], bp?: "mobile" | "desktop") =>
 const FULL: GridSlot[] = [
   { network: "exoclick", zoneId: "e1" },
   { network: "trafficstars", zoneId: "t1" },
-  { network: "wynq", zoneId: "w1" },
+  { network: "trafficstars", zoneId: "t2" },
   { network: "exoclick", zoneId: "e2" },
   { network: "trafficstars", zoneId: "t2" },
-  { network: "wynq", zoneId: "w2" },
+  { network: "trafficstars", zoneId: "t1" },
 ];
 
 // Page sizes in use: catalog 30 (DEFAULT_PAGE_SIZE), landing / en 24, home = 30 minus hero cards,
@@ -77,35 +79,45 @@ test("full pages keep the usual positions (phone after every 4th video, laptop a
   }
 });
 
-test("no zone ID appears twice in one view, fallback zones included", () => {
+test("ExoClick zones (primary + fallback) are unique; TrafficStars spots may be reused", () => {
   for (const n of COUNTS) {
     const cells = planGrid(n, true);
     for (const bp of BPS) {
-      const ids = ads(cells, bp).map((c) => c.slot.zoneId);
-      assert.equal(new Set(ids).size, ids.length);
+      const list = ads(cells, bp);
+      const exo = list.filter((c) => c.slot.network === "exoclick").map((c) => c.slot.zoneId);
+      assert.equal(new Set(exo).size, exo.length, `${bp} n=${n}`);
+      const ts = list.filter((c) => c.slot.network === "trafficstars").map((c) => c.slot.zoneId);
+      assert.ok(ts.every((id) => id === TS_SPOT_1 || id === TS_SPOT_2));
+      assert.equal(new Set(ts).size, 2);
     }
     const keys = ads(cells).map((c) => c.key);
     assert.equal(new Set(keys).size, keys.length);
   }
-  const all = [...GRID_SLOTS.map((s) => s.zoneId), ...Object.values(EXO_FALLBACK_ZONES)].filter(Boolean);
-  assert.equal(new Set(all).size, all.length);
+  const exoAll = [
+    ...GRID_SLOTS.filter((s) => s.network === "exoclick").map((s) => s.zoneId),
+    ...Object.values(EXO_FALLBACK_ZONES),
+  ].filter(Boolean);
+  assert.equal(new Set(exoAll).size, exoAll.length);
+  const tsAll = GRID_SLOTS.filter((s) => s.network === "trafficstars").map((s) => s.zoneId);
+  assert.ok(tsAll.every((id) => id === TS_SPOT_1 || id === TS_SPOT_2));
+  assert.equal(new Set(tsAll).size, 2);
 });
 
-test("real config: all 6 slots, Wynq included", () => {
+test("real config: all 6 slots, former Wynq slots reuse the two TrafficStars spots", () => {
   const expected = [
     [0, "exoclick", "6053864"],
     [1, "trafficstars", "b027eda668f044c2a0e1a331d59cb3d3"],
-    [2, "wynq", "0SBV7RF557074"],
+    [2, "trafficstars", "68654e89b8b14322bcc946c618f13e4c"],
     [3, "exoclick", "6111252"],
     [4, "trafficstars", "68654e89b8b14322bcc946c618f13e4c"],
-    [5, "wynq", "0SBV80XGCJ8C1"],
+    [5, "trafficstars", "b027eda668f044c2a0e1a331d59cb3d3"],
   ];
   for (const bp of BPS) {
     assert.deepEqual(ads(planGrid(30, true), bp).map((c) => [c.slotIndex, c.slot.network, c.slot.zoneId]), expected);
   }
 });
 
-test("ExoClick fallback: only for TS / Wynq slots, never an ExoClick slot, '' means none yet", () => {
+test("ExoClick fallback: only for TS slots, never an ExoClick slot, '' means none yet", () => {
   const fb = { 1: "x1", 2: "x2", 4: "x4", 5: "x5" };
   assert.equal(fallbackZone(0, FULL, fb), null);
   assert.equal(fallbackZone(3, FULL, fb), null);
@@ -117,13 +129,12 @@ test("ExoClick fallback: only for TS / Wynq slots, never an ExoClick slot, '' me
 
 test("a slot without a zone ID renders nothing and never borrows another zone", () => {
   const sparse: GridSlot[] = FULL.map((s, i) => (i === 2 ? { ...s, zoneId: "" } : s));
-  const cells = planGrid(30, true, sparse, true);
-  assert.deepEqual(ads(cells, "desktop").map((c) => [c.slotIndex, c.slot.zoneId]), [[0, "e1"], [1, "t1"], [3, "e2"], [4, "t2"], [5, "w2"]]);
+  const cells = planGrid(30, true, sparse);
+  assert.deepEqual(ads(cells, "desktop").map((c) => [c.slotIndex, c.slot.zoneId]), [[0, "e1"], [1, "t1"], [3, "e2"], [4, "t2"], [5, "t1"]]);
   assert.equal(visibleCells(cells, "desktop").length % 3, 0, "rows still full");
-  assert.equal(gridSlot(2, sparse, true), null);
+  assert.equal(gridSlot(2, sparse), null);
   assert.equal(gridSlot(6), null);
-  assert.equal(gridSlot(2, FULL, false), null);
-  assert.deepEqual(gridSlot(2, FULL, true), { network: "wynq", zoneId: "w1" });
+  assert.deepEqual(gridSlot(2, FULL), { network: "trafficstars", zoneId: "t2" });
 });
 
 test("no catalog landing is ad-free (isAdFreePath stays data-driven)", () => {

@@ -3,7 +3,9 @@
 // ExoClick flagged zone 6053864 (27 Nov 2026, "low traffic uniqueness") because that one 300x250 zone
 // was repeated 6-7 times on every catalog page. Rules now:
 // - At most MAX_GRID_ADS (6) ad slots per page per breakpoint, slotIndex 0..5 in order.
-// - Every slot has its own zone/spot; no zone ID appears twice in one view.
+// - Every ExoClick zone (primary + fallback) is unique on a page. Only two TrafficStars
+//   banner spots exist in the repo, so those two are reused across the four TS slots
+//   (adjacent TS slots always get different spots). Do not invent zone IDs.
 // - A slot without a zone ID renders nothing (no placeholder, no video displaced) and never falls back to
 //   another slot's or another network's zone.
 // - No refresh / rotation anywhere: each slot loads once when it nears the viewport.
@@ -11,7 +13,7 @@
 // 2, 7, 12, ... (count % 5 === 2). Phone and laptop each count their own slotIndex; a slot meant for the
 // other breakpoint is display:none, never intersects and so never requests an ad.
 
-export type AdNetwork = "exoclick" | "trafficstars" | "wynq";
+export type AdNetwork = "exoclick" | "trafficstars";
 export type GridSlot = { network: AdNetwork; zoneId: string };
 export type Breakpoint = "mobile" | "desktop";
 
@@ -21,33 +23,21 @@ export const EXO_ZONE_2 = "6111252";
 /** TrafficStars 300x250 spots (data-ts-spot codes, created 27 Nov 2026), SDK on gajukogyxywahu.com. */
 export const TS_SPOT_1 = "b027eda668f044c2a0e1a331d59cb3d3";
 export const TS_SPOT_2 = "68654e89b8b14322bcc946c618f13e4c";
-/** Wynq responsive 1:1 display zones (data-bpid), rendered by the site tag below. */
-export const WYNQ_ZONE_1 = "0SBV7RF557074";
-export const WYNQ_ZONE_2 = "0SBV80XGCJ8C1";
-/** Wynq grid slots on/off. */
-export const WYNQ_ENABLED = true;
-/** Wynq segment 0SBV0CWY9FC1A runs through the anti-adblock tag only (no standard rapidfire.cc s.js tag):
- * the Worker serves a ~5 min fresh first-party copy at this path (src/lib/site-runtime-tag.js, segment
- * bound server-side via sids), loaded once per page in <head> by src/routes/__root.tsx, except on
- * owner/admin/login/API paths (isOwnerAdminPath) and ad-free catalog pages (isAdFreePath; LocaleHead
- * also drops it). Must equal RUNTIME_TAG_PATH. */
-export const SITE_RUNTIME_SRC = "/static/qv8m3k.js";
-
 export const MAX_GRID_ADS = 6;
 
 /** Slot config by slotIndex. */
 export const GRID_SLOTS: readonly GridSlot[] = [
   { network: "exoclick", zoneId: EXO_ZONE_1 },
   { network: "trafficstars", zoneId: TS_SPOT_1 },
-  { network: "wynq", zoneId: WYNQ_ZONE_1 },
+  { network: "trafficstars", zoneId: TS_SPOT_2 },
   { network: "exoclick", zoneId: EXO_ZONE_2 },
   { network: "trafficstars", zoneId: TS_SPOT_2 },
-  { network: "wynq", zoneId: WYNQ_ZONE_2 },
+  { network: "trafficstars", zoneId: TS_SPOT_1 },
 ];
 
-/** ExoClick 300x250 fallback zone per non-ExoClick slotIndex: when that slot's TrafficStars / Wynq ad is
+/** ExoClick 300x250 fallback zone per non-ExoClick slotIndex: when that slot's TrafficStars ad is
  * still unfilled after the fill timeout, the cell is swapped ONCE to this ExoClick zone (never back, no
- * refresh). Every fallback zone must differ from each other and from EXO_ZONE_1/2, so no zone repeats on a
+ * refresh). Every fallback zone must differ from each other and from EXO_ZONE_1/2, so no ExoClick zone repeats on a
  * page. "" = none: the cell then keeps its (empty) frame, it never disappears. Zones created 27 Nov 2026
  * on site 1115596. */
 export const EXO_FALLBACK_ZONES: Readonly<Record<number, string>> = { 1: "6111370", 2: "6111372", 4: "6111374", 5: "6111376" };
@@ -69,13 +59,12 @@ export const EXO_ZONES: readonly string[] = [
   ...Object.values(EXO_FALLBACK_ZONES).filter(Boolean),
 ];
 
-/** The live slot for a slotIndex, or null when it must render nothing (out of range, no zone ID, or
- * Wynq while WYNQ_ENABLED is false). Never substitutes another zone. */
-export function gridSlot(slotIndex: number, slots: readonly GridSlot[] = GRID_SLOTS, wynqEnabled = WYNQ_ENABLED): GridSlot | null {
+/** The live slot for a slotIndex, or null when it must render nothing (out of range or no zone ID).
+ * Never substitutes another zone. */
+export function gridSlot(slotIndex: number, slots: readonly GridSlot[] = GRID_SLOTS): GridSlot | null {
   if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= MAX_GRID_ADS) return null;
   const slot = slots[slotIndex];
   if (!slot || !slot.zoneId) return null;
-  if (slot.network === "wynq" && !wynqEnabled) return null;
   return slot;
 }
 
@@ -105,13 +94,12 @@ export function adPositions(videoCount: number, bp: Breakpoint, max = MAX_GRID_A
 /** Cell order for a catalog grid. Every page gets exactly MAX_GRID_ADS ad cells per breakpoint (slotIndex
  * 0..5, all configured), ad cells carry stable keys (`ad-mobile-N` / `ad-desktop-N`, no re-request on
  * re-render), and trailing videos are hidden per breakpoint so the visible cell count is a multiple of the
- * columns: every row is full, no holes (except a last page of only 1-2 videos, which keeps them). Ad cells never disappear (unfilled TS/Wynq swap to an ExoClick
+ * columns: every row is full, no holes (except a last page of only 1-2 videos, which keeps them). Ad cells never disappear (unfilled TS swap to an ExoClick
  * fallback zone, see EXO_FALLBACK_ZONES), so this count holds after load too. */
 export function planGrid(
   videoCount: number,
   showAds: boolean,
   slots: readonly GridSlot[] = GRID_SLOTS,
-  wynqEnabled = WYNQ_ENABLED,
   cols: Readonly<Record<Breakpoint, number>> = GRID_COLS,
 ): GridCell[] {
   const after: Record<Breakpoint, Map<number, GridCell[]>> = { mobile: new Map(), desktop: new Map() };
@@ -120,7 +108,7 @@ export function planGrid(
     if (!showAds) continue;
     let ads = 0;
     adPositions(videoCount, bp).forEach((pos, slotIndex) => {
-      const slot = gridSlot(slotIndex, slots, wynqEnabled);
+      const slot = gridSlot(slotIndex, slots);
       if (!slot) return;
       ads++;
       const list = after[bp].get(pos) || [];
