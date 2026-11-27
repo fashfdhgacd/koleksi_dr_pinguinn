@@ -7,6 +7,7 @@ import { PresencePing } from "@/components/presence-ping";
 import { SwCleanup } from "@/components/sw-cleanup";
 import { DEFAULT_OG, HOME_DESCRIPTION, HOME_TITLE, OG_SITE_NAME } from "@/lib/seo";
 import { SITE_RUNTIME_SRC } from "@/lib/grid-ads";
+import { isOwnerAdminPath } from "@/lib/owner-admin-path";
 import appCss from "../styles.css?url";
 import figtreeFont from "../assets/fonts/figtree-latin.woff2?url";
 import silkscreenFont from "../assets/fonts/silkscreen-latin-400.woff2?url";
@@ -31,7 +32,9 @@ export const Route = createRootRoute({
       statusCode: 301,
     });
   },
-  head: () => ({
+  head: ({ matches }) => {
+    const noAdScripts = isOwnerAdminPath(matches.at(-1)?.pathname);
+    return {
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
@@ -42,17 +45,19 @@ export const Route = createRootRoute({
         content: HOME_DESCRIPTION,
       },
       { name: "theme-color", content: "#09090b" },
-      // TrafficStars Client Hints (blog "Boost Earnings with Existing Ad Formats"): delegate UA hints
-      // to the TrafficStars ad servers (tsyndicate.com + our direct-link/VAST domain) for better mobile targeting.
-      { httpEquiv: "Accept-CH", content: "Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform, Sec-CH-UA-Model, Sec-CH-UA-Platform-Version, Sec-CH-UA-Full-Version-List" },
-      { httpEquiv: "delegate-ch", content: "sec-ch-ua https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-bitness https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-arch https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-model https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-platform https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-platform-version https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-full-version https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-full-version-list https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-mobile https://tsyndicate.com https://fozekikikiminu.com" },
+      // TrafficStars Client Hints and site verification stay off owner/admin/login/API paths.
+      ...(!noAdScripts
+        ? [
+            { httpEquiv: "Accept-CH", content: "Sec-CH-UA, Sec-CH-UA-Mobile, Sec-CH-UA-Platform, Sec-CH-UA-Model, Sec-CH-UA-Platform-Version, Sec-CH-UA-Full-Version-List" },
+            { httpEquiv: "delegate-ch", content: "sec-ch-ua https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-bitness https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-arch https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-model https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-platform https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-platform-version https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-full-version https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-full-version-list https://tsyndicate.com https://fozekikikiminu.com; sec-ch-ua-mobile https://tsyndicate.com https://fozekikikiminu.com" },
+            { name: "Trafficstars", content: "91976" },
+          ]
+        : []),
       { name: "robots", content: "index,follow,max-image-preview:large" },
       { name: "rating", content: "adult" },
       // RTA label (rtalabel.org). Uppercase key so HeadContent does not dedupe it with "rating".
       { name: "RATING", content: "RTA-5042-1996-1400-1577-RTA" },
       { name: "googlebot", content: "index,follow,max-image-preview:large" },
-      // TrafficStars site verification (publisher account).
-      { name: "Trafficstars", content: "91976" },
       { property: "og:site_name", content: OG_SITE_NAME },
       { property: "og:title", content: HOME_TITLE },
       { property: "og:type", content: "website" },
@@ -87,10 +92,11 @@ export const Route = createRootRoute({
       { rel: "manifest", href: "/site.webmanifest" },
       { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png?v=3" },
     ],
-    // Wynq anti-adblock tag as a first-party script (segment bound server-side, nothing else on the
-    // page), site-wide in <head>, async so it never blocks rendering. Replaces the standard s.js tag.
-    scripts: [{ src: SITE_RUNTIME_SRC, async: true }],
-  }),
+    // Wynq anti-adblock tag: first-party, segment bound server-side, async. Off on owner/admin/login/API
+    // paths (LocaleHead also drops it on those paths and on ad-free catalog pages).
+    scripts: noAdScripts ? [] : [{ src: SITE_RUNTIME_SRC, async: true }],
+  };
+  },
   component: RootComponent,
 });
 
