@@ -1,10 +1,12 @@
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { isRealMinor } from "@/lib/minor-terms";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AdSlot } from "@/components/ad-slot";
+import { useWynqSiteScript } from "@/components/ad-slot";
+import { GridAd } from "@/components/grid-ad";
+import { planGrid } from "@/lib/grid-ads";
 import { onCatalogCardClick } from "@/components/card-popunder";
 import { VideoCard } from "./video-card";
-import { Fragment, useEffect } from "react";
+import { useEffect } from "react";
 import { restoreCatalogScroll } from "@/lib/catalog/last-catalog";
 
 const DEFAULT_GRID =
@@ -31,6 +33,7 @@ export function VideoGrid({
 }) {
   const shown = visibleCards(items);
   const showAds = ads && !adFree;
+  useWynqSiteScript(showAds);
   // "Kembali ke katalog" with a full load: scroll back to where the card was clicked.
   const hasItems = shown.length > 0;
   useEffect(() => {
@@ -42,18 +45,16 @@ export function VideoGrid({
       // Catalog grids only: first video-card click per session also opens the popunder.
       onClickCapture={ads && !adFree ? (e) => onCatalogCardClick(e, (id) => String(shown.find((v) => v.id === id)?.creator || "")) : undefined}
     >
-      {shown.map((video, index) => {
-        const count = index + 1;
-        const mobileAd = showAds && count % 4 === 0;
-        const desktopAd = showAds && count % 5 === 2;
-        return (
-          <Fragment key={video.id}>
-            <VideoCard video={video} catalog={ads} eager={index < eagerCount} />
-            {(mobileAd || desktopAd) && (
-              <AdSlot className={mobileAd && desktopAd ? "" : mobileAd ? "lg:hidden" : "hidden lg:block"} />
-            )}
-          </Fragment>
-        );
+      {/* Max 6 ads per breakpoint, each its own zone (src/lib/grid-ads.ts). Flat list with stable keys:
+          a re-render keeps every mounted ad slot (no second request). */}
+      {planGrid(shown.length, showAds).map((cell) => {
+        if (cell.kind === "ad") {
+          return (
+            <GridAd key={cell.key} slot={cell.slot} className={cell.breakpoint === "mobile" ? "lg:hidden" : "hidden lg:block"} />
+          );
+        }
+        const video = shown[cell.index];
+        return <VideoCard key={video.id} video={video} catalog={ads} eager={cell.index < eagerCount} />;
       })}
     </div>
   );

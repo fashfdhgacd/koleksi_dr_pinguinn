@@ -1,17 +1,18 @@
-// ExoClick 300x250 banners (zones AD_ZONES, one per slot) as cards in catalog grids.
+// Catalog grid ad cards (ExoClick 300x250 + TrafficStars 300x250), one per slot from src/lib/grid-ads.ts.
 // - Same shell as a video card (16:10 box, "iklan" / "sponsor" where the title goes).
 // - The 300x250 banner is centred in the box; when the card is narrower it is scaled down to fit.
-// - Server + client render identical markup (hydration safe); no layout shift.
-// - ad-provider.js loaded once, async, only when the slot nears the viewport.
-// - serve pushed once per mounted slot (SPA remount => new push). Ad blockers: fails silently.
+// - Server + client render identical markup (hydration safe); the zone is only attached on the client.
+// - ExoClick: ad-provider.js loaded once per page (async), one <ins data-zoneid> per slot, one serve push
+//   per mounted slot when it first nears the viewport. No refresh, no interval, no rotation.
 // - A slot hidden with display:none (other breakpoint) never intersects, so it never requests an ad.
 import { useEffect, useRef, useState } from "react";
+import { EXO_ZONES, WYNQ_ENABLED, WYNQ_SITE_ID, WYNQ_SITE_SCRIPT_SRC } from "@/lib/grid-ads";
 
-/** Grid banner zone: ExoClick 300x250 6053864 for every grid slot (restored 26 Okt 2026, replacing the
- * TrafficStars MasterSpot whose 300x100/300x250 children paid $0.003-0.005 eCPM vs ExoClick ~$0.016). */
-export const AD_ZONES = ["6053864"] as const;
+/** ExoClick zones wired into the grid (distinct, one slot each). Read by /pemilik. */
+export const AD_ZONES = EXO_ZONES;
 const SCRIPT_ID = "exo-ad-provider";
 const SCRIPT_SRC = "https://a.magsrv.com/ad-provider.js";
+const WYNQ_SCRIPT_ID = "wynq-site";
 
 type AdWindow = Window & { AdProvider?: Array<Record<string, unknown>> };
 
@@ -26,8 +27,22 @@ function ensureScript() {
   document.head.appendChild(s);
 }
 
-export function AdSlot({ className = "", zoneId = AD_ZONES[0] }: { className?: string; zoneId?: string } = {}) {
-  const ref = useRef<HTMLDivElement>(null);
+/** Wynq site script, loaded once per page only while WYNQ_ENABLED is true (false for now). */
+export function useWynqSiteScript(active: boolean) {
+  useEffect(() => {
+    if (!WYNQ_ENABLED || !active || document.getElementById(WYNQ_SCRIPT_ID)) return;
+    const s = document.createElement("script");
+    s.id = WYNQ_SCRIPT_ID;
+    s.async = true;
+    s.src = WYNQ_SITE_SCRIPT_SRC;
+    s.setAttribute("data-sid", WYNQ_SITE_ID);
+    s.onerror = () => {};
+    document.head.appendChild(s);
+  }, [active]);
+}
+
+/** Scale factor that fits a 300x250 creative into the element (never up). */
+export function useFitScale(ref: React.RefObject<HTMLDivElement | null>) {
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const el = ref.current;
@@ -41,14 +56,76 @@ export function AdSlot({ className = "", zoneId = AD_ZONES[0] }: { className?: s
     const ro = new ResizeObserver(fit);
     ro.observe(el);
     return () => ro.disconnect();
-  }, []);
+  }, [ref]);
+  return scale;
+}
+
+/** Runs `load` once, the first time `el` comes within 400px of the viewport. */
+export function onceNearViewport(el: HTMLElement, load: () => void): () => void {
+  if (typeof IntersectionObserver === "undefined") {
+    load();
+    return () => {};
+  }
+  const io = new IntersectionObserver(
+    (entries) => {
+      if (entries.some((e) => e.isIntersecting)) {
+        io.disconnect();
+        load();
+      }
+    },
+    { rootMargin: "400px 0px" },
+  );
+  io.observe(el);
+  return () => io.disconnect();
+}
+
+/** Video-card-shaped shell with a centred 300x250 frame. */
+export function AdCardShell({
+  network,
+  className = "",
+  frameRef,
+  innerRef,
+  scale,
+}: {
+  network: string;
+  className?: string;
+  frameRef: React.RefObject<HTMLDivElement | null>;
+  innerRef?: React.RefObject<HTMLDivElement | null>;
+  scale: number;
+}) {
+  return (
+    <div data-kdp-ad={network} className={`rounded-none p-1 sm:p-1.5 ${className}`} aria-label="Iklan">
+      <div
+        ref={frameRef}
+        className="relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-none bg-transparent"
+      >
+        <div
+          ref={innerRef}
+          className="flex h-[250px] w-[300px] shrink-0 items-center justify-center"
+          style={{ transform: scale < 1 ? `scale(${scale})` : undefined, transformOrigin: "center" }}
+        />
+      </div>
+      <div className="px-1 pb-1 pt-2.5 sm:px-1.5 sm:pt-3">
+        <h3 className="line-clamp-2 min-h-[2.75em] text-xs font-medium leading-snug text-foreground sm:text-[15px]">
+          iklan
+        </h3>
+        <div className="mt-1.5 text-[11px] text-muted sm:text-xs">sponsor</div>
+      </div>
+    </div>
+  );
+}
+
+/** ExoClick 300x250 banner for one zone. */
+export function AdSlot({ className = "", zoneId }: { className?: string; zoneId: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const served = useRef(false);
+  const scale = useFitScale(ref);
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
-    let done = false;
-    const serve = () => {
-      if (done || !el.clientWidth) return;
-      done = true;
+    if (!el || !zoneId || served.current) return;
+    return onceNearViewport(el, () => {
+      if (served.current || !el.clientWidth) return;
+      served.current = true;
       try {
         if (!el.querySelector("ins")) {
           const ins = document.createElement("ins");
@@ -62,41 +139,7 @@ export function AdSlot({ className = "", zoneId = AD_ZONES[0] }: { className?: s
       } catch {
         /* blocked or failed: stay blank */
       }
-    };
-    if (typeof IntersectionObserver === "undefined") {
-      serve();
-      return;
-    }
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          io.disconnect();
-          serve();
-        }
-      },
-      { rootMargin: "400px 0px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
+    });
   }, [zoneId]);
-
-  return (
-    <div data-kdp-ad="exoclick" className={`rounded-none p-1 sm:p-1.5 ${className}`} aria-label="Iklan">
-      <div
-        ref={ref}
-        className="relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-none bg-transparent"
-      >
-        <div
-          className="flex h-[250px] w-[300px] shrink-0 items-center justify-center"
-          style={{ transform: scale < 1 ? `scale(${scale})` : undefined, transformOrigin: "center" }}
-        />
-      </div>
-      <div className="px-1 pb-1 pt-2.5 sm:px-1.5 sm:pt-3">
-        <h3 className="line-clamp-2 min-h-[2.75em] text-xs font-medium leading-snug text-foreground sm:text-[15px]">
-          iklan
-        </h3>
-        <div className="mt-1.5 text-[11px] text-muted sm:text-xs">sponsor</div>
-      </div>
-    </div>
-  );
+  return <AdCardShell network="exoclick" className={className} frameRef={ref} scale={scale} />;
 }
