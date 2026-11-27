@@ -493,7 +493,8 @@ export function StatusCard(props: {
   const tsPop = useTsPopunder();
   const siteOk = pop ? (pop.today.ok || 0) + (pop.today.cardOk || 0) : 0;
   const siteBlock = pop ? (pop.today.block || 0) + (pop.today.cardBlock || 0) : 0;
-  // Every opened tab by position (pop_n1..6); 0 until the deploy that logs them has run a while.
+  // Every opened tab by position (pop_n1..6). Only n1..n3 still happen (non-Videy 1x, Videy max 3x per
+  // video); n4..n6 stay in the sum so an older row from the 6x era still totals correctly.
   const siteAll = pop ? (pop.today.n1 || 0) + (pop.today.n2 || 0) + (pop.today.n3 || 0) + (pop.today.n4 || 0) + (pop.today.n5 || 0) + (pop.today.n6 || 0) : 0;
   const rows: { name: string; tone: "ok" | "warn" | "bad" | "idle"; value: string; sub?: string; note?: string }[] = [
     { name: "Bot Telegram", tone: botOk == null ? "idle" : botOk ? "ok" : "warn", value: botOk == null ? "…" : botOk ? "tersambung" : "perlu dicek" },
@@ -533,9 +534,9 @@ export function StatusCard(props: {
       note: pop
         ? `Hitungan web sendiri (tap pemutar saja, mulai 00.00 WIB): ${
             siteAll > 0
-              ? `${fmt(siteAll)} tab iklan terbuka (ke-1 ${fmt(pop.today.n1 || 0)}, ke-2 ${fmt(pop.today.n2 || 0)}, ke-3 ${fmt(pop.today.n3 || 0)}, ke-4 ${fmt(pop.today.n4 || 0)}, ke-5 ${fmt(pop.today.n5 || 0)}, ke-6 ${fmt(pop.today.n6 || 0)})`
+              ? `${fmt(siteAll)} tab iklan terbuka (ke-1 ${fmt(pop.today.n1 || 0)}, ke-2 ${fmt(pop.today.n2 || 0)}, ke-3 ${fmt(pop.today.n3 || 0)}; ke-2 dan ke-3 cuma dari Videy)`
               : `${fmt(siteOk)} tab iklan terbuka`
-          }, ${fmt(siteBlock)} diblok browser. Ini bukan angka bayaran: jam mulainya beda 7 jam (TrafficStars mulai 07.00 WIB) dan data TrafficStars baru masuk 2x sehari. Yang dibayar angka TrafficStars di atas.`
+          }, ${fmt(siteBlock)} diblok browser. Aturannya: server biasa 1x per video saat play, Videy maksimal 3x per video (jeda minimal 5 detik). Ini bukan angka bayaran: jam mulainya beda 7 jam (TrafficStars mulai 07.00 WIB) dan data TrafficStars baru masuk 2x sehari. Yang dibayar angka TrafficStars di atas.`
         : undefined,
     },
     {
