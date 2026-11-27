@@ -15,6 +15,8 @@ import {
   type BreakdownRow,
   type DayTotal,
   type DimVisitorRow,
+  type PeriodDistinct,
+  type PopDayRow,
   type Stats14,
   type UtmVisitorRow,
   PATHS_PER_DAY,
@@ -209,5 +211,71 @@ export async function readStats14(db: D1DatabaseLike, today: string, now = Date.
   const totals = list
     .map((d) => fromSummary.get(d) || fromDevices.get(d))
     .filter((t): t is DayTotal => Boolean(t));
-  return buildStats14(today, breakdown, totals, now);
+  // Optional extras for the "Statistik" tab; a failure only hides that part (never the panel).
+  const [distinct, pops] = await Promise.all([
+    readPeriodDistinct(db, today).catch((err) => {
+      console.error("[stats14] distinct failed", err);
+      return undefined;
+    }),
+    readPopDays(db, first, today).catch(() => null),
+  ]);
+  return buildStats14(today, breakdown, totals, now, { distinct, pops });
+}
+
+export const POP_EVENTS = ["pop_n1", "pop_n2", "pop_n3", "pop_n4", "pop_n5", "pop_n6"] as const;
+const POP_IN = POP_EVENTS.map((e) => `'${e}'`).join(",");
+
+/**
+ * Popunder tabs opened per WIB day and host. Read from the existing player-log daily counters
+ * (player_errors, events pop_n1..pop_n6 = 1st..6th tab opened on a video, since 2 Nov 2026). Nothing new
+ * is written per visit.
+ */
+export async function readPopDays(db: D1DatabaseLike, first: string, last: string): Promise<PopDayRow[]> {
+  const rows = await all<{ day: string; host: string; n: number }>(
+    db,
+    `select day, host, sum(n) as n from player_errors
+      where day >= ?1 and day <= ?2 and event in (${POP_IN}) group by day, host`,
+    first,
+    last,
+  );
+  return rows.map((r) => ({ day: String(r.day), host: String(r.host || ""), n: Number(r.n) || 0 }));
+}
+
+/**
+ * Distinct visitors over the 7- and 14-day periods (and the periods before them), from ONE aggregate
+ * read of the last 28 days of pageviews (visitor id = random id kept in the browser's localStorage).
+ * A sampled visitor (traffic-valve.ts) counts with their weight. Owner-only; the API answer is cached at
+ * the edge for 10 minutes, so this never runs per visit.
+ */
+export async function readPeriodDistinct(db: D1DatabaseLike, today: string): Promise<PeriodDistinct> {
+  const days = wibDayList(today, STATS14_DAYS * 2);
+  const n = days.length;
+  const at = (i: number) => wibDayStartMs(days[i]);
+  const end = wibDayStartMs(today) + DAY_MS;
+  const t7 = at(n - 7);
+  const t14 = at(n - 14);
+  const t28 = at(0);
+  const row = await db
+    .prepare(
+      `select coalesce(sum(case when c7 = 1 then vw end), 0) as c7,
+              coalesce(sum(case when p7 = 1 then vw end), 0) as p7,
+              coalesce(sum(case when c14 = 1 then vw end), 0) as c14,
+              coalesce(sum(case when p14 = 1 then vw end), 0) as p14
+         from (
+           select max(${W}) as vw,
+                  max(created_at >= ?2) as c7,
+                  max(created_at >= ?3 and created_at < ?2) as p7,
+                  max(created_at >= ?3) as c14,
+                  max(created_at < ?3) as p14
+             from analytics_events
+            where created_at >= ?1 and created_at < ?4 and event_type = 'pageview' and visitor_id is not null
+            group by visitor_id
+         )`,
+    )
+    .bind(t28, t7, t14, end)
+    .first<{ c7: number; p7: number; c14: number; p14: number }>();
+  return {
+    "7d": { cur: Number(row?.c7) || 0, prev: Number(row?.p7) || 0 },
+    "14d": { cur: Number(row?.c14) || 0, prev: Number(row?.p14) || 0 },
+  };
 }

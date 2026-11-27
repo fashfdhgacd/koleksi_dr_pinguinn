@@ -144,3 +144,36 @@ test("buildRefPeriods: hari ini vs kemarin, old days topped up from src, interna
   assert.equal(y.sources.find((s) => s.key === "justpaste.it")?.views, 40);
   assert.equal(w.sources.find((s) => s.key === "google.com")?.views, 42);
 });
+
+test("buildRefPeriods: people, countries and popunders per period", () => {
+  const today = "2026-11-28";
+  const rows: BreakdownRow[] = [
+    { day: "2026-11-28", kind: "country", key: "ID", views: 10, uniq: 4 },
+    { day: "2026-11-28", kind: "country", key: "SG", views: 3, uniq: 1 },
+    { day: "2026-11-27", kind: "country", key: "ID", views: 20, uniq: 8 },
+  ];
+  const dayTotals = [
+    { day: "2026-11-28", views: 13, uniq: 5 },
+    { day: "2026-11-27", views: 20, uniq: 8 },
+    { day: "2026-11-26", views: 7, uniq: 3 },
+  ];
+  const pops = [
+    { day: "2026-11-28", host: "Videy", n: 4 },
+    { day: "2026-11-28", host: "IndoAV", n: 2 },
+    { day: "2026-11-27", host: "UserBokep", n: 6 },
+  ];
+  const [t, y, w] = buildRefPeriods(today, rows, { dayTotals, pops, distinct: { "7d": { cur: 11, prev: 0 } } });
+  assert.deepEqual(t.people, { uniq: 5, views: 13, prevUniq: 8, prevViews: 20, exact: true });
+  assert.deepEqual(y.people, { uniq: 8, views: 20, prevUniq: 3, prevViews: 7, exact: true });
+  assert.deepEqual(w.people, { uniq: 11, views: 40, prevUniq: 0, prevViews: 0, exact: true });
+  assert.deepEqual(t.countries, [
+    { key: "ID", uniq: 4, views: 10, prevUniq: 8 },
+    { key: "SG", uniq: 1, views: 3, prevUniq: 0 },
+  ]);
+  assert.deepEqual(t.pops, { videy: 4, other: 2, prevVidey: 0, prevOther: 6 });
+  assert.deepEqual(w.pops, { videy: 4, other: 8, prevVidey: 0, prevOther: 0 });
+  const [, , , f] = buildRefPeriods(today, rows, { dayTotals });
+  assert.equal(f.people.exact, false);
+  assert.equal(f.people.uniq, 16);
+  assert.equal(f.pops, null);
+});

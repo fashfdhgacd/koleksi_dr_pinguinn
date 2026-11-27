@@ -18,6 +18,7 @@ import { OwnerVideyUntitled } from "@/components/owner-videy-untitled";
 import { OwnerVideySuggest } from "@/components/owner-videy-suggest";
 import { OwnerKirimanVidey } from "@/components/owner-kiriman-videy";
 import { OwnerVideyPanel } from "@/components/owner-videy-panel";
+import { OwnerStatistik } from "@/components/owner-statistik";
 import { OwnerSatelit } from "@/components/owner-satelit";
 import { PANEL_SITES, type PanelSite } from "@/lib/satelit/config";
 import { OwnerAuthedBottom } from "@/components/owner-authed-bottom";
@@ -272,7 +273,7 @@ export function OwnerDashboard() {
 
   const [site, setSite] = useState<PanelSite>("semua");
   const [tab, setTab] = useState<Tab>("ringkasan");
-  const [seen, setSeen] = useState<Record<Tab, boolean>>({ ringkasan: true, cek: true, video: false, videyy: false, pengaturan: false });
+  const [seen, setSeen] = useState<Record<Tab, boolean>>({ ringkasan: true, cek: true, video: false, videyy: false, statistik: false, pengaturan: false });
   const [reviewCount, setReviewCount] = useState<number | null>(null);
   const [flagCount, setFlagCount] = useState(0);
   const [commentPending, setCommentPending] = useState(0);
@@ -339,6 +340,7 @@ export function OwnerDashboard() {
     { id: "cek", label: "Perlu dicek", icon: "⚑", badge: (reviewCount || 0) + flagCount + commentPending + reportPending + embedPending || null },
     { id: "video", label: "Video", icon: "▶" },
     { id: "videyy", label: "Videyy", icon: "◈" },
+    { id: "statistik", label: "Statistik", icon: "▤" },
     { id: "pengaturan", label: "Pengaturan", icon: "⚙" },
   ];
 
@@ -588,6 +590,13 @@ export function OwnerDashboard() {
             </section>
           ) : null}
 
+          {/* STATISTIK: orang, negara, popunder, video ditonton */}
+          {seen.statistik ? (
+            <section className={`${show("statistik")} flex-col gap-4`}>
+              <OwnerStatistik secret={secret} />
+            </section>
+          ) : null}
+
           {/* PENGATURAN */}
           {seen.pengaturan ? (
             <section className={`${show("pengaturan")} flex-col gap-4`}>
@@ -621,14 +630,14 @@ export function OwnerDashboard() {
         className="fixed inset-x-0 bottom-0 z-40 border-t border-white/[0.08] bg-[#0b0c0d]/85 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
         aria-label="Menu pemilik"
       >
-        <div className="mx-auto grid max-w-md grid-cols-5">
+        <div className="mx-auto grid max-w-md grid-cols-6">
           {tabs.map((t) => (
             <button
               key={t.id}
               type="button"
               onClick={() => goTab(t.id)}
               aria-current={tab === t.id ? "page" : undefined}
-              className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-1 py-2 text-[11px] ${focusRing} ${tab === t.id ? "text-[#5eead4]" : "text-zinc-500"}`}
+              className={`relative flex min-h-14 flex-col items-center justify-center gap-0.5 px-0.5 py-2 text-center text-[11px] leading-tight ${focusRing} ${tab === t.id ? "text-[#5eead4]" : "text-zinc-500"}`}
             >
               <span className="text-lg leading-none" aria-hidden="true">{t.icon}</span>
               {t.label}
@@ -648,7 +657,7 @@ export function OwnerDashboard() {
   );
 }
 
-type Tab = "ringkasan" | "cek" | "video" | "videyy" | "pengaturan";
+type Tab = "ringkasan" | "cek" | "video" | "videyy" | "statistik" | "pengaturan";
 
 const shellStyle: React.CSSProperties = {
   backgroundColor: "#08090a",

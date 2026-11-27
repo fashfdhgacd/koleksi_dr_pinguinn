@@ -11,7 +11,7 @@ import { type RefPeriod, type Series, type Stats14, type TopItem, changeWords } 
 
 const TEAL = "#2dd4bf";
 
-const COUNTRY: Record<string, string> = {
+export const COUNTRY: Record<string, string> = {
   ID: "Indonesia",
   SG: "Singapura",
   MY: "Malaysia",
@@ -62,7 +62,7 @@ function shortDay(iso: string, today: string): string {
   });
 }
 
-function wibClock(iso: string): string {
+export function wibClock(iso: string): string {
   try {
     return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Jakarta" });
   } catch {
@@ -70,7 +70,7 @@ function wibClock(iso: string): string {
   }
 }
 
-function Card(props: { title: string; children: React.ReactNode }) {
+export function Card(props: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border border-white/[0.05] bg-[#0c0e0f] p-4">
       <h2 className="text-[13px] uppercase tracking-[0.16em] text-zinc-400">{props.title}</h2>
@@ -79,7 +79,7 @@ function Card(props: { title: string; children: React.ReactNode }) {
   );
 }
 
-function Bar(props: { value: number; max: number }) {
+export function Bar(props: { value: number; max: number }) {
   const w = props.max > 0 ? Math.max(1.5, (props.value / props.max) * 100) : 0;
   return (
     <span className="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
@@ -101,9 +101,11 @@ const GROUP_DOT: Record<string, string> = {
 };
 
 /** "Sumber pengunjung" with a period toggle; every source host, its group, and the previous period. */
-function SourcesCard(props: { periods: RefPeriod[]; clock: string }) {
-  const [pk, setPk] = useState<RefPeriod["key"]>("today");
+export function SourcesCard(props: { periods: RefPeriod[]; clock: string; period?: RefPeriod["key"] }) {
+  const [own, setPk] = useState<RefPeriod["key"]>("today");
   const [all, setAll] = useState(false);
+  const pk = props.period || own;
+  useEffect(() => setAll(false), [props.period]);
   const p = props.periods.find((x) => x.key === pk) || props.periods[0];
   if (!p) return null;
   const ext = p.sources.reduce((a, s) => a + s.views, 0);
@@ -113,7 +115,7 @@ function SourcesCard(props: { periods: RefPeriod[]; clock: string }) {
   const vs = (n: number) => `${p.prevLabel} ${fmt(n)}`;
   return (
     <Card title={`Sumber pengunjung · ${p.label} (WIB)`}>
-      <div className="flex flex-wrap gap-1.5">
+      <div className={props.period ? "hidden" : "flex flex-wrap gap-1.5"}>
         {props.periods.map((x) => (
           <button
             key={x.key}
