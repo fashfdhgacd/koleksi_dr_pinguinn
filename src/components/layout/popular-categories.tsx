@@ -12,7 +12,7 @@ export const POPULAR_CATEGORY_LINKS: ReadonlyArray<{ slug: string; label: string
   // /cari landing (2026-11-20): "bokep malay rempit" 168 imp/28 d; sitewide link so Google finds it.
   { slug: "bokep-malaysia-rempit", label: "Bokep Malay Rempit", href: "/cari/bokep-malaysia-rempit" },
   { slug: "bokep", label: "Bokep Indo" },
-  // Source collections (2026-11-20): videos from IndoAV / UserBokep, ad-free /cari pages.
+  // Source collections (2026-11-20): videos from IndoAV / UserBokep. UserBokep /cari stays ad-free.
   { slug: "bokep-indoav-terbaru", label: "Video dari IndoAV", href: "/cari/bokep-indoav-terbaru" },
   { slug: "bokep-userbokep-indo", label: "Video dari UserBokep", href: "/cari/bokep-userbokep-indo" },
   { slug: "jav", label: "JAV Sub Indo" },

@@ -51,13 +51,16 @@ describe("search landing allowlist", () => {
 });
 
 describe("source landings (IndoAV / UserBokep)", () => {
-  it("only take their own source, newest first, ad-free, and never claim to be the source site", () => {
+  it("only take their own source, newest first, and never claim to be the source site", () => {
     const indoav = findLanding("bokep-indoav-terbaru");
     const ub = findLanding("bokep-userbokep-indo");
     assert.ok(indoav && ub);
+    assert.equal(indoav.adFree, undefined);
+    assert.equal(ub.adFree, true);
+    assert.doesNotMatch(indoav.intro, /tanpa iklan banner/);
+    assert.match(ub.intro, /tanpa iklan banner/);
     for (const l of [indoav, ub]) {
       assert.equal(l.order, "latest");
-      assert.equal(l.adFree, true);
       assert.match(l.intro, /Kami bukan situs/);
       assert.match(l.title, /Koleksi Video dari/);
     }
