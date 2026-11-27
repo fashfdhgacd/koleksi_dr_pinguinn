@@ -21,12 +21,13 @@ export const EXO_ZONE_2 = "6111252";
 /** TrafficStars 300x250 spots (data-ts-spot codes, created 27 Nov 2026), SDK on gajukogyxywahu.com. */
 export const TS_SPOT_1 = "b027eda668f044c2a0e1a331d59cb3d3";
 export const TS_SPOT_2 = "68654e89b8b14322bcc946c618f13e4c";
-/** TODO: Wynq 300x250 zone IDs once the site is approved and zones exist. */
-export const WYNQ_ZONE_1 = "";
-export const WYNQ_ZONE_2 = "";
-/** Wynq banner zones: off until zones exist (the site tag below is loaded site-wide in __root.tsx). */
-export const WYNQ_ENABLED = false;
-/** Wynq site tag (rapidfire.cc), loaded once per page in <head> by src/routes/__root.tsx. */
+/** Wynq responsive 1:1 display zones (data-bpid), rendered by the site tag below. */
+export const WYNQ_ZONE_1 = "0SBV7RF557074";
+export const WYNQ_ZONE_2 = "0SBV80XGCJ8C1";
+/** Wynq grid slots on/off. */
+export const WYNQ_ENABLED = true;
+/** Wynq site tag (rapidfire.cc), loaded once per page in <head> by src/routes/__root.tsx, except on
+ * ad-free pages (src/components/locale-head.tsx drops it there, see isAdFreePath). */
 export const WYNQ_SITE_SCRIPT_SRC = "https://rapidfire.cc/s.js";
 export const WYNQ_SITE_ID = "0SBV0CWY9FC1A";
 

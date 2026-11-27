@@ -4,12 +4,18 @@ import { SITE_ORIGIN } from "@/lib/seo";
 import { languageFamily } from "@/lib/language-family";
 import { decodePublicPath } from "@/lib/public-locale";
 import { pageCopy } from "@/lib/page-copy";
+import { isAdFreePath } from "@/lib/catalog/landing";
+import { WYNQ_SITE_SCRIPT_SRC } from "@/lib/grid-ads";
 
 export function LocaleHead() {
-  const tags = useTags();
+  const allTags = useTags();
   const nonce = useRouter().options.ssr?.nonce;
   const href = useRouterState({ select: s => s.location.publicHref });
-  const { language, path } = decodePublicPath(href.split(/[?#]/)[0]);
+  const rawPath = href.split(/[?#]/)[0];
+  const { language, path } = decodePublicPath(rawPath);
+  // Ad-free source pages (IndoAV / UserBokep): no Wynq site tag (it can inject pop/push formats).
+  const adFree = isAdFreePath(rawPath) || isAdFreePath(path);
+  const tags = adFree ? allTags.filter(t => !(t.tag === "script" && t.attrs?.src === WYNQ_SITE_SCRIPT_SRC)) : allTags;
   const total = useRouterState({ select: s => {
     const data = s.matches.at(-1)?.loaderData;
     if (!data || !("ok" in data) || !data.ok) return undefined;
