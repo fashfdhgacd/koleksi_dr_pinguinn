@@ -1,7 +1,7 @@
 // Videy player popunder: the Videy player (videy-player.tsx, our own HTML5 player) calls popTap()
-// synchronously in a tap handler (poster tap, or the re-armed tap layer during playback). The cap
-// (POP_MAX_VIDEY per Videy video, POP_MIN_GAP_MS between pops) lives in card-popunder.ts and is shared
-// with the catalog cards and the watch-page tap layer. Opened -> the tap does nothing else (next tap
+// synchronously in the poster tap handler. Mid-playback resume-after-pause uses PopTapLayer with
+// the same cap (POP_MAX_VIDEY per Videy video, POP_MIN_GAP_MS between pops) in card-popunder.ts.
+// Videy does not consume the shared daily page cap. Opened -> the tap does nothing else (next tap
 // plays); blocked -> the next tap retries, and after 2 blocked tries per video the tap plays so
 // ad-blocker visitors are never stuck.
 // Counters (player-log, once per video per session): pop_fire / pop_ok / pop_block.

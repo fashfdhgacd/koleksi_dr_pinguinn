@@ -33,7 +33,7 @@ export type PlayerLogRow = {
   hidden: boolean;
 };
 
-type PopCounts = { fire: number; ok: number; block: number; cardFire?: number; cardOk?: number; cardBlock?: number; preReq?: number; preFill?: number; preDone?: number; preSkip?: number; n1?: number; n2?: number; n3?: number };
+type PopCounts = { fire: number; ok: number; block: number; cardFire?: number; cardOk?: number; cardBlock?: number; preReq?: number; preFill?: number; preDone?: number; preSkip?: number; n1?: number; n2?: number; n3?: number; n4?: number; n5?: number; n6?: number };
 
 export type PlayerLogData = {
   ok?: boolean;
@@ -493,8 +493,8 @@ export function StatusCard(props: {
   const tsPop = useTsPopunder();
   const siteOk = pop ? (pop.today.ok || 0) + (pop.today.cardOk || 0) : 0;
   const siteBlock = pop ? (pop.today.block || 0) + (pop.today.cardBlock || 0) : 0;
-  // Every opened tab by position (pop_n1..3); 0 until the deploy that logs them has run a while.
-  const siteAll = pop ? (pop.today.n1 || 0) + (pop.today.n2 || 0) + (pop.today.n3 || 0) : 0;
+  // Every opened tab by position (pop_n1..6); 0 until the deploy that logs them has run a while.
+  const siteAll = pop ? (pop.today.n1 || 0) + (pop.today.n2 || 0) + (pop.today.n3 || 0) + (pop.today.n4 || 0) + (pop.today.n5 || 0) + (pop.today.n6 || 0) : 0;
   const rows: { name: string; tone: "ok" | "warn" | "bad" | "idle"; value: string; sub?: string; note?: string }[] = [
     { name: "Bot Telegram", tone: botOk == null ? "idle" : botOk ? "ok" : "warn", value: botOk == null ? "…" : botOk ? "tersambung" : "perlu dicek" },
     {
@@ -533,7 +533,7 @@ export function StatusCard(props: {
       note: pop
         ? `Hitungan web sendiri (Videy + kartu, mulai 00.00 WIB): ${
             siteAll > 0
-              ? `${fmt(siteAll)} tab iklan terbuka (ke-1 ${fmt(pop.today.n1 || 0)}, ke-2 ${fmt(pop.today.n2 || 0)}, ke-3 ${fmt(pop.today.n3 || 0)})`
+              ? `${fmt(siteAll)} tab iklan terbuka (ke-1 ${fmt(pop.today.n1 || 0)}, ke-2 ${fmt(pop.today.n2 || 0)}, ke-3 ${fmt(pop.today.n3 || 0)}, ke-4 ${fmt(pop.today.n4 || 0)}, ke-5 ${fmt(pop.today.n5 || 0)}, ke-6 ${fmt(pop.today.n6 || 0)})`
               : `${fmt(siteOk)} tab iklan terbuka`
           }, ${fmt(siteBlock)} diblok browser. Ini bukan angka bayaran: jam mulainya beda 7 jam (TrafficStars mulai 07.00 WIB) dan data TrafficStars baru masuk 2x sehari. Yang dibayar angka TrafficStars di atas.`
         : undefined,

@@ -64,7 +64,7 @@ export const SPOT_FIELDS: { key: SpotKey; label: string }[] = [
 ];
 
 export const AD_RULES_LABEL =
-  "Popunder halaman dan kartu maksimal 3 kali per pengunjung per hari. Popunder skip pemutar Videy maksimal 3 kali per video. Tidak pernah di IndoAV.";
+  "Popunder halaman dan kartu maksimal 6 kali per pengunjung per hari. Popunder pemutar Videy maksimal 6 kali per video (tap pertama dan setiap putar lagi setelah jeda). Host lain 1 kali di tap pertama pemutar. Tidak pernah di IndoAV.";
 
 const ID_RE = /^[A-Za-z0-9_-]{3,64}$/;
 const SPOT_RE = /^\d{1,12}$/;
