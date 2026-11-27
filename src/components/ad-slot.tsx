@@ -77,6 +77,10 @@ export function onceNearViewport(el: HTMLElement, load: () => void): () => void 
 }
 
 /** Video-card-shaped shell with a centred 300x250 frame. */
+/** Neutral marker emitted on each grid cell (styles.css scopes SDK overrides with it). The page never
+ * carries network names or "ad" in attribute names/values; the mapping lives only here. */
+const CELL_KIND: Record<string, string> = { exoclick: "c1", trafficstars: "c2", wynq: "c3" };
+
 export function AdCardShell({
   network,
   className = "",
@@ -91,7 +95,7 @@ export function AdCardShell({
   scale: number;
 }) {
   return (
-    <div data-kdp-ad={network} className={`rounded-none p-1 sm:p-1.5 ${className}`} aria-label="Iklan">
+    <div data-kdp-cell={CELL_KIND[network] ?? "c0"} className={`rounded-none p-1 sm:p-1.5 ${className}`} aria-label="Iklan">
       <div
         ref={frameRef}
         className="relative flex aspect-[16/10] items-center justify-center overflow-hidden rounded-none bg-transparent"

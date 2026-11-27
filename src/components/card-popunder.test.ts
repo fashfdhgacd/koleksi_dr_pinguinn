@@ -162,7 +162,7 @@ test("IndoAV never opens a popunder from firePop or a catalog card click", () =>
     },
   });
   const target = Object.assign(new Element(), {
-    closest: (sel: string) => (sel === "[data-kdp-ad]" ? null : a),
+    closest: (sel: string) => (sel === "[data-kdp-cell]" ? null : a),
   });
   onCatalogCardClick({ target }, () => "IndoAV");
   assert.equal(opened.length, 0);
