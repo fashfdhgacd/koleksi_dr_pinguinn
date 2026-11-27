@@ -45,7 +45,7 @@ export function useFitScale(ref: React.RefObject<HTMLDivElement | null>) {
   return scale;
 }
 
-/** Fill timeout for TrafficStars / Wynq grid ads: still empty after this -> onEmpty (ExoClick fallback swap). */
+/** Fill timeout for TrafficStars grid ads: still empty after this -> onEmpty (ExoClick fallback swap). */
 export const FILL_TIMEOUT_MS = 8000;
 
 /** Calls the latest `onEmpty` once when `empty` turns true. */
@@ -79,7 +79,7 @@ export function onceNearViewport(el: HTMLElement, load: () => void): () => void 
 /** Video-card-shaped shell with a centred 300x250 frame. */
 /** Neutral marker emitted on each grid cell (styles.css scopes SDK overrides with it). The page never
  * carries network names or "ad" in attribute names/values; the mapping lives only here. */
-const CELL_KIND: Record<string, string> = { exoclick: "c1", trafficstars: "c2", wynq: "c3" };
+const CELL_KIND: Record<string, string> = { exoclick: "c1", trafficstars: "c2" };
 
 export function AdCardShell({
   network,

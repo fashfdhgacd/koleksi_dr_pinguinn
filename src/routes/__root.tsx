@@ -6,7 +6,6 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { PresencePing } from "@/components/presence-ping";
 import { SwCleanup } from "@/components/sw-cleanup";
 import { DEFAULT_OG, HOME_DESCRIPTION, HOME_TITLE, OG_SITE_NAME } from "@/lib/seo";
-import { SITE_RUNTIME_SRC } from "@/lib/grid-ads";
 import { isOwnerAdminPath } from "@/lib/owner-admin-path";
 import appCss from "../styles.css?url";
 import figtreeFont from "../assets/fonts/figtree-latin.woff2?url";
@@ -92,9 +91,6 @@ export const Route = createRootRoute({
       { rel: "manifest", href: "/site.webmanifest" },
       { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png?v=3" },
     ],
-    // Wynq anti-adblock tag: first-party, segment bound server-side, async. Off on owner/admin/login/API
-    // paths (LocaleHead also drops it on those paths and on ad-free catalog pages).
-    scripts: noAdScripts ? [] : [{ src: SITE_RUNTIME_SRC, async: true }],
   };
   },
   component: RootComponent,

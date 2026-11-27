@@ -331,7 +331,7 @@ export function findLanding(slug: string | undefined | null): LandingDef | undef
 }
 
 /** True for /cari/<adFree slug> and its /halaman/N pages (any language prefix) when that landing sets adFree.
- * Used to keep the Wynq site tag (which can also inject pop/push formats) off those pages. No landing is ad-free today. */
+ * No landing is ad-free today. */
 export function isAdFreePath(path: string | undefined | null): boolean {
   const m = /^(?:\/(?:ms|id|en))?\/cari\/([a-z0-9-]+)(?:\/halaman\/[1-9]\d*)?\/?$/i.exec(String(path || "").split(/[?#]/)[0]);
   return Boolean(m && findLanding(m[1])?.adFree);

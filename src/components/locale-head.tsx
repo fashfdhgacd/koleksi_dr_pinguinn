@@ -4,13 +4,7 @@ import { SITE_ORIGIN } from "@/lib/seo";
 import { languageFamily } from "@/lib/language-family";
 import { decodePublicPath } from "@/lib/public-locale";
 import { pageCopy } from "@/lib/page-copy";
-import { isAdFreePath } from "@/lib/catalog/landing";
 import { isOwnerAdminPath } from "@/lib/owner-admin-path";
-import { SITE_RUNTIME_SRC } from "@/lib/grid-ads";
-
-function isSiteRuntimeScript(t: { tag: string; attrs?: { src?: string } }) {
-  return t.tag === "script" && t.attrs?.src === SITE_RUNTIME_SRC;
-}
 
 function isTrafficStarsHeadTag(t: { tag: string; attrs?: Record<string, unknown> }) {
   if (t.tag !== "meta" || !t.attrs) return false;
@@ -25,12 +19,9 @@ export function LocaleHead() {
   const href = useRouterState({ select: s => s.location.publicHref });
   const rawPath = href.split(/[?#]/)[0];
   const { language, path } = decodePublicPath(rawPath);
-  // Wynq tag stays off ad-free source pages (existing isAdFreePath rule) and off owner/admin/login/API
-  // paths. TrafficStars head tags are dropped only on owner/admin paths (public pages unchanged).
-  const adFree = isAdFreePath(rawPath) || isAdFreePath(path);
+  // TrafficStars head tags are dropped only on owner/admin paths (public pages unchanged).
   const ownerAdmin = isOwnerAdminPath(rawPath) || isOwnerAdminPath(path);
   const tags = allTags.filter((t) => {
-    if (isSiteRuntimeScript(t) && (adFree || ownerAdmin)) return false;
     if (ownerAdmin && isTrafficStarsHeadTag(t)) return false;
     return true;
   });
