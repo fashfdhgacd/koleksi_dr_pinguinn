@@ -25,7 +25,7 @@ test("ad caps match the main site", () => {
   assert.equal(PAGE_POPUNDER_MAX_PER_DAY, PAGE_POP_MAX_PER_DAY);
   assert.equal(VIDEY_SKIP_POPUNDER_MAX_PER_VIDEO, videyCap);
   assert.equal(PAGE_POPUNDER_MAX_PER_DAY, 6);
-  assert.equal(VIDEY_SKIP_POPUNDER_MAX_PER_VIDEO, 6);
+  assert.equal(VIDEY_SKIP_POPUNDER_MAX_PER_VIDEO, 3);
 });
 
 test("public config shape for an empty save", () => {
@@ -38,7 +38,7 @@ test("public config shape for an empty save", () => {
   assert.equal(pub.rules.catalogBlockKey, CATALOG_BLOCK_KEY);
   assert.equal(pub.rules.catalogBlockAppliesEverywhere, true);
   assert.equal(pub.rules.pagePopunderMaxPerVisitorPerDay, 6);
-  assert.equal(pub.rules.videySkipPopunderMaxPerVideo, 6);
+  assert.equal(pub.rules.videySkipPopunderMaxPerVideo, 3);
   assert.equal(pub.rules.neverOnIndoav, true);
   assert.deepEqual(
     pub.sites.map((site) => site.host),

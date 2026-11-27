@@ -531,7 +531,7 @@ export function StatusCard(props: {
         .filter(Boolean)
         .join(" · "),
       note: pop
-        ? `Hitungan web sendiri (Videy + kartu, mulai 00.00 WIB): ${
+        ? `Hitungan web sendiri (tap pemutar saja, mulai 00.00 WIB): ${
             siteAll > 0
               ? `${fmt(siteAll)} tab iklan terbuka (ke-1 ${fmt(pop.today.n1 || 0)}, ke-2 ${fmt(pop.today.n2 || 0)}, ke-3 ${fmt(pop.today.n3 || 0)}, ke-4 ${fmt(pop.today.n4 || 0)}, ke-5 ${fmt(pop.today.n5 || 0)}, ke-6 ${fmt(pop.today.n6 || 0)})`
               : `${fmt(siteOk)} tab iklan terbuka`

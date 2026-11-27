@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { registerHooks } from "node:module";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeEach, test } from "node:test";
@@ -19,12 +19,10 @@ registerHooks({
 
 const {
   POP_MAX_OTHER,
-  POP_MAX_PER_VIDEO,
   POP_MAX_VIDEY,
   POP_MIN_GAP_MS,
   canPop,
   firePop,
-  onCatalogCardClick,
   popMaxFor,
 } = await import("./card-popunder.ts");
 type Store = { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void; clear(): void };
@@ -107,24 +105,26 @@ afterEach(() => {
   Date.now = realNow;
 });
 
-test("player tap caps: Videy 6 per video, other hosts 1", () => {
-  assert.equal(popMaxFor("Videy"), 6);
+test("player tap caps: Videy 3 per video, other hosts 1, 5s gap", () => {
+  assert.equal(popMaxFor("Videy"), 3);
   assert.equal(popMaxFor("Videy"), POP_MAX_VIDEY);
+  assert.equal(POP_MAX_VIDEY, 3);
+  assert.equal(POP_MIN_GAP_MS, 5_000);
   assert.equal(popMaxFor("UserBokep"), 1);
   assert.equal(popMaxFor("UserBokep"), POP_MAX_OTHER);
   assert.equal(popMaxFor("IndoAV"), POP_MAX_OTHER);
   assert.equal(popMaxFor("Streamtape"), POP_MAX_OTHER);
-  assert.equal(POP_MAX_PER_VIDEO, 3);
+  assert.equal(popMaxFor("Putarin"), POP_MAX_OTHER);
 });
 
-test("Videy can open 6 popunders per video after the gap, ignoring the daily page cap", () => {
+test("Videy can open 3 popunders per video after the 5s gap, ignoring the daily page cap", () => {
   const id = "videyAAAA1";
-  // Fill the shared daily cap first; Videy (daily=false) must still be allowed.
+  // Fill the shared daily cap first with non-Videy first-play taps; Videy (daily=false) must still be allowed.
   for (let i = 0; i < 6; i++) {
-    assert.equal(firePop(`other${i}xxxx`, POP_MAX_PER_VIDEO, "UserBokep", true), "ok");
+    assert.equal(firePop(`other${i}xxxx`, POP_MAX_OTHER, "UserBokep", true), "ok");
     now += POP_MIN_GAP_MS + 1;
   }
-  assert.equal(canPop("other6xxxx", POP_MAX_PER_VIDEO, true), false);
+  assert.equal(canPop("other6xxxx", POP_MAX_OTHER, true), false);
 
   for (let i = 0; i < POP_MAX_VIDEY; i++) {
     assert.equal(canPop(id, POP_MAX_VIDEY, false), true, `videy open ${i + 1} allowed`);
@@ -132,7 +132,7 @@ test("Videy can open 6 popunders per video after the gap, ignoring the daily pag
     now += POP_MIN_GAP_MS + 1;
   }
   assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "skip");
-  assert.equal(opened.length, 6 + 6);
+  assert.equal(opened.length, 6 + 3);
 });
 
 test("non-Videy player taps stop after 1 per video and share the daily cap", () => {
@@ -159,24 +159,31 @@ test("IndoAV player taps stop after 1 per video, same as other non-Videy hosts",
   assert.equal(opened.length, 1);
 });
 
-test("IndoAV catalog card click can open a page popunder", () => {
-  const Element = (globalThis as typeof globalThis & { Element: new () => Element }).Element;
-  const a = Object.assign(new Element(), {
-    getAttribute: (name: string) => (name === "href" ? "/watch/indoav00002" : null),
-    closest(this: { getAttribute: (n: string) => string | null }, sel: string) {
-      return sel === 'a[href^="/watch/"]' ? this : null;
-    },
-  });
-  const target = Object.assign(new Element(), {
-    closest: (sel: string) => (sel === "[data-kdp-cell]" ? null : a),
-  });
-  onCatalogCardClick({ target }, () => "IndoAV");
-  assert.equal(opened.length, 1);
+test("catalog, hero, and card-popunder sources have no page-click popunder trigger", () => {
+  const here = new URL(".", import.meta.url);
+  const files = ["card-popunder.ts", "video/video-grid.tsx", "video/hero.tsx"];
+  for (const rel of files) {
+    const src = readFileSync(new URL(rel, here), "utf8");
+    assert.equal(src.includes("onCatalogCardClick"), false, `${rel} still mentions onCatalogCardClick`);
+  }
 });
 
-test("the 20s gap blocks a second open on the same video, not on a new video", () => {
+test("the 5s gap blocks a second Videy open on the same video, not on a new video", () => {
   assert.equal(firePop("samevideo01", POP_MAX_VIDEY, "Videy", false), "ok");
   now += POP_MIN_GAP_MS - 1;
   assert.equal(firePop("samevideo01", POP_MAX_VIDEY, "Videy", false), "skip");
   assert.equal(firePop("newvideo001", POP_MAX_VIDEY, "Videy", false), "ok");
+});
+
+test("the 5s gap then allows Videy pops #2 and #3 on the same video, and blocks #4", () => {
+  const id = "gapvideo001";
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "ok");
+  now += POP_MIN_GAP_MS - 1;
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "skip");
+  now += 1;
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "ok");
+  now += POP_MIN_GAP_MS;
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "ok");
+  now += POP_MIN_GAP_MS;
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "skip");
 });

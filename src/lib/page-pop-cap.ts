@@ -1,7 +1,7 @@
 /**
- * Page popunder cap: 6 successful opens per calendar day in Asia/Jakarta, shared by every page.
- * Catalog clicks and non-Videy player taps share this counter.
+ * Daily cap for non-Videy player taps: 6 successful opens per calendar day in Asia/Jakarta.
  * Videy player taps do not use this counter (they have a per-video cap only).
+ * Catalog, hero, category, pagination, and "Muat lagi" clicks never fire a popunder.
  * A new Jakarta date starts the count at zero.
  */
 

@@ -1,9 +1,11 @@
-// TrafficStars direct-link popunder (spot 5210859), shared by every trigger: catalog card / hero click,
-// the one-shot tap layer over iframe players (tap-popunder.tsx) and the Videy player (ts-videy-popunder.tsx).
+// TrafficStars direct-link popunder (spot 5210859), used only by player-tap paths:
+// the one-shot tap layer over iframe players (tap-popunder.tsx) and the Videy player
+// (ts-videy-popunder.tsx). Catalog, hero, category, pagination, and "Muat lagi"
+// clicks never fire a popunder.
 // In-video taps keep the per-video cap below (sessionStorage, resets when another video is opened).
-// Catalog clicks and non-Videy player taps share one daily counter. Blocked tabs consume no slot.
-// Videy player taps use the per-video allowance only.
-// Counters: popc_fire / popc_ok / popc_block in player-log (once per video+event per session).
+// Non-Videy player taps share one daily counter. Blocked tabs consume no slot.
+// Videy player taps use the per-video allowance only (independent of the daily cap).
+// Counters: pop_fire / pop_ok / pop_block in player-log (once per video+event per session).
 // Each open is also logged by its position for that video (pop_n1..pop_n6, one D1
 // upsert per opened tab, same beacon as today), so /pemilik can compare ALL our opens with
 // TrafficStars' paid impressions instead of only the first tab per video.
@@ -13,16 +15,15 @@ import { nextPagePop, pagePopAllowed, type PagePopDay } from "@/lib/page-pop-cap
 const DIRECT_LINK = "https://fozekikikiminu.com/api/v1/direct/587547ff73c844b39ab9f02d1285154b";
 const HOSTS = new Set(["IndoAV", "UserBokep", "Streamtape", "Putarin", "Videy", "Arsip"]);
 
-/** Max popunders per video id for catalog / hero card clicks. Easy to change. */
-export const POP_MAX_PER_VIDEO = 3;
-/** Non-Videy player tap layer: one popunder on the first tap, then the video loads. */
+/** Non-Videy player tap layer: one popunder on the first play tap, then the video loads. */
 export const POP_MAX_OTHER = 1;
-/** Minimum time between two popunders on the SAME video (a newly opened video may pop at once). */
-export const POP_MIN_GAP_MS = 20_000;
-/** Videy popunder cap per video (independent of the shared daily cap). First tap plus
- * each resume-after-pause, until this many successful opens. */
-export const POP_MAX_VIDEY = 6;
-/** Per-video cap for the player tap layer. Catalog clicks use POP_MAX_PER_VIDEO instead. */
+/** Minimum time between two Videy popunders on the SAME video (a newly opened video may pop at once). */
+export const POP_MIN_GAP_MS = 5_000;
+/** Videy popunder cap per video (independent of the shared daily cap). Pop #1 on the
+ * first play/start tap; pops #2 and #3 on later player-control taps (play/resume, seek,
+ * speed) after this gap. */
+export const POP_MAX_VIDEY = 3;
+/** Per-video cap for the player tap layer. */
 export function popMaxFor(host: string): number {
   return host === "Videy" ? POP_MAX_VIDEY : POP_MAX_OTHER;
 }
@@ -54,7 +55,7 @@ function writeState(v: PopState): void {
 }
 
 /** Checks the daily allowance, per-video allowance, and minimum gap. */
-export function canPop(videoId: string, max: number = POP_MAX_PER_VIDEO, daily = true): boolean {
+export function canPop(videoId: string, max: number, daily = true): boolean {
   if (typeof window === "undefined" || !videoId) return false;
   if (daily && !pagePopAllowed(readPagePop(), Date.now())) return false;
   const st = readState();
@@ -63,7 +64,7 @@ export function canPop(videoId: string, max: number = POP_MAX_PER_VIDEO, daily =
 }
 
 /** True when this video can still get a popunder later (count not used up), ignoring the gap. */
-export function popsLeft(videoId: string, max: number = POP_MAX_PER_VIDEO): boolean {
+export function popsLeft(videoId: string, max: number): boolean {
   if (typeof window === "undefined" || !videoId) return false;
   const st = readState();
   return (st.id === videoId ? st.n : 0) < max;
@@ -75,7 +76,7 @@ export function popsLeft(videoId: string, max: number = POP_MAX_PER_VIDEO): bool
  */
 export function firePop(
   videoId: string,
-  max: number = POP_MAX_PER_VIDEO,
+  max: number,
   host?: PlayerLogHost,
   daily = true,
 ): "ok" | "block" | "skip" {
@@ -147,24 +148,4 @@ function writePagePop(state: PagePopDay): void {
   } catch {
     /* in-memory only for this hit; the next successful write catches up */
   }
-}
-
-/**
- * Catalog / hero card click (capture). A daily-capped page popunder: shares the
- * PAGE_POP_MAX_PER_DAY Jakarta-day counter with the iframe-player tap layers.
- * Never prevents navigation. A blocked window.open is not counted.
- */
-export function onCatalogCardClick(event: { target: EventTarget | null }, hostOf: (id: string) => string): void {
-  if (typeof window === "undefined") return;
-  const el = event.target instanceof Element ? event.target : null;
-  if (!el || el.closest("[data-kdp-cell]")) return;
-  const a = el.closest('a[href^="/watch/"]');
-  if (!a) return;
-  const id = decodeURIComponent((a.getAttribute("href") || "").slice("/watch/".length).split(/[?#/]/)[0] || "");
-  if (!id) return;
-  const host = popHost(hostOf(id));
-  if (!canPop(id, POP_MAX_PER_VIDEO)) return;
-  sendPlayerLog(id, host, "popc_fire");
-  const opened = firePop(id, POP_MAX_PER_VIDEO, host) === "ok";
-  sendPlayerLog(id, host, opened ? "popc_ok" : "popc_block");
 }

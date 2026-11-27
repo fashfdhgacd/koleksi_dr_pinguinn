@@ -6,7 +6,6 @@ import { Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { VideoCard as VideoCardType } from "@/lib/catalog/types";
 import { isRealMinor } from "@/lib/minor-terms";
-import { onCatalogCardClick } from "@/components/card-popunder";
 import { BRAND_POSTER, VideoThumb } from "./thumb";
 
 const ROTATE_MS = 60 * 60 * 1000;
@@ -104,9 +103,6 @@ export function Hero({ video, videos, intervalMs = ROTATE_MS }: HeroProps) {
   return (
     // isolate + z-0: keep the hero's internal layering from competing with page content below
     <section
-      // Card-click popunder (card-popunder.ts): same once-per-session flag and popc_* counters as the
-      // catalog grid; opens in this click and never prevents or delays the navigation.
-      onClickCapture={(e) => onCatalogCardClick(e, (id) => String(usable.find((v) => v.id === id)?.creator || ""))}
       className="relative z-0 isolate overflow-hidden bg-surface"
       aria-roledescription="carousel"
     >
