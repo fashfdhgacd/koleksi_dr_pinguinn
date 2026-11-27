@@ -1,4 +1,4 @@
-// TrafficStars 300x250 (MasterSpot 5210857 or another spot code) as one grid card.
+// TrafficStars 300x250 spot (data-ts-spot code from src/lib/grid-ads.ts) as one grid card.
 // Restored from 385b07c (removed in "Iklan audit (#64)"): client-side only, the SDK script is injected
 // into the slot element once, when the slot first nears the viewport; the cell is reserved up front
 // (same shell as an ExoClick card, no layout shift); if nothing fills within 8s the cell is removed.
@@ -6,8 +6,8 @@
 import { useEffect, useRef, useState } from "react";
 import { AdCardShell, onceNearViewport, useFitScale } from "@/components/ad-slot";
 
-const SDK_SRC = "https://cdn.fozekikikiminu.com/sdk/v1/dd.ms.js";
-const DOMAIN = "fozekikikiminu.com";
+const SDK_SRC = "https://cdn.gajukogyxywahu.com/sdk/v1/dd.ms.js";
+const DOMAIN = "gajukogyxywahu.com";
 const FILL_TIMEOUT_MS = 8000;
 
 function hasAd(el: HTMLElement): boolean {

@@ -18,10 +18,9 @@ export type Breakpoint = "mobile" | "desktop";
 /** ExoClick 300x250 zones (site 1115596). Two distinct zones, one each. */
 export const EXO_ZONE_1 = "6053864";
 export const EXO_ZONE_2 = "6111252";
-/** TrafficStars 300x250 MasterSpot 5210857 (data-ts-spot code). */
-export const TS_SPOT_1 = "31bf06c374434eb39d1675268d1608a5";
-/** TODO: second TrafficStars 300x250 spot (dashboard spot creation returned HTTP 500 on 27 Nov 2026). */
-export const TS_SPOT_2 = "";
+/** TrafficStars 300x250 spots (data-ts-spot codes, created 27 Nov 2026), SDK on gajukogyxywahu.com. */
+export const TS_SPOT_1 = "b027eda668f044c2a0e1a331d59cb3d3";
+export const TS_SPOT_2 = "68654e89b8b14322bcc946c618f13e4c";
 /** TODO: Wynq 300x250 zone IDs once the site is approved and zones exist. */
 export const WYNQ_ZONE_1 = "";
 export const WYNQ_ZONE_2 = "";

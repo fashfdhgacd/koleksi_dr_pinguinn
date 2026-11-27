@@ -57,17 +57,17 @@ test("no zone ID appears twice in one view (per breakpoint), with real config an
 });
 
 test("empty slot renders nothing and never borrows another zone; videos are never displaced", () => {
-  const cells = planGrid(30, true); // real config: TS #2 and both Wynq empty, Wynq disabled
+  const cells = planGrid(30, true); // real config: both Wynq empty, Wynq disabled
   assert.deepEqual(ads(cells, "desktop").map((c) => [c.slotIndex, c.slot.network, c.slot.zoneId]), [
     [0, "exoclick", "6053864"],
-    [1, "trafficstars", "31bf06c374434eb39d1675268d1608a5"],
+    [1, "trafficstars", "b027eda668f044c2a0e1a331d59cb3d3"],
     [3, "exoclick", "6111252"],
+    [4, "trafficstars", "68654e89b8b14322bcc946c618f13e4c"],
   ]);
-  assert.deepEqual(ads(cells, "mobile").map((c) => c.slotIndex), [0, 1, 3]);
+  assert.deepEqual(ads(cells, "mobile").map((c) => c.slotIndex), [0, 1, 3, 4]);
   assert.equal(cells.filter((c) => c.kind === "video").length, 30);
   assert.deepEqual(cells.filter((c) => c.kind === "video").map((c) => (c as { index: number }).index), [...Array(30).keys()]);
   assert.equal(gridSlot(2), null);
-  assert.equal(gridSlot(4), null);
   assert.equal(gridSlot(5), null);
   assert.equal(gridSlot(6), null);
   // Wynq with zone ID but disabled -> nothing
