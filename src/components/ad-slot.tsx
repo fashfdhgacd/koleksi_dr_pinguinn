@@ -45,6 +45,18 @@ export function useFitScale(ref: React.RefObject<HTMLDivElement | null>) {
   return scale;
 }
 
+/** Fill timeout for TrafficStars / Wynq grid ads: still empty after this -> onEmpty (ExoClick fallback swap). */
+export const FILL_TIMEOUT_MS = 8000;
+
+/** Calls the latest `onEmpty` once when `empty` turns true. */
+export function useReportEmpty(empty: boolean, onEmpty?: () => void) {
+  const cb = useRef(onEmpty);
+  cb.current = onEmpty;
+  useEffect(() => {
+    if (empty) cb.current?.();
+  }, [empty]);
+}
+
 /** Runs `load` once, the first time `el` comes within 400px of the viewport. */
 export function onceNearViewport(el: HTMLElement, load: () => void): () => void {
   if (typeof IntersectionObserver === "undefined") {
@@ -100,7 +112,7 @@ export function AdCardShell({
   );
 }
 
-/** ExoClick 300x250 banner for one zone. */
+/** ExoClick 300x250 banner for one zone. Never removed (the grid counts on a fixed number of ad cells). */
 export function AdSlot({ className = "", zoneId }: { className?: string; zoneId: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const served = useRef(false);

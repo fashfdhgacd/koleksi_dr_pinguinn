@@ -1,26 +1,27 @@
 // TrafficStars 300x250 spot (data-ts-spot code from src/lib/grid-ads.ts) as one grid card.
 // Restored from 385b07c (removed in "Iklan audit (#64)"): client-side only, the SDK script is injected
 // into the slot element once, when the slot first nears the viewport; the cell is reserved up front
-// (same shell as an ExoClick card, no layout shift); if nothing fills within 8s the cell is removed.
+// (same shell as an ExoClick card, no layout shift); if nothing fills within 8s onEmpty fires (GridAd then
+// swaps the cell once to an ExoClick fallback zone; without one the empty frame stays, never removed).
 // No refresh / rotation.
 import { useEffect, useRef, useState } from "react";
-import { AdCardShell, onceNearViewport, useFitScale } from "@/components/ad-slot";
+import { AdCardShell, FILL_TIMEOUT_MS, onceNearViewport, useFitScale, useReportEmpty } from "@/components/ad-slot";
 
 const SDK_SRC = "https://cdn.gajukogyxywahu.com/sdk/v1/dd.ms.js";
 const DOMAIN = "gajukogyxywahu.com";
-const FILL_TIMEOUT_MS = 8000;
 
 function hasAd(el: HTMLElement): boolean {
   if (el.querySelector("iframe, img, video, ins, a[href]")) return true;
   return Array.from(el.children).some((c) => c.tagName !== "SCRIPT" && (c as HTMLElement).offsetHeight > 20);
 }
 
-export function TsGridAd({ spot, className = "" }: { spot: string; className?: string }) {
+export function TsGridAd({ spot, className = "", onEmpty }: { spot: string; className?: string; onEmpty?: () => void }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const injected = useRef(false);
   const [empty, setEmpty] = useState(false);
   const scale = useFitScale(frameRef);
+  useReportEmpty(empty, onEmpty);
 
   useEffect(() => {
     const frame = frameRef.current;
@@ -57,6 +58,5 @@ export function TsGridAd({ spot, className = "" }: { spot: string; className?: s
     };
   }, [spot]);
 
-  if (empty) return null;
   return <AdCardShell network="trafficstars" className={className} frameRef={frameRef} innerRef={innerRef} scale={scale} />;
 }

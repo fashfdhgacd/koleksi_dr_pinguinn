@@ -43,10 +43,29 @@ export const GRID_SLOTS: readonly GridSlot[] = [
   { network: "wynq", zoneId: WYNQ_ZONE_2 },
 ];
 
+/** ExoClick 300x250 fallback zone per non-ExoClick slotIndex: when that slot's TrafficStars / Wynq ad is
+ * still unfilled after the fill timeout, the cell is swapped ONCE to this ExoClick zone (never back, no
+ * refresh). Every fallback zone must differ from each other and from EXO_ZONE_1/2, so no zone repeats on a
+ * page. "" = not created yet: the cell then keeps its (empty) frame, it never disappears.
+ * TODO: fill with the 4 new ExoClick zone IDs from the panel. */
+export const EXO_FALLBACK_ZONES: Readonly<Record<number, string>> = { 1: "", 2: "", 4: "", 5: "" };
+
+/** ExoClick fallback zone for a slot, or null (no fallback configured / slot is already ExoClick). */
+export function fallbackZone(
+  slotIndex: number,
+  slots: readonly GridSlot[] = GRID_SLOTS,
+  fallbacks: Readonly<Record<number, string>> = EXO_FALLBACK_ZONES,
+): string | null {
+  const slot = slots[slotIndex];
+  if (!slot || slot.network === "exoclick") return null;
+  return fallbacks[slotIndex] || null;
+}
+
 /** ExoClick zones actually wired (shown on /pemilik). */
-export const EXO_ZONES: readonly string[] = GRID_SLOTS.filter((s) => s.network === "exoclick" && s.zoneId).map(
-  (s) => s.zoneId,
-);
+export const EXO_ZONES: readonly string[] = [
+  ...GRID_SLOTS.filter((s) => s.network === "exoclick" && s.zoneId).map((s) => s.zoneId),
+  ...Object.values(EXO_FALLBACK_ZONES).filter(Boolean),
+];
 
 /** The live slot for a slotIndex, or null when it must render nothing (out of range, no zone ID, or
  * Wynq while WYNQ_ENABLED is false). Never substitutes another zone. */
@@ -59,34 +78,66 @@ export function gridSlot(slotIndex: number, slots: readonly GridSlot[] = GRID_SL
 }
 
 export type GridCell =
-  | { kind: "video"; index: number }
+  | { kind: "video"; index: number; hidden: Readonly<Record<Breakpoint, boolean>> }
   | { kind: "ad"; key: string; breakpoint: Breakpoint; slotIndex: number; slot: GridSlot };
 
-/** Cell order for a catalog grid of `videoCount` videos. Ad cells carry stable keys
- * (`ad-mobile-N` / `ad-desktop-N`) so a re-render keeps the same mounted slot (no second request). */
+/** Columns of the catalog grid per breakpoint (CATALOG_GRID: grid-cols-1, lg:grid-cols-3). */
+export const GRID_COLS: Readonly<Record<Breakpoint, number>> = { mobile: 1, desktop: 3 };
+
+const RULES: Readonly<Record<Breakpoint, (count: number) => boolean>> = {
+  mobile: (count) => count % 4 === 0,
+  desktop: (count) => count % 5 === 2,
+};
+
+/** "Ad after video #p" positions (1-based, nondecreasing) for one breakpoint: always exactly `max` of them
+ * when there is at least one video. The usual rule is kept whenever it yields `max` slots (full pages);
+ * shorter pages (last page, landing pages of 24, home minus hero) spread the slots evenly instead. */
+export function adPositions(videoCount: number, bp: Breakpoint, max = MAX_GRID_ADS): number[] {
+  if (videoCount <= 0 || max <= 0) return [];
+  const rule: number[] = [];
+  for (let count = 1; count <= videoCount && rule.length < max; count++) if (RULES[bp](count)) rule.push(count);
+  if (rule.length === max) return rule;
+  return Array.from({ length: max }, (_, i) => Math.min(videoCount, Math.max(1, Math.round(((i + 0.5) * videoCount) / max))));
+}
+
+/** Cell order for a catalog grid. Every page gets exactly MAX_GRID_ADS ad cells per breakpoint (slotIndex
+ * 0..5, all configured), ad cells carry stable keys (`ad-mobile-N` / `ad-desktop-N`, no re-request on
+ * re-render), and trailing videos are hidden per breakpoint so the visible cell count is a multiple of the
+ * columns: every row is full, no holes. Ad cells never disappear (unfilled TS/Wynq swap to an ExoClick
+ * fallback zone, see EXO_FALLBACK_ZONES), so this count holds after load too. */
 export function planGrid(
   videoCount: number,
   showAds: boolean,
   slots: readonly GridSlot[] = GRID_SLOTS,
   wynqEnabled = WYNQ_ENABLED,
+  cols: Readonly<Record<Breakpoint, number>> = GRID_COLS,
 ): GridCell[] {
-  const cells: GridCell[] = [];
-  let mobileIdx = 0;
-  let desktopIdx = 0;
-  for (let index = 0; index < videoCount; index++) {
-    cells.push({ kind: "video", index });
+  const after: Record<Breakpoint, Map<number, GridCell[]>> = { mobile: new Map(), desktop: new Map() };
+  const hidden: Record<Breakpoint, Set<number>> = { mobile: new Set(), desktop: new Set() };
+  for (const bp of ["mobile", "desktop"] as const) {
     if (!showAds) continue;
-    const count = index + 1;
-    if (count % 4 === 0 && mobileIdx < MAX_GRID_ADS) {
-      const slotIndex = mobileIdx++;
+    let ads = 0;
+    adPositions(videoCount, bp).forEach((pos, slotIndex) => {
       const slot = gridSlot(slotIndex, slots, wynqEnabled);
-      if (slot) cells.push({ kind: "ad", key: `ad-mobile-${slotIndex}`, breakpoint: "mobile", slotIndex, slot });
-    }
-    if (count % 5 === 2 && desktopIdx < MAX_GRID_ADS) {
-      const slotIndex = desktopIdx++;
-      const slot = gridSlot(slotIndex, slots, wynqEnabled);
-      if (slot) cells.push({ kind: "ad", key: `ad-desktop-${slotIndex}`, breakpoint: "desktop", slotIndex, slot });
-    }
+      if (!slot) return;
+      ads++;
+      const list = after[bp].get(pos) || [];
+      list.push({ kind: "ad", key: `ad-${bp}-${slotIndex}`, breakpoint: bp, slotIndex, slot });
+      after[bp].set(pos, list);
+    });
+    const k = Math.max(1, cols[bp]);
+    let visible = videoCount + ads;
+    for (let tail = videoCount - 1; visible % k !== 0 && tail >= 0; tail--, visible--) hidden[bp].add(tail);
+  }
+  const cells: GridCell[] = [];
+  for (let index = 0; index < videoCount; index++) {
+    cells.push({ kind: "video", index, hidden: { mobile: hidden.mobile.has(index), desktop: hidden.desktop.has(index) } });
+    for (const bp of ["mobile", "desktop"] as const) cells.push(...(after[bp].get(index + 1) || []));
   }
   return cells;
+}
+
+/** Cells visible on one breakpoint, in order. */
+export function visibleCells(cells: GridCell[], bp: Breakpoint): GridCell[] {
+  return cells.filter((c) => (c.kind === "video" ? !c.hidden[bp] : c.breakpoint === bp));
 }
