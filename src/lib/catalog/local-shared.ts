@@ -12,7 +12,7 @@ import {
 import siteLikesSnapshot from "./site-likes.json";
 import { isNewUpload } from "./feed-order";
 import { DRP_CATEGORY, DRP_SOURCES, drpKindOfItem } from "./drp-hosts.js";
-import { hasEpisodeMarker } from "./series";
+import { hasEpisodeMarker, hasEpisodeWord } from "./series";
 
 /** Our own D1 likes (video_likes), 12-hour snapshot written by the stats workflow. Cards only. */
 const SITE_LIKES = siteLikesSnapshot as unknown as Record<string, number>;
@@ -199,6 +199,16 @@ export function isVidey(item: RawItem): boolean {
 export function isDrpBokep(item: RawItem): boolean {
   return Boolean(drpKindOfItem(item));
 }
+/**
+ * Owner rule 2026-11-28: an own-host (DRP) upload with "Episode" in the title goes to AI Drama.
+ * The bot stores category "ai-plus" for those (upload-handler.js); older DRP rows stored "bokep"
+ * stay in /kategori/bokep until the owner moves them, so this only follows the stored category.
+ */
+export function isDrpAiEpisode(item: RawItem): boolean {
+  if (!isDrpBokep(item) || !hasEpisodeWord(item.title)) return false;
+  const slug = findCategory(String(item.category || "").toLowerCase().trim())?.slug;
+  return slug === "ai-plus" || slug === "ai-indo";
+}
 export function isSideSilo(item: RawItem): boolean {
   return isPutarin(item) || isStreamtape(item) || isVidey(item);
 }
@@ -277,7 +287,7 @@ function nonJavSlug(item: RawItem): string {
 }
 function slugOfRaw(item: RawItem): string {
   if (isVidey(item)) return "videy";
-  if (isDrpBokep(item)) return DRP_CATEGORY;
+  if (isDrpBokep(item)) return isDrpAiEpisode(item) ? "ai-plus" : DRP_CATEGORY;
   const raw = (item.category || "").toLowerCase().trim();
   const title = item.title || "";
   // An explicit AI GAY upload (#aigay / "kategori: ai gay") wins over the host default.

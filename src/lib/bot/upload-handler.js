@@ -21,7 +21,7 @@ import { hasJavCode, uploadRejectReason, uploadWarnReason } from "@/lib/bot/titl
 import { HOLD_REASON, explainTerm, holdReplyLines, isHeldDraftReason, titleHold, uploadAction } from "@/lib/bot/title-hold.js";
 import { isGenericTitle } from "@/lib/catalog/generic-title.js";
 import { guardGivenCategory } from "@/lib/bot/category-guard.js";
-import { hasEpisodeMarker } from "@/lib/catalog/series";
+import { hasEpisodeMarker, hasEpisodeWord } from "@/lib/catalog/series";
 import { embedDomainOf, readEmbedHosts } from "@/lib/embed-hosts.js";
 
 /** Title is clean for the hard checks too (reject list + minor-lock). Used for hold suggestions. */
@@ -48,6 +48,13 @@ async function rawCatalogItems() {
 
 /** Owner's own LuluStream / DoodStream / Byse uploads ("byse-probe" = Byse on a not-yet-listed domain). */
 const DRP_HOSTS = new Set(["lulu", "dood", "byse", "byse-probe", "mxdrop", "vidara"]);
+/**
+ * Owner rule 2026-11-28: "Episode" in the title = AI Drama, even on his own hosts; else "bokep".
+ * @param {string} baseTitle
+ */
+export function drpUploadCategory(baseTitle) {
+  return hasEpisodeWord(baseTitle) ? "ai-plus" : DRP_CATEGORY;
+}
 function isDrpHost(host) {
   return DRP_HOSTS.has(String(host || ""));
 }
@@ -492,7 +499,7 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const detected = detectCategory(baseTitle);
     const category =
       isDrpHost(video.host)
-        ? DRP_CATEGORY
+        ? drpUploadCategory(baseTitle)
         : video.host === "videy"
         ? "videy"
         : video.host === "putarin" || video.host === "putarin-folder"
