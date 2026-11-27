@@ -462,11 +462,8 @@ export function WatchPage() {
                 <VideyPlayer key={item.id} item={item} />
               </AdblockGate>
             ) : hostLabel(catalogPlayUrl(playItem)) === "IndoAV" ? (
-              // IndoAV: never gated (host ads + IndoAV view bonus).
-              <div className="relative">
-                <VideoPlayer key={playItem.id} item={playItem} />
-                <PopTapLayer key={`pop-${item.id}`} videoId={item.id} host="IndoAV" />
-              </div>
+              // IndoAV: never gated, and never a popunder (standing no-ads rule).
+              <VideoPlayer key={playItem.id} item={playItem} />
             ) : (
               // Other hosts (UserBokep, Putarin/Jav, Streamtape, ...): no adblock gate, only Videy is gated.
               <div className="relative">

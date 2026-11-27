@@ -4,7 +4,7 @@
 // Catalog clicks and non-Videy player taps share one daily counter. Blocked tabs consume no slot.
 // Videy player taps use the per-video allowance only.
 // Counters: popc_fire / popc_ok / popc_block in player-log (once per video+event per session).
-// Each of the first three opens is also logged by its position for that video (pop_n1 / pop_n2 / pop_n3, one D1
+// Each open is also logged by its position for that video (pop_n1..pop_n6, one D1
 // upsert per opened tab, same beacon as today), so /pemilik can compare ALL our opens with
 // TrafficStars' paid impressions instead of only the first tab per video.
 import { sendPlayerLog, type PlayerLogHost } from "@/lib/player-log-client";
@@ -13,15 +13,18 @@ import { nextPagePop, pagePopAllowed, type PagePopDay } from "@/lib/page-pop-cap
 const DIRECT_LINK = "https://fozekikikiminu.com/api/v1/direct/587547ff73c844b39ab9f02d1285154b";
 const HOSTS = new Set(["IndoAV", "UserBokep", "Streamtape", "Putarin", "Videy", "Arsip"]);
 
-/** Max popunders per video id. Easy to change. */
+/** Max popunders per video id for catalog / hero card clicks. Easy to change. */
 export const POP_MAX_PER_VIDEO = 3;
+/** Non-Videy player tap layer: one popunder on the first tap, then the video loads. */
+export const POP_MAX_OTHER = 1;
 /** Minimum time between two popunders on the SAME video (a newly opened video may pop at once). */
 export const POP_MIN_GAP_MS = 20_000;
-/** Videy popunder cap per video (independent of the shared daily cap). */
+/** Videy popunder cap per video (independent of the shared daily cap). First tap plus
+ * each resume-after-pause, until this many successful opens. */
 export const POP_MAX_VIDEY = 6;
-/** Per-video cap for a host label. */
+/** Per-video cap for the player tap layer. Catalog clicks use POP_MAX_PER_VIDEO instead. */
 export function popMaxFor(host: string): number {
-  return host === "Videy" ? POP_MAX_VIDEY : POP_MAX_PER_VIDEO;
+  return host === "Videy" ? POP_MAX_VIDEY : POP_MAX_OTHER;
 }
 
 const KEY = "kdp_pop_v1";
@@ -76,6 +79,7 @@ export function firePop(
   host?: PlayerLogHost,
   daily = true,
 ): "ok" | "block" | "skip" {
+  if (host === "IndoAV") return "skip";
   if (!canPop(videoId, max, daily)) return "skip";
   let w: Window | null = null;
   try {
@@ -90,7 +94,9 @@ export function firePop(
   writeState({ id: videoId, n, at: Date.now() });
   // Daily-capped triggers consume one slot of the shared Jakarta-day counter.
   if (daily) writePagePop(nextPagePop(readPagePop(), Date.now()));
-  if (host && n >= 1 && n <= 3) sendPlayerLog(videoId, host, `pop_n${n}` as "pop_n1" | "pop_n2" | "pop_n3");
+  if (host && n >= 1 && n <= 6) {
+    sendPlayerLog(videoId, host, `pop_n${n}` as "pop_n1" | "pop_n2" | "pop_n3" | "pop_n4" | "pop_n5" | "pop_n6");
+  }
   return "ok";
 }
 
@@ -157,8 +163,9 @@ export function onCatalogCardClick(event: { target: EventTarget | null }, hostOf
   if (!a) return;
   const id = decodeURIComponent((a.getAttribute("href") || "").slice("/watch/".length).split(/[?#/]/)[0] || "");
   if (!id) return;
-  if (!canPop(id, POP_MAX_PER_VIDEO)) return;
   const host = popHost(hostOf(id));
+  if (host === "IndoAV") return;
+  if (!canPop(id, POP_MAX_PER_VIDEO)) return;
   sendPlayerLog(id, host, "popc_fire");
   const opened = firePop(id, POP_MAX_PER_VIDEO, host) === "ok";
   sendPlayerLog(id, host, opened ? "popc_ok" : "popc_block");
