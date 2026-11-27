@@ -5,7 +5,19 @@ import { languageFamily } from "@/lib/language-family";
 import { decodePublicPath } from "@/lib/public-locale";
 import { pageCopy } from "@/lib/page-copy";
 import { isAdFreePath } from "@/lib/catalog/landing";
+import { isOwnerAdminPath } from "@/lib/owner-admin-path";
 import { SITE_RUNTIME_SRC } from "@/lib/grid-ads";
+
+function isSiteRuntimeScript(t: { tag: string; attrs?: { src?: string } }) {
+  return t.tag === "script" && t.attrs?.src === SITE_RUNTIME_SRC;
+}
+
+function isTrafficStarsHeadTag(t: { tag: string; attrs?: Record<string, unknown> }) {
+  if (t.tag !== "meta" || !t.attrs) return false;
+  const name = String(t.attrs.name ?? "").toLowerCase();
+  const http = String(t.attrs.httpEquiv ?? t.attrs["http-equiv"] ?? "").toLowerCase();
+  return name === "trafficstars" || http === "accept-ch" || http === "delegate-ch";
+}
 
 export function LocaleHead() {
   const allTags = useTags();
@@ -13,9 +25,15 @@ export function LocaleHead() {
   const href = useRouterState({ select: s => s.location.publicHref });
   const rawPath = href.split(/[?#]/)[0];
   const { language, path } = decodePublicPath(rawPath);
-  // Ad-free source pages (IndoAV / UserBokep): no Wynq tag (it can inject pop/push formats).
+  // Wynq tag stays off ad-free source pages (existing isAdFreePath rule) and off owner/admin/login/API
+  // paths. TrafficStars head tags are dropped only on owner/admin paths (public pages unchanged).
   const adFree = isAdFreePath(rawPath) || isAdFreePath(path);
-  const tags = adFree ? allTags.filter(t => !(t.tag === "script" && t.attrs?.src === SITE_RUNTIME_SRC)) : allTags;
+  const ownerAdmin = isOwnerAdminPath(rawPath) || isOwnerAdminPath(path);
+  const tags = allTags.filter((t) => {
+    if (isSiteRuntimeScript(t) && (adFree || ownerAdmin)) return false;
+    if (ownerAdmin && isTrafficStarsHeadTag(t)) return false;
+    return true;
+  });
   const total = useRouterState({ select: s => {
     const data = s.matches.at(-1)?.loaderData;
     if (!data || !("ok" in data) || !data.ok) return undefined;
