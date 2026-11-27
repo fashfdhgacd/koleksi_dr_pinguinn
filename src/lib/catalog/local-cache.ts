@@ -19,6 +19,7 @@ import {
   isPutarin,
   isUsable,
   isVidey,
+  isDrpAiEpisode,
   isDrpBokep,
   mainCatalog,
   slugOf,
@@ -868,7 +869,7 @@ function ownSlugs(it: RawItem, popular: ReadonlySet<string>): string[] {
   const aiOv = ownerAiDramaOverride(it);
   if (aiOv === "in") {
     if (!slugs.includes("ai-plus")) slugs.push("ai-plus");
-  } else if (aiOv === "out" || !hasEpisodeMarker(it.title)) {
+  } else if (aiOv === "out" || !(hasEpisodeMarker(it.title) || isDrpAiEpisode(it))) {
     slugs = slugs.filter((s) => s !== "ai-plus" && s !== "ai-indo");
   }
   // AI Drama Indo: AI Drama videos with an Indonesian title also sit in /kategori/ai-indo (never AI GAY ones).

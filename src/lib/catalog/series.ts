@@ -150,6 +150,16 @@ export function hasEpisodeMarker(title: string | undefined): boolean {
 }
 
 /**
+ * Owner rule 2026-11-28: the word "Episode" in an upload's title means AI Drama, also for his own
+ * Lulu / Dood / Byse / MXDrop / Vidara uploads (which otherwise all land in /kategori/bokep).
+ * Whole word, any case: "Episode 2", "EPISODE (9)", "Episode 1 - 2"; not "Episodes" or "TerakotaEpisode".
+ */
+const EPISODE_WORD = /(?<![\p{L}\p{N}])episode(?![\p{L}])/iu;
+export function hasEpisodeWord(title: string | undefined): boolean {
+  return EPISODE_WORD.test(String(title || ""));
+}
+
+/**
  * Episode range written with a dash right after an episode marker: "Episode 1 - 2", "Eps 1-2",
  * "Part 3 – 4" (one video holding several episodes). Only with a dash and only when the second
  * number is bigger, so "Episode 12" stays 12 and the ambiguous "Episode 1 2" stays a plain episode.
