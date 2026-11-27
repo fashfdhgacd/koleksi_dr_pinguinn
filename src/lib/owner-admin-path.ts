@@ -1,7 +1,7 @@
 /**
  * Owner / admin / login / API paths that must never load ad scripts
  * (Wynq tag, TrafficStars SDK, ExoClick, popunder handlers, banners).
- * Independent of catalog adFree flags (those only cover IndoAV / UserBokep landings).
+ * Independent of catalog adFree flags (optional per-landing; none are ad-free today).
  */
 export function isOwnerAdminPath(path: string | undefined | null): boolean {
   const raw = String(path || "")

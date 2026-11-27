@@ -20,7 +20,7 @@ export type LandingDef = {
   sources?: string[];
   /** "latest" keeps feed order (newest first); default sorts by views. */
   order?: "views" | "latest";
-  /** No grid ad slots and no card-click popunder on this page (UserBokep source pages stay ad-free). */
+  /** No grid ad slots and no card-click popunder on this page when set. No current landing uses it. */
   adFree?: boolean;
   /** Optional extra title filter inside the category (case-insensitive). */
   match?: RegExp;
@@ -296,7 +296,7 @@ export const LANDINGS: LandingDef[] = [
   // on /), "indoav" 27 imp / 10 clicks (pos 52), "bokep indoav" 8 imp, "indoav stw" 6 imp. Navigational
   // domain queries (indoav.com, userbokep.com) are not targeted. Copy says these are videos FROM the
   // source, collected here; never that this site is IndoAV or UserBokep.
-  // UserBokep source pages stay ad-free; IndoAV pages use the same banners as other catalog pages.
+  // IndoAV and UserBokep source pages use the same banners as other catalog pages.
   {
     slug: "bokep-indoav-terbaru",
     category: ALL_CATEGORIES,
@@ -315,13 +315,12 @@ export const LANDINGS: LandingDef[] = [
     category: ALL_CATEGORIES,
     sources: ["UserBokep"],
     order: "latest",
-    adFree: true,
     h1: "Bokep UserBokep Indo Terbaru: Koleksi Video dari UserBokep",
     title: "Bokep UserBokep Indo Terbaru – Koleksi Video dari UserBokep | koleksidrpinguin.com",
     description:
       "Bokep UserBokep indo terbaru: kumpulan video yang bersumber dari UserBokep, diurutkan dari yang baru masuk. Streaming di HP tanpa login. Khusus 18+.",
     intro:
-      "Halaman ini berisi kumpulan video Indonesia terbaru di koleksidrpinguin.com yang bersumber dari UserBokep. Kami bukan situs UserBokep dan tidak berafiliasi dengan mereka; kami hanya mengumpulkan video dari sumber itu ke satu daftar supaya gampang ditonton. Urutannya dari video yang paling baru masuk, jadi tiap ada tambahan langsung muncul di atas. Isinya rekaman amatir dengan pemeran dewasa, dan judul yang tidak pantas sudah disaring. Video diputar langsung di browser HP tanpa daftar akun. Halaman ini tanpa iklan banner. Mau video dari sumber lain juga? Buka halaman IndoAV atau beranda lewat tautan di bawah.",
+      "Halaman ini berisi kumpulan video Indonesia terbaru di koleksidrpinguin.com yang bersumber dari UserBokep. Kami bukan situs UserBokep dan tidak berafiliasi dengan mereka; kami hanya mengumpulkan video dari sumber itu ke satu daftar supaya gampang ditonton. Urutannya dari video yang paling baru masuk, jadi tiap ada tambahan langsung muncul di atas. Isinya rekaman amatir dengan pemeran dewasa, dan judul yang tidak pantas sudah disaring. Video diputar langsung di browser HP tanpa daftar akun. Mau video dari sumber lain juga? Buka halaman IndoAV atau beranda lewat tautan di bawah.",
     queries: ["userbokep", "bokep userbokep", "userbokep indo", "user bokep"],
   },
 ];
@@ -331,8 +330,8 @@ export function findLanding(slug: string | undefined | null): LandingDef | undef
   return LANDINGS.find((l) => l.slug === s);
 }
 
-/** True for ad-free source pages (/cari/<adFree slug> and its /halaman/N pages, any language prefix).
- * Used to keep the Wynq site tag (which can also inject pop/push formats) off those pages. */
+/** True for /cari/<adFree slug> and its /halaman/N pages (any language prefix) when that landing sets adFree.
+ * Used to keep the Wynq site tag (which can also inject pop/push formats) off those pages. No landing is ad-free today. */
 export function isAdFreePath(path: string | undefined | null): boolean {
   const m = /^(?:\/(?:ms|id|en))?\/cari\/([a-z0-9-]+)(?:\/halaman\/[1-9]\d*)?\/?$/i.exec(String(path || "").split(/[?#]/)[0]);
   return Boolean(m && findLanding(m[1])?.adFree);
