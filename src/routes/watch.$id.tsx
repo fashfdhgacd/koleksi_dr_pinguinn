@@ -75,7 +75,7 @@ export const Route = createFileRoute("/watch/$id")({
   head: ({ loaderData }) => {
     const ok = loaderData && loaderData.ok === true && loaderData.type === "detail";
     const item = ok ? loaderData.item : null;
-    // Placeholder / non-Latin titles get a search-friendly generated title (head only; H1 unchanged).
+    // Placeholder titles get a search-friendly generated title (head only; H1 unchanged).
     const gen = item ? generatedVideoSeo(item) : null;
     const curatedTitle = item ? curatedSeoTitle(item.id) : "";
     const title = curatedTitle
