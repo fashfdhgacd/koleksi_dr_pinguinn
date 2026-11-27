@@ -331,6 +331,13 @@ export function findLanding(slug: string | undefined | null): LandingDef | undef
   return LANDINGS.find((l) => l.slug === s);
 }
 
+/** True for ad-free source pages (/cari/<adFree slug> and its /halaman/N pages, any language prefix).
+ * Used to keep the Wynq site tag (which can also inject pop/push formats) off those pages. */
+export function isAdFreePath(path: string | undefined | null): boolean {
+  const m = /^(?:\/(?:ms|id|en))?\/cari\/([a-z0-9-]+)(?:\/halaman\/[1-9]\d*)?\/?$/i.exec(String(path || "").split(/[?#]/)[0]);
+  return Boolean(m && findLanding(m[1])?.adFree);
+}
+
 /** First genre landing for a category slug, used as the /cari link on a watch page. */
 export function landingForCategory(category: string | undefined | null): LandingDef | undefined {
   const s = String(category || "").trim().toLowerCase();
