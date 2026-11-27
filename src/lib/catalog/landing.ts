@@ -20,7 +20,7 @@ export type LandingDef = {
   sources?: string[];
   /** "latest" keeps feed order (newest first); default sorts by views. */
   order?: "views" | "latest";
-  /** No grid ad slots and no card-click popunder on this page when set. No current landing uses it. */
+  /** No grid ad slots on this page when set. No current landing uses it. */
   adFree?: boolean;
   /** Optional extra title filter inside the category (case-insensitive). */
   match?: RegExp;

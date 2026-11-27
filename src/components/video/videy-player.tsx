@@ -19,10 +19,11 @@ import { loadVast, ping, prerollDue, VAST_TIMEOUT_MS, type VastAd } from "@/comp
  * Fullscreen (native video button): a landscape video locks the screen to landscape where the
  * browser allows it, and unlocks on exit.
  *
- * TrafficStars popunder (ts-videy-popunder.tsx): the first poster tap opens the direct link and
+ * TrafficStars popunder (ts-videy-popunder.tsx): the first poster/start tap opens the direct link and
  * does not start playback (the next tap plays). During playback, a one-shot PopTapLayer re-arms
- * after pause (and after POP_MIN_GAP_MS) so resume-after-pause can add pops up to POP_MAX_VIDEY (6)
- * per video. After 2 blocked opens the tap is allowed to play so ad-blocker visitors are never stuck.
+ * after POP_MIN_GAP_MS (5s) so later player-control taps (play/resume, seek, speed) can add pops
+ * up to POP_MAX_VIDEY (3) per video. After 2 blocked opens the tap is allowed to play so ad-blocker
+ * visitors are never stuck.
  *
  * Kesehatan player (/pemilik): the same /api/player-log beacons as the other hosts, once per video
  * per session (src/lib/player-log-client.ts), host "Videy":
@@ -393,7 +394,7 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
     if (phase !== "idle") return;
     // First tap is the ad (video stays on the poster). popTap() returns true when this tap was
     // used for the popunder or a blocked retry; the next tap, or a tap after 2 blocks, plays.
-    // Later resume-after-pause pops go through PopTapLayer (cap 6/video, 20s gap).
+    // Later control taps (play/resume, seek, speed) go through PopTapLayer (cap 3/video, 5s gap).
     if (popTap(item.id)) return;
     if (!prerollDue()) {
       playFilm();
@@ -488,7 +489,7 @@ export function VideyPlayer({ item }: { item: VideoDetail }) {
         <source src={file} />
       </video>
       {phase === "main" ? (
-        // Re-armed popunder tap during playback (shared per-video cap); removes itself after firing.
+        // Re-armed popunder layer during playback (cap 3/video, 5s gap); intercepts later control taps, then removes itself.
         <PopTapLayer
           videoId={item.id}
           host="Videy"

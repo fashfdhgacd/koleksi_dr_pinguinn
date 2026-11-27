@@ -3,7 +3,6 @@ import { isRealMinor } from "@/lib/minor-terms";
 import { Skeleton } from "@/components/ui/skeleton";
 import { GridAd } from "@/components/grid-ad";
 import { planGrid } from "@/lib/grid-ads";
-import { onCatalogCardClick } from "@/components/card-popunder";
 import { VideoCard } from "./video-card";
 import { useEffect } from "react";
 import { restoreCatalogScroll } from "@/lib/catalog/last-catalog";
@@ -32,7 +31,7 @@ export function VideoGrid({
   eagerCount?: number;
   /** Use the catalog layout and existing catalog ad placements. */
   ads?: boolean;
-  /** Keep the catalog layout but render no ad slots and no card-click popunder (IndoAV source pages). */
+  /** Keep the catalog layout but render no ad slots. */
   adFree?: boolean;
 }) {
   const shown = visibleCards(items);
@@ -43,11 +42,7 @@ export function VideoGrid({
     if (ads && hasItems) restoreCatalogScroll();
   }, [ads, hasItems]);
   return (
-    <div
-      className={ads ? CATALOG_GRID : DEFAULT_GRID}
-      // Catalog grids only: first video-card click per session also opens the popunder.
-      onClickCapture={ads && !adFree ? (e) => onCatalogCardClick(e, (id) => String(shown.find((v) => v.id === id)?.creator || "")) : undefined}
-    >
+    <div className={ads ? CATALOG_GRID : DEFAULT_GRID}>
       {/* Exactly 6 ads per breakpoint on every page, each its own zone (src/lib/grid-ads.ts); trailing videos
           hidden per breakpoint so rows stay full. Flat list with stable keys: a re-render keeps every mounted
           ad slot (no second request). */}

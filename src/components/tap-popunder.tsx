@@ -2,10 +2,14 @@
 // tap opens an ad tab, the next tap reaches the player). A transparent layer sits over the player
 // while the cap (card-popunder.ts: per-video count + POP_MIN_GAP_MS, plus the shared
 // PAGE_POP_MAX_PER_DAY Jakarta-day counter for non-Videy hosts) allows a pop.
+// Non-Videy hosts: one pop on the first play tap, then the layer stays off.
+// Videy: pop #1 is the poster/start tap (ts-videy-popunder.tsx); this layer re-arms for pops #2 and
+// #3 on later control taps (play/resume, seek, speed) after the 5s gap.
 // Its tap fires our popunder and the layer removes itself, so the next tap goes to the player /
 // iframe (whose own ad then runs on its own tap, never in the same tap as ours).
 // Re-arming without timers: the layer comes back only on a page event (tab visible again, window
-// focus/blur, scroll, or our own <video>'s play/pause/timeupdate events) when canPop() says the gap has passed and this video has pops left.
+// focus/blur, scroll, or our own <video>'s play/pause/timeupdate/seeked/ratechange events) when
+// canPop() says the gap has passed and this video has pops left.
 // Not used for ads: it never covers an ad unit, only the video player.
 import { useEffect, useState, type RefObject } from "react";
 import { canPop, firePop, popHost, popMaxFor } from "@/components/card-popunder";
@@ -43,7 +47,7 @@ export function PopTapLayer({
     window.addEventListener("blur", check);
     window.addEventListener("scroll", check, { passive: true });
     const media = mediaRef?.current ?? null;
-    const mediaEvents = ["timeupdate", "pause", "play"] as const;
+    const mediaEvents = ["timeupdate", "pause", "play", "seeking", "seeked", "ratechange"] as const;
     for (const e of mediaEvents) media?.addEventListener(e, check);
     return () => {
       for (const e of mediaEvents) media?.removeEventListener(e, check);

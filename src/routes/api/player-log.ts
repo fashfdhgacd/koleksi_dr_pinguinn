@@ -81,11 +81,11 @@ const EVENTS: Record<string, number> = {
   pop_fire: 1,
   pop_ok: 1,
   pop_block: 1,
-  // Catalog card-click popunder (card-popunder.ts), once per session: same three steps.
+  // Legacy catalog card-click popunder counters (no longer emitted; kept so old rows still roll up).
   popc_fire: 1,
   popc_ok: 1,
   popc_block: 1,
-  // Every opened popunder tab by its position for that video (card-popunder.ts firePop): 1st..6th.
+  // Every opened popunder tab by its position for that video (card-popunder.ts firePop): 1st..6th (Videy now caps at 3).
   pop_n1: 1,
   pop_n2: 1,
   pop_n3: 1,
