@@ -2,7 +2,8 @@
 // the one-shot tap layer over iframe players (tap-popunder.tsx) and the Videy player
 // (ts-videy-popunder.tsx). Catalog, hero, category, pagination, and "Muat lagi"
 // clicks never fire a popunder.
-// In-video taps keep the per-video cap below (sessionStorage, resets when another video is opened).
+// In-video taps keep the per-video cap below: each of the last 50 videos keeps its own count for
+// 24h (localStorage, src/lib/pop-memory.ts), so going back to an earlier video does not reset it.
 // Non-Videy player taps share one daily counter. Blocked tabs consume no slot.
 // Videy player taps use the per-video allowance only (independent of the daily cap).
 // Counters: pop_fire / pop_ok / pop_block in player-log (once per video+event per session).
@@ -11,6 +12,7 @@
 // TrafficStars' paid impressions instead of only the first tab per video.
 import { sendPlayerLog, type PlayerLogHost } from "@/lib/player-log-client";
 import { nextPagePop, pagePopAllowed, type PagePopDay } from "@/lib/page-pop-cap";
+import { parsePopMemory, popEntry, prunePopMemory, recordPop, type PopEntry } from "@/lib/pop-memory";
 
 const DIRECT_LINK = "https://fozekikikiminu.com/api/v1/direct/587547ff73c844b39ab9f02d1285154b";
 const HOSTS = new Set(["IndoAV", "UserBokep", "Streamtape", "Putarin", "Videy", "Arsip"]);
@@ -28,27 +30,23 @@ export function popMaxFor(host: string): number {
   return host === "Videy" ? POP_MAX_VIDEY : POP_MAX_OTHER;
 }
 
-const KEY = "kdp_pop_v1";
-type PopState = { id: string; n: number; at: number };
-let mem: PopState = { id: "", n: 0, at: 0 };
+const KEY = "kdp_pop_v2";
+let mem: PopEntry[] = [];
 
-function readState(): PopState {
+function readMemory(now: number): PopEntry[] {
   try {
-    const raw = sessionStorage.getItem(KEY);
-    if (raw) {
-      const v = JSON.parse(raw) as PopState;
-      if (v && typeof v.id === "string" && typeof v.n === "number" && typeof v.at === "number") return v;
-    }
+    const raw = localStorage.getItem(KEY);
+    if (raw !== null) return parsePopMemory(raw, now);
   } catch {
     /* fall back to memory */
   }
-  return mem;
+  return prunePopMemory(mem, now);
 }
 
-function writeState(v: PopState): void {
-  mem = v;
+function writeMemory(list: PopEntry[]): void {
+  mem = list;
   try {
-    sessionStorage.setItem(KEY, JSON.stringify(v));
+    localStorage.setItem(KEY, JSON.stringify(list));
   } catch {
     /* in-memory only */
   }
@@ -58,16 +56,17 @@ function writeState(v: PopState): void {
 export function canPop(videoId: string, max: number, daily = true): boolean {
   if (typeof window === "undefined" || !videoId) return false;
   if (daily && !pagePopAllowed(readPagePop(), Date.now())) return false;
-  const st = readState();
-  if (st.id !== videoId) return true; // another video: fresh count, no gap
-  return st.n < max && Date.now() - st.at >= POP_MIN_GAP_MS;
+  const now = Date.now();
+  const e = popEntry(readMemory(now), videoId, now);
+  if (!e) return true; // this video has not popped yet (or its entry expired): no gap
+  return e.n < max && now - e.at >= POP_MIN_GAP_MS;
 }
 
 /** True when this video can still get a popunder later (count not used up), ignoring the gap. */
 export function popsLeft(videoId: string, max: number): boolean {
   if (typeof window === "undefined" || !videoId) return false;
-  const st = readState();
-  return (st.id === videoId ? st.n : 0) < max;
+  const now = Date.now();
+  return (popEntry(readMemory(now), videoId, now)?.n ?? 0) < max;
 }
 
 /**
@@ -89,9 +88,10 @@ export function firePop(
     w = null;
   }
   if (!w) return "block";
-  const st = readState();
-  const n = (st.id === videoId ? st.n : 0) + 1;
-  writeState({ id: videoId, n, at: Date.now() });
+  const now = Date.now();
+  const list = recordPop(readMemory(now), videoId, now);
+  writeMemory(list);
+  const n = popEntry(list, videoId, now)?.n ?? 1;
   // Daily-capped triggers consume one slot of the shared Jakarta-day counter.
   if (daily) writePagePop(nextPagePop(readPagePop(), Date.now()));
   if (host && n >= 1 && n <= 6) {
