@@ -13,6 +13,11 @@ const DEFAULT_GRID =
 const CATALOG_GRID =
   "relative left-1/2 grid w-full max-w-screen-2xl -translate-x-1/2 auto-rows-fr grid-cols-1 gap-3 lg:w-[calc(100%+2rem)] lg:grid-cols-3 lg:gap-4";
 
+/** Show a cell on one breakpoint only (lg = laptop). */
+const BP_ONLY = { mobile: "lg:hidden", desktop: "hidden lg:block" } as const;
+/** Hide classes for a video cell by [hidden on mobile][hidden on desktop]. */
+const HIDE: Record<string, string> = { "00": "", "10": "hidden lg:block", "01": "lg:hidden", "11": "hidden" };
+
 function visibleCards(items: VideoCardType[]): VideoCardType[] {
   return items.filter((video) => !isRealMinor({ title: video.title, tags: video.category }));
 }
@@ -43,16 +48,22 @@ export function VideoGrid({
       // Catalog grids only: first video-card click per session also opens the popunder.
       onClickCapture={ads && !adFree ? (e) => onCatalogCardClick(e, (id) => String(shown.find((v) => v.id === id)?.creator || "")) : undefined}
     >
-      {/* Max 6 ads per breakpoint, each its own zone (src/lib/grid-ads.ts). Flat list with stable keys:
-          a re-render keeps every mounted ad slot (no second request). */}
+      {/* Exactly 6 ads per breakpoint on every page, each its own zone (src/lib/grid-ads.ts); trailing videos
+          hidden per breakpoint so rows stay full. Flat list with stable keys: a re-render keeps every mounted
+          ad slot (no second request). */}
       {planGrid(shown.length, showAds).map((cell) => {
         if (cell.kind === "ad") {
-          return (
-            <GridAd key={cell.key} slot={cell.slot} className={cell.breakpoint === "mobile" ? "lg:hidden" : "hidden lg:block"} />
-          );
+          return <GridAd key={cell.key} slot={cell.slot} slotIndex={cell.slotIndex} className={BP_ONLY[cell.breakpoint]} />;
         }
         const video = shown[cell.index];
-        return <VideoCard key={video.id} video={video} catalog={ads} eager={cell.index < eagerCount} />;
+        const hide = HIDE[`${cell.hidden.mobile ? 1 : 0}${cell.hidden.desktop ? 1 : 0}`];
+        return hide ? (
+          <div key={video.id} className={hide}>
+            <VideoCard video={video} catalog={ads} eager={cell.index < eagerCount} />
+          </div>
+        ) : (
+          <VideoCard key={video.id} video={video} catalog={ads} eager={cell.index < eagerCount} />
+        );
       })}
     </div>
   );

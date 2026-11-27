@@ -2,11 +2,10 @@
 // __root.tsx) renders every <div data-bpid>. The div is added once, client-side, only when the slot
 // first nears the viewport (a slot hidden for the other breakpoint never gets one, so a bpid is never
 // on the page twice). Reserved 300x250 frame (no layout shift); if nothing with height > 20px appears
-// within 8s the cell is removed. No refresh / rotation.
+// within 8s onEmpty fires (GridAd swaps once to an ExoClick fallback zone; without one the frame stays).
+// No refresh / rotation.
 import { useEffect, useRef, useState } from "react";
-import { AdCardShell, onceNearViewport, useFitScale } from "@/components/ad-slot";
-
-const FILL_TIMEOUT_MS = 8000;
+import { AdCardShell, FILL_TIMEOUT_MS, onceNearViewport, useFitScale, useReportEmpty } from "@/components/ad-slot";
 
 function filled(el: HTMLElement): boolean {
   const slot = el.querySelector("[data-bpid]");
@@ -14,12 +13,13 @@ function filled(el: HTMLElement): boolean {
   return Array.from(slot.querySelectorAll("*")).some((c) => (c as HTMLElement).offsetHeight > 20);
 }
 
-export function WynqGridAd({ zoneId, className = "" }: { zoneId: string; className?: string }) {
+export function WynqGridAd({ zoneId, className = "", onEmpty }: { zoneId: string; className?: string; onEmpty?: () => void }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const innerRef = useRef<HTMLDivElement>(null);
   const placed = useRef(false);
   const [empty, setEmpty] = useState(false);
   const scale = useFitScale(frameRef);
+  useReportEmpty(empty, onEmpty);
 
   useEffect(() => {
     const frame = frameRef.current;
@@ -46,6 +46,5 @@ export function WynqGridAd({ zoneId, className = "" }: { zoneId: string; classNa
     };
   }, [zoneId]);
 
-  if (empty) return null;
   return <AdCardShell network="wynq" className={className} frameRef={frameRef} innerRef={innerRef} scale={scale} />;
 }
