@@ -158,9 +158,9 @@ test("buildRefPeriods: people, countries and popunders per period", () => {
     { day: "2026-11-26", views: 7, uniq: 3 },
   ];
   const pops = [
-    { day: "2026-11-28", host: "Videy", n: 4 },
-    { day: "2026-11-28", host: "IndoAV", n: 2 },
-    { day: "2026-11-27", host: "UserBokep", n: 6 },
+    { day: "2026-11-28", host: "Videy", n: 4, exo: 1, fail: 2 },
+    { day: "2026-11-28", host: "IndoAV", n: 2 }, // no exo/fail field: counts as TrafficStars
+    { day: "2026-11-27", host: "UserBokep", n: 6, exo: 3, fail: 1 },
   ];
   const [t, y, w] = buildRefPeriods(today, rows, { dayTotals, pops, distinct: { "7d": { cur: 11, prev: 0 } } });
   assert.deepEqual(t.people, { uniq: 5, views: 13, prevUniq: 8, prevViews: 20, exact: true });
@@ -170,8 +170,8 @@ test("buildRefPeriods: people, countries and popunders per period", () => {
     { key: "ID", uniq: 4, views: 10, prevUniq: 8 },
     { key: "SG", uniq: 1, views: 3, prevUniq: 0 },
   ]);
-  assert.deepEqual(t.pops, { videy: 4, other: 2, prevVidey: 0, prevOther: 6 });
-  assert.deepEqual(w.pops, { videy: 4, other: 8, prevVidey: 0, prevOther: 0 });
+  assert.deepEqual(t.pops, { videy: 4, other: 2, prevVidey: 0, prevOther: 6, exo: 1, prevExo: 3, fail: 2, prevFail: 1 });
+  assert.deepEqual(w.pops, { videy: 4, other: 8, prevVidey: 0, prevOther: 0, exo: 4, prevExo: 0, fail: 3, prevFail: 0 });
   const [, , , f] = buildRefPeriods(today, rows, { dayTotals });
   assert.equal(f.people.exact, false);
   assert.equal(f.people.uniq, 16);

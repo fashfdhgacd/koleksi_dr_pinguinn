@@ -92,6 +92,17 @@ const EVENTS: Record<string, number> = {
   pop_n4: 1,
   pop_n5: 1,
   pop_n6: 1,
+  // Of those, the ones opened by the ExoClick fallback (TrafficStars was blocked): pop_x<n> = nth tab on that video.
+  // No pop_x row = TrafficStars (also every row from before the fallback existed).
+  pop_x1: 1,
+  pop_x2: 1,
+  pop_x3: 1,
+  pop_x4: 1,
+  pop_x5: 1,
+  pop_x6: 1,
+  // Taps where neither TrafficStars nor ExoClick opened: 1st / 2nd failed try on that video.
+  pop_f1: 1,
+  pop_f2: 1,
   // Videy VAST pre-roll (videy-preroll.ts): requested / ad returned / played to the end.
   pre_req: 1,
   pre_fill: 1,
@@ -323,8 +334,8 @@ async function handleOwnerView(): Promise<Response> {
     }
   }
   // Videy popunder counters for today / yesterday (one small grouped read on the owner view).
-  type Pop = { fire: number; ok: number; block: number; cardFire: number; cardOk: number; cardBlock: number; preReq: number; preFill: number; preDone: number; preSkip: number; n1: number; n2: number; n3: number; n4: number; n5: number; n6: number };
-  const emptyPop = (): Pop => ({ fire: 0, ok: 0, block: 0, cardFire: 0, cardOk: 0, cardBlock: 0, preReq: 0, preFill: 0, preDone: 0, preSkip: 0, n1: 0, n2: 0, n3: 0, n4: 0, n5: 0, n6: 0 });
+  type Pop = { fire: number; ok: number; block: number; cardFire: number; cardOk: number; cardBlock: number; preReq: number; preFill: number; preDone: number; preSkip: number; n1: number; n2: number; n3: number; n4: number; n5: number; n6: number; exo: number; fail: number };
+  const emptyPop = (): Pop => ({ fire: 0, ok: 0, block: 0, cardFire: 0, cardOk: 0, cardBlock: 0, preReq: 0, preFill: 0, preDone: 0, preSkip: 0, n1: 0, n2: 0, n3: 0, n4: 0, n5: 0, n6: 0, exo: 0, fail: 0 });
   const popunder: Record<string, Pop> = {};
   if (db) {
     try {
@@ -333,7 +344,7 @@ async function handleOwnerView(): Promise<Response> {
           await db
             .prepare(
               `select day, event, sum(n) as n from player_errors
-               where day >= ? and event in ('pop_fire','pop_ok','pop_block','popc_fire','popc_ok','popc_block','pre_req','pre_fill','pre_done','pre_skip','pop_n1','pop_n2','pop_n3','pop_n4','pop_n5','pop_n6') group by day, event`,
+               where day >= ? and event in ('pop_fire','pop_ok','pop_block','popc_fire','popc_ok','popc_block','pre_req','pre_fill','pre_done','pre_skip','pop_n1','pop_n2','pop_n3','pop_n4','pop_n5','pop_n6','pop_x1','pop_x2','pop_x3','pop_x4','pop_x5','pop_x6','pop_f1','pop_f2') group by day, event`,
             )
             .bind(yesterday)
             .all<{ day: string; event: string; n: number }>()
@@ -341,7 +352,7 @@ async function handleOwnerView(): Promise<Response> {
       for (const r of rows) {
         const cur = (popunder[r.day] ||= emptyPop());
         const n = Number(r.n) || 0;
-        const key = ({ pop_fire: "fire", pop_ok: "ok", pop_block: "block", popc_fire: "cardFire", popc_ok: "cardOk", popc_block: "cardBlock", pre_req: "preReq", pre_fill: "preFill", pre_done: "preDone", pre_skip: "preSkip", pop_n1: "n1", pop_n2: "n2", pop_n3: "n3", pop_n4: "n4", pop_n5: "n5", pop_n6: "n6" } as const)[
+        const key = ({ pop_fire: "fire", pop_ok: "ok", pop_block: "block", popc_fire: "cardFire", popc_ok: "cardOk", popc_block: "cardBlock", pre_req: "preReq", pre_fill: "preFill", pre_done: "preDone", pre_skip: "preSkip", pop_n1: "n1", pop_n2: "n2", pop_n3: "n3", pop_n4: "n4", pop_n5: "n5", pop_n6: "n6", pop_x1: "exo", pop_x2: "exo", pop_x3: "exo", pop_x4: "exo", pop_x5: "exo", pop_x6: "exo", pop_f1: "fail", pop_f2: "fail" } as const)[
           r.event as "pop_fire"
         ];
         if (key) cur[key] += n;

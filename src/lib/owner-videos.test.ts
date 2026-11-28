@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mergeWatched, pageButtons, pageWatched, watchId, type WatchedList } from "./owner-videos.ts";
+import { mergeWatched, pageButtons, pageWatched, popOutcomes, watchId, type WatchedList } from "./owner-videos.ts";
 
 test("watchId keeps only /watch/<id> paths", () => {
   assert.equal(watchId("/watch/abc"), "abc");
@@ -34,6 +34,27 @@ test("mergeWatched joins views and popunders by video id", () => {
   );
 });
 
+test("mergeWatched splits popunders per video: TrafficStars = opened - ExoClick fallback, plus both-failed", () => {
+  const rows = mergeWatched(
+    [{ path: "/watch/a", views: 5, uniq: 3 }],
+    [
+      { id: "a", n: 4, exo: 1, fail: 2 },
+      { id: "old", n: 3 }, // old rows have no pop_x / pop_f: all TrafficStars
+      { id: "onlyfail", n: 0, fail: 1 }, // a video where every tap failed still shows up
+    ],
+  );
+  const by = Object.fromEntries(rows.map((r) => [r.id, r]));
+  assert.deepEqual([by.a.pops, by.a.popsExo, by.a.popsFail], [4, 1, 2]);
+  assert.deepEqual(popOutcomes(by.a.pops, by.a.popsExo, by.a.popsFail), { ts: 3, exo: 1, fail: 2 });
+  assert.deepEqual(popOutcomes(by.old.pops, by.old.popsExo, by.old.popsFail), { ts: 3, exo: 0, fail: 0 });
+  assert.deepEqual(popOutcomes(by.onlyfail.pops, by.onlyfail.popsExo, by.onlyfail.popsFail), { ts: 0, exo: 0, fail: 1 });
+});
+
+test("popOutcomes never goes negative and tolerates missing fields", () => {
+  assert.deepEqual(popOutcomes(2, 5, 0), { ts: 0, exo: 2, fail: 0 });
+  assert.deepEqual(popOutcomes(7, undefined as unknown as number, undefined as unknown as number), { ts: 7, exo: 0, fail: 0 });
+});
+
 function list(n: number): WatchedList {
   return {
     period: "today",
@@ -47,8 +68,10 @@ function list(n: number): WatchedList {
       views: n - i,
       uniq: 1,
       pops: i % 3,
+      popsExo: 0,
+      popsFail: 0,
     })),
-    totals: { views: 0, prevViews: 0, pops: { videy: 0, other: 0, prevVidey: 0, prevOther: 0 } },
+    totals: { views: 0, prevViews: 0, pops: { videy: 0, other: 0, prevVidey: 0, prevOther: 0, exo: 0, prevExo: 0, fail: 0, prevFail: 0 } },
     updatedAt: "",
   };
 }

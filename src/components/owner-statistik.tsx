@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fmt } from "@/components/owner-dashboard-shared";
 import { Bar, Card, COUNTRY, SourcesCard, wibClock } from "@/components/owner-stats14";
 import { PERIOD_KEYS, PERIOD_LABELS, type PeriodKey, type RefPeriod, type Stats14 } from "@/lib/stats14";
-import { pageButtons, type WatchedPage } from "@/lib/owner-videos";
+import { pageButtons, popOutcomes, type WatchedPage } from "@/lib/owner-videos";
 
 /**
  * /pemilik → "Statistik": jumlah orang, asal negara, popunder, sumber pengunjung and the "Video
@@ -146,12 +146,24 @@ function CountryCard(props: { p: RefPeriod }) {
   );
 }
 
+/** TrafficStars / ExoClick (cadangan) / Gagal dua-duanya, small text under a popunder number. */
+function PopBrands(props: { total: number; exo?: number; fail?: number; className?: string }) {
+  const o = popOutcomes(props.total, props.exo || 0, props.fail || 0);
+  return (
+    <span className={props.className || "block text-[11px] text-zinc-500"}>
+      TrafficStars {fmt(o.ts)} · ExoClick (cadangan) {fmt(o.exo)} · Gagal dua-duanya {fmt(o.fail)}
+    </span>
+  );
+}
+
 function PopCard(props: { p: RefPeriod; videos: WatchedPage | null }) {
   const { p, videos } = props;
   const pops = videos?.totals.pops || p.pops;
   if (!pops) return null;
   const total = pops.videy + pops.other;
   const prev = pops.prevVidey + pops.prevOther;
+  const now = popOutcomes(total, pops.exo, pops.fail);
+  const before = popOutcomes(prev, pops.prevExo, pops.prevFail);
   const views = videos?.totals.views;
   return (
     <Card title={`Popunder · ${p.label}`}>
@@ -181,10 +193,31 @@ function PopCard(props: { p: RefPeriod; videos: WatchedPage | null }) {
             {fmt(pops.other)} <span className="text-[11px] text-zinc-500">({fmt(pops.prevOther)})</span>
           </span>
         </li>
+        <li className="flex justify-between gap-2">
+          <span className="text-zinc-400">TrafficStars</span>
+          <span className="tabular-nums text-zinc-200">
+            {fmt(now.ts)} <span className="text-[11px] text-zinc-500">({fmt(before.ts)})</span>
+          </span>
+        </li>
+        <li className="flex justify-between gap-2">
+          <span className="text-zinc-400">ExoClick (cadangan)</span>
+          <span className="tabular-nums text-zinc-200">
+            {fmt(now.exo)} <span className="text-[11px] text-zinc-500">({fmt(before.exo)})</span>
+          </span>
+        </li>
+        <li className="flex justify-between gap-2">
+          <span className="text-zinc-400">Gagal dua-duanya</span>
+          <span className="tabular-nums text-zinc-200">
+            {fmt(now.fail)} <span className="text-[11px] text-zinc-500">({fmt(before.fail)})</span>
+          </span>
+        </li>
       </ul>
       <p className="mt-3 text-[12px] text-zinc-500">
-        Popunder = tab iklan yang benar-benar terbuka saat pengunjung tap play (yang diblokir browser tidak dihitung).
-        Videy maks 3× per video, lainnya 1× per video. Tontonan = halaman video dibuka. Data popunder mulai 2 Nov 2026.
+        Popunder = tab iklan yang benar-benar terbuka saat pengunjung tap play. TrafficStars keluar dulu; kalau diblokir
+        browser, ExoClick (cadangan) keluar di tap yang sama, tidak pernah dua-duanya. Gagal dua-duanya = tap yang
+        tidak membuka tab sama sekali (tidak masuk jumlah popunder). Data sebelum ExoClick cadangan dihitung sebagai
+        TrafficStars. Videy maks 3× per video, lainnya 1× per video. Tontonan = halaman video dibuka. Data popunder
+        mulai 2 Nov 2026.
       </p>
     </Card>
   );
@@ -262,6 +295,9 @@ function VideoTable(props: {
                   <p className="mt-0.5 text-[12px] tabular-nums text-zinc-300">
                     <b style={{ color: TEAL }}>{fmt(r.views)}</b> ditonton · <b className="text-zinc-100">{fmt(r.pops)}</b> popunder
                   </p>
+                  <p className="text-[11px] tabular-nums text-zinc-500">
+                    <PopBrands total={r.pops} exo={r.popsExo} fail={r.popsFail} className="" />
+                  </p>
                   <p className="text-[11px] text-zinc-500">
                     {dateWib(r.up)}
                     {r.server ? ` · ${r.server}` : ""}
@@ -306,7 +342,10 @@ function VideoTable(props: {
                     <td className="py-2 pl-3 text-right font-semibold tabular-nums" style={{ color: TEAL }}>
                       {fmt(r.views)}
                     </td>
-                    <td className="py-2 pl-3 text-right tabular-nums text-zinc-200">{fmt(r.pops)}</td>
+                    <td className="py-2 pl-3 text-right tabular-nums text-zinc-200">
+                      {fmt(r.pops)}
+                      <PopBrands total={r.pops} exo={r.popsExo} fail={r.popsFail} />
+                    </td>
                     <td className="whitespace-nowrap py-2 pl-3 text-zinc-400">{dateWib(r.up)}</td>
                     <td className="py-2 pl-3 text-[12px] text-zinc-400">
                       {r.cat ? catLabel(r.cat) : "—"}
@@ -340,7 +379,7 @@ function VideoTable(props: {
             </nav>
           ) : null}
           <p className="mt-3 text-[12px] text-zinc-500">
-            Ditonton = halaman video dibuka dalam periode ini. Popunder = tab iklan yang terbuka di video itu. 10 video per
+            Ditonton = halaman video dibuka dalam periode ini. Popunder = tab iklan yang terbuka di video itu, dipecah: TrafficStars, ExoClick (cadangan), dan tap yang gagal dua-duanya. 10 video per
             halaman. Diperbarui paling lama tiap 10 menit{data.updatedAt ? ` (${wibClock(data.updatedAt)} WIB)` : ""}.
           </p>
         </>

@@ -63,7 +63,7 @@ export const SPOT_FIELDS: { key: SpotKey; label: string }[] = [
 ];
 
 export const AD_RULES_LABEL =
-  "Popunder hanya saat pengunjung mengetuk play di pemutar, bukan saat ganti kategori, pilih kartu, atau pindah halaman. Videy maksimal 3 kali per video (tap putar pertama, lalu tap kontrol pemutar dengan jeda minimal 5 detik). Host lain 1 kali di tap pertama pemutar. Tidak ada batas harian per pengunjung. Tidak pernah di IndoAV.";
+  "Popunder hanya saat pengunjung mengetuk play di pemutar, bukan saat ganti kategori, pilih kartu, atau pindah halaman. Situs utama: TrafficStars keluar dulu, kalau diblokir browser ExoClick keluar sebagai cadangan di tap yang sama (tidak pernah dua-duanya; tetap 1 popunder per tap). Videy maksimal 3 kali per video (tap putar pertama, lalu tap kontrol pemutar dengan jeda minimal 5 detik). Host lain 1 kali di tap pertama pemutar. Tidak ada batas harian per pengunjung. Tidak pernah di IndoAV.";
 
 const ID_RE = /^[A-Za-z0-9_-]{3,64}$/;
 const SPOT_RE = /^\d{1,12}$/;
