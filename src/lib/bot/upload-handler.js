@@ -20,7 +20,7 @@ import { uploadModeration } from "@/lib/catalog/moderation.js";
 import { hasJavCode, uploadRejectReason, uploadWarnReason } from "@/lib/bot/title-guard.js";
 import { HOLD_REASON, explainTerm, holdReplyLines, isHeldDraftReason, titleHold, uploadAction } from "@/lib/bot/title-hold.js";
 import { isGenericTitle } from "@/lib/catalog/generic-title.js";
-import { guardGivenCategory } from "@/lib/bot/category-guard.js";
+import { guardGivenCategory, hasGayCue } from "@/lib/bot/category-guard.js";
 import { hasEpisodeMarker, hasEpisodeWord } from "@/lib/catalog/series";
 import { embedDomainOf, readEmbedHosts } from "@/lib/embed-hosts.js";
 
@@ -50,9 +50,14 @@ async function rawCatalogItems() {
 const DRP_HOSTS = new Set(["lulu", "dood", "byse", "byse-probe", "mxdrop", "vidara"]);
 /**
  * Owner rule 2026-11-28: "Episode" in the title = AI Drama, even on his own hosts; else "bokep".
+ * Gay content wins over that Episode rule (title cue or an explicit AI GAY category from the
+ * message). Other given categories are ignored here so own-host uploads stay in bokep / AI Drama.
  * @param {string} baseTitle
+ * @param {string} [given]
  */
-export function drpUploadCategory(baseTitle) {
+export function drpUploadCategory(baseTitle, given) {
+  const g = String(given || "").toLowerCase().trim();
+  if (g === "ai-gay" || hasGayCue(baseTitle)) return "ai-gay";
   return hasEpisodeWord(baseTitle) ? "ai-plus" : DRP_CATEGORY;
 }
 function isDrpHost(host) {
@@ -499,13 +504,13 @@ export async function processUploadBatch({ token, chatId, text, env, tgSend, tgS
     const detected = detectCategory(baseTitle);
     const category =
       isDrpHost(video.host)
-        ? drpUploadCategory(baseTitle)
+        ? drpUploadCategory(baseTitle, given)
         : video.host === "videy"
         ? "videy"
         : video.host === "putarin" || video.host === "putarin-folder"
         ? given || "jav"
         : video.host === "streamtape"
-          ? given || (hasEpisodeMarker(baseTitle) ? "ai-plus" : detected !== "lainnya" ? detected : "lainnya")
+          ? given || (hasGayCue(baseTitle) ? "ai-gay" : hasEpisodeMarker(baseTitle) ? "ai-plus" : detected !== "lainnya" ? detected : "lainnya")
           : !generic
             ? given
             : detected !== "lainnya"
