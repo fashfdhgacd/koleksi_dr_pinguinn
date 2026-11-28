@@ -4,7 +4,9 @@
  *
  * One row per video id: `views` = video page opens (/watch/<id> pageviews, sample-weighted) in the
  * period, `uniq` = distinct visitors who opened it, `pops` = popunder tabs opened on that video
- * (player-log pop_n1..n6 daily counters, which carry the video id).
+ * (player-log pop_n1..n6 daily counters, which carry the video id), of which `popsExo` were opened by the
+ * ExoClick fallback (pop_x1..x6; the rest are TrafficStars, and rows from before the fallback have no
+ * pop_x, so they count as TrafficStars) and `popsFail` = taps where neither brand opened (pop_f1/f2).
  */
 import type { PeriodKey } from "./stats14.ts";
 
@@ -25,10 +27,33 @@ export type WatchedVideo = {
   up: number;
   views: number;
   uniq: number;
+  /** Popunder tabs opened on this video (TrafficStars + ExoClick fallback). */
   pops: number;
+  /** Of `pops`, opened by the ExoClick fallback. TrafficStars = pops - popsExo. */
+  popsExo: number;
+  /** Taps on this video where neither TrafficStars nor ExoClick opened. */
+  popsFail: number;
 };
 
-export type PopTotals = { videy: number; other: number; prevVidey: number; prevOther: number };
+export type PopTotals = {
+  videy: number;
+  other: number;
+  prevVidey: number;
+  prevOther: number;
+  /** Of videy + other, opened by the ExoClick fallback (TrafficStars = total - exo). */
+  exo: number;
+  prevExo: number;
+  /** Taps where neither brand opened. */
+  fail: number;
+  prevFail: number;
+};
+
+/** The three outcomes shown in /pemilik: TrafficStars opened, ExoClick fallback opened, both failed. */
+export function popOutcomes(total: number, exo: number, fail: number): { ts: number; exo: number; fail: number } {
+  const t = Math.max(0, Math.round(Number(total) || 0));
+  const e = Math.min(t, Math.max(0, Math.round(Number(exo) || 0)));
+  return { ts: t - e, exo: e, fail: Math.max(0, Math.round(Number(fail) || 0)) };
+}
 
 export type WatchedList = {
   period: PeriodKey;
@@ -70,12 +95,12 @@ export function watchId(path: string): string {
  */
 export function mergeWatched(
   viewRows: { path: string; views: number; uniq: number }[],
-  popRows: { id: string; n: number }[],
+  popRows: { id: string; n: number; exo?: number; fail?: number }[],
 ): WatchedVideo[] {
   const m = new Map<string, WatchedVideo>();
   const get = (id: string) => {
     let r = m.get(id);
-    if (!r) m.set(id, (r = { id, title: "", thumb: "", cat: "", server: "", up: 0, views: 0, uniq: 0, pops: 0 }));
+    if (!r) m.set(id, (r = { id, title: "", thumb: "", cat: "", server: "", up: 0, views: 0, uniq: 0, pops: 0, popsExo: 0, popsFail: 0 }));
     return r;
   };
   for (const v of viewRows) {
@@ -88,8 +113,13 @@ export function mergeWatched(
   for (const p of popRows) {
     const id = String(p.id || "");
     const n = Math.max(0, Math.round(Number(p.n) || 0));
-    if (!id || !n) continue;
-    get(id).pops += n;
+    const exo = Math.max(0, Math.round(Number(p.exo) || 0));
+    const fail = Math.max(0, Math.round(Number(p.fail) || 0));
+    if (!id || (!n && !fail)) continue;
+    const r = get(id);
+    r.pops += n;
+    r.popsExo += exo;
+    r.popsFail += fail;
   }
   return [...m.values()].sort((a, b) => b.views - a.views || b.pops - a.pops);
 }

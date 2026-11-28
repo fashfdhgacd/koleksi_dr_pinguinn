@@ -33,7 +33,7 @@ export type PlayerLogRow = {
   hidden: boolean;
 };
 
-type PopCounts = { fire: number; ok: number; block: number; cardFire?: number; cardOk?: number; cardBlock?: number; preReq?: number; preFill?: number; preDone?: number; preSkip?: number; n1?: number; n2?: number; n3?: number; n4?: number; n5?: number; n6?: number };
+type PopCounts = { fire: number; ok: number; block: number; cardFire?: number; cardOk?: number; cardBlock?: number; preReq?: number; preFill?: number; preDone?: number; preSkip?: number; n1?: number; n2?: number; n3?: number; n4?: number; n5?: number; n6?: number; exo?: number; fail?: number };
 
 export type PlayerLogData = {
   ok?: boolean;
@@ -534,9 +534,9 @@ export function StatusCard(props: {
       note: pop
         ? `Hitungan web sendiri (tap pemutar saja, mulai 00.00 WIB): ${
             siteAll > 0
-              ? `${fmt(siteAll)} tab iklan terbuka (ke-1 ${fmt(pop.today.n1 || 0)}, ke-2 ${fmt(pop.today.n2 || 0)}, ke-3 ${fmt(pop.today.n3 || 0)}; ke-2 dan ke-3 cuma dari Videy)`
+              ? `${fmt(siteAll)} tab iklan terbuka (ke-1 ${fmt(pop.today.n1 || 0)}, ke-2 ${fmt(pop.today.n2 || 0)}, ke-3 ${fmt(pop.today.n3 || 0)}; ke-2 dan ke-3 cuma dari Videy; ${fmt(Math.max(0, siteAll - (pop.today.exo || 0)))} TrafficStars, ${fmt(pop.today.exo || 0)} ExoClick (cadangan))`
               : `${fmt(siteOk)} tab iklan terbuka`
-          }, ${fmt(siteBlock)} diblok browser. Aturannya: server biasa 1x per video saat play, Videy maksimal 3x per video (jeda minimal 5 detik). Ini bukan angka bayaran: jam mulainya beda 7 jam (TrafficStars mulai 07.00 WIB) dan data TrafficStars baru masuk 2x sehari. Yang dibayar angka TrafficStars di atas.`
+          }, ${fmt(siteBlock)} gagal dua-duanya (tidak ada tab yang terbuka). Aturannya: TrafficStars keluar dulu, ExoClick cuma cadangan kalau diblokir;  server biasa 1x per video saat play, Videy maksimal 3x per video (jeda minimal 5 detik). Ini bukan angka bayaran: jam mulainya beda 7 jam (TrafficStars mulai 07.00 WIB) dan data TrafficStars baru masuk 2x sehari. Yang dibayar angka TrafficStars di atas.`
         : undefined,
     },
     {

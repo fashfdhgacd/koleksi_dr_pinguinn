@@ -5,9 +5,10 @@
 // No daily cap. Opened -> the tap does nothing else (next tap
 // plays or reaches the control); blocked -> the next tap retries, and after 2 blocked tries per
 // video the tap plays so ad-blocker visitors are never stuck.
-// Counters (player-log, once per video per session): pop_fire / pop_ok / pop_block.
+// Counters (player-log, once per video per session): pop_fire / pop_ok (a tab opened, TrafficStars or the
+// ExoClick fallback) / pop_block (neither opened) + pop_f1/pop_f2 (1st/2nd failed try); pop_x<n> marks a pop opened by ExoClick.
 import { sendPlayerLog } from "@/lib/player-log-client";
-import { canPop, firePop, POP_MAX_VIDEY } from "@/components/card-popunder";
+import { canPop, firePop, popOpened, POP_MAX_VIDEY } from "@/components/card-popunder";
 
 const MAX_FAILS = 2;
 const failures = new Map<string, number>();
@@ -25,14 +26,16 @@ export function popTap(videoId: string): boolean {
   if (!owesAd(videoId)) return false;
   sendPlayerLog(videoId, "Videy", "pop_fire");
   const r = firePop(videoId, POP_MAX_VIDEY, "Videy");
-  if (r === "ok") {
+  if (popOpened(r)) {
     sendPlayerLog(videoId, "Videy", "pop_ok");
     return true;
   }
   // "skip" = a cap or gap said no (per-video) — let the tap play, not a blocker.
   if (r === "skip") return false;
+  // Neither TrafficStars nor the ExoClick fallback opened.
   sendPlayerLog(videoId, "Videy", "pop_block");
   const n = (failures.get(videoId) || 0) + 1;
   failures.set(videoId, n);
+  if (n <= 2) sendPlayerLog(videoId, "Videy", n === 1 ? "pop_f1" : "pop_f2");
   return n < MAX_FAILS;
 }

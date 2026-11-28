@@ -11,7 +11,7 @@
 // canPop() says the gap has passed and this video has pops left.
 // Not used for ads: it never covers an ad unit, only the video player.
 import { useEffect, useState, type RefObject } from "react";
-import { canPop, firePop, popHost, popMaxFor } from "@/components/card-popunder";
+import { canPop, firePop, popHost, popMaxFor, popOpened } from "@/components/card-popunder";
 import { sendPlayerLog } from "@/lib/player-log-client";
 
 const MAX_FAILS = 2;
@@ -76,7 +76,7 @@ export function PopTapLayer({
         }
         sendPlayerLog(videoId, lh, "pop_fire");
         const r = firePop(videoId, max, lh);
-        if (r === "ok") {
+        if (popOpened(r)) {
           sendPlayerLog(videoId, lh, "pop_ok");
           setArmed(false);
           return;
@@ -87,8 +87,10 @@ export function PopTapLayer({
           setArmed(false);
           return;
         }
+        // Neither TrafficStars nor the ExoClick fallback opened.
         sendPlayerLog(videoId, lh, "pop_block");
         const n = fails + 1;
+        if (n <= 2) sendPlayerLog(videoId, lh, n === 1 ? "pop_f1" : "pop_f2");
         setFails(n);
         if (n >= MAX_FAILS) onPass?.();
       }}
