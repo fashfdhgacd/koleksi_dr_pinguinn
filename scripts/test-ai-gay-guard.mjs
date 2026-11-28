@@ -3,7 +3,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { guardGivenCategory, hasGayCue } from "../src/lib/bot/category-guard.js";
-import { parseMessage } from "../src/lib/bot/parse.js";
+import { parseMessage, detectCategory } from "../src/lib/bot/parse.js";
 
 const straight = [
   "Bokep Indo Miss Beelzewbub Tiktokers Tobrut Ngentot Pake Lingerie Hitam",
@@ -53,3 +53,12 @@ test("parseMessage: no AI GAY signal => no ai-gay category, even with 'gaya'", (
   const msg = parseMessage("https://tv1.indoav.app/e/QhA98Rx5t0Kt\nKOMPLIKASI GAYA WOT gaya enak");
   assert.notEqual(msg.category, "ai-gay");
 });
+
+test("detectCategory returns ai-gay for gay titles, including Episode titles; gaya is not gay", () => {
+  assert.equal(detectCategory("Fuck to the Clouds Episode 1 gay"), "ai-gay");
+  assert.equal(detectCategory("Rahasia di Departemen Seni Rupa ( Koleksi Dr. Boy Friend TV, G. Y. B.)"), "ai-gay");
+  assert.equal(detectCategory("Gay lokal indonesia"), "ai-gay");
+  assert.notEqual(detectCategory("KOMPLIKASI GAYA WOT"), "ai-gay");
+  assert.notEqual(detectCategory("Belajar Gaya Wot Episode 1"), "ai-gay");
+});
+

@@ -1,4 +1,5 @@
 import { refineCategory } from "../catalog/title-category.js";
+import { hasGayCue } from "./category-guard.js";
 import { cleanUploadTitle, brandUploadTitle } from "./title-brand.js";
 import {
   DRP_ID_PREFIX,
@@ -48,6 +49,8 @@ function normText(value = "") {
 export function detectCategory(title = "", fallback = "") {
   const text = normText(`${title} ${fallback}`);
   if (!text) return "lainnya";
+  // Gay title cues beat the other title rules (and, at ingest, the Episode -> AI Drama fallback).
+  if (hasGayCue(text)) return "ai-gay";
   let base = "lainnya";
   for (const [slug, re] of CATEGORY_RULES) {
     if (re.test(text)) {

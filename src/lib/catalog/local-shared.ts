@@ -13,6 +13,7 @@ import siteLikesSnapshot from "./site-likes.json";
 import { isNewUpload } from "./feed-order";
 import { DRP_CATEGORY, DRP_SOURCES, drpKindOfItem } from "./drp-hosts.js";
 import { hasEpisodeMarker, hasEpisodeWord } from "./series";
+import { hasGayCue } from "../bot/category-guard.js";
 
 /** Our own D1 likes (video_likes), 12-hour snapshot written by the stats workflow. Cards only. */
 const SITE_LIKES = siteLikesSnapshot as unknown as Record<string, number>;
@@ -203,9 +204,10 @@ export function isDrpBokep(item: RawItem): boolean {
  * Owner rule 2026-11-28: an own-host (DRP) upload with "Episode" in the title goes to AI Drama.
  * The bot stores category "ai-plus" for those (upload-handler.js); older DRP rows stored "bokep"
  * stay in /kategori/bokep until the owner moves them, so this only follows the stored category.
+ * Gay titles are not AI Drama: slugOf sends those to AI GAY first.
  */
 export function isDrpAiEpisode(item: RawItem): boolean {
-  if (!isDrpBokep(item) || !hasEpisodeWord(item.title)) return false;
+  if (!isDrpBokep(item) || !hasEpisodeWord(item.title) || hasGayCue(item.title)) return false;
   const slug = findCategory(String(item.category || "").toLowerCase().trim())?.slug;
   return slug === "ai-plus" || slug === "ai-indo";
 }
@@ -287,9 +289,12 @@ function nonJavSlug(item: RawItem): string {
 }
 function slugOfRaw(item: RawItem): string {
   if (isVidey(item)) return "videy";
-  if (isDrpBokep(item)) return isDrpAiEpisode(item) ? "ai-plus" : DRP_CATEGORY;
   const raw = (item.category || "").toLowerCase().trim();
   const title = item.title || "";
+  // Gay content (title cue or stored AI GAY) wins over the Episode -> AI Drama rule and over
+  // the own-host bokep default. Videy stays a source silo above this. "gaya" is not a cue.
+  if (findCategory(raw)?.slug === "ai-gay" || hasGayCue(title)) return "ai-gay";
+  if (isDrpBokep(item)) return isDrpAiEpisode(item) ? "ai-plus" : DRP_CATEGORY;
   // An explicit AI GAY upload (#aigay / "kategori: ai gay") wins over the host default.
   // Same for the 2026-10-26 SEO categories (#blunder, "kategori: kelas bintang", ...). No stored
   // category of a live video names one of them, so no live video moves.
