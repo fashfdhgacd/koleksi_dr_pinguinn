@@ -47,8 +47,7 @@ export function effectiveSpots(host: SatelliteHost, spots: Record<SpotKey, strin
   return { ...spots, popunder: spots.popunder || EXOCLICK_SITE[host].popunderZone };
 }
 
-/** Same caps as the main site (page-pop-cap.ts PAGE_POP_MAX_PER_DAY, card-popunder.ts POP_MAX_VIDEY). */
-export const PAGE_POPUNDER_MAX_PER_DAY = 6;
+/** Same per-video cap as the main site (card-popunder.ts POP_MAX_VIDEY). No daily cap. */
 export const VIDEY_SKIP_POPUNDER_MAX_PER_VIDEO = 3;
 
 export const SPOT_KEYS = ["popunder", "preroll", "inpagePush", "videoSlider", "native300x250", "banner300x100"] as const;
@@ -64,7 +63,7 @@ export const SPOT_FIELDS: { key: SpotKey; label: string }[] = [
 ];
 
 export const AD_RULES_LABEL =
-  "Popunder hanya saat pengunjung mengetuk play di pemutar, bukan saat ganti kategori, pilih kartu, atau pindah halaman. Videy maksimal 3 kali per video (tap putar pertama, lalu tap kontrol pemutar dengan jeda minimal 5 detik). Host lain 1 kali di tap pertama pemutar. Batas harian untuk host non-Videy: 6 kali per pengunjung per hari. Tidak pernah di IndoAV.";
+  "Popunder hanya saat pengunjung mengetuk play di pemutar, bukan saat ganti kategori, pilih kartu, atau pindah halaman. Videy maksimal 3 kali per video (tap putar pertama, lalu tap kontrol pemutar dengan jeda minimal 5 detik). Host lain 1 kali di tap pertama pemutar. Tidak ada batas harian per pengunjung. Tidak pernah di IndoAV.";
 
 const ID_RE = /^[A-Za-z0-9_-]{3,64}$/;
 const SPOT_RE = /^\d{1,12}$/;
@@ -300,7 +299,6 @@ export type PublicConfig = {
   rules: {
     catalogBlockKey: typeof CATALOG_BLOCK_KEY;
     catalogBlockAppliesEverywhere: true;
-    pagePopunderMaxPerVisitorPerDay: number;
     videySkipPopunderMaxPerVideo: number;
     neverOnIndoav: true;
   };
@@ -323,7 +321,6 @@ export function toPublicConfig(state: SatelitState, blockedIds: readonly string[
     rules: {
       catalogBlockKey: CATALOG_BLOCK_KEY,
       catalogBlockAppliesEverywhere: true,
-      pagePopunderMaxPerVisitorPerDay: PAGE_POPUNDER_MAX_PER_DAY,
       videySkipPopunderMaxPerVideo: VIDEY_SKIP_POPUNDER_MAX_PER_VIDEO,
       neverOnIndoav: true,
     },

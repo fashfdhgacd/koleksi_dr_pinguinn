@@ -117,45 +117,38 @@ test("player tap caps: Videy 3 per video, other hosts 1, 5s gap", () => {
   assert.equal(popMaxFor("Putarin"), POP_MAX_OTHER);
 });
 
-test("Videy can open 3 popunders per video after the 5s gap, ignoring the daily page cap", () => {
+test("Videy can open 3 popunders per video after the 5s gap", () => {
   const id = "videyAAAA1";
-  // Fill the shared daily cap first with non-Videy first-play taps; Videy (daily=false) must still be allowed.
-  for (let i = 0; i < 6; i++) {
-    assert.equal(firePop(`other${i}xxxx`, POP_MAX_OTHER, "UserBokep", true), "ok");
-    now += POP_MIN_GAP_MS + 1;
-  }
-  assert.equal(canPop("other6xxxx", POP_MAX_OTHER, true), false);
-
   for (let i = 0; i < POP_MAX_VIDEY; i++) {
-    assert.equal(canPop(id, POP_MAX_VIDEY, false), true, `videy open ${i + 1} allowed`);
-    assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "ok", `videy open ${i + 1}`);
+    assert.equal(canPop(id, POP_MAX_VIDEY), true, `videy open ${i + 1} allowed`);
+    assert.equal(firePop(id, POP_MAX_VIDEY, "Videy"), "ok", `videy open ${i + 1}`);
     now += POP_MIN_GAP_MS + 1;
   }
-  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "skip");
-  assert.equal(opened.length, 6 + 3);
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy"), "skip");
+  assert.equal(opened.length, 3);
 });
 
-test("non-Videy player taps stop after 1 per video and share the daily cap", () => {
+test("non-Videy player taps stop after 1 per video", () => {
   const id = "userbokep01";
-  assert.equal(firePop(id, POP_MAX_OTHER, "UserBokep", true), "ok");
+  assert.equal(firePop(id, POP_MAX_OTHER, "UserBokep"), "ok");
   now += POP_MIN_GAP_MS + 1;
-  assert.equal(firePop(id, POP_MAX_OTHER, "UserBokep", true), "skip");
+  assert.equal(firePop(id, POP_MAX_OTHER, "UserBokep"), "skip");
 });
 
 test("a blocked window.open is not counted and can be retried", () => {
   const id = "blockretry1";
   openImpl = () => null;
-  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "block");
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy"), "block");
   openImpl = () => ({ opener: {} });
-  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "ok");
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy"), "ok");
   assert.equal(opened.length, 1);
 });
 
 test("IndoAV player taps stop after 1 per video, same as other non-Videy hosts", () => {
   const id = "indoav00001";
-  assert.equal(firePop(id, POP_MAX_OTHER, "IndoAV", true), "ok");
+  assert.equal(firePop(id, POP_MAX_OTHER, "IndoAV"), "ok");
   now += POP_MIN_GAP_MS + 1;
-  assert.equal(firePop(id, POP_MAX_OTHER, "IndoAV", true), "skip");
+  assert.equal(firePop(id, POP_MAX_OTHER, "IndoAV"), "skip");
   assert.equal(opened.length, 1);
 });
 
@@ -169,69 +162,75 @@ test("catalog, hero, and card-popunder sources have no page-click popunder trigg
 });
 
 test("the 5s gap blocks a second Videy open on the same video, not on a new video", () => {
-  assert.equal(firePop("samevideo01", POP_MAX_VIDEY, "Videy", false), "ok");
+  assert.equal(firePop("samevideo01", POP_MAX_VIDEY, "Videy"), "ok");
   now += POP_MIN_GAP_MS - 1;
-  assert.equal(firePop("samevideo01", POP_MAX_VIDEY, "Videy", false), "skip");
-  assert.equal(firePop("newvideo001", POP_MAX_VIDEY, "Videy", false), "ok");
+  assert.equal(firePop("samevideo01", POP_MAX_VIDEY, "Videy"), "skip");
+  assert.equal(firePop("newvideo001", POP_MAX_VIDEY, "Videy"), "ok");
 });
 
 test("the 5s gap then allows Videy pops #2 and #3 on the same video, and blocks #4", () => {
   const id = "gapvideo001";
-  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "ok");
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy"), "ok");
   now += POP_MIN_GAP_MS - 1;
-  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "skip");
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy"), "skip");
   now += 1;
-  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "ok");
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy"), "ok");
   now += POP_MIN_GAP_MS;
-  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "ok");
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy"), "ok");
   now += POP_MIN_GAP_MS;
-  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy", false), "skip");
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy"), "skip");
 });
 
 test("A -> B -> A: a non-Videy video that already popped does not pop again after another video", () => {
-  assert.equal(firePop("indoavAAAA1", POP_MAX_OTHER, "IndoAV", true), "ok");
+  assert.equal(firePop("indoavAAAA1", POP_MAX_OTHER, "IndoAV"), "ok");
   now += POP_MIN_GAP_MS + 1;
-  assert.equal(firePop("userbokepB1", POP_MAX_OTHER, "UserBokep", true), "ok");
+  assert.equal(firePop("userbokepB1", POP_MAX_OTHER, "UserBokep"), "ok");
   now += POP_MIN_GAP_MS + 1;
-  assert.equal(canPop("indoavAAAA1", POP_MAX_OTHER, true), false);
-  assert.equal(firePop("indoavAAAA1", POP_MAX_OTHER, "IndoAV", true), "skip");
+  assert.equal(canPop("indoavAAAA1", POP_MAX_OTHER), false);
+  assert.equal(firePop("indoavAAAA1", POP_MAX_OTHER, "IndoAV"), "skip");
   assert.equal(opened.length, 2);
 });
 
 test("Videy keeps max 3 per video across revisits (A -> B -> A -> B)", () => {
   const a = "videyAAAAA1";
   const b = "videyBBBBB1";
-  assert.equal(firePop(a, POP_MAX_VIDEY, "Videy", false), "ok");
+  assert.equal(firePop(a, POP_MAX_VIDEY, "Videy"), "ok");
   now += POP_MIN_GAP_MS;
-  assert.equal(firePop(a, POP_MAX_VIDEY, "Videy", false), "ok");
+  assert.equal(firePop(a, POP_MAX_VIDEY, "Videy"), "ok");
   // B pops at once (new video, no gap), then back to A: A has 1 pop left.
-  assert.equal(firePop(b, POP_MAX_VIDEY, "Videy", false), "ok");
+  assert.equal(firePop(b, POP_MAX_VIDEY, "Videy"), "ok");
   now += POP_MIN_GAP_MS;
-  assert.equal(firePop(a, POP_MAX_VIDEY, "Videy", false), "ok");
+  assert.equal(firePop(a, POP_MAX_VIDEY, "Videy"), "ok");
   now += POP_MIN_GAP_MS;
-  assert.equal(firePop(a, POP_MAX_VIDEY, "Videy", false), "skip", "A is at 3");
+  assert.equal(firePop(a, POP_MAX_VIDEY, "Videy"), "skip", "A is at 3");
   // B again: 2 left, still with the 5s gap.
-  assert.equal(firePop(b, POP_MAX_VIDEY, "Videy", false), "ok");
-  assert.equal(firePop(b, POP_MAX_VIDEY, "Videy", false), "skip", "5s gap on B");
+  assert.equal(firePop(b, POP_MAX_VIDEY, "Videy"), "ok");
+  assert.equal(firePop(b, POP_MAX_VIDEY, "Videy"), "skip", "5s gap on B");
   now += POP_MIN_GAP_MS;
-  assert.equal(firePop(b, POP_MAX_VIDEY, "Videy", false), "ok");
+  assert.equal(firePop(b, POP_MAX_VIDEY, "Videy"), "ok");
   now += POP_MIN_GAP_MS;
-  assert.equal(firePop(b, POP_MAX_VIDEY, "Videy", false), "skip", "B is at 3");
+  assert.equal(firePop(b, POP_MAX_VIDEY, "Videy"), "skip", "B is at 3");
   now += POP_MIN_GAP_MS;
-  assert.equal(firePop(a, POP_MAX_VIDEY, "Videy", false), "skip", "A still at 3 after B");
+  assert.equal(firePop(a, POP_MAX_VIDEY, "Videy"), "skip", "A still at 3 after B");
   assert.equal(opened.length, 6);
 });
 
 test("the per-video memory survives a fresh page (stored in localStorage)", () => {
-  assert.equal(firePop("persistA001", POP_MAX_OTHER, "Streamtape", true), "ok");
+  assert.equal(firePop("persistA001", POP_MAX_OTHER, "Streamtape"), "ok");
   const stored = (globalThis as unknown as { localStorage: Store }).localStorage.getItem("kdp_pop_v2");
   assert.ok(stored && stored.includes("persistA001"));
   now += POP_MIN_GAP_MS + 1;
-  assert.equal(canPop("persistA001", POP_MAX_OTHER, true), false);
+  assert.equal(canPop("persistA001", POP_MAX_OTHER), false);
 });
 
-test("the non-Videy daily cap of 6 still applies with per-video memory", () => {
-  for (let i = 0; i < 6; i++) assert.equal(firePop(`dailyvid${i}x`, POP_MAX_OTHER, "UserBokep", true), "ok");
-  assert.equal(firePop("dailyvid6x", POP_MAX_OTHER, "UserBokep", true), "skip");
-  assert.equal(opened.length, 6);
+test("there is no daily cap: many different videos each pop once, no matter how many opened today", () => {
+  for (let i = 0; i < 25; i++) {
+    assert.equal(firePop(`nocap${String(i).padStart(2, "0")}xxx`, POP_MAX_OTHER, "UserBokep"), "ok", `video ${i + 1}`);
+    now += 1_000;
+  }
+  assert.equal(opened.length, 25);
+  assert.equal(firePop("nocap00xxx", POP_MAX_OTHER, "UserBokep"), "skip", "same video still pops only once");
+  assert.equal(opened.length, 25);
+  const ls = (globalThis as unknown as { localStorage: Store }).localStorage;
+  assert.equal(ls.getItem("kdp_page_pop_day"), null, "no daily counter is written");
 });

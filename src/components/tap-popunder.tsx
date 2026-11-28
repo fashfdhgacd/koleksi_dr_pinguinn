@@ -1,7 +1,6 @@
 // One-shot popunder tap layer for the watch page (same pattern as the hosts' own players: the first
 // tap opens an ad tab, the next tap reaches the player). A transparent layer sits over the player
-// while the cap (card-popunder.ts: per-video count + POP_MIN_GAP_MS, plus the shared
-// PAGE_POP_MAX_PER_DAY Jakarta-day counter for non-Videy hosts) allows a pop.
+// while the cap (card-popunder.ts: per-video count + POP_MIN_GAP_MS; no daily cap) allows a pop.
 // Non-Videy hosts: one pop on the first play tap, then the layer stays off.
 // Videy: pop #1 is the poster/start tap (ts-videy-popunder.tsx); this layer re-arms for pops #2 and
 // #3 on later control taps (play/resume, seek, speed) after the 5s gap.
@@ -33,10 +32,9 @@ export function PopTapLayer({
   const [armed, setArmed] = useState(false);
   const [fails, setFails] = useState(0);
   const max = popMaxFor(host);
-  const daily = host !== "Videy";
   useEffect(() => {
     const check = () => {
-      setArmed(canPop(videoId, max, daily));
+      setArmed(canPop(videoId, max));
     };
     check();
     const vis = () => {
@@ -56,7 +54,7 @@ export function PopTapLayer({
       window.removeEventListener("blur", check);
       window.removeEventListener("scroll", check);
     };
-  }, [videoId, mediaRef, max, daily]);
+  }, [videoId, mediaRef, max]);
 
   if (!armed || fails >= MAX_FAILS) return null;
   const lh = popHost(host);
@@ -71,19 +69,19 @@ export function PopTapLayer({
       tabIndex={-1}
       className="absolute inset-0 z-10 cursor-pointer bg-transparent"
       onClick={() => {
-        if (!canPop(videoId, max, daily)) {
+        if (!canPop(videoId, max)) {
           setArmed(false);
           onPass?.();
           return;
         }
         sendPlayerLog(videoId, lh, "pop_fire");
-        const r = firePop(videoId, max, lh, daily);
+        const r = firePop(videoId, max, lh);
         if (r === "ok") {
           sendPlayerLog(videoId, lh, "pop_ok");
           setArmed(false);
           return;
         }
-        // "skip" = a cap was hit between arming and the tap (daily cap or per-video) —
+        // "skip" = a cap was hit between arming and the tap (per-video cap or gap) —
         // not a blocker, so it must not burn a fail or log pop_block.
         if (r === "skip") {
           setArmed(false);
