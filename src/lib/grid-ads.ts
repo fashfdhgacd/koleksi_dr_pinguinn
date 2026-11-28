@@ -3,6 +3,7 @@
 // ExoClick flagged zone 6053864 (27 Nov 2026, "low traffic uniqueness") because that one 300x250 zone
 // was repeated 6-7 times on every catalog page. Rules now:
 // - At most MAX_GRID_ADS (6) ad slots per page per breakpoint, slotIndex 0..5 in order.
+// - Mix: 4 ExoClick + 2 TrafficStars (slots 0,1,3,5 ExoClick; 2,4 TrafficStars).
 // - Every ExoClick zone (primary + fallback) is unique on a page. Only two TrafficStars
 //   banner spots exist in the repo, so those two are reused across the four TS slots
 //   (adjacent TS slots always get different spots). Do not invent zone IDs.
@@ -17,9 +18,11 @@ export type AdNetwork = "exoclick" | "trafficstars";
 export type GridSlot = { network: AdNetwork; zoneId: string };
 export type Breakpoint = "mobile" | "desktop";
 
-/** ExoClick 300x250 zones (site 1115596). Two distinct zones, one each. */
+/** ExoClick 300x250 zones (site 1115596). Four distinct zones, one per ExoClick slot (3 and 4 created 27 Nov 2026). */
 export const EXO_ZONE_1 = "6053864";
 export const EXO_ZONE_2 = "6111252";
+export const EXO_ZONE_3 = "6111370";
+export const EXO_ZONE_4 = "6111372";
 /** TrafficStars 300x250 spots (data-ts-spot codes, created 27 Nov 2026), SDK on gajukogyxywahu.com. */
 export const TS_SPOT_1 = "b027eda668f044c2a0e1a331d59cb3d3";
 export const TS_SPOT_2 = "68654e89b8b14322bcc946c618f13e4c";
@@ -28,11 +31,11 @@ export const MAX_GRID_ADS = 6;
 /** Slot config by slotIndex. */
 export const GRID_SLOTS: readonly GridSlot[] = [
   { network: "exoclick", zoneId: EXO_ZONE_1 },
-  { network: "trafficstars", zoneId: TS_SPOT_1 },
-  { network: "trafficstars", zoneId: TS_SPOT_2 },
   { network: "exoclick", zoneId: EXO_ZONE_2 },
-  { network: "trafficstars", zoneId: TS_SPOT_2 },
   { network: "trafficstars", zoneId: TS_SPOT_1 },
+  { network: "exoclick", zoneId: EXO_ZONE_3 },
+  { network: "trafficstars", zoneId: TS_SPOT_2 },
+  { network: "exoclick", zoneId: EXO_ZONE_4 },
 ];
 
 /** ExoClick 300x250 fallback zone per non-ExoClick slotIndex: when that slot's TrafficStars ad is
@@ -40,7 +43,7 @@ export const GRID_SLOTS: readonly GridSlot[] = [
  * refresh). Every fallback zone must differ from each other and from EXO_ZONE_1/2, so no ExoClick zone repeats on a
  * page. "" = none: the cell then keeps its (empty) frame, it never disappears. Zones created 27 Nov 2026
  * on site 1115596. */
-export const EXO_FALLBACK_ZONES: Readonly<Record<number, string>> = { 1: "6111370", 2: "6111372", 4: "6111374", 5: "6111376" };
+export const EXO_FALLBACK_ZONES: Readonly<Record<number, string>> = { 2: "6111374", 4: "6111376" };
 
 /** ExoClick fallback zone for a slot, or null (no fallback configured / slot is already ExoClick). */
 export function fallbackZone(
