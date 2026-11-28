@@ -227,23 +227,30 @@ export const POP_EVENTS = ["pop_n1", "pop_n2", "pop_n3", "pop_n4", "pop_n5", "po
 export const POP_EXO_EVENTS = ["pop_x1", "pop_x2", "pop_x3", "pop_x4", "pop_x5", "pop_x6"] as const;
 /** Taps where neither TrafficStars nor ExoClick opened: 1st / 2nd failed try on a video. */
 export const POP_FAIL_EVENTS = ["pop_f1", "pop_f2"] as const;
+export const POP_TAP_EVENTS = ["tap_e"] as const;
+export const POP_REVISIT_EVENTS = ["tap_r"] as const;
 const POP_IN = POP_EVENTS.map((e) => `'${e}'`).join(",");
 const POP_EXO_IN = POP_EXO_EVENTS.map((e) => `'${e}'`).join(",");
 const POP_FAIL_IN = POP_FAIL_EVENTS.map((e) => `'${e}'`).join(",");
-/** SQL select list shared by the owner reads: opened (any brand), ExoClick fallback, both failed. */
+const POP_TAP_IN = POP_TAP_EVENTS.map((e) => `'${e}'`).join(",");
+const POP_REVISIT_IN = POP_REVISIT_EVENTS.map((e) => `'${e}'`).join(",");
+/** SQL select list shared by the owner reads: opened, ExoClick fallback, both failed, first play taps. */
 export const POP_SUMS = `sum(case when event in (${POP_IN}) then n else 0 end) as n,
        sum(case when event in (${POP_EXO_IN}) then n else 0 end) as exo,
-       sum(case when event in (${POP_FAIL_IN}) then n else 0 end) as fail`;
-export const POP_ALL_IN = `${POP_IN},${POP_EXO_IN},${POP_FAIL_IN}`;
+       sum(case when event in (${POP_FAIL_IN}) then n else 0 end) as fail,
+       sum(case when event in (${POP_TAP_IN}) then n else 0 end) as tap,
+       sum(case when event in (${POP_REVISIT_IN}) then n else 0 end) as revisit`;
+export const POP_ALL_IN = `${POP_IN},${POP_EXO_IN},${POP_FAIL_IN},${POP_TAP_IN},${POP_REVISIT_IN}`;
 
 /**
  * Popunder tabs opened per WIB day and host. Read from the existing player-log daily counters
  * (player_errors, events pop_n1..pop_n6 = 1st..6th tab opened on a video, since 2 Nov 2026; pop_x1..x6 = the
- * ones opened by the ExoClick fallback, pop_f1/f2 = taps where neither brand opened). Nothing new
- * is written per visit.
+ * ones opened by the ExoClick fallback, pop_f1/f2 = taps where neither brand opened, tap_e = first
+ * entitled play tap, tap_r = first play tap on a video already at its cap). Nothing new is written
+ * per visit.
  */
 export async function readPopDays(db: D1DatabaseLike, first: string, last: string): Promise<PopDayRow[]> {
-  const rows = await all<{ day: string; host: string; n: number; exo: number; fail: number }>(
+  const rows = await all<{ day: string; host: string; n: number; exo: number; fail: number; tap: number; revisit: number }>(
     db,
     `select day, host, ${POP_SUMS} from player_errors
       where day >= ?1 and day <= ?2 and event in (${POP_ALL_IN}) group by day, host`,
@@ -256,6 +263,8 @@ export async function readPopDays(db: D1DatabaseLike, first: string, last: strin
     n: Number(r.n) || 0,
     exo: Number(r.exo) || 0,
     fail: Number(r.fail) || 0,
+    tap: Number(r.tap) || 0,
+    revisit: Number(r.revisit) || 0,
   }));
 }
 

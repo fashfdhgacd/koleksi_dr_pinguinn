@@ -30,6 +30,8 @@ export type PlayerLogEvent =
   | "pop_x6"
   | "pop_f1"
   | "pop_f2"
+  | "tap_e"
+  | "tap_r"
   | "pre_req"
   | "pre_fill"
   | "pre_done"

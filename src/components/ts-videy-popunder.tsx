@@ -8,7 +8,7 @@
 // Counters (player-log, once per video per session): pop_fire / pop_ok (a tab opened, TrafficStars or the
 // ExoClick fallback) / pop_block (neither opened) + pop_f1/pop_f2 (1st/2nd failed try); pop_x<n> marks a pop opened by ExoClick.
 import { sendPlayerLog } from "@/lib/player-log-client";
-import { canPop, firePop, popOpened, POP_MAX_VIDEY } from "@/components/card-popunder";
+import { canPop, firePop, notePlayTap, popOpened, POP_MAX_VIDEY } from "@/components/card-popunder";
 
 const MAX_FAILS = 2;
 const failures = new Map<string, number>();
@@ -23,7 +23,11 @@ export function owesAd(videoId: string): boolean {
  * caller must NOT play), false when it should play.
  */
 export function popTap(videoId: string): boolean {
-  if (!owesAd(videoId)) return false;
+  if (!owesAd(videoId)) {
+    // Poster/start tap on a video that already used its cap: count as a revisit, then play.
+    notePlayTap(videoId, POP_MAX_VIDEY, "Videy");
+    return false;
+  }
   sendPlayerLog(videoId, "Videy", "pop_fire");
   const r = firePop(videoId, POP_MAX_VIDEY, "Videy");
   if (popOpened(r)) {

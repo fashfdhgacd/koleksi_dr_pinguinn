@@ -206,19 +206,21 @@ export type RefPeriod = {
   /**
    * Popunder tabs opened (player-log pop_n1..n6, TrafficStars or the ExoClick fallback), Videy vs other
    * hosts, plus how many of them the ExoClick fallback opened (pop_x1..x6; the rest, including all rows
-   * from before the fallback existed, are TrafficStars) and how many taps failed with both brands
-   * (pop_f1/f2); null when not read.
+   * from before the fallback existed, are TrafficStars), how many taps failed with both brands
+   * (pop_f1/f2), first entitled play taps (tap_e) and first play taps on a video already at its cap
+   * (tap_r); null when not read.
    */
-  pops: { videy: number; other: number; prevVidey: number; prevOther: number; exo: number; prevExo: number; fail: number; prevFail: number } | null;
+  pops: { videy: number; other: number; prevVidey: number; prevOther: number; exo: number; prevExo: number; fail: number; prevFail: number; tap: number; prevTap: number; revisit: number; prevRevisit: number } | null;
 };
 
 /** Distinct visitors over a multi-day period (and the one before), from one aggregate read. */
 export type PeriodDistinct = Partial<Record<RefPeriod["key"], { cur: number; prev: number }>>;
 /**
  * One player_errors aggregate for a WIB day and host: `n` = popunder tabs opened (any brand), `exo` = of
- * those, opened by the ExoClick fallback, `fail` = taps where neither brand opened.
+ * those, opened by the ExoClick fallback, `fail` = taps where neither brand opened, `tap` = first
+ * entitled play taps (tap_e), `revisit` = first play taps on a video already at its cap (tap_r).
  */
-export type PopDayRow = { day: string; host: string; n: number; exo?: number; fail?: number };
+export type PopDayRow = { day: string; host: string; n: number; exo?: number; fail?: number; tap?: number; revisit?: number };
 /** Extra (optional) inputs for the per-period cards. */
 export type RefExtras = { dayTotals?: DayTotal[]; distinct?: PeriodDistinct; pops?: PopDayRow[] | null };
 
@@ -371,22 +373,28 @@ export function buildRefPeriods(today: string, rows: BreakdownRow[], extras: Ref
     if (extras.pops) {
       const cs = new Set(cur);
       const ps = new Set(prev);
-      pops = { videy: 0, other: 0, prevVidey: 0, prevOther: 0, exo: 0, prevExo: 0, fail: 0, prevFail: 0 };
+      pops = { videy: 0, other: 0, prevVidey: 0, prevOther: 0, exo: 0, prevExo: 0, fail: 0, prevFail: 0, tap: 0, prevTap: 0, revisit: 0, prevRevisit: 0 };
       for (const r of extras.pops) {
         const n = Math.max(0, Number(r.n) || 0);
         const exo = Math.max(0, Number(r.exo) || 0);
         const fail = Math.max(0, Number(r.fail) || 0);
+        const tap = Math.max(0, Number(r.tap) || 0);
+        const revisit = Math.max(0, Number(r.revisit) || 0);
         const v = r.host === "Videy";
         if (cs.has(r.day)) {
           if (v) pops.videy += n;
           else pops.other += n;
           pops.exo += exo;
           pops.fail += fail;
+          pops.tap += tap;
+          pops.revisit += revisit;
         } else if (ps.has(r.day)) {
           if (v) pops.prevVidey += n;
           else pops.prevOther += n;
           pops.prevExo += exo;
           pops.prevFail += fail;
+          pops.prevTap += tap;
+          pops.prevRevisit += revisit;
         }
       }
     }

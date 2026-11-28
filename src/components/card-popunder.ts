@@ -18,6 +18,9 @@
 // Each open is also logged by its position for that video (pop_n1..pop_n6, one D1
 // upsert per opened tab, same beacon as today), so /pemilik can compare ALL our opens with
 // TrafficStars' paid impressions instead of only the first tab per video.
+// First play taps: tap_e = this tap is entitled to a popunder attempt (the same tap that
+// calls firePop when the video has not popped yet); tap_r = first play tap on a video
+// already in kdp_pop_v2 at its cap (revisit, no pop). Videy taps #2/#3 are not new taps.
 import { sendPlayerLog, type PlayerLogHost } from "@/lib/player-log-client";
 import { parsePopMemory, popEntry, prunePopMemory, recordPop, type PopEntry } from "@/lib/pop-memory";
 
@@ -78,6 +81,30 @@ export function popsLeft(videoId: string, max: number): boolean {
   return (popEntry(readMemory(now), videoId, now)?.n ?? 0) < max;
 }
 
+export type PlayTapKind = "entitled" | "revisit" | "later";
+
+/**
+ * Classify (and log) a first play tap. "entitled" (tap_e) = this video has not popped yet, so
+ * the tap may attempt a popunder. "revisit" (tap_r) = kdp_pop_v2 already used up this video's
+ * cap, so no pop. "later" = Videy pops #2/#3 (count not used up, but this is not a new first
+ * tap) — not logged. Once per video+event per session, same beacon path as the other counters.
+ * Does not open a tab and does not change the cap.
+ */
+export function notePlayTap(videoId: string, max: number, host?: PlayerLogHost): PlayTapKind {
+  if (typeof window === "undefined" || !videoId) return "later";
+  const now = Date.now();
+  const n = popEntry(readMemory(now), videoId, now)?.n ?? 0;
+  if (n <= 0) {
+    if (host) sendPlayerLog(videoId, host, "tap_e");
+    return "entitled";
+  }
+  if (n >= max) {
+    if (host) sendPlayerLog(videoId, host, "tap_r");
+    return "revisit";
+  }
+  return "later";
+}
+
 export type PopResult = "ok" | "exo" | "block" | "skip";
 
 /** True when a tab opened (TrafficStars "ok" or the ExoClick fallback "exo"). */
@@ -110,6 +137,8 @@ function openTab(url: string): boolean {
  */
 export function firePop(videoId: string, max: number, host?: PlayerLogHost): PopResult {
   if (!canPop(videoId, max)) return "skip";
+  // First entitled play tap (n == 0) logs tap_e. Videy later entitled taps (n > 0) do not.
+  notePlayTap(videoId, max, host);
   let result: PopResult = "ok";
   if (!openTab(DIRECT_LINK)) {
     if (!openTab(EXO_DIRECT_LINK)) return "block";
