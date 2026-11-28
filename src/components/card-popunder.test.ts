@@ -24,8 +24,10 @@ const {
   canPop,
   EXO_ZONE,
   firePop,
+  notePlayTap,
   popMaxFor,
   popOpened,
+  popsLeft,
 } = await import("./card-popunder.ts");
 type Store = { getItem(k: string): string | null; setItem(k: string, v: string): void; removeItem(k: string): void; clear(): void };
 
@@ -254,7 +256,7 @@ const events = () => beacons.map((b) => b.event);
 test("fallback: TrafficStars opens -> only TrafficStars, ExoClick is never touched", () => {
   assert.equal(firePop("fbok0000001", POP_MAX_OTHER, "UserBokep"), "ok");
   assert.deepEqual(brandsOpened(), ["ts"]);
-  assert.deepEqual(events(), ["pop_n1"], "no pop_x row: counts as TrafficStars");
+  assert.deepEqual(events(), ["tap_e", "pop_n1"], "no pop_x row: counts as TrafficStars");
 });
 
 test("fallback: TrafficStars window.open returns null -> ExoClick opens in the same call, never both", () => {
@@ -268,7 +270,7 @@ test("fallback: TrafficStars window.open returns null -> ExoClick opens in the s
   assert.ok(calls[0].includes(TS_HOST));
   assert.equal(calls[1], EXO_URL);
   assert.deepEqual(brandsOpened(), ["exo"], "only one tab opened");
-  assert.deepEqual(events(), ["pop_n1", "pop_x1"]);
+  assert.deepEqual(events(), ["tap_e", "pop_n1", "pop_x1"]);
 });
 
 test("fallback: a window that is already closed counts as blocked and falls back to ExoClick", () => {
@@ -290,7 +292,7 @@ test("fallback: both blocked -> 'block', nothing counted, the tap can be retried
   openImpl = () => null;
   assert.equal(firePop(id, POP_MAX_OTHER, "UserBokep"), "block");
   assert.equal(opened.length, 0);
-  assert.deepEqual(events(), [], "no pop_n / pop_x written");
+  assert.deepEqual(events(), ["tap_e"], "entitled first tap is logged even when both tabs are blocked; no pop_n / pop_x");
   assert.equal(canPop(id, POP_MAX_OTHER), true, "no slot used");
   openImpl = () => ({ opener: {} });
   assert.equal(firePop(id, POP_MAX_OTHER, "UserBokep"), "ok");
@@ -319,7 +321,7 @@ test("fallback: Videy max 3 per video, 5s gap, with a mix of TrafficStars and Ex
   now += POP_MIN_GAP_MS;
   assert.equal(firePop(id, POP_MAX_VIDEY, "Videy"), "skip", "3 per video, Exo pops included");
   assert.deepEqual(brandsOpened(), ["ts", "exo", "exo"]);
-  assert.deepEqual(events(), ["pop_n1", "pop_n2", "pop_x2", "pop_n3", "pop_x3"]);
+  assert.deepEqual(events(), ["tap_e", "pop_n1", "pop_n2", "pop_x2", "pop_n3", "pop_x3"]);
 });
 
 test("fallback: no daily cap, many videos each pop once whichever brand opens", () => {
@@ -350,6 +352,43 @@ test("popOpened is true for TrafficStars and ExoClick, false for block/skip", ()
   assert.equal(popOpened("skip"), false);
 });
 
+test("first entitled play tap logs tap_e and still opens the popunder; a retry does not log again", () => {
+  const id = "tape0000001";
+  assert.equal(notePlayTap(id, POP_MAX_OTHER, "UserBokep"), "entitled");
+  assert.deepEqual(events(), ["tap_e"]);
+  assert.equal(firePop(id, POP_MAX_OTHER, "UserBokep"), "ok");
+  assert.equal(opened.length, 1);
+  assert.deepEqual(events(), ["tap_e", "pop_n1"], "tap_e is once per session even when firePop also tries to log it");
+});
+
+test("Videy later taps (#2 and #3) do not log a new tap_e or tap_r", () => {
+  const id = "tapvidey001";
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy"), "ok");
+  now += POP_MIN_GAP_MS + 1;
+  assert.equal(notePlayTap(id, POP_MAX_VIDEY, "Videy"), "later");
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy"), "ok");
+  now += POP_MIN_GAP_MS + 1;
+  assert.equal(notePlayTap(id, POP_MAX_VIDEY, "Videy"), "later");
+  assert.equal(firePop(id, POP_MAX_VIDEY, "Videy"), "ok");
+  assert.equal(events().filter((e) => e === "tap_e").length, 1);
+  assert.equal(events().includes("tap_r"), false);
+  assert.deepEqual(events().filter((e) => e.startsWith("pop_n")), ["pop_n1", "pop_n2", "pop_n3"]);
+});
+
+test("a revisit of a video already at its cap logs tap_r and firePop does not open a tab", () => {
+  const id = "tapr0000001";
+  assert.equal(firePop(id, POP_MAX_OTHER, "UserBokep"), "ok");
+  beacons = [];
+  opened = [];
+  now += POP_MIN_GAP_MS + 1;
+  assert.equal(popsLeft(id, POP_MAX_OTHER), false);
+  assert.equal(notePlayTap(id, POP_MAX_OTHER, "UserBokep"), "revisit");
+  assert.deepEqual(events(), ["tap_r"]);
+  assert.equal(firePop(id, POP_MAX_OTHER, "UserBokep"), "skip");
+  assert.equal(opened.length, 0);
+  assert.deepEqual(events(), ["tap_r"], "skip does not log another tap");
+});
+
 test("sources: ExoClick zone is not a satellite zone, only the tap paths open it, and never on owner paths", () => {
   assert.equal(EXO_ZONE, "6055468");
   assert.notEqual(EXO_ZONE, "6088480");
@@ -360,5 +399,9 @@ test("sources: ExoClick zone is not a satellite zone, only the tap paths open it
   for (const rel of ["tap-popunder.tsx", "ts-videy-popunder.tsx"]) {
     const t = readFileSync(new URL(rel, here), "utf8");
     assert.equal(t.includes("pemsrv"), false, `${rel} must not hold its own ad URL`);
+    assert.equal(t.includes("notePlayTap"), true, `${rel} must log first play taps through notePlayTap`);
   }
+  const client = readFileSync(new URL("../lib/player-log-client.ts", here), "utf8");
+  assert.equal(client.includes('"tap_e"'), true);
+  assert.equal(client.includes('"tap_r"'), true);
 });

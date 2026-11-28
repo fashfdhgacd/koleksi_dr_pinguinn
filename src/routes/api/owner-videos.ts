@@ -13,14 +13,14 @@ import { mergeWatched, pageWatched, type WatchedList, type WatchedVideo } from "
  * Read-only on existing data, nothing is written per visit:
  *  - opens / visitors: analytics_events pageviews on /watch/<id> (one grouped read per period);
  *  - popunders: player-log daily counters player_errors (events pop_n1..n6 = tabs opened, pop_x1..x6 = of
- *    those opened by the ExoClick fallback, pop_f1/f2 = neither brand opened; keyed by video id);
+ *    those opened by the ExoClick fallback, pop_f1/f2 = neither brand opened, tap_e / tap_r = first play taps; keyed by video id);
  *  - title / thumbnail / category / server / upload date: the in-memory catalog (no DB read).
  * The full list per period is computed at most once per CACHE_SEC per data centre and kept in the Cache
  * API under /api/owner… (never served publicly); search, sort and the 10-row pages are cut from that
  * cached copy. Loaded only when the owner opens the Statistik tab; no polling.
  */
 const CACHE_SEC = 600;
-const CACHE_PATH = "/api/owner-videos-cache-v1";
+const CACHE_PATH = "/api/owner-videos-cache-v2";
 const DAY_MS = 86_400_000;
 const W = "coalesce(w, 1)";
 const TITLE_LOOKUP_TIMEOUT_MS = 2500;
@@ -110,7 +110,7 @@ async function compute(db: D1DatabaseLike, period: PeriodKey): Promise<WatchedLi
   ]);
   const curSet = new Set(cur);
   const prevSet = new Set(prev);
-  const pops = { videy: 0, other: 0, prevVidey: 0, prevOther: 0, exo: 0, prevExo: 0, fail: 0, prevFail: 0 };
+  const pops = { videy: 0, other: 0, prevVidey: 0, prevOther: 0, exo: 0, prevExo: 0, fail: 0, prevFail: 0, tap: 0, prevTap: 0, revisit: 0, prevRevisit: 0 };
   for (const r of popDays) {
     const v = r.host === "Videy";
     if (curSet.has(r.day)) {
@@ -118,11 +118,15 @@ async function compute(db: D1DatabaseLike, period: PeriodKey): Promise<WatchedLi
       else pops.other += r.n;
       pops.exo += r.exo || 0;
       pops.fail += r.fail || 0;
+      pops.tap += r.tap || 0;
+      pops.revisit += r.revisit || 0;
     } else if (prevSet.has(r.day)) {
       if (v) pops.prevVidey += r.n;
       else pops.prevOther += r.n;
       pops.prevExo += r.exo || 0;
       pops.prevFail += r.fail || 0;
+      pops.prevTap += r.tap || 0;
+      pops.prevRevisit += r.revisit || 0;
     }
   }
   const rows = await withCatalog(mergeWatched(viewRows, popRows));

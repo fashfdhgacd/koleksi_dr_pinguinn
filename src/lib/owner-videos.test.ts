@@ -71,7 +71,7 @@ function list(n: number): WatchedList {
       popsExo: 0,
       popsFail: 0,
     })),
-    totals: { views: 0, prevViews: 0, pops: { videy: 0, other: 0, prevVidey: 0, prevOther: 0, exo: 0, prevExo: 0, fail: 0, prevFail: 0 } },
+    totals: { views: 0, prevViews: 0, pops: { videy: 0, other: 0, prevVidey: 0, prevOther: 0, exo: 0, prevExo: 0, fail: 0, prevFail: 0, tap: 0, prevTap: 0, revisit: 0, prevRevisit: 0 } },
     updatedAt: "",
   };
 }

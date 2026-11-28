@@ -10,8 +10,8 @@
 // focus/blur, scroll, or our own <video>'s play/pause/timeupdate/seeked/ratechange events) when
 // canPop() says the gap has passed and this video has pops left.
 // Not used for ads: it never covers an ad unit, only the video player.
-import { useEffect, useState, type RefObject } from "react";
-import { canPop, firePop, popHost, popMaxFor, popOpened } from "@/components/card-popunder";
+import { useEffect, useRef, useState, type RefObject } from "react";
+import { canPop, firePop, notePlayTap, popHost, popMaxFor, popOpened, popsLeft } from "@/components/card-popunder";
 import { sendPlayerLog } from "@/lib/player-log-client";
 
 const MAX_FAILS = 2;
@@ -32,6 +32,25 @@ export function PopTapLayer({
   const [armed, setArmed] = useState(false);
   const [fails, setFails] = useState(0);
   const max = popMaxFor(host);
+  const lh = popHost(host);
+  const anchorRef = useRef<HTMLSpanElement>(null);
+
+  // Revisit first-play observer: only if this video was already at its cap when the layer
+  // mounted (a later pop on this same page must not be counted as a revisit). Capture-only,
+  // no preventDefault / stopPropagation, so the same-origin play button still gets the tap
+  // and no popunder opens.
+  useEffect(() => {
+    if (popsLeft(videoId, max)) return;
+    const root = anchorRef.current?.parentElement;
+    if (!root) return;
+    const onFirst = (e: Event) => {
+      if ("button" in e && (e as PointerEvent).button !== 0) return;
+      notePlayTap(videoId, max, lh);
+    };
+    root.addEventListener("pointerdown", onFirst, { capture: true, once: true });
+    return () => root.removeEventListener("pointerdown", onFirst, { capture: true });
+  }, [videoId, max, lh]);
+
   useEffect(() => {
     const check = () => {
       setArmed(canPop(videoId, max));
@@ -56,9 +75,10 @@ export function PopTapLayer({
     };
   }, [videoId, mediaRef, max]);
 
-  if (!armed || fails >= MAX_FAILS) return null;
-  const lh = popHost(host);
   return (
+    <>
+      <span ref={anchorRef} hidden aria-hidden="true" />
+      {!armed || fails >= MAX_FAILS ? null : (
     <button
       type="button"
       // Pointer-only monetization layer: its tap opens an ad tab, not playback.
@@ -95,5 +115,7 @@ export function PopTapLayer({
         if (n >= MAX_FAILS) onPass?.();
       }}
     />
+      )}
+    </>
   );
 }

@@ -165,19 +165,33 @@ function PopCard(props: { p: RefPeriod; videos: WatchedPage | null }) {
   const now = popOutcomes(total, pops.exo, pops.fail);
   const before = popOutcomes(prev, pops.prevExo, pops.prevFail);
   const views = videos?.totals.views;
+  const prevViews = videos?.totals.prevViews;
+  const tap = pops.tap || 0;
+  const prevTap = pops.prevTap || 0;
+  const revisit = pops.revisit || 0;
+  const prevRevisit = pops.prevRevisit || 0;
   return (
     <Card title={`Popunder · ${p.label}`}>
       <p className="text-sm text-zinc-200">
-        Popunder {p.label.toLowerCase()}: <b className="text-lg tabular-nums text-zinc-50">{fmt(total)}</b>
         {views != null ? (
           <>
-            {" "}
-            dari <b className="tabular-nums">{fmt(views)}</b> tontonan
+            Tontonan <b className="text-lg tabular-nums text-zinc-50">{fmt(views)}</b>
+            {" · "}
           </>
-        ) : null}{" "}
+        ) : null}
+        Tap play <b className="text-lg tabular-nums text-zinc-50">{fmt(tap)}</b>
+        {" · "}
+        Popunder <b className="text-lg tabular-nums text-zinc-50">{fmt(total)}</b>{" "}
         <Gray>
-          ({p.prevLabel} {fmt(prev)}
-          {videos ? ` dari ${fmt(videos.totals.prevViews)} tontonan` : ""})
+          ({p.prevLabel}{" "}
+          {prevViews != null ? `${fmt(prevViews)} · ` : ""}
+          {fmt(prevTap)} · {fmt(prev)})
+        </Gray>
+      </p>
+      <p className="mt-1 text-sm text-zinc-300">
+        Tap play di video yang sudah pernah pop: <b className="tabular-nums text-zinc-50">{fmt(revisit)}</b>{" "}
+        <Gray>
+          ({p.prevLabel} {fmt(prevRevisit)})
         </Gray>
       </p>
       <ul className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
@@ -216,8 +230,11 @@ function PopCard(props: { p: RefPeriod; videos: WatchedPage | null }) {
         Popunder = tab iklan yang benar-benar terbuka saat pengunjung tap play. TrafficStars keluar dulu; kalau diblokir
         browser, ExoClick (cadangan) keluar di tap yang sama, tidak pernah dua-duanya. Gagal dua-duanya = tap yang
         tidak membuka tab sama sekali (tidak masuk jumlah popunder). Data sebelum ExoClick cadangan dihitung sebagai
-        TrafficStars. Videy maks 3× per video, lainnya 1× per video. Tontonan = halaman video dibuka. Data popunder
-        mulai 2 Nov 2026.
+        TrafficStars. Videy maks 3× per video, lainnya 1× per video. Tontonan = halaman video dibuka. Tap play = tap
+        play pertama yang boleh dapat popunder (satu kali per video per kunjungan; tap Videy ke-2 dan ke-3 tidak
+        dihitung lagi). Tap play di video yang sudah pernah pop = tap play di video yang sudah kena pop sebelumnya,
+        jadi tidak dapat pop lagi. Data popunder mulai 2 Nov 2026. Data tap play mulai dari rilis penghitungan ini
+        (belum ada angka sebelum itu).
       </p>
     </Card>
   );

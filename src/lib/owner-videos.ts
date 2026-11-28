@@ -46,6 +46,12 @@ export type PopTotals = {
   /** Taps where neither brand opened. */
   fail: number;
   prevFail: number;
+  /** First play taps entitled to a popunder attempt (tap_e). */
+  tap: number;
+  prevTap: number;
+  /** First play taps on a video already at its per-video cap (tap_r). */
+  revisit: number;
+  prevRevisit: number;
 };
 
 /** The three outcomes shown in /pemilik: TrafficStars opened, ExoClick fallback opened, both failed. */
