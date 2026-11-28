@@ -2,11 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   EXO_FALLBACK_ZONES,
-  EXO_ZONE_1,
-  EXO_ZONE_2,
+  EXO_ZONES,
   GRID_SLOTS,
-  TS_SPOT_1,
-  TS_SPOT_2,
   MAX_GRID_ADS,
   adPositions,
   fallbackZone,
@@ -79,16 +76,15 @@ test("full pages keep the usual positions (phone after every 4th video, laptop a
   }
 });
 
-test("ExoClick zones (primary + fallback) are unique; TrafficStars spots may be reused", () => {
+test("every live slot is a unique ExoClick zone; no TrafficStars banners", () => {
   for (const n of COUNTS) {
     const cells = planGrid(n, true);
     for (const bp of BPS) {
       const list = ads(cells, bp);
-      const exo = list.filter((c) => c.slot.network === "exoclick").map((c) => c.slot.zoneId);
+      assert.ok(list.every((c) => c.slot.network === "exoclick"), `${bp} n=${n}`);
+      const exo = list.map((c) => c.slot.zoneId);
       assert.equal(new Set(exo).size, exo.length, `${bp} n=${n}`);
-      const ts = list.filter((c) => c.slot.network === "trafficstars").map((c) => c.slot.zoneId);
-      assert.ok(ts.every((id) => id === TS_SPOT_1 || id === TS_SPOT_2));
-      assert.equal(new Set(ts).size, 2);
+      assert.equal(exo.length, 6);
     }
     const keys = ads(cells).map((c) => c.key);
     assert.equal(new Set(keys).size, keys.length);
@@ -98,39 +94,39 @@ test("ExoClick zones (primary + fallback) are unique; TrafficStars spots may be 
     ...Object.values(EXO_FALLBACK_ZONES),
   ].filter(Boolean);
   assert.equal(new Set(exoAll).size, exoAll.length);
-  const tsAll = GRID_SLOTS.filter((s) => s.network === "trafficstars").map((s) => s.zoneId);
-  assert.ok(tsAll.every((id) => id === TS_SPOT_1 || id === TS_SPOT_2));
-  assert.equal(new Set(tsAll).size, 2);
+  assert.equal(GRID_SLOTS.filter((s) => s.network === "trafficstars").length, 0);
+  // old TS banner spots and the unused TS-slot fallback zones must not be wired
+  const wired = new Set([...exoAll, ...EXO_ZONES]);
+  for (const id of ["b027eda668f044c2a0e1a331d59cb3d3", "68654e89b8b14322bcc946c618f13e4c", "6111374", "6111376"]) {
+    assert.equal(wired.has(id), false, id);
+  }
 });
 
-test("real config: 4 ExoClick + 2 TrafficStars, ExoClick slots first and in the planned order", () => {
+test("real config: 6 distinct ExoClick 300x250 zones in the planned order", () => {
   const expected = [
     [0, "exoclick", "6053864"],
     [1, "exoclick", "6111252"],
-    [2, "trafficstars", "b027eda668f044c2a0e1a331d59cb3d3"],
+    [2, "exoclick", "6056216"],
     [3, "exoclick", "6111370"],
-    [4, "trafficstars", "68654e89b8b14322bcc946c618f13e4c"],
+    [4, "exoclick", "6056218"],
     [5, "exoclick", "6111372"],
   ];
   for (const bp of BPS) {
     assert.deepEqual(ads(planGrid(30, true), bp).map((c) => [c.slotIndex, c.slot.network, c.slot.zoneId]), expected);
   }
-  assert.equal(GRID_SLOTS.filter((s) => s.network === "exoclick").length, 4);
-  assert.equal(GRID_SLOTS.filter((s) => s.network === "trafficstars").length, 2);
+  assert.equal(GRID_SLOTS.filter((s) => s.network === "exoclick").length, 6);
+  assert.equal(GRID_SLOTS.filter((s) => s.network === "trafficstars").length, 0);
+  assert.deepEqual(EXO_ZONES, expected.map(([, , id]) => id));
 });
 
-test("ExoClick fallback: only for TS slots, never an ExoClick slot, '' means none yet", () => {
+test("ExoClick fallback: only for non-ExoClick slots, never an ExoClick slot, '' means none", () => {
   const fb = { 2: "x2", 4: "x4" };
   for (const i of [0, 1, 3, 5]) assert.equal(fallbackZone(i, FULL, fb), null, `slot ${i} is ExoClick`);
   assert.deepEqual([2, 4].map((i) => fallbackZone(i, FULL, fb)), ["x2", "x4"]);
   assert.equal(fallbackZone(2, FULL, { 2: "" }), null);
-  assert.deepEqual(Object.keys(EXO_FALLBACK_ZONES).map(Number), [2, 4], "real fallbacks sit on the two TrafficStars slots");
-  assert.deepEqual(EXO_FALLBACK_ZONES, { 2: "6111374", 4: "6111376" });
-  // no zone repeats on a page, even after both TS slots swap to their fallback
-  const primaries = GRID_SLOTS.filter((s) => s.network === "exoclick").map((s) => s.zoneId);
-  const all = [...primaries, ...Object.values(EXO_FALLBACK_ZONES)];
-  assert.equal(new Set(all).size, all.length);
-  assert.equal(all.length, 6);
+  // live config: all six slots are already ExoClick, so no fallback is wired
+  assert.deepEqual(EXO_FALLBACK_ZONES, {});
+  for (let i = 0; i < 6; i++) assert.equal(fallbackZone(i), null, `live slot ${i}`);
 });
 
 test("a slot without a zone ID renders nothing and never borrows another zone", () => {
