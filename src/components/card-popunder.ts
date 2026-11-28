@@ -4,14 +4,12 @@
 // clicks never fire a popunder.
 // In-video taps keep the per-video cap below: each of the last 50 videos keeps its own count for
 // 24h (localStorage, src/lib/pop-memory.ts), so going back to an earlier video does not reset it.
-// Non-Videy player taps share one daily counter. Blocked tabs consume no slot.
-// Videy player taps use the per-video allowance only (independent of the daily cap).
+// There is no daily cap: only the per-video allowance and the minimum gap apply. Blocked tabs consume no slot.
 // Counters: pop_fire / pop_ok / pop_block in player-log (once per video+event per session).
 // Each open is also logged by its position for that video (pop_n1..pop_n6, one D1
 // upsert per opened tab, same beacon as today), so /pemilik can compare ALL our opens with
 // TrafficStars' paid impressions instead of only the first tab per video.
 import { sendPlayerLog, type PlayerLogHost } from "@/lib/player-log-client";
-import { nextPagePop, pagePopAllowed, type PagePopDay } from "@/lib/page-pop-cap";
 import { parsePopMemory, popEntry, prunePopMemory, recordPop, type PopEntry } from "@/lib/pop-memory";
 
 const DIRECT_LINK = "https://fozekikikiminu.com/api/v1/direct/587547ff73c844b39ab9f02d1285154b";
@@ -21,7 +19,7 @@ const HOSTS = new Set(["IndoAV", "UserBokep", "Streamtape", "Putarin", "Videy", 
 export const POP_MAX_OTHER = 1;
 /** Minimum time between two Videy popunders on the SAME video (a newly opened video may pop at once). */
 export const POP_MIN_GAP_MS = 5_000;
-/** Videy popunder cap per video (independent of the shared daily cap). Pop #1 on the
+/** Videy popunder cap per video. Pop #1 on the
  * first play/start tap; pops #2 and #3 on later player-control taps (play/resume, seek,
  * speed) after this gap. */
 export const POP_MAX_VIDEY = 3;
@@ -52,10 +50,9 @@ function writeMemory(list: PopEntry[]): void {
   }
 }
 
-/** Checks the daily allowance, per-video allowance, and minimum gap. */
-export function canPop(videoId: string, max: number, daily = true): boolean {
+/** Checks the per-video allowance and the minimum gap. */
+export function canPop(videoId: string, max: number): boolean {
   if (typeof window === "undefined" || !videoId) return false;
-  if (daily && !pagePopAllowed(readPagePop(), Date.now())) return false;
   const now = Date.now();
   const e = popEntry(readMemory(now), videoId, now);
   if (!e) return true; // this video has not popped yet (or its entry expired): no gap
@@ -77,9 +74,8 @@ export function firePop(
   videoId: string,
   max: number,
   host?: PlayerLogHost,
-  daily = true,
 ): "ok" | "block" | "skip" {
-  if (!canPop(videoId, max, daily)) return "skip";
+  if (!canPop(videoId, max)) return "skip";
   let w: Window | null = null;
   try {
     w = window.open(DIRECT_LINK, "_blank");
@@ -92,8 +88,6 @@ export function firePop(
   const list = recordPop(readMemory(now), videoId, now);
   writeMemory(list);
   const n = popEntry(list, videoId, now)?.n ?? 1;
-  // Daily-capped triggers consume one slot of the shared Jakarta-day counter.
-  if (daily) writePagePop(nextPagePop(readPagePop(), Date.now()));
   if (host && n >= 1 && n <= 6) {
     sendPlayerLog(videoId, host, `pop_n${n}` as "pop_n1" | "pop_n2" | "pop_n3" | "pop_n4" | "pop_n5" | "pop_n6");
   }
@@ -102,50 +96,4 @@ export function firePop(
 
 export function popHost(h: string): PlayerLogHost {
   return (HOSTS.has(h) ? h : "Lainnya") as PlayerLogHost;
-}
-
-const PAGE_POP_KEY = "kdp_page_pop_day";
-
-function parsePagePop(raw: string | null): PagePopDay | null {
-  if (!raw) return null;
-  try {
-    const v = JSON.parse(raw) as PagePopDay;
-    if (v && typeof v.day === "string" && typeof v.n === "number" && v.n >= 0) return { day: v.day, n: v.n };
-  } catch {
-    /* cookie uses day.n */
-  }
-  const m = /^(\d{4}-\d{2}-\d{2})\.(\d+)$/.exec(raw);
-  return m ? { day: m[1], n: Number(m[2]) } : null;
-}
-
-/** localStorage, with a cookie copy so the same browser still counts if storage throws. */
-function readPagePop(): PagePopDay | null {
-  let stored: PagePopDay | null = null;
-  let cookie: PagePopDay | null = null;
-  try {
-    stored = parsePagePop(localStorage.getItem(PAGE_POP_KEY));
-  } catch {
-    /* private mode */
-  }
-  try {
-    const row = document.cookie.split("; ").find((part) => part.startsWith(`${PAGE_POP_KEY}=`));
-    if (row) cookie = parsePagePop(decodeURIComponent(row.slice(PAGE_POP_KEY.length + 1)));
-  } catch {
-    /* ignore */
-  }
-  if (stored && cookie && stored.day === cookie.day) return stored.n >= cookie.n ? stored : cookie;
-  return stored || cookie;
-}
-
-function writePagePop(state: PagePopDay): void {
-  try {
-    localStorage.setItem(PAGE_POP_KEY, JSON.stringify(state));
-  } catch {
-    /* cookie still records it */
-  }
-  try {
-    document.cookie = `${PAGE_POP_KEY}=${encodeURIComponent(`${state.day}.${state.n}`)}; Max-Age=172800; Path=/; SameSite=Lax`;
-  } catch {
-    /* in-memory only for this hit; the next successful write catches up */
-  }
 }

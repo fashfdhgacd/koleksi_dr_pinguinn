@@ -1,11 +1,9 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { PAGE_POP_MAX_PER_DAY } from "../page-pop-cap.ts";
 import {
   CONFIG_URL,
   CATALOG_BLOCK_KEY,
-  PAGE_POPUNDER_MAX_PER_DAY,
   TRAFFICSTARS_SITE_ID,
   VIDEY_SKIP_POPUNDER_MAX_PER_VIDEO,
   defaultState,
@@ -22,9 +20,7 @@ import { triggerSatelliteSync } from "./sync.ts";
 test("ad caps match the main site", () => {
   const popunder = readFileSync(new URL("../../components/card-popunder.ts", import.meta.url), "utf8");
   const videyCap = Number(popunder.match(/export const POP_MAX_VIDEY = (\d+)/)?.[1]);
-  assert.equal(PAGE_POPUNDER_MAX_PER_DAY, PAGE_POP_MAX_PER_DAY);
   assert.equal(VIDEY_SKIP_POPUNDER_MAX_PER_VIDEO, videyCap);
-  assert.equal(PAGE_POPUNDER_MAX_PER_DAY, 6);
   assert.equal(VIDEY_SKIP_POPUNDER_MAX_PER_VIDEO, 3);
 });
 
@@ -37,7 +33,7 @@ test("public config shape for an empty save", () => {
   assert.deepEqual(pub.blockedIds, ["aaa111", "bbb222"]);
   assert.equal(pub.rules.catalogBlockKey, CATALOG_BLOCK_KEY);
   assert.equal(pub.rules.catalogBlockAppliesEverywhere, true);
-  assert.equal(pub.rules.pagePopunderMaxPerVisitorPerDay, 6);
+  assert.equal("pagePopunderMaxPerVisitorPerDay" in pub.rules, false, "no daily popunder cap any more");
   assert.equal(pub.rules.videySkipPopunderMaxPerVideo, 3);
   assert.equal(pub.rules.neverOnIndoav, true);
   assert.deepEqual(
