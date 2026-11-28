@@ -3,10 +3,8 @@
 // ExoClick flagged zone 6053864 (27 Nov 2026, "low traffic uniqueness") because that one 300x250 zone
 // was repeated 6-7 times on every catalog page. Rules now:
 // - At most MAX_GRID_ADS (6) ad slots per page per breakpoint, slotIndex 0..5 in order.
-// - Mix: 4 ExoClick + 2 TrafficStars (slots 0,1,3,5 ExoClick; 2,4 TrafficStars).
-// - Every ExoClick zone (primary + fallback) is unique on a page. Only two TrafficStars
-//   banner spots exist in the repo, so those two are reused across the four TS slots
-//   (adjacent TS slots always get different spots). Do not invent zone IDs.
+// - All six slots are distinct ExoClick 300x250 banners (site 1115596). No TrafficStars banners,
+//   no In-Page Push, no repeated zone IDs. Do not invent zone IDs.
 // - A slot without a zone ID renders nothing (no placeholder, no video displaced) and never falls back to
 //   another slot's or another network's zone.
 // - No refresh / rotation anywhere: each slot loads once when it nears the viewport.
@@ -18,32 +16,31 @@ export type AdNetwork = "exoclick" | "trafficstars";
 export type GridSlot = { network: AdNetwork; zoneId: string };
 export type Breakpoint = "mobile" | "desktop";
 
-/** ExoClick 300x250 zones (site 1115596). Four distinct zones, one per ExoClick slot (3 and 4 created 27 Nov 2026). */
+/** ExoClick 300x250 zones (site 1115596). Six distinct zones, one per grid slot.
+ * EXO_ZONE_5/6 fill the two former TrafficStars banner slots. They were unused active
+ * Banner 300x250 zones; 6111374/6111376 stay unused because they were the old TS-slot fallbacks. */
 export const EXO_ZONE_1 = "6053864";
 export const EXO_ZONE_2 = "6111252";
 export const EXO_ZONE_3 = "6111370";
 export const EXO_ZONE_4 = "6111372";
-/** TrafficStars 300x250 spots (data-ts-spot codes, created 27 Nov 2026), SDK on gajukogyxywahu.com. */
-export const TS_SPOT_1 = "b027eda668f044c2a0e1a331d59cb3d3";
-export const TS_SPOT_2 = "68654e89b8b14322bcc946c618f13e4c";
+export const EXO_ZONE_5 = "6056216";
+export const EXO_ZONE_6 = "6056218";
 export const MAX_GRID_ADS = 6;
 
 /** Slot config by slotIndex. */
 export const GRID_SLOTS: readonly GridSlot[] = [
   { network: "exoclick", zoneId: EXO_ZONE_1 },
   { network: "exoclick", zoneId: EXO_ZONE_2 },
-  { network: "trafficstars", zoneId: TS_SPOT_1 },
+  { network: "exoclick", zoneId: EXO_ZONE_5 },
   { network: "exoclick", zoneId: EXO_ZONE_3 },
-  { network: "trafficstars", zoneId: TS_SPOT_2 },
+  { network: "exoclick", zoneId: EXO_ZONE_6 },
   { network: "exoclick", zoneId: EXO_ZONE_4 },
 ];
 
-/** ExoClick 300x250 fallback zone per non-ExoClick slotIndex: when that slot's TrafficStars ad is
- * still unfilled after the fill timeout, the cell is swapped ONCE to this ExoClick zone (never back, no
- * refresh). Every fallback zone must differ from each other and from EXO_ZONE_1/2, so no ExoClick zone repeats on a
- * page. "" = none: the cell then keeps its (empty) frame, it never disappears. Zones created 27 Nov 2026
- * on site 1115596. */
-export const EXO_FALLBACK_ZONES: Readonly<Record<number, string>> = { 2: "6111374", 4: "6111376" };
+/** ExoClick 300x250 fallback zone per non-ExoClick slotIndex. Empty: every live slot is already
+ * ExoClick, so nothing swaps. Kept so a future non-ExoClick slot can wire a distinct fallback
+ * without inventing a zone. "" = none. */
+export const EXO_FALLBACK_ZONES: Readonly<Record<number, string>> = {};
 
 /** ExoClick fallback zone for a slot, or null (no fallback configured / slot is already ExoClick). */
 export function fallbackZone(
@@ -97,8 +94,7 @@ export function adPositions(videoCount: number, bp: Breakpoint, max = MAX_GRID_A
 /** Cell order for a catalog grid. Every page gets exactly MAX_GRID_ADS ad cells per breakpoint (slotIndex
  * 0..5, all configured), ad cells carry stable keys (`ad-mobile-N` / `ad-desktop-N`, no re-request on
  * re-render), and trailing videos are hidden per breakpoint so the visible cell count is a multiple of the
- * columns: every row is full, no holes (except a last page of only 1-2 videos, which keeps them). Ad cells never disappear (unfilled TS swap to an ExoClick
- * fallback zone, see EXO_FALLBACK_ZONES), so this count holds after load too. */
+ * columns: every row is full, no holes (except a last page of only 1-2 videos, which keeps them). Ad cells never disappear, so this count holds after load too. */
 export function planGrid(
   videoCount: number,
   showAds: boolean,

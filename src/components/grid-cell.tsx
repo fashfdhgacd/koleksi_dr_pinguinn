@@ -1,4 +1,4 @@
-// Catalog grid ad cards (ExoClick 300x250 + TrafficStars 300x250), one per slot from src/lib/grid-ads.ts.
+// Catalog grid ad cards (ExoClick 300x250), one per slot from src/lib/grid-ads.ts.
 // - Same shell as a video card (16:10 box, "iklan" / "sponsor" where the title goes).
 // - The 300x250 banner is centred in the box; when the card is narrower it is scaled down to fit.
 // - Server + client render identical markup (hydration safe); the zone is only attached on the client.
@@ -43,18 +43,6 @@ export function useFitScale(ref: React.RefObject<HTMLDivElement | null>) {
     return () => ro.disconnect();
   }, [ref]);
   return scale;
-}
-
-/** Fill timeout for TrafficStars grid ads: still empty after this -> onEmpty (ExoClick fallback swap). */
-export const FILL_TIMEOUT_MS = 8000;
-
-/** Calls the latest `onEmpty` once when `empty` turns true. */
-export function useReportEmpty(empty: boolean, onEmpty?: () => void) {
-  const cb = useRef(onEmpty);
-  cb.current = onEmpty;
-  useEffect(() => {
-    if (empty) cb.current?.();
-  }, [empty]);
 }
 
 /** Runs `load` once, the first time `el` comes within 400px of the viewport. */
