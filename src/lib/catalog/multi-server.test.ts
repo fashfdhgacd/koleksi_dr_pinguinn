@@ -4,10 +4,12 @@ import {
   applyManualMerges,
   borrowedPosters,
   borrowedTitles,
+  mergeKeyOf,
   mergeServers,
   multiServerFrom,
   serverHostOf,
 } from "./multi-server.ts";
+import { seriesIndex } from "./series.ts";
 
 const T = "Mahasiswi Cantik Main Di Kos Sampai Pagi";
 const indo = (id: string, extra: Record<string, unknown> = {}) => ({
@@ -59,13 +61,14 @@ describe("mergeServers", () => {
     assert.deepEqual(r.groups[0].ids, ["t-b", "by-a"]);
   });
 
-  it("never merges Videy; a short title needs the same known duration on every copy", () => {
+  it("never merges Videy; a short title on one host needs the same known duration", () => {
     const videy = { id: "v1", title: T, embed: "https://videy.co/e/v1" };
     assert.equal(mergeServers([videy, tape("t1")]).groups.length, 0);
-    assert.equal(
-      mergeServers([tape("s1", { title: "Cewek Kos" }), indo("s2", { title: "Cewek Kos" })]).groups
-        .length,
-      0,
+    // Two hosts, same short title, no duration: a multi-host upload of one video.
+    const hosts = mergeServers([tape("s1", { title: "Cewek Kos" }), indo("s2", { title: "Cewek Kos" })]);
+    assert.deepEqual(
+      hosts.groups.map((g) => g.ids),
+      [["s2", "s1"]],
     );
     const short = mergeServers([
       indo("m1", { title: "Mantanmu Idamanku", duration: 801 }),
@@ -384,5 +387,124 @@ describe("mergeServers with MXDrop file-name titles", () => {
     ]);
     assert.equal(r.groups.length, 1);
     assert.deepEqual(r.groups[0].hosts, ["LuluStream", "DoodStream", "MXDrop"]);
+  });
+});
+
+const lulu = (id: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  source: "LuluStream",
+  embed: `https://lplaygo.com/e/${id}`,
+  ...extra,
+});
+const mxdrop = (id: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  source: "MXDrop",
+  embed: `https://mxdrop.sx/e/${id}`,
+  ...extra,
+});
+const vidara = (id: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  source: "Vidara",
+  embed: `https://vidara.to/e/${id}`,
+  ...extra,
+});
+
+describe("mergeServers: short series and multi-host titles", () => {
+  const suffix = " - koleksidrpinguin.com";
+
+  it("treats a compact Episode title as a series key, not a short title", () => {
+    const a = mergeKeyOf({
+      id: "lu-1",
+      title: `Bai Jie Episode 1${suffix}`,
+      source: "LuluStream",
+      embed: "https://lplaygo.com/e/1",
+    });
+    const b = mergeKeyOf({
+      id: "by-1",
+      title: `Bai Jie Episode 1${suffix}`,
+      source: "Byse",
+      embed: "https://bysejikuar.com/e/1",
+    });
+    assert.equal(a.why, "series");
+    assert.equal(a.key, b.key);
+    assert.equal(a.key, "m:baijie#1.0");
+    assert.notEqual(
+      a.key,
+      mergeKeyOf({
+        id: "lu-2",
+        title: `Bai Jie Episode 2${suffix}`,
+        source: "LuluStream",
+        embed: "https://lplaygo.com/e/2",
+      }).key,
+    );
+  });
+
+  it("folds every host copy of one short episode into a single page, and keeps other episodes apart", () => {
+    const items = [];
+    for (const ep of [1, 2]) {
+      const title = `Bai Jie Episode ${ep}${suffix}`;
+      items.push(
+        byse(`by-${ep}`, { title, date: "2026-11-27" }),
+        mxdrop(`mx-${ep}`, { title, date: "2026-11-27" }),
+        lulu(`lu-${ep}`, { title, date: "2026-11-27" }),
+        vidara(`vd-${ep}`, { title, date: "2026-11-27" }),
+      );
+    }
+    const r = mergeServers(items);
+    assert.equal(r.groups.length, 2);
+    const byMain = new Map(r.groups.map((g) => [g.main, g]));
+    // Oldest copy is main; Lulu ranks before MXDrop/Vidara/Byse when dates are equal.
+    const ep1 = [...byMain.values()].find((g) => g.ids.includes("lu-1"));
+    const ep2 = [...byMain.values()].find((g) => g.ids.includes("lu-2"));
+    assert.ok(ep1 && ep2);
+    assert.equal(ep1.ids.length, 4);
+    assert.equal(ep2.ids.length, 4);
+    assert.deepEqual(new Set(ep1.hosts).size, 4);
+    assert.ok(ep1.hosts.includes("LuluStream"));
+    assert.ok(ep1.hosts.includes("Byse"));
+    assert.ok(ep1.hosts.includes("MXDrop"));
+    assert.ok(ep1.hosts.includes("Vidara"));
+    assert.equal(new Set([...ep1.ids, ...ep2.ids]).size, 8);
+  });
+
+  it("folds a 40-episode short series into 40 pages, then seriesIndex lists episodes 1-40 in order", () => {
+    const items = [];
+    for (let ep = 1; ep <= 40; ep++) {
+      const title = `Bai Jie Episode ${ep}${suffix}`;
+      items.push(
+        byse(`by-${ep}`, { title, date: "2026-11-27", category: "ai-plus" }),
+        mxdrop(`mx-${ep}`, { title, date: "2026-11-27", category: "ai-plus" }),
+        lulu(`lu-${ep}`, { title, date: "2026-11-27", category: "ai-plus" }),
+        vidara(`vd-${ep}`, { title, date: "2026-11-27", category: "ai-plus" }),
+      );
+    }
+    const r = mergeServers(items);
+    assert.equal(r.groups.length, 40);
+    assert.equal(r.blocked.length, 0);
+    const mains = r.groups.map((g) => ({ id: g.main, title: items.find((it) => it.id === g.main)?.title }));
+    const idx = seriesIndex(mains);
+    const key = idx.byId.get("lu-1") || idx.byId.get(r.groups.find((g) => g.ids.includes("lu-1"))?.main || "");
+    assert.ok(key);
+    const ids = idx.groups.get(key) || [];
+    assert.equal(ids.length, 40);
+    const eps = ids.map((id) => Number(/Episode (\d+)/.exec(mains.find((m) => m.id === id)?.title || "")?.[1]));
+    assert.deepEqual(eps, Array.from({ length: 40 }, (_, i) => i + 1));
+  });
+
+  it("joins a short non-episode title across hosts without duration, and leaves same-host copies apart", () => {
+    const title = `Enak Gak Sayang${suffix}`;
+    const multi = mergeServers([
+      vidara("vd-a", { title, date: "2026-11-01" }),
+      lulu("lu-a", { title, date: "2026-11-01" }),
+      byse("by-a", { title, date: "2026-11-01" }),
+    ]);
+    assert.equal(multi.groups.length, 1);
+    assert.equal(multi.groups[0].ids.length, 3);
+    const same = mergeServers([
+      lulu("lu-1", { title: "Anime Hentai (7)" + suffix, date: "2026-10-27" }),
+      lulu("lu-2", { title: "Anime Hentai (7)" + suffix, date: "2026-10-27" }),
+    ]);
+    assert.equal(same.groups.length, 0);
+    assert.equal(same.blocked[0].why, "short-no-duration");
   });
 });
