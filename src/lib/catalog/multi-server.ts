@@ -13,10 +13,13 @@
  *  - title cleaned (cleanUploadTitle, NFKC, site suffix and quality/sub tail tags removed), then
  *    compared as lower-case letters and digits only;
  *  - never merged: Videy, generic / auto titles, numbered brand titles ("Koleksi Dr Pinguin 12");
- *  - short titles (under 16 chars or 3 words, 6 chars for CJK) merge only when every copy has the
- *    same known duration ("Mantanmu Idamanku", 801 s twice); "Anime Hentai (7)" twice with no
- *    duration stays apart (two different files, Oct 30 2026 check);
- *  - series titles keep the episode in the key, so Ep 2 only merges with Ep 2;
+ *  - series titles with an explicit episode marker (Episode/Eps/Part/…) use a series+episode key
+ *    even when the compact title is short, so "Bai Jie Episode 1" (14 letters+digits) still merges
+ *    with its other host copies and Ep 2 only merges with Ep 2;
+ *  - other short titles (under 16 chars or 3 words, 6 chars for CJK) merge when every copy has the
+ *    same known duration ("Mantanmu Idamanku", 801 s twice), or when the copies are on 2+ distinct
+ *    hosts (a multi-host upload without duration). Same-host short titles with no shared duration
+ *    stay apart ("Anime Hentai (7)" twice on Lulu, two different files, Oct 30 2026 check);
  *  - copies also meet on the whole title as letters and digits ("[Ailin] … Bab 1 (Kisah …)" =
  *    "Ailin … Bab 1 Kisah …"), with a boundary kept between separate numbers so "1 - 2" / "1 2" never
  *    equals "12"; a group whose copies still read as different episodes is left alone;
@@ -144,6 +147,12 @@ export function mergeKeyOf(it: ServerItem): {
   if (isGenericTitle(it.title, it) || it.titleAuto) return { key: null, why: "generic" };
   const clean = cleanTitle(it.title);
   if (NUMBERED_BRAND.test(clean)) return { key: null, why: "numbered-brand" };
+  // Explicit episode markers first: the short-title gate used to run before parseSeries, so a
+  // compact series title ("Bai Jie Episode 1", 14 letters+digits) never got a series key and each
+  // host copy stayed on its own page. Trailing-number titles ("Anime Hentai (7)") stay on the short
+  // path so two same-host copies with no duration still do not merge.
+  const s = parseSeries(stripStrayCom(it.title));
+  if (s?.key.startsWith("m:")) return { key: `${s.key}#${s.ep}.${s.sub}`, why: "series" };
   const lower = clean.toLowerCase();
   const k = lower.replace(/[^\p{L}\p{N}]+/gu, "");
   const words = lower
@@ -152,10 +161,10 @@ export function mergeKeyOf(it: ServerItem): {
     .split(" ")
     .filter(Boolean);
   const cjk = CJK.test(k);
-  // Short titles are too common to trust alone: their group also needs one known duration (mergeServers).
+  // Short titles are too common to trust alone on one host: their group also needs one known
+  // duration, unless the copies are on 2+ distinct hosts (mergeServers).
   if ((!cjk && (k.length < 16 || words.length < 3)) || (cjk && k.length < 6))
     return { key: `s:${flatKey(lower)}`, why: "short" };
-  const s = parseSeries(stripStrayCom(it.title));
   return s
     ? { key: `${s.key}#${s.ep}.${s.sub}`, why: "series" }
     : { key: `x:${flatKey(lower)}`, why: "title" };
@@ -292,10 +301,14 @@ export function mergeServers(items: readonly ServerItem[]): MergeResult {
       continue;
     }
     const ds = all.map((x) => durationOf(x.it));
-    // A short title alone is not enough: every copy needs the same known duration.
+    // A short title on one host is not enough without a shared known duration ("Anime Hentai (7)"
+    // twice on Lulu). The same short title on 2+ distinct hosts is a multi-host upload of one video,
+    // so it still merges when duration is unknown. Known duration conflicts are checked below.
     if (all.some((x) => isShort(x.key)) && !(ds.every((d) => d > 0) && new Set(ds).size === 1)) {
-      blocked.push({ key, ids, why: "short-no-duration" });
-      continue;
+      if (new Set(all.map((x) => x.host)).size < 2) {
+        blocked.push({ key, ids, why: "short-no-duration" });
+        continue;
+      }
     }
     // Same host twice: those copies are one file, so their known durations must be equal.
     const perHost = new Map<string, Set<number>>();
